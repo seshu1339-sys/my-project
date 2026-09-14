@@ -35,6 +35,16 @@ firebase.cmd deploy --only hosting --project e-commerce-app-a3897
 
 Cloud Functions and Storage require suitable billing/service configuration. Enable Authentication's Phone provider, SMS regions and authorized web domains. Android requires signing SHA fingerprints; iOS requires APNs and phone-auth callback configuration. Verify actual SMS sign-in on configured devices before launch. Firebase client keys identify the application; never place service-account, signing or payment secrets in Flutter.
 
+For the current project, Phone authentication and India SMS delivery are configured. Billing remains disabled. The setup helper uses the already signed-in Firebase CLI without exporting credentials:
+
+```powershell
+node scripts/firebase-setup.cjs inspect
+# After the project owner completes Blaze billing setup:
+node scripts/firebase-setup.cjs create-storage
+```
+
+Storage creation uses `asia-south1`, matching the existing database. This helper uses the installed Firebase CLI internals (validated with CLI 15.30.0); on another machine set `FIREBASE_TOOLS_LIB` to its `firebase-tools/lib` directory. It does not enable billing or submit payment information.
+
 ### Administrator
 
 Sign in to the intended owner's account using SMS, then grant that existing Auth UID the admin claim from a trusted environment with Application Default Credentials:

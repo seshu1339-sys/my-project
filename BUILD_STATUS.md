@@ -24,12 +24,14 @@ Project: `e-commerce-app-a3897`.
 - Registered local Android debug SHA-1 and SHA-256 fingerprints.
 - Deployed tested Firestore rules and indexes.
 - Enabled the Storage API during deployment preparation; no Storage bucket exists yet.
+- Rechecked project setup: Phone authentication is enabled and web/localhost domains are authorized. Enabled India (`IN`) in the previously empty SMS region allowlist and verified the result.
+- Added a credential-safe Firebase inspection/setup helper using the signed-in CLI; it can create the default Storage bucket in Mumbai after billing is enabled.
 
 ## External actions still needed
 
 1. Complete Blaze billing setup at https://console.firebase.google.com/project/e-commerce-app-a3897/usage/details. Cloud Functions deployment was rejected because the current plan cannot enable Cloud Build/Artifact Registry.
-2. Initialize Storage at https://console.firebase.google.com/project/e-commerce-app-a3897/storage, then deploy Storage rules and Functions.
-3. Enable Phone authentication/SMS regions, identify the owner's mobile number, verify that number, and grant the corresponding Auth UID the admin custom claim.
+2. After billing is enabled, run the prepared Storage creation step and deploy Storage rules and Functions. The latest deployment retry confirmed that the bucket is still absent.
+3. Identify the owner's mobile number, verify that number, and grant the corresponding Auth UID the admin custom claim. Phone authentication and the India SMS region are configured; real SMS verification is not yet tested.
 4. GitHub is connected at https://github.com/seshu1339-sys/my-project on branch `main`; authentication succeeded and the implementation has been pushed. A separate project-local repository keeps personal home-folder files outside version control.
 5. Complete iOS signing/APNs and release signing before store publication. Review APK uses debug signing.
 
