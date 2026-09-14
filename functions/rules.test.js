@@ -1,0 +1,31 @@
+const {test} = require('node:test');
+const {readFileSync} = require('node:fs');
+const {resolve} = require('node:path');
+const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
+const {doc, setDoc, getDoc, updateDoc, serverTimestamp} = require('firebase/firestore');
+test('Firestore denies escalation, PIN access and forged orders; isolates customer data', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+  const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
+  try {
+    const anonymous = env.unauthenticatedContext().firestore();
+    const alice = env.authenticatedContext('alice').firestore();
+    const bob = env.authenticatedContext('bob').firestore();
+    const admin = env.authenticatedContext('owner', {admin: true}).firestore();
+    await assertSucceeds(setDoc(doc(admin, 'products/p1'), {name: 'Test', active: true}));
+    await assertSucceeds(getDoc(doc(anonymous, 'products/p1')));
+    await assertFails(setDoc(doc(alice, 'products/p1'), {price: 1}));
+    await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
+    await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
+    await assertFails(getDoc(doc(bob, 'users/alice')));
+    await assertFails(getDoc(doc(admin, '_pins/alice')));
+    await assertFails(setDoc(doc(alice, 'orders/fake'), {userId: 'alice', total: 0}));
+    await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'orders/o1'), {userId: 'alice', total: 100, status: 'submitted'}));
+    await assertSucceeds(getDoc(doc(alice, 'orders/o1')));
+    await assertFails(getDoc(doc(bob, 'orders/o1')));
+    await assertFails(updateDoc(doc(admin, 'orders/o1'), {total: 1}));
+    await assertSucceeds(updateDoc(doc(admin, 'orders/o1'), {status: 'confirmed'}));
+    const review = {userId: 'alice', name: 'Alice', rating: 5, text: 'Great', updatedAt: serverTimestamp()};
+    await assertSucceeds(setDoc(doc(alice, 'products/p1/reviews/alice'), review));
+    await assertFails(setDoc(doc(bob, 'products/p1/reviews/alice'), review));
+    await assertFails(setDoc(doc(alice, 'products/p1/reviews/alice'), {...review, rating: 9}));
+  } finally { await env.cleanup(); }
+});

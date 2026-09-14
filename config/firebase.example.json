@@ -1,0 +1,9 @@
+{
+  "FIREBASE_PROJECT_ID": "your-project-id",
+  "FIREBASE_API_KEY": "your-client-api-key",
+  "FIREBASE_APP_ID": "platform-specific-app-id",
+  "FIREBASE_MESSAGING_SENDER_ID": "sender-id",
+  "FIREBASE_AUTH_DOMAIN": "your-project-id.firebaseapp.com",
+  "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app",
+  "FIREBASE_IOS_BUNDLE_ID": "com.example.ecommerceApp"
+}

@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function admin() { return signedIn() && request.auth.token.admin == true; }
+    match /{collection}/{id} {
+      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
+      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
+    }
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || admin());
+      allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['name']) && request.resource.data.name is string && request.resource.data.name.size() <= 100;
+    }
+    match /products/{productId}/reviews/{uid} {
+      allow read: if true;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['userId', 'name', 'rating', 'text', 'updatedAt'])
+        && request.resource.data.userId == uid
+        && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.name is string && request.resource.data.name.size() <= 100
+        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if admin() || (signedIn() && request.auth.uid == uid);
+    }
+    match /orders/{id} {
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+      allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['submitted', 'confirmed', 'fulfilled', 'cancelled'];
+    }
+    // PIN hashes, rate limits, and orders are created only by trusted functions.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
