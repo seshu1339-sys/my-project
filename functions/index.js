@@ -6,6 +6,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {createHash} = require('node:crypto');
 const {hashPin, verifyPin, quote} = require('./domain');
 initializeApp();
+Object.assign(exports, require('./notifications'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

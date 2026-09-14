@@ -11,6 +11,29 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == uid || admin());
       allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['name']) && request.resource.data.name is string && request.resource.data.name.size() <= 100;
     }
+    match /users/{uid}/pushTokens/{tokenId} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['token', 'updatedAt'])
+        && request.resource.data.token == tokenId && tokenId.size() <= 2048
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /notificationSubscribers/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /products/{productId}/viewers/{uid} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && exists(/databases/$(database)/documents/products/$(productId))
+        && request.resource.data.keys().hasOnly(['pincode', 'lastViewedAt'])
+        && request.resource.data.pincode is string
+        && request.resource.data.pincode.matches('^([0-9]{6})?$')
+        && request.resource.data.lastViewedAt == request.time;
+    }
     match /products/{productId}/reviews/{uid} {
       allow read: if true;
       allow create, update: if signedIn() && request.auth.uid == uid

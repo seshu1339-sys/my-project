@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data/store.dart';
 import 'ui/storefront.dart';
+import 'ui/details.dart';
+import 'domain/catalog.dart';
+
+final _navigator = GlobalKey<NavigatorState>();
+final _messenger = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,9 +44,65 @@ Future<void> main() async {
     );
     return;
   }
-  final store = Store(live: live);
+  final firestore = live ? FirebaseFirestore.instance : null;
+  final store = Store(live: live, database: firestore);
   await store.init();
   runApp(MarketApp(store: store));
+  if (live) {
+    FirebaseMessaging.onMessage.listen((message) {
+      final notification = message.notification;
+      if (notification != null) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(
+              '${notification.title ?? 'New alert'}: ${notification.body ?? ''}',
+            ),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () => _openAlert(store, message),
+            ),
+          ),
+        );
+      }
+    });
+    FirebaseMessaging.onMessageOpenedApp.listen(
+      (message) => _openAlert(store, message),
+    );
+    try {
+      final message = await FirebaseMessaging.instance.getInitialMessage();
+      if (message != null) {
+        await WidgetsBinding.instance.endOfFrame;
+        await _openAlert(store, message);
+      }
+    } catch (_) {
+      /* Unsupported messaging must not block the storefront. */
+    }
+  }
+}
+
+Future<void> _openAlert(Store store, RemoteMessage message) async {
+  final id = message.data['productId'];
+  if (id == null) {
+    _navigator.currentState?.popUntil((route) => route.isFirst);
+    return;
+  }
+  try {
+    final doc = await store.firestore.collection('products').doc(id).get();
+    if (doc.exists) {
+      _navigator.currentState?.push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              ProductPage(store: store, entry: Entry(doc.id, doc.data()!)),
+        ),
+      );
+    }
+  } catch (_) {
+    _messenger.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text('Could not open this item. Please try searching for it.'),
+      ),
+    );
+  }
 }
 
 class MarketApp extends StatelessWidget {
@@ -47,6 +110,8 @@ class MarketApp extends StatelessWidget {
   final Store store;
   @override
   Widget build(BuildContext context) => MaterialApp(
+    navigatorKey: _navigator,
+    scaffoldMessengerKey: _messenger,
     debugShowCheckedModeBanner: false,
     title: 'Neighbourly • Your local marketplace',
     theme: ThemeData(

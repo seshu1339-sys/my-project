@@ -16,6 +16,17 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
     await assertFails(getDoc(doc(bob, 'users/alice')));
+    const view = {pincode: '500001', lastViewedAt: serverTimestamp()};
+    await assertSucceeds(setDoc(doc(alice, 'products/p1/viewers/alice'), view));
+    await assertFails(setDoc(doc(bob, 'products/p1/viewers/alice'), view));
+    await assertFails(getDoc(doc(bob, 'products/p1/viewers/alice')));
+    await assertFails(setDoc(doc(alice, 'products/p1/viewers/alice'), {...view, pincode: 'bad'}));
+    await assertSucceeds(setDoc(doc(alice, 'users/alice/pushTokens/token'), {token: 'token', updatedAt: serverTimestamp()}));
+    await assertFails(getDoc(doc(bob, 'users/alice/pushTokens/token')));
+    await assertFails(setDoc(doc(alice, 'users/alice/pushTokens/token'), {token: 'other', updatedAt: serverTimestamp()}));
+    await assertSucceeds(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp()}));
+    await assertFails(setDoc(doc(bob, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp()}));
+    await assertFails(setDoc(doc(alice, '_notificationDeliveries/fake'), {sent: true}));
     await assertFails(getDoc(doc(admin, '_pins/alice')));
     await assertFails(setDoc(doc(alice, 'orders/fake'), {userId: 'alice', total: 0}));
     await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'orders/o1'), {userId: 'alice', total: 100, status: 'submitted'}));

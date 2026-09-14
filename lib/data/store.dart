@@ -10,10 +10,32 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../services/notifications.dart';
 
 class Store extends ChangeNotifier {
-  Store({this.live = false});
+  Store({this.live = false, this.database});
   final bool live;
+  final FirebaseFirestore? database;
+  FirebaseFirestore get firestore => database ?? FirebaseFirestore.instance;
+  late final notifications = CustomerNotifications(firestore);
+  Future<void> trackItemView(Entry entry) async {
+    final uid = user?.uid;
+    if (!live || uid == null) return;
+    try {
+      await firestore
+          .collection('products')
+          .doc(entry.id)
+          .collection('viewers')
+          .doc(uid)
+          .set({
+            'pincode': pincode,
+            'lastViewedAt': FieldValue.serverTimestamp(),
+          });
+    } catch (_) {
+      /* Analytics must never prevent browsing. */
+    }
+  }
+
   Map<String, List<Entry>> catalog = {};
   final Map<String, int> cart = {};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -67,12 +89,13 @@ class Store extends ChangeNotifier {
               u != null &&
               (await u.getIdTokenResult()).claims?['admin'] == true;
           profileName = u?.displayName ?? '';
+          await notifications.restore();
           notifyListeners();
         }),
       );
       for (final collection in collections) {
         _subscriptions.add(
-          FirebaseFirestore.instance
+          firestore
               .collection(collection)
               .snapshots()
               .listen(
@@ -97,10 +120,7 @@ class Store extends ChangeNotifier {
 
   Future<void> save(String collection, Entry entry) async {
     if (live) {
-      await FirebaseFirestore.instance
-          .collection(collection)
-          .doc(entry.id)
-          .set(entry.data);
+      await firestore.collection(collection).doc(entry.id).set(entry.data);
     } else {
       catalog.putIfAbsent(collection, () => []);
       catalog[collection]!.removeWhere((e) => e.id == entry.id);
@@ -208,7 +228,7 @@ class Store extends ChangeNotifier {
 
   Future<void> updateProfile(String name) async {
     await user!.updateDisplayName(name);
-    await FirebaseFirestore.instance.collection('users').doc(user!.uid).set({
+    await firestore.collection('users').doc(user!.uid).set({
       'name': name,
     }, SetOptions(merge: true));
     profileName = name;
@@ -216,6 +236,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    if (live) await notifications.disable();
     await FirebaseAuth.instance.signOut();
     cart.clear();
     notifyListeners();
@@ -246,6 +267,7 @@ class Store extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (live) notifications.dispose();
     for (final s in _subscriptions) {
       s.cancel();
     }

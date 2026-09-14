@@ -49,6 +49,10 @@ Use Node 22 / npm 10 for backend installation, matching Cloud Build. The lockfil
 
 All three Functions are deployed with owner-approved public HTTP invocation; handler-level PIN/SMS/authentication checks remain required. Live smoke checks pass for hosting and all three callable rejection guards. The runtime's self-signing permission is configured. If invocation IAM needs repair, the explicitly authorized operator command `node scripts/firebase-setup.cjs configure-invokers` preserves existing bindings and verifies access for only these three services. See `BUILD_STATUS.md` for remaining verification.
 
+### Customer alerts
+
+Signed-in item views and opt-in Firebase Messaging alerts are implemented. See [notification setup and delivery behavior](docs/notifications.md) for the web VAPID key, iOS APNs setup, scheduling and device verification.
+
 ### Administrator
 
 Sign in to the intended owner's account using SMS, then grant that existing Auth UID the admin claim from a trusted environment with Application Default Credentials:

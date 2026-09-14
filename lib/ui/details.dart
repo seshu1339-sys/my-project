@@ -9,10 +9,23 @@ import '../domain/catalog.dart';
 import 'shared.dart';
 import 'account.dart';
 
-class ProductPage extends StatelessWidget {
+class ProductPage extends StatefulWidget {
   const ProductPage({super.key, required this.store, required this.entry});
   final Store store;
   final Entry entry;
+  @override
+  State<ProductPage> createState() => _ProductPageState();
+}
+
+class _ProductPageState extends State<ProductPage> {
+  Store get store => widget.store;
+  Entry get entry => widget.entry;
+  @override
+  void initState() {
+    super.initState();
+    store.trackItemView(entry);
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: store,

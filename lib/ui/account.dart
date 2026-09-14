@@ -141,6 +141,35 @@ class _AccountPageState extends State<AccountPage> {
                   child: const Text('Log out'),
                 ),
                 const Divider(),
+                const Text(
+                  'Get price-drop alerts for items you view and new offer notifications. Your signed-in item views are saved privately to personalize these alerts.',
+                ),
+                OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          await widget.store.notifications.enable();
+                          if (context.mounted) {
+                            message(
+                              context,
+                              'Price-drop and offer alerts enabled',
+                            );
+                          }
+                        }),
+                  icon: const Icon(Icons.notifications_active_outlined),
+                  label: const Text('Enable alerts on this device'),
+                ),
+                TextButton(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          await widget.store.notifications.disable();
+                          if (context.mounted) {
+                            message(context, 'Alerts disabled');
+                          }
+                        }),
+                  child: const Text('Disable alerts for my account'),
+                ),
                 const Text('Your orders', style: TextStyle(fontSize: 22)),
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance

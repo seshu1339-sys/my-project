@@ -6,8 +6,8 @@ Customer storefront and admin studio implemented; see README for capabilities an
 
 - Flutter dependencies installed.
 - Flutter analysis: no issues.
-- Nine Flutter tests: pass, including mobile/desktop layout, search, cart and admin form editing.
-- Four backend domain tests: pass.
+- Ten Flutter tests: pass, including mobile/desktop layout, search, cart, admin form editing and once-per-visit item tracking.
+- Six backend domain tests: pass, including pincode-aware price-drop detection and offer schedules.
 - Firestore emulator security test: pass (role escalation, private data, forged orders, reviews and order ownership).
 - Backend callable module loads successfully.
 - npm dependency audit: zero vulnerabilities after updates and an npm-10-compatible UUID override. Clean npm 10 install and backend tests pass.
@@ -32,10 +32,13 @@ Project: `e-commerce-app-a3897`.
 - Enabled the signing API and granted the runtime service account token-signing permission on itself; verified the binding.
 - Redeployed all three Functions and applied the owner's approved public invocation permissions to their Cloud Run services, preserving existing IAM bindings.
 - Live smoke checks pass: exact hosted release, invalid PIN-login input rejection, and unauthenticated PIN-setting/order rejection.
+- Added private signed-in item views, customer opt-in alert controls and Firebase Messaging token registration/refresh. Updated ownership rules pass emulator tests and are deployed.
+- Deployed and verified `notifyPriceDrop` and `notifyNewOffers` as active in `asia-south1`; the offer schedule runs every 15 minutes and the FCM API is enabled. Retried the first Eventarc deployment after service-agent permissions propagated.
+- Published the updated web release and background push worker; built the updated Firebase-connected Android debug APK. See `docs/notifications.md` for delivery semantics and device setup.
 
 ## External actions still needed
 
-1. Deployment and public invocation are complete and verified. No further invocation approval is pending.
+1. Web push needs the public Web Push certificate (`FIREBASE_VAPID_KEY`) from Firebase Console, followed by a rebuild/deploy. The current website reports that missing configuration when alerts are enabled. Android push is ready for an opted-in device test; iOS still needs APNs and Xcode capabilities. No real-device push delivery has been verified.
 2. The owner number has been provided privately, but is not yet registered in Firebase Auth. Verify it by SMS, choose a PIN, then grant its Auth UID the admin claim. No owner phone number is stored in this repository.
 3. Real SMS verification, signed-in checkout and admin uploads still need end-to-end verification. Live negative Function checks pass.
 4. GitHub is connected at https://github.com/seshu1339-sys/my-project on branch `main`; authentication succeeded and the implementation has been pushed. A separate project-local repository keeps personal home-folder files outside version control.

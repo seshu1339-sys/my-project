@@ -16,7 +16,23 @@ const mode = process.argv[2] || 'inspect';
   const identity = new Client({urlPrefix: 'https://identitytoolkit.googleapis.com', auth: true});
   const storage = new Client({urlPrefix: 'https://firebasestorage.googleapis.com', auth: true});
   const configPath = `/admin/v2/projects/${project}/config`;
-  if (mode === 'configure-invokers') {
+  if (mode === 'inspect-notifications') {
+    const functions = new Client({urlPrefix: 'https://cloudfunctions.googleapis.com', auth: true});
+    for (const name of ['notifyPriceDrop', 'notifyNewOffers']) {
+      const result = (await functions.get(`/v2/projects/${project}/locations/asia-south1/functions/${name}`)).body;
+      console.log(`${name}: ${result.state}`);
+      if (result.state !== 'ACTIVE') throw Error(`${name} is not active`);
+    }
+    const scheduler = new Client({urlPrefix: 'https://cloudscheduler.googleapis.com', auth: true});
+    const job = (await scheduler.get(`/v1/projects/${project}/locations/asia-south1/jobs/firebase-schedule-notifyNewOffers-asia-south1`)).body;
+    console.log(`Offer schedule: ${job.state}, ${job.schedule}`);
+    if (job.state !== 'ENABLED') throw Error('Offer schedule is not enabled');
+    const services = new Client({urlPrefix: 'https://serviceusage.googleapis.com', auth: true});
+    const messaging = (await services.get(`/v1/projects/${project}/services/fcm.googleapis.com`)).body;
+    console.log(`FCM API: ${messaging.state}`);
+    if (messaging.state !== 'ENABLED') throw Error('Enable the Firebase Cloud Messaging API before delivery');
+    return;
+  } else if (mode === 'configure-invokers') {
     const run = require(path.join(cli, 'gcp/run'));
     for (const name of ['pinlogin', 'setpin', 'placeorder']) {
       const resource = `projects/${project}/locations/us-central1/services/${name}`;
