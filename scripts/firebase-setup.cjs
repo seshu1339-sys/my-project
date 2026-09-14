@@ -16,7 +16,24 @@ const mode = process.argv[2] || 'inspect';
   const identity = new Client({urlPrefix: 'https://identitytoolkit.googleapis.com', auth: true});
   const storage = new Client({urlPrefix: 'https://firebasestorage.googleapis.com', auth: true});
   const configPath = `/admin/v2/projects/${project}/config`;
-  if (mode === 'inspect-runtime' || mode === 'configure-runtime') {
+  if (mode === 'configure-invokers') {
+    const run = require(path.join(cli, 'gcp/run'));
+    for (const name of ['pinlogin', 'setpin', 'placeorder']) {
+      const resource = `projects/${project}/locations/us-central1/services/${name}`;
+      const policy = await run.getIamPolicy(resource);
+      policy.bindings ||= [];
+      let binding = policy.bindings.find(b => b.role === 'roles/run.invoker' && !b.condition);
+      if (!binding) { binding = {role: 'roles/run.invoker', members: []}; policy.bindings.push(binding); }
+      if (!binding.members.includes('allUsers')) {
+        binding.members.push('allUsers');
+        await run.setIamPolicy(resource, policy);
+      }
+      const verified = await run.getIamPolicy(resource);
+      if (!verified.bindings?.some(b => b.role === 'roles/run.invoker' && !b.condition && b.members?.includes('allUsers'))) throw Error(`Public invocation verification failed: ${name}`);
+      console.log(`${name}: approved public invocation verified`);
+    }
+    return;
+  } else if (mode === 'inspect-runtime' || mode === 'configure-runtime') {
     const functions = new Client({urlPrefix: 'https://cloudfunctions.googleapis.com', auth: true});
     const fn = (await functions.get(`/v2/projects/${project}/locations/us-central1/functions/pinLogin`)).body;
     const email = fn.serviceConfig?.serviceAccountEmail;

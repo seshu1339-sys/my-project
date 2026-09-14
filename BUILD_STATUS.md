@@ -30,12 +30,14 @@ Project: `e-commerce-app-a3897`.
 - Built the Firebase-connected Android debug APK.
 - All three Node 22 Functions (`pinLogin`, `setPin`, `placeOrder`) are deployed and active after repairing the npm lockfile.
 - Enabled the signing API and granted the runtime service account token-signing permission on itself; verified the binding.
+- Redeployed all three Functions and applied the owner's approved public invocation permissions to their Cloud Run services, preserving existing IAM bindings.
+- Live smoke checks pass: exact hosted release, invalid PIN-login input rejection, and unauthenticated PIN-setting/order rejection.
 
 ## External actions still needed
 
-1. Approve public HTTP invocation for the three Firebase callable endpoints. Cloud Run currently returns HTTP 403 before application authentication. The explicit `invoker: 'public'` patch is prepared and locally tested, but automatic approval review rejected deployment pending the owner's explicit approval for the internet-accessible boundary. PIN/SMS/user checks remain in the handlers.
+1. Deployment and public invocation are complete and verified. No further invocation approval is pending.
 2. The owner number has been provided privately, but is not yet registered in Firebase Auth. Verify it by SMS, choose a PIN, then grant its Auth UID the admin claim. No owner phone number is stored in this repository.
-3. Real SMS verification, signed-in checkout and admin uploads still need end-to-end verification. Live negative Function checks cannot pass until HTTP invocation is approved.
+3. Real SMS verification, signed-in checkout and admin uploads still need end-to-end verification. Live negative Function checks pass.
 4. GitHub is connected at https://github.com/seshu1339-sys/my-project on branch `main`; authentication succeeded and the implementation has been pushed. A separate project-local repository keeps personal home-folder files outside version control.
 5. Complete iOS signing/APNs and release signing before store publication. Review APK uses debug signing.
 

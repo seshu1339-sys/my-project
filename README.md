@@ -47,7 +47,7 @@ Storage creation uses `asia-south1`, matching the existing database. This helper
 
 Use Node 22 / npm 10 for backend installation, matching Cloud Build. The lockfile is validated with npm 10.9.4. On this Windows machine, set `FUNCTIONS_DISCOVERY_TIMEOUT=60` when deploying to accommodate local module loading. `node scripts/firebase-smoke.cjs` verifies the hosted bundle and negative authentication checks without creating data.
 
-The Functions are deployed, but currently return Cloud Run HTTP 403. The public HTTP invoker setting needed by Firebase callable clients is pending explicit owner approval; handler-level PIN/SMS/authentication checks remain required. The runtime's self-signing permission is configured. See `BUILD_STATUS.md` for the current deployment boundary.
+All three Functions are deployed with owner-approved public HTTP invocation; handler-level PIN/SMS/authentication checks remain required. Live smoke checks pass for hosting and all three callable rejection guards. The runtime's self-signing permission is configured. If invocation IAM needs repair, the explicitly authorized operator command `node scripts/firebase-setup.cjs configure-invokers` preserves existing bindings and verifies access for only these three services. See `BUILD_STATUS.md` for remaining verification.
 
 ### Administrator
 

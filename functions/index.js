@@ -7,7 +7,9 @@ const {createHash} = require('node:crypto');
 const {hashPin, verifyPin, quote} = require('./domain');
 initializeApp();
 const db = getFirestore();
-const options = {region: 'us-central1', maxInstances: 10};
+// Firebase callable handlers validate user auth inside the function. The HTTP
+// transport must accept requests before login and Firebase ID-token requests.
+const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const digest = value => createHash('sha256').update(value).digest('hex');
 async function rateLimit(key, limit, windowMs) {
   const ref = db.collection('_rateLimits').doc(digest(key));
