@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -20,6 +21,7 @@ class ProductPage extends StatefulWidget {
 class _ProductPageState extends State<ProductPage> {
   Store get store => widget.store;
   Entry get entry => widget.entry;
+  String? selectedVariant;
   @override
   void initState() {
     super.initState();
@@ -40,8 +42,38 @@ class _ProductPageState extends State<ProductPage> {
         if (p.data['images'] is List)
           ...(p.data['images'] as List).map((e) => e.toString()),
       ];
+      final variants = p.data['variants'] is List
+          ? (p.data['variants'] as List).map((item) => item.toString()).toList()
+          : <String>[];
+      final related = store
+          .visible('products')
+          .where(
+            (item) =>
+                item.id != p.id &&
+                item.text('categoryId') == p.text('categoryId'),
+          )
+          .take(4)
+          .toList();
       return Scaffold(
-        appBar: AppBar(title: Text(p.text('name'))),
+        appBar: AppBar(
+          title: Text(p.text('name')),
+          actions: [
+            IconButton(
+              tooltip: 'Share product',
+              onPressed: () => _share(context, p),
+              icon: const Icon(Icons.share_outlined),
+            ),
+            IconButton(
+              tooltip: 'Wishlist',
+              onPressed: () => _toggleWishlist(context, p),
+              icon: Icon(
+                store.wishlist.contains(p.id)
+                    ? Icons.favorite
+                    : Icons.favorite_border,
+              ),
+            ),
+          ],
+        ),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 900),
@@ -85,28 +117,78 @@ class _ProductPageState extends State<ProductPage> {
                   const Text(
                     'Base price shown. Set a pincode on the home page for local pricing.',
                   ),
+                if (p.number('compareAtPrice') > p.price(store.pincode))
+                  Text(
+                    'Regular ${money(p.number('compareAtPrice'))}  •  Offer ${money(p.price(store.pincode))}',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                if (variants.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: selectedVariant,
+                      decoration: const InputDecoration(labelText: 'Variant'),
+                      items: variants
+                          .map(
+                            (variant) => DropdownMenuItem(
+                              value: variant,
+                              child: Text(variant),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => selectedVariant = value),
+                    ),
+                  ),
+                if (p.text('size').isNotEmpty || p.text('color').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      '${p.text('size').isEmpty ? '' : 'Size: ${p.text('size')}  '}${p.text('color').isEmpty ? '' : 'Color: ${p.text('color')}'}',
+                    ),
+                  ),
                 const SizedBox(height: 20),
                 Text(
                   p.text('description'),
                   style: const TextStyle(fontSize: 17, height: 1.6),
                 ),
                 const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed:
-                      !p.active || p.number('stock') <= (store.cart[p.id] ?? 0)
-                      ? null
-                      : () {
-                          store.add(p);
-                          message(context, 'Added to bag');
-                        },
-                  icon: const Icon(Icons.shopping_bag_outlined),
-                  label: Text(
-                    p.number('stock') <= 0
-                        ? 'Currently unavailable'
-                        : p.text('kind') == 'service'
-                        ? 'Add service to bag'
-                        : 'Add to bag',
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _canAdd(p)
+                            ? () {
+                                store.add(p);
+                                message(context, 'Added to bag');
+                              }
+                            : null,
+                        icon: const Icon(Icons.shopping_bag_outlined),
+                        label: Text(
+                          p.number('stock') <= 0
+                              ? 'Currently unavailable'
+                              : 'Add to bag',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _canAdd(p)
+                            ? () {
+                                store.add(p);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => CartPage(store: store),
+                                  ),
+                                );
+                              }
+                            : null,
+                        child: const Text('Buy now'),
+                      ),
+                    ),
+                  ],
                 ),
                 if (shop != null)
                   ListTile(
@@ -123,6 +205,30 @@ class _ProductPageState extends State<ProductPage> {
                     ),
                   ),
                 const Divider(height: 40),
+                if (related.isNotEmpty) ...[
+                  const Text(
+                    'Related products',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  for (final item in related)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: SizedBox(
+                        width: 64,
+                        child: ProductArt(item, height: 56),
+                      ),
+                      title: Text(item.text('name')),
+                      subtitle: Text(money(item.price(store.pincode))),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ProductPage(store: store, entry: item),
+                        ),
+                      ),
+                    ),
+                ],
                 Reviews(store: store, productId: p.id),
               ],
             ),
@@ -131,6 +237,105 @@ class _ProductPageState extends State<ProductPage> {
       );
     },
   );
+
+  bool _canAdd(Entry product) =>
+      product.active && product.number('stock') > (store.cart[product.id] ?? 0);
+
+  Future<void> _toggleWishlist(BuildContext context, Entry product) async {
+    await store.toggleWishlist(product.id);
+    if (context.mounted) {
+      message(context, 'Wishlist updated');
+    }
+  }
+
+  Future<void> _share(BuildContext context, Entry product) async {
+    await Clipboard.setData(
+      ClipboardData(text: 'Check out ${product.text('name')}'),
+    );
+    if (context.mounted) {
+      message(context, 'Product details copied');
+    }
+  }
+}
+
+class CategoryPage extends StatelessWidget {
+  const CategoryPage({
+    super.key,
+    required this.store,
+    required this.categoryId,
+  });
+  final Store store;
+  final String categoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    final category = store
+        .entries('categories')
+        .where((item) => item.id == categoryId)
+        .firstOrNull;
+    final children = store
+        .visible('categories')
+        .where((item) => item.text('parentId') == categoryId)
+        .toList();
+    final products = store
+        .visible('products')
+        .where((item) => item.text('categoryId') == categoryId)
+        .toList();
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(category?.text('name', 'Category') ?? 'Category'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          if (children.isNotEmpty) ...[
+            const Text(
+              'Subcategories',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            for (final child in children)
+              ListTile(
+                title: Text(child.text('name')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CategoryPage(store: store, categoryId: child.id),
+                  ),
+                ),
+              ),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            '${products.length} products',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          if (products.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: Text('No products are available in this category yet.'),
+            ),
+          for (final product in products)
+            ListTile(
+              leading: SizedBox(
+                width: 72,
+                child: ProductArt(product, height: 64),
+              ),
+              title: Text(product.text('name')),
+              subtitle: Text(money(product.price(store.pincode))),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => ProductPage(store: store, entry: product),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class Reviews extends StatefulWidget {

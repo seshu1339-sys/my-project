@@ -17,7 +17,7 @@ void main() {
       final store = Store();
       await store.init();
       await tester.pumpWidget(MarketApp(store: store));
-      expect(find.text('Neighbourly'), findsOneWidget);
+      expect(find.text('APP LOGO'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'Plumbing');
       await tester.pump();
       expect(find.text('Plumbing visit'), findsOneWidget);

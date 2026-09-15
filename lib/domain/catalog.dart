@@ -49,13 +49,26 @@ const collections = [
 Map<String, List<Entry>> demoCatalog() => {
   'settings': [
     const Entry('business', {
-      'name': 'Neighbourly',
-      'tagline': 'Good things. Close to home.',
-      'address': 'Your local marketplace',
+      'name': 'Local Market',
+      'tagline': 'Everyday shopping made easy.',
+      'address': 'Your online storefront',
       'phone': '+91 90000 00000',
       'radiusKm': 10,
       'active': true,
     }),
+    const Entry('scrollingText', {
+      'name': 'Scrolling text',
+      'text': '',
+      'textColor': '#FFFFFF',
+      'backgroundColor': '#174C38',
+      'fontSize': 12,
+      'fontWeight': 400,
+      'speed': 70,
+      'height': 36,
+      'padding': 9,
+      'active': true,
+    }),
+    const Entry('theme', {'name': 'Theme', 'mode': 'light', 'active': true}),
   ],
   'categories': [
     for (final (i, name) in [
@@ -159,8 +172,9 @@ Map<String, List<Entry>> demoCatalog() => {
   ],
   'promotions': [
     const Entry('welcome', {
-      'name': 'Fresh finds, familiar faces.',
-      'description': 'Discover everyday essentials and trusted services from shops around you.',
+      'name': 'Everyday essentials, ready when you are.',
+      'description':
+          'Shop products and trusted services from one convenient storefront.',
       'placement': 'carousel',
       'target': 'category:c0',
       'order': 0,
@@ -169,7 +183,7 @@ Map<String, List<Entry>> demoCatalog() => {
     const Entry('local', {
       'name': 'A little closer. A lot better.',
       'description':
-          'Bring your neighbourhood home. Explore local shops today.',
+          'Browse the collection and find something useful for today.',
       'placement': 'carousel',
       'target': 'shops',
       'order': 1,

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../services/localization.dart';
 import '../services/notifications.dart';
 
 class Store extends ChangeNotifier {
@@ -38,14 +39,20 @@ class Store extends ChangeNotifier {
 
   Map<String, List<Entry>> catalog = {};
   final Map<String, int> cart = {};
+  final Set<String> wishlist = {};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-  String pincode = '', address = '', profileName = '', error = '';
+  String pincode = '',
+      address = '',
+      profileName = '',
+      language = 'en',
+      error = '';
+  String paymentBrand = '', paymentLast4 = '';
   double? latitude, longitude;
   bool admin = false, ready = false;
   User? get user => live ? FirebaseAuth.instance.currentUser : null;
   Entry get business =>
       entries('settings').where((e) => e.id == 'business').firstOrNull ??
-      const Entry('business', {'name': 'Neighbourly', 'radiusKm': 10});
+      const Entry('business', {'name': 'Local Market', 'radiusKm': 10});
   List<Entry> entries(String collection) =>
       List<Entry>.from(catalog[collection] ?? [])
         ..sort((a, b) => a.number('order').compareTo(b.number('order')));
@@ -65,6 +72,21 @@ class Store extends ChangeNotifier {
     address = prefs.getString('address') ?? '';
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
+    final savedLanguage = prefs.getString('language');
+    if (savedLanguage != null) {
+      language = savedLanguage;
+    } else {
+      try {
+        language = AppLocale.detect(
+          WidgetsBinding.instance.platformDispatcher.locales,
+        );
+      } catch (_) {
+        language = 'en';
+      }
+    }
+    paymentBrand = prefs.getString('paymentBrand') ?? '';
+    paymentLast4 = prefs.getString('paymentLast4') ?? '';
+    wishlist.addAll(prefs.getStringList('wishlist') ?? const []);
     if (!live) {
       final saved = prefs.getString('demoCatalog');
       catalog = saved == null
@@ -89,6 +111,20 @@ class Store extends ChangeNotifier {
               u != null &&
               (await u.getIdTokenResult()).claims?['admin'] == true;
           profileName = u?.displayName ?? '';
+          if (u != null) {
+            try {
+              final profile = await firestore
+                  .collection('users')
+                  .doc(u.uid)
+                  .get();
+              final data = profile.data();
+              language = data?['language']?.toString() ?? language;
+              paymentBrand = data?['paymentBrand']?.toString() ?? paymentBrand;
+              paymentLast4 = data?['paymentLast4']?.toString() ?? paymentLast4;
+            } catch (_) {
+              /* Optional profile preferences must not block sign-in. */
+            }
+          }
           await notifications.restore();
           notifyListeners();
         }),
@@ -130,6 +166,16 @@ class Store extends ChangeNotifier {
     }
   }
 
+  Future<void> delete(String collection, String id) async {
+    if (live) {
+      await firestore.collection(collection).doc(id).delete();
+    } else {
+      catalog[collection]?.removeWhere((entry) => entry.id == id);
+      await _persistDemo();
+      notifyListeners();
+    }
+  }
+
   Future<void> _persistDemo() async =>
       (await SharedPreferences.getInstance()).setString(
         'demoCatalog',
@@ -161,6 +207,62 @@ class Store extends ChangeNotifier {
     } else {
       await prefs.remove('latitude');
       await prefs.remove('longitude');
+    }
+    notifyListeners();
+  }
+
+  Future<void> setLanguage(String value) async {
+    language = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('language', value);
+    if (live && user != null) {
+      await firestore.collection('users').doc(user!.uid).set({
+        'language': value,
+      }, SetOptions(merge: true));
+    }
+    notifyListeners();
+  }
+
+  Future<void> setPaymentCard(String brand, String last4) async {
+    paymentBrand = brand;
+    paymentLast4 = last4;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('paymentBrand', brand);
+    await prefs.setString('paymentLast4', last4);
+    if (live && user != null) {
+      await firestore.collection('users').doc(user!.uid).set({
+        'paymentBrand': brand,
+        'paymentLast4': last4,
+      }, SetOptions(merge: true));
+    }
+    notifyListeners();
+  }
+
+  Future<void> removePaymentCard() async {
+    paymentBrand = '';
+    paymentLast4 = '';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('paymentBrand');
+    await prefs.remove('paymentLast4');
+    if (live && user != null) {
+      await firestore.collection('users').doc(user!.uid).set({
+        'paymentBrand': FieldValue.delete(),
+        'paymentLast4': FieldValue.delete(),
+      }, SetOptions(merge: true));
+    }
+    notifyListeners();
+  }
+
+  Future<void> toggleWishlist(String productId) async {
+    if (!wishlist.add(productId)) {
+      wishlist.remove(productId);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('wishlist', wishlist.toList());
+    if (live && user != null) {
+      await firestore.collection('users').doc(user!.uid).set({
+        'wishlist': wishlist.toList(),
+      }, SetOptions(merge: true));
     }
     notifyListeners();
   }

@@ -10,6 +10,8 @@ Customers explicitly enable price-drop and offer alerts in Account. Permission d
 
 Notifications contain display text, item/offer IDs, and no phone number or authentication credentials. Foreground messages appear as an in-app snackbar; mobile notification taps open the item, and web notifications open the storefront. The OS/FCM displays notification payloads in the background. Invalid device tokens are removed by the backend.
 
+Mobile startup registers the top-level `firebaseMessagingBackgroundHandler` before `runApp()`. Its `@pragma('vm:entry-point')` preserves it in release builds, and it initializes Firebase in the background isolate with the same build configuration as the foreground app. It does not access UI or create duplicate notifications. Web background callbacks run in the JavaScript service worker instead. Data-only application work can be added to these handlers when needed; push receipt is still subject to platform delivery restrictions.
+
 Delivery claims under `_notificationDeliveries` prevent duplicate event dispatch. Claims are written before sending: a crash or transient FCM error after a claim can lose an alert. This is best-effort delivery, not a guaranteed queue. Logs record failure counts without tokens. Jobs page through viewers/subscribers and batch FCM calls; large catalogs/customer bases should move to a dedicated queued campaign system. Review retention for views, tokens and delivery claims as the store grows.
 
 ## Platform setup

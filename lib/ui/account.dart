@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
+import '../services/localization.dart';
 import 'shared.dart';
 
 class AccountPage extends StatefulWidget {
@@ -21,6 +22,8 @@ class _AccountPageState extends State<AccountPage> {
   String? verificationId;
   ConfirmationResult? confirmation;
   bool recovery = false, sent = false, verified = false, busy = false;
+  final cardBrand = TextEditingController(),
+      cardLast4 = TextEditingController();
   Future<void> run(Future<void> Function() action) async {
     setState(() => busy = true);
     try {
@@ -76,6 +79,8 @@ class _AccountPageState extends State<AccountPage> {
   void initState() {
     super.initState();
     name.text = widget.store.profileName;
+    cardBrand.text = widget.store.paymentBrand;
+    cardLast4.text = widget.store.paymentLast4;
   }
 
   @override
@@ -84,6 +89,8 @@ class _AccountPageState extends State<AccountPage> {
     pin.dispose();
     code.dispose();
     name.dispose();
+    cardBrand.dispose();
+    cardLast4.dispose();
     super.dispose();
   }
 
@@ -128,6 +135,86 @@ class _AccountPageState extends State<AccountPage> {
                           }
                         }),
                   child: const Text('Save profile'),
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      AppLocale.names.containsKey(widget.store.language)
+                      ? widget.store.language
+                      : 'en',
+                  decoration: const InputDecoration(
+                    labelText: 'Language / भाषा',
+                  ),
+                  items: AppLocale.names.entries
+                      .where(
+                        (entry) => AppLocale.enabled(
+                          widget.store.business.text('enabledLanguages'),
+                        ).any((locale) => locale.languageCode == entry.key),
+                      )
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.store.setLanguage(value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                const Text('Payment card', style: TextStyle(fontSize: 20)),
+                const Text(
+                  'Only the card brand and last four digits are stored.',
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: cardBrand,
+                        decoration: const InputDecoration(labelText: 'Brand'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        controller: cardLast4,
+                        maxLength: 4,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Last 4'),
+                      ),
+                    ),
+                  ],
+                ),
+                OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          if (!RegExp(r'^\d{4}$')
+                              .hasMatch(cardLast4.text.trim())) {
+                            throw StateError(
+                              'Enter the last four card digits.',
+                            );
+                          }
+                          await widget.store.setPaymentCard(
+                            cardBrand.text.trim().isEmpty
+                                ? 'Card'
+                                : cardBrand.text.trim(),
+                            cardLast4.text.trim(),
+                          );
+                          if (context.mounted) {
+                            message(context, 'Payment card saved');
+                          }
+                        }),
+                  child: const Text('Save payment card'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _manageSavedCards(context),
+                  icon: const Icon(Icons.credit_card_outlined),
+                  label: const Text('Manage saved cards'),
                 ),
                 OutlinedButton(
                   onPressed: () => setState(() {
@@ -220,6 +307,32 @@ class _AccountPageState extends State<AccountPage> {
                       : 'Sign in with your mobile number and six-digit PIN.',
                 ),
                 const SizedBox(height: 24),
+                DropdownButtonFormField<String>(
+                  initialValue:
+                      AppLocale.names.containsKey(widget.store.language)
+                      ? widget.store.language
+                      : 'en',
+                  decoration: const InputDecoration(
+                    labelText: 'Language / भाषा',
+                  ),
+                  items: AppLocale.names.entries
+                      .where(
+                        (entry) => AppLocale.enabled(
+                          widget.store.business.text('enabledLanguages'),
+                        ).any((locale) => locale.languageCode == entry.key),
+                      )
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(entry.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) widget.store.setLanguage(value);
+                  },
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: phone,
                   keyboardType: TextInputType.phone,
@@ -313,4 +426,32 @@ class _AccountPageState extends State<AccountPage> {
       ),
     ),
   );
+
+  Future<void> _manageSavedCards(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Manage saved cards'),
+        content: Text(
+          widget.store.paymentLast4.isEmpty
+              ? 'No saved cards.'
+              : '${widget.store.paymentBrand} ending in ${widget.store.paymentLast4}',
+        ),
+        actions: [
+          if (widget.store.paymentLast4.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                await widget.store.removePaymentCard();
+                if (dialog.mounted) Navigator.pop(dialog);
+              },
+              child: const Text('Remove card'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 }

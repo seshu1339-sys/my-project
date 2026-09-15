@@ -1,6 +1,6 @@
 {
-    "name": "Neighbourly",
-    "short_name": "Neighbourly",
+    "name": "Local Market",
+    "short_name": "Local Market",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#f7f8f4",
