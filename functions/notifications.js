@@ -52,6 +52,21 @@ exports.notifyPriceDrop = onDocumentUpdated({document: 'products/{productId}', r
     }, {type: 'priceDrop', productId: event.params.productId});
   }
 });
+// One account (the admin changing status) notifying exactly one other
+// account (the customer who placed that order) — not a broadcast.
+const orderStatusCopy = {
+  confirmed: 'Your order has been confirmed.',
+  fulfilled: 'Your order has been fulfilled.',
+  cancelled: 'Your order was cancelled and any charged stock has been restored.',
+};
+exports.notifyOrderStatus = onDocumentUpdated({document: 'orders/{orderId}', region: 'asia-south1', maxInstances: 5}, async event => {
+  const before = event.data.before.data(), after = event.data.after.data();
+  const body = orderStatusCopy[after.status];
+  if (!body || before.status === after.status || !after.userId) return;
+  await send(after.userId, event.id, {title: 'Order update', body}, {
+    type: 'orderStatus', orderId: event.params.orderId, status: after.status,
+  });
+});
 // Polling also catches offers whose scheduled start arrives without a document edit.
 exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
   for await (const offer of pages(db.collection('promotions').orderBy('__name__'))) {

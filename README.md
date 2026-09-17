@@ -19,9 +19,8 @@ The current client supports email/password with email verification, password res
 
 - Responsive storefront, animated ticker, clickable auto-advancing promotions, nested categories, product/service filters, text search, image gallery, location pricing, cart and order-request checkout.
 - GPS/manual pincode, per-shop service radius, nearby shops, OpenStreetMap pins, Google Maps routes and shop catalogs.
-- Phone + six-digit PIN authentication; SMS registration/recovery; profile, logout, orders and reviews.
-- Business studio forms for products, services, categories, shops, coordinates, radii, pincode prices, image uploads/URLs, scheduled promotions, order and business identity. Hide/unpublish avoids destructive deletion.
-- Administrator order queue and status changes.
+- Email/password and passwordless email-link authentication; profile, logout, orders and reviews.
+- A separate admin studio app (not part of the customer app) with forms for products, services, categories, shops, coordinates, radii, pincode prices, image uploads/URLs, scheduled promotions, layout/theme customization, order queue and status changes, and business identity. Hide/unpublish avoids destructive deletion.
 - Voice/image provider interfaces in `lib/services/search.dart`. Recognition providers are not configured; the UI reports this explicitly.
 
 ## Firebase
@@ -55,17 +54,23 @@ All three Functions are deployed with owner-approved public HTTP invocation; han
 
 ### Customer alerts
 
-Signed-in item views and opt-in Firebase Messaging alerts are implemented. See [notification setup and delivery behavior](docs/notifications.md) for the web VAPID key, iOS APNs setup, scheduling and device verification.
+Signed-in item views and opt-in Firebase Messaging alerts are implemented, including a one-account-to-one-account order-status alert (`notifyOrderStatus`) sent only to the customer whose order changed. See [notification setup and delivery behavior](docs/notifications.md) for the web VAPID key, iOS APNs setup, scheduling and device verification.
 
 ### Administrator
 
-Sign in to the intended owner's account using SMS, then grant that existing Auth UID the admin claim from a trusted environment with Application Default Credentials:
+The admin studio is a **separate app**, not reachable from the customer app at all — there is no admin link, button or route inside the customer build. It is a second Flutter entry point, `lib/main_admin.dart`, built and deployed independently:
+
+```powershell
+./scripts/flutter.ps1 build web -t lib/main_admin.dart -o build/admin_web --dart-define-from-file=firebase-config-web.json
+```
+
+Deploy `build/admin_web` to its own Firebase Hosting site/target (not yet configured or deployed) so it gets its own URL, separate from the customer site. Sign in to the intended owner's account with email and password (verify the email first), then grant that existing Auth UID the admin claim from a trusted environment with Application Default Credentials:
 
 ```powershell
 node functions/set-admin.js e-commerce-app-a3897 EXISTING_USER_UID
 ```
 
-Sign out and back in to refresh claims. Customers cannot elevate their role. The owner phone/UID must be explicitly identified. Add business settings, shops, categories, products and promotions in the studio. Demo data is never automatically written to the live database.
+Sign out and back in (or reload the admin app) to refresh claims. Customers cannot elevate their role, and the admin app itself refuses any signed-in account without the claim. Add business settings, shops, categories, products and promotions in the studio. Demo data is never automatically written to the live database.
 
 ## Architecture
 
