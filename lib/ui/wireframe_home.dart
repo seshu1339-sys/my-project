@@ -205,31 +205,76 @@ class WireframeHome extends StatelessWidget {
                       c.maxWidth * .28,
                       fallback: (c.maxWidth * .22).clamp(230, 380),
                     );
-                    final wide =
-                        c.maxWidth >= 1100 &&
-                        adLayout.visible &&
-                        ads.isNotEmpty;
-                    final rail = LayoutSection(
-                      layout: adLayout,
-                      child: Column(
-                        children: [
-                          for (final ad in ads)
-                            Padding(
-                              padding: EdgeInsets.only(
-                                bottom: ad
-                                    .number('spacing', adLayout.gap)
-                                    .clamp(0, 64),
-                              ),
-                              child: ScheduledPromo(
-                                entry: Entry(ad.id, {
-                                  ...adLayout.entry.data,
-                                  ...ad.data,
-                                }),
-                                onTap: () => onPromotion(ad.text('target')),
-                              ),
+                    final railHasContent =
+                        (adLayout.visible && ads.isNotEmpty) ||
+                        (layoutFor(context, settings, 'boxes').visible &&
+                            boxes.isNotEmpty);
+                    final wide = c.maxWidth >= 1100 && railHasContent;
+                    // Ads and feature/promo boxes share the same vertical
+                    // side rail, stacked together, rather than boxes
+                    // repeating as a separate full-width section below.
+                    final rail = Column(
+                      children: [
+                        if (adLayout.visible)
+                          LayoutSection(
+                            layout: adLayout,
+                            child: Column(
+                              children: [
+                                for (final ad in ads)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: ad
+                                          .number('spacing', adLayout.gap)
+                                          .clamp(0, 64),
+                                    ),
+                                    child: ScheduledPromo(
+                                      entry: Entry(ad.id, {
+                                        ...adLayout.entry.data,
+                                        ...ad.data,
+                                      }),
+                                      onTap: () =>
+                                          onPromotion(ad.text('target')),
+                                    ),
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
+                          ),
+                        if (boxes.isNotEmpty)
+                          LayoutSection(
+                            layout: layoutFor(context, settings, 'boxes'),
+                            child: Column(
+                              children: [
+                                for (final box in boxes)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: clampedNumber(
+                                        box,
+                                        'spacing',
+                                        layoutFor(
+                                          context,
+                                          settings,
+                                          'boxes',
+                                        ).gap,
+                                        0,
+                                        64,
+                                      ),
+                                    ),
+                                    child: ScheduledPromo(
+                                      entry: Entry(box.id, {
+                                        ...sectionConfig(
+                                          settings,
+                                          'boxes',
+                                        ).data,
+                                        ...box.data,
+                                      }),
+                                      onTap: () =>
+                                          onPromotion(box.text('target')),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
                     );
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,46 +458,6 @@ class WireframeHome extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (boxes.isNotEmpty)
-                          LayoutSection(
-                            layout: layoutFor(context, settings, 'boxes'),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const HomeSectionHeading(
-                                  title: 'Best offers',
-                                  subtitle: 'More from your local shops',
-                                ),
-                                for (final box in boxes)
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: clampedNumber(
-                                        box,
-                                        'spacing',
-                                        layoutFor(
-                                          context,
-                                          settings,
-                                          'boxes',
-                                        ).gap,
-                                        0,
-                                        64,
-                                      ),
-                                    ),
-                                    child: ScheduledPromo(
-                                      entry: Entry(box.id, {
-                                        ...sectionConfig(
-                                          settings,
-                                          'boxes',
-                                        ).data,
-                                        ...box.data,
-                                      }),
-                                      onTap: () =>
-                                          onPromotion(box.text('target')),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
                       ],
                     );
                     return wide
@@ -465,10 +470,7 @@ class WireframeHome extends StatelessWidget {
                             ],
                           )
                         : Column(
-                            children: [
-                              main,
-                              if (adLayout.visible && ads.isNotEmpty) rail,
-                            ],
+                            children: [main, if (railHasContent) rail],
                           );
                   },
                 ),
