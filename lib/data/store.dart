@@ -140,6 +140,10 @@ class Store extends ChangeNotifier {
               language = data?['language']?.toString() ?? language;
               paymentBrand = data?['paymentBrand']?.toString() ?? paymentBrand;
               paymentLast4 = data?['paymentLast4']?.toString() ?? paymentLast4;
+              final cloudWishlist = data?['wishlist'];
+              if (cloudWishlist is List) {
+                wishlist.addAll(cloudWishlist.map((e) => e.toString()));
+              }
             } catch (_) {
               /* Optional profile preferences must not block sign-in. */
             }
@@ -285,9 +289,13 @@ class Store extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('wishlist', wishlist.toList());
     if (live && user != null) {
-      await firestore.collection('users').doc(user!.uid).set({
-        'wishlist': wishlist.toList(),
-      }, SetOptions(merge: true));
+      try {
+        await firestore.collection('users').doc(user!.uid).set({
+          'wishlist': wishlist.toList(),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        /* Wishlist works offline; cross-device sync is best-effort. */
+      }
     }
     notifyListeners();
   }

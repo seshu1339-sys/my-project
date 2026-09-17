@@ -18,6 +18,10 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(alice, 'products/p1'), {price: 1}));
     await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
+    // Language, saved-card display and wishlist are the other fields the client merges onto a profile.
+    await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice', language: 'hi', paymentBrand: 'Visa', paymentLast4: '4242', wishlist: ['p1', 'p2']}));
+    await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', paymentLast4: '42424'}));
+    await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', wishlist: 'p1'}));
     await assertFails(getDoc(doc(bob, 'users/alice')));
     const view = {pincode: '500001', lastViewedAt: serverTimestamp()};
     await assertSucceeds(setDoc(doc(alice, 'products/p1/viewers/alice'), view));

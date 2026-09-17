@@ -183,9 +183,7 @@ class _AccountPageState extends State<AccountPage> {
                       )
                       .toList(),
                   onChanged: (value) {
-                    if (value != null) {
-                      widget.store.setLanguage(value);
-                    }
+                    if (value != null) run(() => widget.store.setLanguage(value));
                   },
                 ),
                 const SizedBox(height: 14),
@@ -350,7 +348,7 @@ class _AccountPageState extends State<AccountPage> {
                       )
                       .toList(),
                   onChanged: (value) {
-                    if (value != null) widget.store.setLanguage(value);
+                    if (value != null) run(() => widget.store.setLanguage(value));
                   },
                 ),
                 const SizedBox(height: 14),
@@ -471,8 +469,12 @@ class _AccountPageState extends State<AccountPage> {
           if (widget.store.paymentLast4.isNotEmpty)
             TextButton(
               onPressed: () async {
-                await widget.store.removePaymentCard();
-                if (dialog.mounted) Navigator.pop(dialog);
+                try {
+                  await widget.store.removePaymentCard();
+                  if (dialog.mounted) Navigator.pop(dialog);
+                } catch (e) {
+                  if (dialog.mounted) message(dialog, e);
+                }
               },
               child: const Text('Remove card'),
             ),

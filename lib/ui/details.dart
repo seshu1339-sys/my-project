@@ -251,9 +251,15 @@ class _ProductPageState extends State<ProductPage> {
       product.active && product.number('stock') > (store.cart[product.id] ?? 0);
 
   Future<void> _toggleWishlist(BuildContext context, Entry product) async {
-    await store.toggleWishlist(product.id);
-    if (context.mounted) {
-      message(context, 'Wishlist updated');
+    try {
+      await store.toggleWishlist(product.id);
+      if (context.mounted) {
+        message(context, 'Wishlist updated');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        message(context, e);
+      }
     }
   }
 

@@ -9,7 +9,15 @@ service cloud.firestore {
     }
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || admin());
-      allow create, update: if signedIn() && request.auth.uid == uid && request.resource.data.keys().hasOnly(['name']) && request.resource.data.name is string && request.resource.data.name.size() <= 100;
+      // Client saves merge one or two of these fields at a time (profile name,
+      // language, saved card display, wishlist); each is validated only when present.
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'language', 'paymentBrand', 'paymentLast4', 'wishlist'])
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 100))
+        && (!('language' in request.resource.data) || (request.resource.data.language is string && request.resource.data.language.size() <= 10))
+        && (!('paymentBrand' in request.resource.data) || (request.resource.data.paymentBrand is string && request.resource.data.paymentBrand.size() <= 30))
+        && (!('paymentLast4' in request.resource.data) || (request.resource.data.paymentLast4 is string && request.resource.data.paymentLast4.size() <= 4))
+        && (!('wishlist' in request.resource.data) || (request.resource.data.wishlist is list && request.resource.data.wishlist.size() <= 500));
     }
     match /users/{uid}/pushTokens/{tokenId} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
