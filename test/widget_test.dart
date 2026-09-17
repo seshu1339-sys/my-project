@@ -22,6 +22,9 @@ void main() {
       await tester.pump();
       expect(find.text('Plumbing visit'), findsOneWidget);
       expect(find.text('Farm-fresh vegetable box'), findsNothing);
+      // The admin panel is a separate app/build target; it must never be
+      // reachable from inside the customer app, in demo or live mode.
+      expect(find.byTooltip('Business admin'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       store.dispose();

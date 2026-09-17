@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/localization.dart';
-import 'admin.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 
@@ -118,17 +117,6 @@ class ResponsiveHeader extends StatelessWidget {
                 onPressed: onAccount,
                 icon: const Icon(Icons.settings_outlined),
               ),
-              if (!store.live || store.admin)
-                IconButton(
-                  tooltip: 'Business admin',
-                  icon: const Icon(Icons.dashboard_customize_outlined),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => AdminPage(store: store),
-                    ),
-                  ),
-                ),
               PopupMenuButton<String>(
                 tooltip: 'Language',
                 icon: const Icon(Icons.language),
