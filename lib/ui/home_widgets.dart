@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
 import 'shared.dart';
+import 'layout_settings.dart';
 
 class HomeSectionHeading extends StatelessWidget {
   const HomeSectionHeading({
@@ -18,34 +19,46 @@ class HomeSectionHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(top: 28, bottom: 16),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
+    child: LayoutBuilder(
+      builder: (context, c) {
+        final heading = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: sectionTextStyle(
+                appearance ?? const Entry('', {}),
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ],
+        );
+        final button = action == null
+            ? null
+            : TextButton(onPressed: action, child: Text(actionLabel));
+        if (c.maxWidth < 600 ||
+            MediaQuery.textScalerOf(context).scale(14) > 20) {
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: sectionTextStyle(
-                  appearance ?? const Entry('', {}),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (action != null)
-          TextButton(onPressed: action, child: Text(actionLabel)),
-      ],
+            children: [heading, ?button],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: heading),
+            ?button,
+          ],
+        );
+      },
     ),
   );
 }
@@ -74,8 +87,12 @@ class HomeCategoryTile extends StatelessWidget {
       Icons.home_repair_service_outlined,
       Icons.kitchen_outlined,
     ];
+    final layout = ComponentLayout(
+      appearance ?? const Entry('', {}),
+      MediaQuery.sizeOf(context).width,
+    );
     return SizedBox(
-      width: 112,
+      width: 160,
       child: Semantics(
         selected: selected,
         child: Material(
@@ -88,35 +105,53 @@ class HomeCategoryTile extends StatelessWidget {
                   appearance?.text('backgroundColor') ?? '',
                   Colors.white,
                 ),
-          borderRadius: BorderRadius.circular(20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(layout.radius),
+            side: BorderSide(
+              color: colorFromHex(
+                layout.entry.text('borderColor'),
+                const Color(0xffe6eae3),
+              ),
+              width: layout.n('borderWidth', 0, 0, 8),
+            ),
+          ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(layout.radius),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-              child: Column(
-                children: [
-                  if (entry.text('imageUrl').isNotEmpty)
-                    ProductArt(entry, height: 44)
-                  else
-                    Icon(
-                      icons[index % icons.length],
-                      color: const Color(0xff176b50),
-                      size: 30,
-                    ),
-                  const SizedBox(height: 10),
-                  Text(
-                    entry.text('name'),
-                    maxLines: 2,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: sectionTextStyle(
-                      appearance ?? const Entry('', {}),
-                      fontSize: 12,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                    ),
+              padding: EdgeInsets.all(layout.padding),
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (entry.text('imageUrl').isNotEmpty)
+                        ProductArt(
+                          entry,
+                          height: layout.n('imageHeight', 56, 32, 120),
+                        )
+                      else
+                        Icon(
+                          icons[index % icons.length],
+                          color: const Color(0xff176b50),
+                          size: layout.n('iconSize', 40, 16, 72),
+                        ),
+                      const SizedBox(height: 10),
+                      Text(
+                        entry.text('name'),
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: sectionTextStyle(
+                          appearance ?? const Entry('', {}),
+                          fontSize: 14,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -143,6 +178,10 @@ class HomeProductTile extends StatelessWidget {
   final Entry? appearance;
   @override
   Widget build(BuildContext context) {
+    final layout = ComponentLayout(
+      appearance ?? const Entry('', {}),
+      MediaQuery.sizeOf(context).width,
+    );
     final original = entry.number('compareAtPrice');
     final discount = original > price && price >= 0
         ? ((original - price) / original * 100).floor()
@@ -174,13 +213,24 @@ class HomeProductTile extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(layout.padding),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Stack(
                 children: [
-                  ProductArt(entry, height: 140),
+                  ProductArt(
+                    entry,
+                    height:
+                        layout.n(
+                          'imageHeight',
+                          MediaQuery.sizeOf(context).width >= 1100 ? 180 : 140,
+                          32,
+                          400,
+                        ) *
+                        layout.scale,
+                  ),
                   if (discount > 0 || preview)
                     Positioned(
                       top: 8,
@@ -221,15 +271,13 @@ class HomeProductTile extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 entry.text('name'),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 style: sectionTextStyle(
                   appearance ?? const Entry('', {}),
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ).copyWith(height: 1.3),
               ),
-              const Spacer(),
+              const SizedBox(height: 16),
               if (discount > 0)
                 Text(
                   money(original),
@@ -268,7 +316,10 @@ class HomeProductTile extends StatelessWidget {
                   IconButton.filledTonal(
                     tooltip: 'Add ${entry.text('name')} to bag',
                     onPressed: onAdd,
-                    icon: const Icon(Icons.add, size: 21),
+                    icon: Icon(
+                      Icons.add,
+                      size: layout.n('iconSize', 21, 16, 40),
+                    ),
                   ),
                 ],
               ),
@@ -285,31 +336,42 @@ class HomeProductGrid extends StatelessWidget {
     super.key,
     required this.entries,
     required this.itemBuilder,
+    this.appearance = const Entry('', {}),
   });
   final List<Entry> entries;
   final Widget Function(Entry) itemBuilder;
+  final Entry appearance;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
-      final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-      final columns = c.maxWidth >= 840
-          ? 4
-          : c.maxWidth >= 610
-          ? 3
-          : c.maxWidth >= 310
-          ? 2
-          : 1;
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: entries.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          mainAxisExtent: 345 + (scale - 1).clamp(0, 3) * 160,
-        ),
-        itemBuilder: (_, i) => itemBuilder(entries[i]),
+      final layout = ComponentLayout(
+        appearance,
+        MediaQuery.sizeOf(context).width,
+      );
+      final columns = layout.columns(
+        c.maxWidth,
+        preferred: 250,
+        minimum: (layout.padding * 2 + 150).clamp(180, 320),
+      );
+      final slotWidth = (c.maxWidth - (columns - 1) * layout.gap) / columns;
+      final width = layout.width(
+        slotWidth,
+        fallback: slotWidth,
+        floor: (layout.padding * 2 + 150).clamp(180, 320),
+      );
+      return Wrap(
+        spacing: layout.gap,
+        runSpacing: layout.gap,
+        children: [
+          for (final entry in entries)
+            SizedBox(
+              width: width,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: layout.height(0)),
+                child: itemBuilder(entry),
+              ),
+            ),
+        ],
       );
     },
   );

@@ -17,7 +17,7 @@ void main() {
       final store = Store();
       await store.init();
       await tester.pumpWidget(MarketApp(store: store));
-      expect(find.text('APP LOGO'), findsOneWidget);
+      expect(find.bySemanticsLabel('App logo'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'Plumbing');
       await tester.pump();
       expect(find.text('Plumbing visit'), findsOneWidget);
@@ -43,6 +43,8 @@ void main() {
     await tester.tap(find.byTooltip('Add Farm-fresh vegetable box to bag'));
     await tester.pump();
     expect(store.count, 1);
+    await tester.ensureVisible(find.byTooltip('Shopping bag'));
+    await tester.pump();
     await tester.tap(find.byTooltip('Shopping bag'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

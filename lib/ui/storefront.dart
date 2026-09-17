@@ -11,6 +11,7 @@ import 'account.dart';
 import 'details.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
+import 'services_page.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
@@ -100,18 +101,23 @@ class _StorefrontState extends State<Storefront> {
       final p = store.product(target.substring(8));
       if (p != null) {
         open(ProductPage(store: store, entry: p));
+      } else {
+        message(context, 'This product is no longer available.');
       }
     } else if (Uri.tryParse(target)?.scheme == 'https') {
       try {
-        await launchUrl(
+        final opened = await launchUrl(
           Uri.parse(target),
           mode: LaunchMode.externalApplication,
         );
+        if (!opened && mounted) message(context, 'Could not open this link.');
       } catch (e) {
         if (mounted) {
           message(context, 'Could not open this link.');
         }
       }
+    } else {
+      message(context, 'Ask our office for more information about this offer.');
     }
   }
 
@@ -312,13 +318,17 @@ class _StorefrontState extends State<Storefront> {
               )
             : null,
         body: WireframeHome(
+          scroll: scroll,
+          categoriesKey: categoriesKey,
+          productsKey: productsKey,
+          onPromotion: action,
           store: store,
           search: search,
           searchService: widget.searchService,
           onSearch: () => setState(() {}),
           onLocation: location,
           onAssistedSearch: assistedSearch,
-          onServices: () => open(CategoryPage(store: store, categoryId: 'c3')),
+          onServices: () => open(ServicesPage(store: store)),
           onAccount: () => open(AccountPage(store: store)),
           onCart: () => open(CartPage(store: store)),
           onProduct: (entry) => open(ProductPage(store: store, entry: entry)),

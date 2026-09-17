@@ -12,7 +12,10 @@ class HomeHeroSlide extends StatelessWidget {
     builder: (context, c) {
       final wide = c.maxWidth >= 900;
       return Material(
-        color: const Color(0xffdfebd7),
+        color: colorFromHex(
+          entry.text('backgroundColor'),
+          const Color(0xffdfebd7),
+        ),
         child: InkWell(
           onTap: onTap,
           child: Stack(
@@ -42,7 +45,9 @@ class HomeHeroSlide extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: EdgeInsets.all(wide ? 36 : 24),
+                padding: EdgeInsets.all(
+                  clampedNumber(entry, 'padding', wide ? 36 : 24, 0, 48),
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -78,13 +83,19 @@ class HomeHeroSlide extends StatelessWidget {
                               entry.text('name'),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: wide ? 44 : 32,
-                                height: 1.05,
-                                letterSpacing: -1.5,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xff163e2e),
-                              ),
+                              style:
+                                  sectionTextStyle(
+                                    entry,
+                                    fontSize: wide ? 44 : 32,
+                                    fontWeight: FontWeight.w800,
+                                  ).copyWith(
+                                    height: 1.05,
+                                    letterSpacing: -1.5,
+                                    color: colorFromHex(
+                                      entry.text('textColor'),
+                                      const Color(0xff163e2e),
+                                    ),
+                                  ),
                             ),
                           ),
                           const SizedBox(height: 16),

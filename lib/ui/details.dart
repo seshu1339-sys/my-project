@@ -9,6 +9,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'shared.dart';
 import 'account.dart';
+import 'responsive_header.dart';
 
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key, required this.store, required this.entry});
@@ -204,6 +205,14 @@ class _ProductPageState extends State<ProductPage> {
                       ),
                     ),
                   ),
+                if (shop != null && p.text('kind') == 'service') ...[
+                  Text(shop.text('address')),
+                  ProductArt(shop, height: 140),
+                  ContactActions(
+                    phone: shop.text('phone'),
+                    whatsapp: shop.text('whatsapp'),
+                  ),
+                ],
                 const Divider(height: 40),
                 if (related.isNotEmpty) ...[
                   const Text(
@@ -506,6 +515,12 @@ class ShopsPage extends StatelessWidget {
               shops: shops,
               latitude: store.latitude,
               longitude: store.longitude,
+              onShop: (shop) => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => ShopPage(store: store, shop: shop),
+                ),
+              ),
             ),
           for (final shop in shops)
             Card(
@@ -536,12 +551,16 @@ class ShopMap extends StatelessWidget {
     required this.shops,
     this.latitude,
     this.longitude,
+    this.height = 300,
+    this.onShop,
   });
   final List<Entry> shops;
   final double? latitude, longitude;
+  final double height;
+  final ValueChanged<Entry>? onShop;
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 300,
+    height: height,
     child: ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: FlutterMap(
@@ -569,10 +588,13 @@ class ShopMap extends StatelessWidget {
                   height: 50,
                   child: Tooltip(
                     message: shop.text('name'),
-                    child: const Icon(
-                      Icons.location_on,
-                      size: 42,
-                      color: Color(0xff176b50),
+                    child: IconButton(
+                      onPressed: onShop == null ? null : () => onShop!(shop),
+                      icon: const Icon(
+                        Icons.location_on,
+                        size: 36,
+                        color: Color(0xff176b50),
+                      ),
                     ),
                   ),
                 ),
@@ -620,6 +642,10 @@ class ShopPage extends StatelessWidget {
             Text(shop.text('description')),
             Text('${shop.text('address')} • ${shop.text('pincode')}'),
             Text(shop.text('phone')),
+            ContactActions(
+              phone: shop.text('phone'),
+              whatsapp: shop.text('whatsapp'),
+            ),
             const SizedBox(height: 20),
             ShopMap(
               shops: [shop],

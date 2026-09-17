@@ -17,7 +17,10 @@ double clampedNumber(
   double fallback,
   double min,
   double max,
-) => entry.number(key, fallback).clamp(min, max).toDouble();
+) {
+  final value = entry.number(key, fallback);
+  return (value.isFinite ? value : fallback).clamp(min, max).toDouble();
+}
 
 Entry sectionConfig(List<Entry> settings, String section) =>
     settings.firstWhere(
@@ -26,18 +29,23 @@ Entry sectionConfig(List<Entry> settings, String section) =>
     );
 
 bool sectionVisible(Entry config) =>
-    config.id.isEmpty || config.data['visible'] != 'false';
+    config.id.isEmpty ||
+    (config.data['visible'] != 'false' && config.data['visible'] != false);
 
 TextStyle sectionTextStyle(
   Entry config, {
   double fontSize = 14,
   FontWeight fontWeight = FontWeight.normal,
 }) => TextStyle(
-  color: colorFromHex(config.text('textColor'), Colors.black87),
+  color: config.text('textColor').isEmpty
+      ? null
+      : colorFromHex(config.text('textColor'), Colors.black87),
   fontFamily: config.text('fontFamily').isEmpty
       ? null
       : config.text('fontFamily'),
-  fontSize: clampedNumber(config, 'fontSize', fontSize, 8, 72),
+  fontSize: config.number('fontSize') <= 0
+      ? fontSize
+      : clampedNumber(config, 'fontSize', fontSize, 10, 72),
   fontWeight: FontWeight.values.firstWhere(
     (weight) =>
         weight.value ==
@@ -67,11 +75,11 @@ BoxDecoration entryDecoration(
   final opacity = clampedNumber(entry, 'opacity', 1, 0, 1);
   final brightness = clampedNumber(entry, 'brightness', 1, 0.2, 2);
   final base = colorFromHex(entry.text('backgroundColor'), fallback);
-  final background = Color.lerp(
-    Colors.black,
-    base,
-    brightness.clamp(0, 1),
-  )!.withValues(alpha: opacity);
+  final background =
+      (brightness <= 1
+              ? Color.lerp(Colors.black, base, brightness)!
+              : Color.lerp(base, Colors.white, brightness - 1)!)
+          .withValues(alpha: base.a * opacity);
   final shadow = shadowFromEntry(entry);
   final imageUrl = entry.text('backgroundImage');
   return BoxDecoration(
@@ -163,9 +171,7 @@ class ProductArt extends StatelessWidget {
               entry.text('imageUrl'),
               height: height,
               width: double.infinity,
-              fit: BoxFit.cover,
-              cacheWidth: (height * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
+              fit: BoxFit.contain,
               errorBuilder: (_, e, s) => placeholder,
             ),
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../domain/catalog.dart';
 import 'shared.dart';
 import 'home_hero_slide.dart';
+import 'layout_settings.dart';
 
 class PromoCard extends StatelessWidget {
   const PromoCard({super.key, required this.entry, required this.onTap});
@@ -23,59 +24,69 @@ class PromoCard extends StatelessWidget {
         decoration: entryDecoration(entry, fallback: const Color(0xffeee6d6)),
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: entry.number('height', 200).clamp(100, 600),
+            minHeight: clampedNumber(entry, 'height', 200, 100, 1200),
           ),
-          child: Padding(
-            padding: EdgeInsets.all(clampedNumber(entry, 'padding', 24, 0, 80)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (entry.text('imageUrl').isNotEmpty)
-                  ProductArt(entry, height: 100),
-                Text(
-                  entry.text('placement') == 'ad'
-                      ? 'NEIGHBOURHOOD SPOTLIGHT'
-                      : 'CURATED FOR YOU',
-                  style: TextStyle(
-                    fontSize: entry.number('labelFontSize', 10),
-                    color: colorFromHex(
-                      entry.text('textColor'),
-                      Colors.black87,
-                    ),
-                    letterSpacing: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  entry.text('name'),
-                  style: TextStyle(
-                    fontSize: entry.number('fontSize', 25),
-                    fontWeight: FontWeight.values.firstWhere(
-                      (weight) =>
-                          weight.value == entry.number('fontWeight', 700),
-                      orElse: () => FontWeight.w700,
-                    ),
-                    color: colorFromHex(
-                      entry.text('textColor'),
-                      Colors.black87,
-                    ),
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  entry.text('description'),
-                  style: TextStyle(
-                    color: colorFromHex(
-                      entry.text('textColor'),
-                      Colors.black87,
+          child: LayoutBuilder(
+            builder: (context, c) => Padding(
+              padding: EdgeInsets.all(
+                clampedNumber(entry, 'padding', 24, 0, c.maxWidth / 8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (entry.text('imageUrl').isNotEmpty)
+                    ProductArt(entry, height: 100),
+                  Text(
+                    entry.text('placement') == 'ad'
+                        ? 'NEIGHBOURHOOD SPOTLIGHT'
+                        : 'CURATED FOR YOU',
+                    style: TextStyle(
+                      fontSize: clampedNumber(
+                        entry,
+                        'labelFontSize',
+                        10,
+                        10,
+                        24,
+                      ),
+                      color: colorFromHex(
+                        entry.text('textColor'),
+                        Colors.black87,
+                      ),
+                      letterSpacing: 1.6,
                     ),
                   ),
-                ),
-                const SizedBox(height: 18),
-                const Icon(Icons.arrow_forward),
-              ],
+                  const SizedBox(height: 20),
+                  Text(
+                    entry.text('name'),
+                    style: TextStyle(
+                      fontSize: clampedNumber(entry, 'fontSize', 25, 10, 40),
+                      fontWeight: FontWeight.values.firstWhere(
+                        (weight) =>
+                            weight.value == entry.number('fontWeight', 700),
+                        orElse: () => FontWeight.w700,
+                      ),
+                      color: colorFromHex(
+                        entry.text('textColor'),
+                        Colors.black87,
+                      ),
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    entry.text('description'),
+                    style: TextStyle(
+                      color: colorFromHex(
+                        entry.text('textColor'),
+                        Colors.black87,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Icon(Icons.arrow_forward),
+                ],
+              ),
             ),
           ),
         ),
@@ -91,8 +102,10 @@ class HeroCarousel extends StatefulWidget {
     required this.onTap,
     this.reverse = false,
     this.speed = 600,
+    this.appearance = const Entry('', {}),
   });
   final List<Entry> entries;
+  final Entry appearance;
   final void Function(String) onTap;
   final bool reverse;
   final double speed;
@@ -104,10 +117,13 @@ class _HeroCarouselState extends State<HeroCarousel> {
   final controller = PageController();
   Timer? timer;
   int page = 0;
+  int pageCount = 1;
   @override
   void didUpdateWidget(covariant HeroCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (page >= widget.entries.length) {
+    timer?.cancel();
+    startTimer();
+    if (page >= pageCount) {
       page = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && controller.hasClients) controller.jumpToPage(0);
@@ -118,12 +134,16 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   void initState() {
     super.initState();
+    startTimer();
+  }
+
+  void startTimer() {
     timer = Timer.periodic(_interval(), (_) {
       if (controller.hasClients &&
-          widget.entries.length > 1 &&
+          pageCount > 1 &&
           !MediaQuery.of(context).disableAnimations) {
         controller.animateToPage(
-          (page + 1) % widget.entries.length,
+          (page + 1) % pageCount,
           duration: Duration(
             milliseconds: widget.speed.clamp(200, 2000).round(),
           ),
@@ -134,6 +154,10 @@ class _HeroCarouselState extends State<HeroCarousel> {
   }
 
   Duration _interval() {
+    final configured = widget.appearance.number('animationMs');
+    if (configured > 0) {
+      return Duration(milliseconds: configured.clamp(1000, 120000).round());
+    }
     final milliseconds = widget.entries
         .map((entry) => entry.number('animationMs', 6000).round())
         .where((value) => value > 0)
@@ -154,57 +178,104 @@ class _HeroCarouselState extends State<HeroCarousel> {
     if (widget.entries.isEmpty) {
       return const SizedBox.shrink();
     }
-    return Column(
-      children: [
-        SizedBox(
-          height:
-              360 +
-              (MediaQuery.textScalerOf(context).scale(14) / 14 - 1).clamp(
-                    0,
-                    3,
-                  ) *
-                  240,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: PageView.builder(
-              controller: controller,
-              itemCount: widget.entries.length,
-              reverse: widget.reverse,
-              onPageChanged: (v) => setState(() => page = v),
-              itemBuilder: (context, i) {
-                final p = widget.entries[i];
-                return HomeHeroSlide(
-                  entry: p,
-                  onTap: () => widget.onTap(p.text('target')),
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          alignment: WrapAlignment.center,
+    return LayoutBuilder(
+      builder: (context, c) {
+        final layout = ComponentLayout(
+          widget.appearance,
+          MediaQuery.sizeOf(context).width,
+        );
+        final requested = layout.n('visibleCount', 1, 1, 12).round();
+        final count = requested.clamp(
+          1,
+          ((c.maxWidth + layout.gap) / (200 + layout.gap)).floor().clamp(1, 12),
+        );
+        pageCount = (widget.entries.length / count).ceil();
+        if (page >= pageCount) {
+          page = 0;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && controller.hasClients) controller.jumpToPage(0);
+          });
+        }
+        final height = layout.height(
+          widget.entries.first.number('height', count == 1 ? 300 : 220),
+          floor: 120,
+        );
+        return Column(
           children: [
-            for (var i = 0; i < widget.entries.length; i++)
-              IconButton(
-                tooltip: 'Show promotion ${i + 1}',
-                constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                padding: EdgeInsets.zero,
-                onPressed: () => controller.animateToPage(
-                  i,
-                  duration: Duration(
-                    milliseconds: widget.speed.clamp(200, 2000).round(),
+            SizedBox(
+              key: const ValueKey('banner-viewport'),
+              height: height,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(layout.radius),
+                child: PageView.builder(
+                  controller: controller,
+                  itemCount: pageCount,
+                  reverse: Directionality.of(context) == TextDirection.rtl
+                      ? !widget.reverse
+                      : widget.reverse,
+                  onPageChanged: (v) => setState(() => page = v),
+                  itemBuilder: (context, group) => Row(
+                    children: [
+                      for (var offset = 0; offset < count; offset++) ...[
+                        if (offset > 0) SizedBox(width: layout.gap),
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final original =
+                                  widget.entries[(group * count + offset) %
+                                      widget.entries.length];
+                              final entry = Entry(original.id, {
+                                ...widget.appearance.data,
+                                ...original.data,
+                              });
+                              if (count == 1 &&
+                                  height >= 300 &&
+                                  c.maxWidth >= 700) {
+                                return HomeHeroSlide(
+                                  entry: entry,
+                                  onTap: () =>
+                                      widget.onTap(entry.text('target')),
+                                );
+                              }
+                              return SizedBox(
+                                height: double.infinity,
+                                child: _CompactBanner(
+                                  entry: entry,
+                                  onTap: () =>
+                                      widget.onTap(entry.text('target')),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  curve: Curves.easeOut,
-                ),
-                icon: Icon(
-                  i == page ? Icons.circle : Icons.circle_outlined,
-                  size: 9,
                 ),
               ),
+            ),
+            if (pageCount > 1)
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  for (var i = 0; i < pageCount; i++)
+                    IconButton(
+                      tooltip: 'Show promotion ${i + 1}',
+                      onPressed: () => controller.animateToPage(
+                        i,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut,
+                      ),
+                      icon: Icon(
+                        i == page ? Icons.circle : Icons.circle_outlined,
+                        size: 9,
+                      ),
+                    ),
+                ],
+              ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }
@@ -304,7 +375,18 @@ class _TickerStripState extends State<TickerStrip>
       textScaler: scaler,
     )..layout();
     final segmentWidth = painter.width + 64;
-    final height = widget.height ?? painter.height + widget.padding * 2;
+    final naturalHeight = painter.height + widget.padding * 2;
+    final height = (widget.height ?? naturalHeight).clamp(
+      naturalHeight,
+      double.infinity,
+    );
+    final duration = Duration(
+      milliseconds: (segmentWidth / widget.speed.clamp(10, 300) * 1000).round(),
+    );
+    if (animation.duration != duration) {
+      animation.duration = duration;
+      if (!paused && widget.playback == 'running') animation.repeat();
+    }
     painter.dispose();
     final base = widget.backgroundColor;
     final background = Color.lerp(
@@ -352,7 +434,7 @@ class _TickerStripState extends State<TickerStrip>
                     MediaQuery.of(context).disableAnimations
                         ? 12
                         : (widget.reverse
-                                  ? animation.value
+                                  ? animation.value - 1
                                   : -animation.value) *
                               segmentWidth,
                     0,
@@ -411,4 +493,178 @@ class _TickerStripState extends State<TickerStrip>
       ),
     );
   }
+}
+
+class _CompactBanner extends StatelessWidget {
+  const _CompactBanner({required this.entry, required this.onTap});
+  final Entry entry;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Container(
+        decoration: entryDecoration(entry, fallback: const Color(0xffdfebd7)),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.all(clampedNumber(entry, 'padding', 16, 0, 40)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (entry.text('imageUrl').isNotEmpty)
+                  ProductArt(entry, height: 120),
+                Text(
+                  entry.text('name'),
+                  style: sectionTextStyle(
+                    entry,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(entry.text('description')),
+                const SizedBox(height: 12),
+                const Icon(Icons.arrow_forward),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Each promotion owns its playback clock, dimensions and stop timer.
+class ScheduledPromo extends StatefulWidget {
+  const ScheduledPromo({super.key, required this.entry, required this.onTap});
+  final Entry entry;
+  final VoidCallback onTap;
+  @override
+  State<ScheduledPromo> createState() => _ScheduledPromoState();
+}
+
+class _ScheduledPromoState extends State<ScheduledPromo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController animation = AnimationController(vsync: this);
+  Timer? stop;
+  bool paused = false;
+  double cycle = 1;
+  String signature = '';
+  @override
+  void dispose() {
+    stop?.cancel();
+    animation.dispose();
+    super.dispose();
+  }
+
+  void configure(double extent, ComponentLayout layout) {
+    final next = '$extent-${widget.entry.data}';
+    if (next == signature) return;
+    signature = next;
+    cycle = extent;
+    stop?.cancel();
+    animation.stop();
+    final enabled = widget.entry.text('scrollEnabled', 'false') == 'true';
+    paused = !enabled || widget.entry.text('playback', 'running') != 'running';
+    animation.duration = Duration(
+      milliseconds: (extent / layout.n('speed', 25, 10, 300) * 1000)
+          .round()
+          .clamp(1000, 120000),
+    );
+    if (!paused) animation.repeat();
+    final seconds = layout.n('stopAfter', 0, 0, 3600);
+    if (seconds > 0 && !paused) {
+      stop = Timer(Duration(milliseconds: (seconds * 1000).round()), () {
+        if (mounted) {
+          setState(() {
+            paused = true;
+            animation.stop();
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final layout = ComponentLayout(
+        widget.entry,
+        MediaQuery.sizeOf(context).width,
+      );
+      final height = layout.height(240, floor: 120);
+      final gap = layout.n('spacing', 16, 0, 64);
+      configure(height + gap, layout);
+      final moving = widget.entry.text('scrollEnabled', 'false') == 'true';
+      final width = layout.width(c.maxWidth, fallback: c.maxWidth, floor: 140);
+      final position = widget.entry.text('position', 'start');
+      Widget card() => SizedBox(
+        height: height,
+        child: SingleChildScrollView(
+          child: PromoCard(entry: widget.entry, onTap: widget.onTap),
+        ),
+      );
+      return Align(
+        alignment: position == 'end'
+            ? Alignment.centerRight
+            : position == 'center'
+            ? Alignment.center
+            : Alignment.centerLeft,
+        child: SizedBox(
+          width: width,
+          height: height,
+          child: Stack(
+            children: [
+              ClipRect(
+                child: AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, _) => Transform.translate(
+                    key: ValueKey('promo-motion-${widget.entry.id}'),
+                    offset: Offset(
+                      0,
+                      moving && !MediaQuery.of(context).disableAnimations
+                          ? -animation.value * cycle
+                          : 0,
+                    ),
+                    child: OverflowBox(
+                      alignment: Alignment.topCenter,
+                      minHeight: 0,
+                      maxHeight: double.infinity,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          card(),
+                          if (moving) ...[SizedBox(height: gap), card()],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (moving)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: IconButton(
+                    tooltip: paused
+                        ? 'Resume advertisement'
+                        : 'Pause advertisement',
+                    onPressed: () => setState(() {
+                      paused = !paused;
+                      if (paused) {
+                        animation.stop();
+                      } else {
+                        animation.repeat();
+                      }
+                    }),
+                    icon: Icon(paused ? Icons.play_arrow : Icons.pause),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -21,7 +21,17 @@ void main() {
       find.widgetWithText(TextFormField, 'Category name'),
       'Garden',
     );
-    await tester.ensureVisible(find.text('Save changes'));
+    await tester.scrollUntilVisible(
+      find.text('Save changes'),
+      250,
+      scrollable: find
+          .byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          )
+          .first,
+    );
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

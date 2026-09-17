@@ -1,15 +1,36 @@
-# Home page
+﻿# Responsive homepage and layout controls
 
-The home page uses the existing green Material theme and existing Store, search providers, page routes and location flow. No Firebase configuration, authentication, backend functions, rules or GitHub configuration changes are required.
+The active homepage remains `WireframeHome`, composed from the existing store, cards, ticker, carousel and detail routes. The fixed 1,050 px canvas and page-wide horizontal scrolling have been removed.
 
-- `home_content.dart` composes categories, featured products, nearby shops, services, offers and the desktop advertising column.
-- `home_widgets.dart` contains reusable category, product, shop, grid and section-heading widgets.
-- `home_promotions.dart` handles the ticker, six-second carousel and scheduled promotional cards. Existing admin visibility, order, targets and size fields are used. Reduced-motion preferences stop visible automatic movement.
-- `home_hero_slide.dart` renders the responsive promotional artwork and text.
-- `storefront.dart` connects existing search, location, cart, account and admin actions, with bottom navigation below 700px and a right advertising column from 1100px.
+## Administrator workflow
 
-Admin product editing includes an optional `compareAtPrice` for discount badges. The badge compares this against the customer's effective pincode price. Demo cards use illustrative original prices; live cards use only provided values. Product and promotional images continue to use the existing `imageUrl` fields and icon artwork when absent or unavailable.
+Open **Business admin → UI Customization / Layout Settings** (the customization icon in the studio toolbar). Choose a component, edit its dimensions, and save. Save/reset remain visible while scrolling. Changing components saves pending valid edits; invalid values remain in the current form.
 
-Empty collections use presentation-only sample data. Preview products cannot open a real product page or enter the cart. Nearby shops use the existing GPS radius/pincode filtering after location is selected. Voice/image search buttons retain the existing provider integration and explanatory message if no provider is connected.
+- Settings use existing `settings/section_<component>` documents. Live writes retain the existing administrator-only Firestore rules. Demo changes use the existing SharedPreferences catalog and survive restart.
+- Blank fields inherit responsive defaults; zero width/height/breakpoint widths mean automatic. Breakpoint widths override the general width. Component fonts/colors override the global **Theme Settings**.
+- Mobile is below 700 px, tablet below 1,100 px, and desktop starts at 1,100 px. Grids also consider their own available width, including the ad column.
+- Sizes are constrained to the viewport. Minimum readable controls, text scaling and content height take priority over impossibly small requests. Width/height minimums cannot exceed nonzero maximums in the editor.
+- **Reset this component to default** clears the component's layout overrides, preserving content and unrelated components.
+- Search includes independent breakpoint widths, bounds, height, typography, search/voice/image icon sizes, padding, borders and icon gaps. Recognition still requires the existing voice/image provider integrations.
+- Banner visible count is reduced on narrow screens to keep cards readable. Rotation interval and dimensions are configurable. Existing banner direction, targets and individual content remain supported.
+- Ticker text, translations, notice fields, scheduling and playback remain in **Scrolling Text Settings**. Layout overrides are in **Ticker / notice bar**. Both scrolling directions and pause/resume work.
+- **Promotions** keeps per-item width, height, placement, order, schedule, appearance and spacing. Per-item values override advertisement/promotional-box defaults. Enable **Scroll bottom-to-top**, set speed, and optionally set **Stop scrolling after seconds**; zero means continuous. Position is alignment within the available ad/promo area.
+- Office basics remain next to Services when space permits. Contact details open on request. Office phone, WhatsApp and details are editable in **Business profile**.
 
-Validation covers 320px, 390px, 768px and 1440px layouts, large text, mobile navigation, disabled preview purchases, existing search/cart flows and admin editing. Rendered previews are generated under `build/home-390.png` and `build/home-1440.png` by `test/home_layout_test.dart`.
+## Implementation
+
+- `layout_settings.dart`: bounded sizing and breakpoint resolution; reusable section constraints.
+- `layout_editor.dart`: grouped persistent administration and component reset.
+- `responsive_header.dart`: logo, account/location/language/admin actions, independent search, Services and office contact reveal.
+- `wireframe_home.dart`: responsive composition, ticker translation, category/product grids, nearby map and promotion rails.
+- `home_widgets.dart`, `home_promotions.dart`, `home_hero_slide.dart`: existing reusable widgets extended for dimensions, safe content and independent animation clocks.
+- `services_page.dart`: searchable services using existing products/providers and product details.
+- `shared.dart`: full-quality aspect-preserving images, safe numbers and transparent backgrounds.
+
+Product details, variants, cart, checkout, reviews, account/orders, pricing, GPS/pincode filtering, Firebase initialization, backend functions and security configuration are retained. Empty live collections display honest empty states rather than purchasable sample records. Sample data remains available in the existing explicit demo mode.
+
+## Verification
+
+`flutter test` includes 320, 390, 768, 1024, 1440, 1920 and 2560 px layouts, accessibility text scaling, extreme settings, saved search width/height and Services independence, admin validation/reset/persistence, five-banner desktop layout/mobile reduction, ticker direction/pause, timed upward ads, service detail navigation, text search, cart and existing pricing/radius tests.
+
+`build/home-<width>.png` contains rendered visual checks generated by `test/home_layout_test.dart`. Browser-specific test results and build logs are recorded in `build/` during validation. Live sign-in, real checkout submission and recognition providers require the existing configured accounts/services and are not simulated as production success.

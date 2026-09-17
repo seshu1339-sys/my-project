@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'shared.dart';
+import 'layout_editor.dart';
 
 const adminSections = <String, String>{
   'products': 'Products & services',
@@ -37,6 +38,7 @@ const fields = <String, Map<String, String>>{
   'categories': {
     'name': 'Category name',
     'parentId': 'Parent category (optional)',
+    'imageUrl': 'Category image URL (optional)',
     'order': 'Display order',
   },
   'shops': {
@@ -44,6 +46,7 @@ const fields = <String, Map<String, String>>{
     'description': 'About this shop',
     'address': 'Street address',
     'phone': 'Phone',
+    'whatsapp': 'WhatsApp number (country code included)',
     'pincode': 'Pincode',
     'latitude': 'Latitude',
     'longitude': 'Longitude',
@@ -57,8 +60,8 @@ const fields = <String, Map<String, String>>{
     'placement': 'Display location',
     'target': 'Click action (shops / category:ID / product:ID / https://…)',
     'imageUrl': 'Image URL',
-    'width': 'Web width (120–360 px)',
-    'height': 'Height (100–600 px)',
+    'width': 'Width (0 = automatic, up to 3840 px)',
+    'height': 'Height (120-1200 px)',
     'startsAt': 'Starts at (optional)',
     'endsAt': 'Ends at (optional)',
     'order': 'Display order',
@@ -76,6 +79,9 @@ const fields = <String, Map<String, String>>{
     'padding': 'Box padding',
     'spacing': 'Section spacing',
     'animationMs': 'Animation timing (milliseconds)',
+    'position': 'Horizontal position (start / center / end)',
+    'scrollEnabled': 'Scroll bottom-to-top (true / false)',
+    'stopAfter': 'Stop scrolling after seconds (0 = continuous)',
     'direction': 'Movement direction (rtl / ltr)',
     'speed': 'Movement speed',
   },
@@ -84,6 +90,8 @@ const fields = <String, Map<String, String>>{
     'tagline': 'Tagline',
     'address': 'Business address',
     'phone': 'Phone',
+    'whatsapp': 'WhatsApp number (country code included)',
+    'description': 'Office / head office details',
     'imageUrl': 'Logo URL',
     'radiusKm': 'Default nearby radius (km)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
@@ -314,6 +322,16 @@ class _AdminPageState extends State<AdminPage> {
         appBar: AppBar(
           title: const Text('Business studio'),
           actions: [
+            IconButton(
+              tooltip: 'UI Customization / Layout Settings',
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (_) => LayoutSettingsPage(store: widget.store),
+                ),
+              ),
+            ),
             TextButton.icon(
               onPressed: () => Navigator.push(
                 context,
@@ -339,17 +357,20 @@ class _AdminPageState extends State<AdminPage> {
               ),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final item in adminSections.keys)
-                    ChoiceChip(
-                      label: Text(adminSections[item]!),
-                      selected: section == item,
-                      onSelected: (_) => setState(() => section = item),
-                    ),
-                ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final item in adminSections.keys)
+                      ChoiceChip(
+                        label: Text(adminSections[item]!),
+                        selected: section == item,
+                        onSelected: (_) => setState(() => section = item),
+                      ),
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -509,6 +530,7 @@ class _EntryEditorState extends State<EntryEditor> {
     'opacity',
     'spacing',
     'animationMs',
+    'stopAfter',
   };
   @override
   void initState() {
@@ -543,6 +565,9 @@ class _EntryEditorState extends State<EntryEditor> {
                       'opacity': '1',
                       'spacing': '16',
                       'animationMs': '6000',
+                      'stopAfter': '0',
+                      'scrollEnabled': 'false',
+                      'position': 'start',
                       'animationSpeed': '600',
                       'displayDuration': '6000',
                       'section': 'header',
@@ -733,7 +758,12 @@ class _EntryEditorState extends State<EntryEditor> {
 
   Widget field(String key, String label) {
     List<DropdownMenuItem<String>>? options;
-    if (['categoryId', 'parentId', 'shopId'].contains(key)) {
+    if (['position', 'scrollEnabled'].contains(key)) {
+      options =
+          (key == 'position' ? ['start', 'center', 'end'] : ['false', 'true'])
+              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+              .toList();
+    } else if (['categoryId', 'parentId', 'shopId'].contains(key)) {
       options = [
         const DropdownMenuItem(value: '', child: Text('None')),
         ...widget.store

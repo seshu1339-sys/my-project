@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/search.dart';
+import 'details.dart';
 import 'home_promotions.dart';
+import 'home_widgets.dart';
+import 'layout_settings.dart';
+import 'responsive_header.dart';
 import 'shared.dart';
 
+/// The existing homepage composition, now constrained by its actual viewport.
 class WireframeHome extends StatelessWidget {
   const WireframeHome({
     super.key,
@@ -21,637 +26,451 @@ class WireframeHome extends StatelessWidget {
     required this.onProduct,
     required this.onAdd,
     required this.onCategory,
+    required this.onPromotion,
+    required this.scroll,
+    required this.categoriesKey,
+    required this.productsKey,
   });
-
   final Store store;
   final TextEditingController search;
   final SmartSearch searchService;
-  final VoidCallback onSearch;
-  final VoidCallback onLocation;
+  final VoidCallback onSearch, onLocation, onServices, onAccount, onCart;
   final ValueChanged<bool> onAssistedSearch;
-  final VoidCallback onServices;
-  final VoidCallback onAccount;
-  final VoidCallback onCart;
-  final ValueChanged<Entry> onProduct;
-  final ValueChanged<Entry> onAdd;
-  final ValueChanged<String> onCategory;
-
-  List<Entry> entries(String collection) {
-    final values = store.visible(collection);
-    if (values.isNotEmpty) return values;
-    return demoCatalog()[collection] ?? const [];
-  }
+  final ValueChanged<Entry> onProduct, onAdd;
+  final ValueChanged<String> onCategory, onPromotion;
+  final ScrollController scroll;
+  final GlobalKey categoriesKey, productsKey;
 
   @override
   Widget build(BuildContext context) {
-    final categories = entries('categories');
-    final products = searchService
-        .text(entries('products'), search.text)
-        .take(7)
+    final settings = store.entries('settings');
+    final categories = store
+        .visible('categories')
+        .where((e) => e.text('parentId').isEmpty)
         .toList();
-    final promotions = entries('promotions');
+    final products = searchService.text(store.visible('products'), search.text);
+    final promotions = store.visible('promotions');
     final offers = promotions
-        .where((entry) => entry.text('placement') == 'carousel')
+        .where((e) => e.text('placement') == 'carousel')
         .toList();
-    final ads = promotions
-        .where((entry) => entry.text('placement') == 'ad')
+    final ads = promotions.where((e) => e.text('placement') == 'ad').toList();
+    final boxes = promotions
+        .where((e) => e.text('placement') == 'box')
         .toList();
-    final ticker = promotions
-        .where((entry) => entry.text('placement') == 'ticker')
+    final tickerSettings = store
+        .visible('settings')
+        .where((e) => e.id == 'scrollingText')
         .firstOrNull;
-    final content = <Widget>[
-      _TopRow(
-        store: store,
-        search: search,
-        onSearch: onSearch,
-        onLocation: onLocation,
-        onAssistedSearch: onAssistedSearch,
-        onServices: onServices,
-        onAccount: onAccount,
-        onCart: onCart,
+    final tickerPromo = promotions
+        .where((e) => e.text('placement') == 'ticker')
+        .firstOrNull;
+    final noticeLayout = layoutFor(context, settings, 'notice');
+    final ticker = Entry('notice', {
+      ...?tickerSettings?.data,
+      ...noticeLayout.entry.data,
+    });
+    final translations = ticker.data['translations'];
+    final notices = [
+      'importantNews',
+      'importantUpdates',
+      'customerNotices',
+      'offers',
+      'deliveryInformation',
+      'serviceAnnouncements',
+      'stateSpecificNotices',
+      'generalAlerts',
+    ].map(ticker.text).where((s) => s.isNotEmpty).join('  •  ');
+    final text = translations is Map && translations[store.language] != null
+        ? translations[store.language].toString()
+        : notices.isNotEmpty
+        ? notices
+        : ticker.text('text').isNotEmpty
+        ? ticker.text('text')
+        : tickerPromo?.text('name') ?? '';
+    final page = layoutFor(context, settings, 'background');
+    final categoryLayout = layoutFor(context, settings, 'categories');
+    final productLayout = layoutFor(context, settings, 'products');
+    final adLayout = layoutFor(context, settings, 'ads');
+    final nearby = layoutFor(context, settings, 'nearby');
+    final located = store.pincode.isNotEmpty || store.latitude != null;
+    final shops = located ? store.nearby() : store.visible('shops');
+    final theme =
+        settings.where((e) => e.id == 'theme').firstOrNull ??
+        const Entry('', {});
+    return Container(
+      decoration: entryDecoration(
+        Entry('background', {
+          ...theme.data,
+          'backgroundColor': theme.text('background'),
+          ...page.entry.data,
+        }),
+        fallback: Theme.of(context).scaffoldBackgroundColor,
+        defaultRadius: 0,
       ),
-      const SizedBox(height: 8),
-      _FrontLayout(
-        store: store,
-        categories: categories,
-        products: products,
-        ads: ads,
-        offers: offers,
-        ticker: ticker,
-        onProduct: onProduct,
-        onAdd: onAdd,
-        onCategory: onCategory,
-      ),
-      const SizedBox(height: 18),
-      const SizedBox(
-        height: 42,
-        child: Align(
-          alignment: Alignment.center,
-          child: Text(
-            'Featured products    Nearby shops    Best offers',
-            style: TextStyle(color: Colors.transparent, fontSize: 1),
-          ),
-        ),
-      ),
-    ];
-    return ColoredBox(
-      color: Colors.white,
       child: SingleChildScrollView(
-        child: Center(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: 1050,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Column(children: content),
-              ),
+        controller: scroll,
+        child: Padding(
+          padding: EdgeInsets.all(
+            page
+                .n(
+                  'padding',
+                  MediaQuery.sizeOf(context).width < 700 ? 12 : 24,
+                  0,
+                  48,
+                )
+                .clamp(0, MediaQuery.sizeOf(context).width / 24),
+          ),
+          child: LayoutSection(
+            layout: ComponentLayout(
+              Entry(page.entry.id, {...page.entry.data, 'padding': 0}),
+              page.viewport,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ResponsiveHeader(
+                  store: store,
+                  search: search,
+                  onSearch: onSearch,
+                  onLocation: onLocation,
+                  onServices: onServices,
+                  onAccount: onAccount,
+                  onCart: onCart,
+                  onAssistedSearch: onAssistedSearch,
+                ),
+                if (!store.live)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Demo marketplace • explore the experience'),
+                  ),
+                if (store.error.isNotEmpty)
+                  Text(
+                    store.error,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                if (text.isNotEmpty && noticeLayout.visible)
+                  LayoutSection(
+                    layout: noticeLayout,
+                    child: TickerStrip(
+                      text: text,
+                      height: ComponentLayout(
+                        ticker,
+                        page.viewport,
+                      ).height(40, floor: 32),
+                      fontSize: ComponentLayout(ticker, page.viewport).font(14),
+                      fontFamily: ticker.text('fontFamily'),
+                      fontWeight: FontWeight.values.firstWhere(
+                        (w) => w.value == ticker.number('fontWeight', 400),
+                        orElse: () => FontWeight.normal,
+                      ),
+                      speed: clampedNumber(ticker, 'speed', 70, 10, 300),
+                      padding: clampedNumber(ticker, 'padding', 8, 0, 48),
+                      reverse: ticker.text('direction', 'rtl') == 'ltr',
+                      backgroundColor: colorFromHex(
+                        ticker.text('backgroundColor'),
+                        const Color(0xff174c38),
+                      ),
+                      textColor: colorFromHex(
+                        ticker.text('textColor'),
+                        Colors.white,
+                      ),
+                      backgroundImage: ticker.text('backgroundImage'),
+                      brightness: ticker.number('brightness', 1),
+                      opacity: ticker.number('opacity', 1),
+                      radius: clampedNumber(ticker, 'radius', 8, 0, 80),
+                      borderColor: ticker.text('borderColor'),
+                      borderWidth: clampedNumber(
+                        ticker,
+                        'borderWidth',
+                        0,
+                        0,
+                        8,
+                      ),
+                      playback: ticker.text('playback', 'running'),
+                    ),
+                  ),
+                SizedBox(height: page.gap),
+                LayoutBuilder(
+                  builder: (context, c) {
+                    final railWidth = adLayout.width(
+                      c.maxWidth * .28,
+                      fallback: (c.maxWidth * .22).clamp(230, 380),
+                    );
+                    final wide =
+                        c.maxWidth >= 1100 &&
+                        adLayout.visible &&
+                        ads.isNotEmpty;
+                    final rail = LayoutSection(
+                      layout: adLayout,
+                      child: Column(
+                        children: [
+                          for (final ad in ads)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: ad
+                                    .number('spacing', adLayout.gap)
+                                    .clamp(0, 64),
+                              ),
+                              child: ScheduledPromo(
+                                entry: Entry(ad.id, {
+                                  ...adLayout.entry.data,
+                                  ...ad.data,
+                                }),
+                                onTap: () => onPromotion(ad.text('target')),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                    final main = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LayoutSection(
+                          layout: layoutFor(context, settings, 'promo'),
+                          child: HeroCarousel(
+                            entries: offers,
+                            appearance: sectionConfig(settings, 'promo'),
+                            onTap: onPromotion,
+                            reverse:
+                                offers.isNotEmpty &&
+                                offers.first.text('direction', 'rtl') == 'ltr',
+                            speed: offers.isEmpty
+                                ? 600
+                                : offers.first.number('speed', 600),
+                          ),
+                        ),
+                        LayoutSection(
+                          layout: ComponentLayout(
+                            Entry(categoryLayout.entry.id, {
+                              'visible': categoryLayout.visible,
+                              'margin': categoryLayout.margin,
+                            }),
+                            categoryLayout.viewport,
+                          ),
+                          child: Column(
+                            key: categoriesKey,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              HomeSectionHeading(
+                                title: 'Categories',
+                                subtitle: 'Browse your everyday essentials',
+                                appearance: categoryLayout.entry,
+                              ),
+                              if (categories.isEmpty)
+                                const Text(
+                                  'Categories will appear here when available.',
+                                ),
+                              LayoutBuilder(
+                                builder: (context, grid) {
+                                  final columns = categoryLayout.columns(
+                                    grid.maxWidth,
+                                    preferred: 170,
+                                    minimum: 125,
+                                  );
+                                  final tileWidth =
+                                      (grid.maxWidth -
+                                          (columns - 1) * categoryLayout.gap) /
+                                      columns;
+                                  return Wrap(
+                                    spacing: categoryLayout.gap,
+                                    runSpacing: categoryLayout.gap,
+                                    children: [
+                                      for (final (i, category)
+                                          in categories.indexed)
+                                        SizedBox(
+                                          width: tileWidth,
+                                          height: categoryLayout.height(
+                                            tileWidth,
+                                            floor: tileWidth,
+                                          ),
+                                          child: HomeCategoryTile(
+                                            entry: category,
+                                            selected: false,
+                                            onTap: () =>
+                                                onCategory(category.id),
+                                            index: i,
+                                            appearance: categoryLayout.styled(
+                                              context,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        LayoutSection(
+                          layout: layoutFor(context, settings, 'popular'),
+                          child: Column(
+                            key: productsKey,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              HomeSectionHeading(
+                                title: search.text.isEmpty
+                                    ? 'Popular Products'
+                                    : 'Search results',
+                                subtitle: search.text.isEmpty
+                                    ? 'Products and services from your neighbourhood'
+                                    : '${products.length} matching items',
+                                appearance: sectionConfig(settings, 'popular'),
+                              ),
+                              if (products.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text(
+                                    'No matching products. Try another search.',
+                                  ),
+                                ),
+                              if (productLayout.visible)
+                                HomeProductGrid(
+                                  entries: products,
+                                  appearance: productLayout.entry,
+                                  itemBuilder: (entry) => HomeProductTile(
+                                    entry: entry,
+                                    price: entry.price(store.pincode),
+                                    appearance: productLayout.styled(
+                                      context,
+                                      fontSize: 16,
+                                    ),
+                                    onOpen: () => onProduct(entry),
+                                    onAdd:
+                                        entry.number('stock') >
+                                            (store.cart[entry.id] ?? 0)
+                                        ? () => onAdd(entry)
+                                        : null,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        LayoutSection(
+                          layout: nearby,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              HomeSectionHeading(
+                                title: 'Nearby shops',
+                                subtitle: located
+                                    ? 'Shops serving your selected location'
+                                    : 'Choose a location or browse available shops',
+                                action: onLocation,
+                                actionLabel: located
+                                    ? 'Change location'
+                                    : 'Set location',
+                                appearance: nearby.entry,
+                              ),
+                              if (shops.isNotEmpty && located)
+                                ShopMap(
+                                  key: ValueKey(
+                                    '${store.pincode}-${store.latitude}-${shops.map((e) => e.id).join(',')}',
+                                  ),
+                                  shops: shops,
+                                  latitude: store.latitude,
+                                  longitude: store.longitude,
+                                  height: nearby.height(320, floor: 180),
+                                  onShop: (shop) => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          ShopPage(store: store, shop: shop),
+                                    ),
+                                  ),
+                                ),
+                              if (shops.isEmpty)
+                                const Text(
+                                  'No nearby shops found. You can change your pincode without enabling GPS.',
+                                ),
+                              for (final shop in shops)
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(
+                                    Icons.storefront_outlined,
+                                  ),
+                                  title: Text(shop.text('name')),
+                                  subtitle: Text(
+                                    '${shop.text('address')} • ${shop.text('phone')} ${store.latitude == null ? '' : '• ${distanceKm(store.latitude!, store.longitude!, shop.number('latitude'), shop.number('longitude')).toStringAsFixed(1)} km'}',
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          ShopPage(store: store, shop: shop),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (boxes.isNotEmpty)
+                          LayoutSection(
+                            layout: layoutFor(context, settings, 'boxes'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const HomeSectionHeading(
+                                  title: 'Best offers',
+                                  subtitle: 'More from your local shops',
+                                ),
+                                for (final box in boxes)
+                                  Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: clampedNumber(
+                                        box,
+                                        'spacing',
+                                        layoutFor(
+                                          context,
+                                          settings,
+                                          'boxes',
+                                        ).gap,
+                                        0,
+                                        64,
+                                      ),
+                                    ),
+                                    child: ScheduledPromo(
+                                      entry: Entry(box.id, {
+                                        ...sectionConfig(
+                                          settings,
+                                          'boxes',
+                                        ).data,
+                                        ...box.data,
+                                      }),
+                                      onTap: () =>
+                                          onPromotion(box.text('target')),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                    return wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: main),
+                              SizedBox(width: page.gap),
+                              SizedBox(width: railWidth, child: rail),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              main,
+                              if (adLayout.visible && ads.isNotEmpty) rail,
+                            ],
+                          );
+                  },
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
         ),
       ),
     );
   }
-}
-
-class _TopRow extends StatelessWidget {
-  const _TopRow({
-    required this.store,
-    required this.search,
-    required this.onSearch,
-    required this.onLocation,
-    required this.onAssistedSearch,
-    required this.onServices,
-    required this.onAccount,
-    required this.onCart,
-  });
-
-  final Store store;
-  final TextEditingController search;
-  final VoidCallback onSearch;
-  final VoidCallback onLocation;
-  final ValueChanged<bool> onAssistedSearch;
-  final VoidCallback onServices;
-  final VoidCallback onAccount;
-  final VoidCallback onCart;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 92,
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _HeaderBox(
-          width: 105,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 38,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xff4b4bd5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(
-                    Icons.storefront_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text('APP LOGO', style: _HeaderText.style),
-              ],
-            ),
-          ),
-        ),
-        _HeaderBox(
-          width: 135,
-          child: FittedBox(
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.scaleDown,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  store.profileName.isEmpty ? 'USER NAME' : store.profileName,
-                  maxLines: 1,
-                  style: _HeaderText.style,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  store.address.isEmpty ? 'LOCATION' : store.address,
-                  maxLines: 1,
-                  style: _HeaderText.style,
-                ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          flex: 5,
-          child: _HeaderBox(
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: search,
-                    onChanged: (_) => onSearch(),
-                    decoration: const InputDecoration(
-                      hintText: 'SEARCH',
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Voice search',
-                  onPressed: () => onAssistedSearch(false),
-                  icon: const Icon(Icons.mic_none, color: Color(0xff4141c9)),
-                ),
-                IconButton(
-                  tooltip: 'Camera search',
-                  onPressed: () => onAssistedSearch(true),
-                  icon: const Icon(
-                    Icons.camera_alt_outlined,
-                    color: Color(0xff4141c9),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        _HeaderBox(
-          width: 135,
-          child: TextButton(
-            onPressed: onServices,
-            child: const Text('SERVICES', style: _HeaderText.style),
-          ),
-        ),
-        _HeaderBox(
-          width: 178,
-          child: Row(
-            children: [
-              Expanded(
-                child: FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        store.business.text('address', 'OFFICE ADDRESS'),
-                        maxLines: 1,
-                        style: _HeaderText.style,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        store.business.text('phone', 'MOBILE NUMBER'),
-                        maxLines: 1,
-                        style: _HeaderText.style,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Your account',
-                onPressed: onAccount,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                icon: const Icon(Icons.person_outline, size: 18),
-              ),
-              IconButton(
-                tooltip: 'Shopping bag',
-                onPressed: onCart,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _HeaderBox extends StatelessWidget {
-  const _HeaderBox({required this.child, this.width});
-  final Widget child;
-  final double? width;
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: width,
-    child: Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xff4141c9), width: 2),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: child,
-    ),
-  );
-}
-
-class _FrontLayout extends StatelessWidget {
-  const _FrontLayout({
-    required this.store,
-    required this.categories,
-    required this.products,
-    required this.ads,
-    required this.offers,
-    required this.ticker,
-    required this.onProduct,
-    required this.onAdd,
-    required this.onCategory,
-  });
-  final Store store;
-  final List<Entry> categories, products, ads, offers;
-  final Entry? ticker;
-  final ValueChanged<Entry> onProduct, onAdd;
-  final ValueChanged<String> onCategory;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          children: [
-            _OfferStrip(entries: offers),
-            const SizedBox(height: 12),
-            if (ticker != null)
-              TickerStrip(
-                text: ticker!.text('name'),
-                height: 30,
-                speed: 55,
-                padding: 6,
-                backgroundColor: const Color(0xffcceff4),
-                textColor: const Color(0xff214f59),
-                radius: 0,
-              ),
-            const SizedBox(height: 12),
-            _WireframeBody(
-              store: store,
-              categories: categories,
-              products: products,
-              onProduct: onProduct,
-              onAdd: onAdd,
-              onCategory: onCategory,
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(width: 12),
-      _AdRail(ads: ads),
-    ],
-  );
-}
-
-class _OfferStrip extends StatefulWidget {
-  const _OfferStrip({required this.entries});
-  final List<Entry> entries;
-
-  @override
-  State<_OfferStrip> createState() => _OfferStripState();
-}
-
-class _OfferStripState extends State<_OfferStrip>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController animation = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 12),
-  )..repeat();
-
-  @override
-  void dispose() {
-    animation.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 72,
-    child: ClipRect(
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, _) => FractionalTranslation(
-          translation: Offset(-animation.value * .2, 0),
-          child: OverflowBox(
-            alignment: Alignment.centerLeft,
-            maxWidth: double.infinity,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var index = 0; index < 7; index++)
-                  SizedBox(
-                    width: 190,
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: const Color(0xffff9fbe),
-                          width: 4,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: Icon(
-                              Icons.arrow_back,
-                              color: Color(0xff4141c9),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              index == 1 && widget.entries.isNotEmpty
-                                  ? widget.entries.first.text('name')
-                                  : index == 1
-                                  ? 'TODAY OFFER BOXES'
-                                  : '',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Color(0xff4141c9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _WireframeBody extends StatelessWidget {
-  const _WireframeBody({
-    required this.store,
-    required this.categories,
-    required this.products,
-    required this.onProduct,
-    required this.onAdd,
-    required this.onCategory,
-  });
-  final Store store;
-  final List<Entry> categories, products;
-  final ValueChanged<Entry> onProduct, onAdd;
-  final ValueChanged<String> onCategory;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 12, bottom: 10),
-                child: Text(
-                  'CATEGORIES',
-                  style: const TextStyle(
-                    color: Color(0xff176b50),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            GridView.count(
-              crossAxisCount: 4,
-              crossAxisSpacing: 38,
-              mainAxisSpacing: 18,
-              childAspectRatio: 1.2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                for (final category in categories.take(4))
-                  _CategoryBox(
-                    entry: category,
-                    onTap: () => onCategory(category.id),
-                  ),
-                for (final product in products.take(4))
-                  _ProductBox(
-                    entry: product,
-                    price: product.price(store.pincode),
-                    onOpen: () => onProduct(product),
-                    onAdd: () => onAdd(product),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-}
-
-class _AdRail extends StatelessWidget {
-  const _AdRail({required this.ads});
-  final List<Entry> ads;
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 185,
-    child: Column(
-      children: [
-        for (var index = 0; index < 4; index++)
-          Container(
-            height: 107,
-            margin: const EdgeInsets.only(bottom: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xffe51e2a), width: 4),
-              color: index < ads.length
-                  ? const Color(0xfffff5e8)
-                  : Colors.white,
-            ),
-            child: index < ads.length
-                ? _AdContent(entry: ads[index])
-                : const Center(
-                    child: Text(
-                      'ADS',
-                      style: TextStyle(color: Color(0xffe51e2a)),
-                    ),
-                  ),
-          ),
-      ],
-    ),
-  );
-}
-
-class _CategoryBox extends StatelessWidget {
-  const _CategoryBox({required this.entry, required this.onTap});
-  final Entry entry;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xffc3c3c3), width: 4),
-        color: Colors.white,
-      ),
-      child: Center(
-        child: Text(
-          entry.text('name'),
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Color(0xff0075b8), fontSize: 13),
-        ),
-      ),
-    ),
-  );
-}
-
-class _ProductBox extends StatelessWidget {
-  const _ProductBox({
-    required this.entry,
-    required this.price,
-    required this.onOpen,
-    required this.onAdd,
-  });
-  final Entry entry;
-  final double price;
-  final VoidCallback onOpen, onAdd;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onOpen,
-    child: Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xffc3c3c3), width: 4),
-        color: Colors.white,
-      ),
-      padding: const EdgeInsets.all(8),
-      child: FittedBox(
-        alignment: Alignment.bottomLeft,
-        fit: BoxFit.scaleDown,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              entry.text('name'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Color(0xff0075b8), fontSize: 12),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  money(price),
-                  style: const TextStyle(
-                    color: Color(0xff0075b8),
-                    fontSize: 12,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Add ${entry.text('name')} to bag',
-                  onPressed: onAdd,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  icon: const Icon(
-                    Icons.add,
-                    size: 18,
-                    color: Color(0xff176b50),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _AdContent extends StatelessWidget {
-  const _AdContent({required this.entry});
-  final Entry entry;
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(12),
-    child: FittedBox(
-      alignment: Alignment.topLeft,
-      fit: BoxFit.scaleDown,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('ADS', style: TextStyle(color: Color(0xff0075b8))),
-          const SizedBox(height: 24),
-          Text(
-            entry.text('name'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _HeaderText {
-  static const style = TextStyle(
-    color: Color(0xfff01818),
-    fontSize: 12,
-    fontWeight: FontWeight.w500,
-  );
 }
