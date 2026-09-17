@@ -21,34 +21,55 @@ Email-link sign-in also verifies ownership of the address. The backend and rules
 
 Artifacts: `build/email-analysis.log`, `build/email-flutter-tests.log`, `build/email-link-widget-tests.log`, `build/email-backend-tests.log`, `build/email-rules-tests.log`, `build/email-flow-emulator.log`, `build/email-web-build.log`, and `build/browser-check/email-link-results.json`.
 
-## Exact production actions proposed
+## Exact production actions proposed (updated 2026-09-17, post admin-panel separation)
 
-Project: **e-commerce-app-a3897**.
+Project: **e-commerce-app-a3897**. Since this doc was first written, the admin studio became a second, separate app (`lib/main_admin.dart`) needing its own Hosting site, and `placeOrder`/`quote()` gained an optional delivery/service fee, and two new notification/stock functions were added. The scope below supersedes the original six-action list.
 
-1. Authentication configuration: enable email-link sign-in by setting `signIn.email.enabled=true` and `signIn.email.passwordRequired=false`. Keep Phone authentication disabled. Email/password remains available. Preserve authorized domains and all unrelated project settings.
-2. Functions in `us-central1`: update **pinLogin**, **setPin**, and **placeOrder** only. The first two reject retired SMS/PIN authentication; checkout additionally requires `email_verified=true`. Existing authoritative pricing, stock transaction and idempotency logic stay intact.
-3. Firestore rules: publish `firestore.rules`, requiring verified email for authenticated private operations and admin writes while preserving public catalog browsing.
-4. Storage rules: publish `storage.rules`, requiring verified email as well as the existing admin claim for catalog uploads/deletion.
-5. Firebase Hosting: publish **build/web** to **https://e-commerce-app-a3897.web.app**. Hosting publishes the entire current local app, including the previously completed responsive work and the new authentication screens; the old hosted bundle differs from it. No homepage redesign was added in this migration.
-6. Verify provider settings, hosted bundle hash, safe callable rejection behavior and the hosted authentication UI. Real email delivery/sign-in needs an owner-supplied address and interaction with its inbox.
+1. One-time Hosting target setup (see **Step-by-step deploy commands** below) so `firebase.json`'s two hosting configs (`customer`, `admin`) resolve to real sites.
+2. Authentication configuration: enable email-link sign-in by setting `signIn.email.enabled=true` and `signIn.email.passwordRequired=false`. Phone stays disabled. Email/password remains available. Preserves authorized domains and all unrelated project settings.
+3. Functions in `us-central1`/`asia-south1`: **pinLogin** and **setPin** reject retired SMS/PIN authentication; **placeOrder** requires `email_verified=true` and now also applies `settings/business`'s optional delivery/service fee; **reconcileCancelledOrderStock** and **notifyOrderStatus** are new (stock restore on cancellation, one-to-one order-status push). `notifyPriceDrop`/`notifyNewOffers` are unchanged.
+4. Firestore rules: publish `firestore.rules` — verified email for authenticated private operations and admin writes, plus the widened (still validated) `users/{uid}` field set for wishlist/payment-card/language sync; public catalog browsing unchanged.
+5. Storage rules: publish `storage.rules` — verified email plus the existing admin claim for catalog uploads/deletion.
+6. Firebase Hosting: publish **build/web** to the customer site and **build/admin_web** to the new, separate admin site. The admin app is not reachable from the customer app at all (confirmed by grepping the compiled customer bundle for admin strings — zero matches).
+7. Web push: `FIREBASE_VAPID_KEY` is now set in the local `firebase-config-web.json` build-define file (owner-supplied), so it will be embedded in the customer build from this point on.
+8. Verify: hosted bundle hash, safe callable rejection behavior, both hosting sites serving, and the admin site's sign-in gate.
 
-Reviewed `build/web/main.dart.js` SHA-256:
-`AA6E3313B2DF2AD9B2B37459EC184020CD012F790ADCBED181102131680E713D`
+This scope does not change IAM/billing, create customer accounts/orders, or modify catalog records. Granting the admin claim is a separate, explicit step (below) gated on the owner actually registering and verifying their email first — it cannot happen before hosting is live, since the currently-deployed customer site still has the old SMS/PIN UI.
 
-Commands prepared, **not executed**:
+## Step-by-step deploy commands
+
+Run these from the project root, in order. Each one only does what it says; nothing here grants admin access or touches billing/IAM.
 
 ```powershell
+# 1. One-time: point the two hosting configs in firebase.json at real sites.
+#    "customer" reuses the EXISTING live site (same ID as the project) — this does not create anything new or move your current site.
+firebase target:apply hosting customer e-commerce-app-a3897 --project e-commerce-app-a3897
+#    "admin" needs a brand-new site, created once:
+firebase hosting:sites:create e-commerce-app-a3897-admin --project e-commerce-app-a3897
+firebase target:apply hosting admin e-commerce-app-a3897-admin --project e-commerce-app-a3897
+
+# 2. Enable email-link sign-in (email/password was already enabled earlier; this adds passwordless).
 node scripts/firebase-setup.cjs configure-email-link
-firebase.cmd deploy --only "functions:pinLogin,functions:setPin,functions:placeOrder,firestore:rules,storage,hosting" --project e-commerce-app-a3897 --non-interactive
+
+# 3. Build both web apps with the live Firebase config (includes the VAPID key for push).
+./scripts/flutter.ps1 build web --dart-define-from-file=firebase-config-web.json
+./scripts/flutter.ps1 build web -t lib/main_admin.dart -o build/admin_web --dart-define-from-file=firebase-config-web.json
+
+# 4. Deploy backend: all functions (including the two new ones), Firestore rules, Storage rules.
+$env:FUNCTIONS_DISCOVERY_TIMEOUT = "60"
+firebase deploy --only functions,firestore:rules,storage --project e-commerce-app-a3897 --non-interactive
+
+# 5. Deploy both hosting sites.
+firebase deploy --only hosting --project e-commerce-app-a3897 --non-interactive
+
+# 6. Verify.
 node scripts/firebase-smoke.cjs
 ```
 
-This scope does not deploy notification functions, change IAM/billing, create accounts/orders, modify catalog records, or grant admin access.
+**Only after step 6 succeeds:** open the now-live customer site, register with the intended owner email, and click the verification link sent to that inbox. Only then run:
 
-## Current production state and approval reason
+```powershell
+node scripts/firebase-setup.cjs grant-email-owner OWNER_EMAIL_HERE
+```
 
-The earlier authorized provider update succeeded: **Email/Password is enabled; Phone is disabled**. Email-link mode has not yet been enabled. The attempted combined app/functions/rules deployment was rejected before execution by automatic approval review because it considered those persistent production changes broader than the authentication request authorized. No workaround or split deployment was attempted.
-
-Consequently, the hosted client still has its old SMS/PIN interface while the Phone provider is disabled. Live sign-in is not ready until the coordinated migration above is approved and published. The last audit found no registered Auth users, but that is not a substitute for deployment approval.
-
-Approval is requested for exactly the six actions above. After approval and publication, the owner can use email-link sign-in or register with email/password and verify their inbox. Administrator access will be assigned only to an explicitly identified, enabled, verified-email account; `scripts/firebase-setup.cjs grant-email-owner EMAIL` and `functions/set-admin.js PROJECT UID` enforce verification.
+This fails on purpose if that email hasn't registered and verified yet — it never creates or guesses an account. Once it succeeds, sign out and back in (or just reload) on the **admin** site — `https://e-commerce-app-a3897-admin.web.app` — to pick up the refreshed claim.

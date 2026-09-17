@@ -64,11 +64,15 @@ The admin studio is a **separate app**, not reachable from the customer app at a
 ./scripts/flutter.ps1 build web -t lib/main_admin.dart -o build/admin_web --dart-define-from-file=firebase-config-web.json
 ```
 
-Deploy `build/admin_web` to its own Firebase Hosting site/target (not yet configured or deployed) so it gets its own URL, separate from the customer site. Sign in to the intended owner's account with email and password (verify the email first), then grant that existing Auth UID the admin claim from a trusted environment with Application Default Credentials:
+`firebase.json` defines two Hosting targets, `customer` (`build/web`) and `admin` (`build/admin_web`); see [the exact deploy commands](docs/authentication-deployment.md) to create/link the admin site the first time. The admin site's own URL (once created) is `https://e-commerce-app-a3897-admin.web.app`, entirely separate from the customer site.
+
+Register the intended owner's account on the **customer** site with email and password (or an email link) and verify the email first, then grant that account the admin claim by its email — this is the only supported way, and it fails on purpose if the account doesn't exist or isn't verified yet:
 
 ```powershell
-node functions/set-admin.js e-commerce-app-a3897 EXISTING_USER_UID
+node scripts/firebase-setup.cjs grant-email-owner OWNER_EMAIL_HERE
 ```
+
+(`functions/set-admin.js e-commerce-app-a3897 EXISTING_USER_UID` is the lower-level equivalent if you already have the Auth UID instead of just the email.)
 
 Sign out and back in (or reload the admin app) to refresh claims. Customers cannot elevate their role, and the admin app itself refuses any signed-in account without the claim. Add business settings, shops, categories, products and promotions in the studio. Demo data is never automatically written to the live database.
 
