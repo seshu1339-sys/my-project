@@ -37,7 +37,17 @@ class Store extends ChangeNotifier {
     }
   }
 
+  // A safety rail, not real pagination: caps each catalog collection's
+  // real-time listener so one runaway collection cannot blow up client
+  // reads/costs. A business with more items than this needs a paginated
+  // or server-searched catalog, which is a separate, larger change.
+  static const _catalogPageLimit = 2000;
   Map<String, List<Entry>> catalog = {};
+  final Set<String> truncatedCollections = {};
+  String get catalogWarning => truncatedCollections.isEmpty
+      ? ''
+      : 'Showing the first $_catalogPageLimit items in '
+            '${truncatedCollections.join(', ')}.';
   final Map<String, int> cart = {};
   final Set<String> wishlist = {};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -142,12 +152,18 @@ class Store extends ChangeNotifier {
         _subscriptions.add(
           firestore
               .collection(collection)
+              .limit(_catalogPageLimit)
               .snapshots()
               .listen(
                 (snapshot) {
                   catalog[collection] = snapshot.docs
                       .map((d) => Entry(d.id, d.data()))
                       .toList();
+                  if (snapshot.docs.length >= _catalogPageLimit) {
+                    truncatedCollections.add(collection);
+                  } else {
+                    truncatedCollections.remove(collection);
+                  }
                   notifyListeners();
                 },
                 onError: (Object e) {

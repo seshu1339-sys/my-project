@@ -80,14 +80,14 @@ Sign out and back in to refresh claims. Customers cannot elevate their role. The
 | `settings/business` | Identity and default radius | Admin |
 | `users/{uid}` | Display name | Owner |
 | `products/{id}/reviews/{uid}` | One editable review per customer | Owner, validated |
-| `orders/{id}` | Server-priced snapshot and status | Functions create; admin changes status |
+| `orders/{id}` | Server-priced snapshot and status | Functions create; admin changes status; Functions restore stock on cancellation |
 | `_pins/{uid}` | Salted scrypt hashes | Functions only |
 | `_rateLimits/{digest}` | Transactional request limits | Functions only |
 | Storage `catalog/{file}` | JPEG/PNG/WebP under 5 MB | Admin |
 
 Public catalog documents, including hidden/scheduled records, are readable. Scheduling is a presentation control, not confidentiality. Never put private information in catalog documents.
 
-`pinLogin` rate-limits phone/IP attempts and issues a Firebase custom token after hash verification. `setPin` requires recent SMS authentication and revokes refresh tokens. `placeOrder` checks identity, stock and server prices transactionally; deterministic request IDs prevent duplicate submission after network retries. Checkout creates a request, not a payment transaction.
+`pinLogin` and `setPin` are retired: they reject every call with an explicit error instead of issuing tokens, kept only so the old callable URLs fail loudly rather than disappear. `placeOrder` requires a verified email and checks identity, stock and server prices transactionally; deterministic request IDs prevent duplicate submission after network retries. Checkout creates a request, not a payment transaction. `reconcileCancelledOrderStock` watches `orders/{id}` and, the first time an order's status becomes `cancelled`, transactionally restores each line's quantity to `products/{id}.stock`; a `stockRestored` flag makes this idempotent if status is toggled again.
 
 ## Verify
 
@@ -104,6 +104,6 @@ Rules tests explicitly skip without an emulator. Domain tests cover hashes and a
 
 ## Release boundaries
 
-Online payments/refunds, tax/delivery policies, dispatch, push notifications and recognition providers remain integrations. Service orders are requests, not appointment calendars. Reviews are authenticated, not purchase-verified. Cancelled orders currently require manual stock reconciliation. Large catalogs need pagination and further abuse controls.
+Online payments/refunds, tax/delivery policies, dispatch, push notifications and recognition providers remain integrations. Service orders are requests, not appointment calendars. Reviews are authenticated, not purchase-verified. Cancelling an order automatically restores its reserved stock exactly once (`reconcileCancelledOrderStock`); this does not retroactively fix orders cancelled before that function was deployed. Each catalog collection's live listener is capped at 2,000 documents as a safety rail against runaway reads/cost, with a visible "showing the first 2,000 items" notice if a collection ever hits it; this is not paginated browsing, and a catalog that outgrows the cap needs a real paginated/server-searched catalog, a larger change. Further abuse controls are still needed.
 
 Android debug APKs are for review. The starter release signing uses the debug key and is unsuitable for Play Store publication. iOS requires macOS/Xcode, signing, APNs and physical-device testing. Replace public OpenStreetMap tiles with a suitable production provider at scale.

@@ -1,5 +1,6 @@
 'use strict';
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {createHash} = require('node:crypto');
@@ -46,5 +47,22 @@ exports.placeOrder = onCall(options, async request => {
     tx.create(orderRef, {userId: request.auth.uid, ...result, pincode, address: address.trim(), status: 'submitted', paymentStatus: 'pending_arrangement', createdAt: FieldValue.serverTimestamp()});
     refs.forEach((ref, i) => tx.update(ref, {stock: snapshots[i].data().stock - items[i].quantity}));
     return {orderId};
+  });
+});
+// Cancelling an order must return its reserved stock exactly once, however many
+// times an admin toggles status; a stockRestored flag makes the transaction idempotent.
+exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{orderId}', region: 'asia-south1', maxInstances: 5}, async event => {
+  const before = event.data.before.data(), after = event.data.after.data();
+  if (after.status !== 'cancelled' || before.status === 'cancelled' || !Array.isArray(after.lines)) return;
+  const orderRef = event.data.after.ref;
+  await db.runTransaction(async tx => {
+    const fresh = (await tx.get(orderRef)).data();
+    if (!fresh || fresh.status !== 'cancelled' || fresh.stockRestored) return;
+    const refs = after.lines.map(line => db.collection('products').doc(line.productId));
+    const snapshots = refs.length ? await tx.getAll(...refs) : [];
+    snapshots.forEach((snapshot, i) => {
+      if (snapshot.exists) tx.update(snapshot.ref, {stock: FieldValue.increment(after.lines[i].quantity)});
+    });
+    tx.update(orderRef, {stockRestored: true});
   });
 });

@@ -150,6 +150,13 @@ class WireframeHome extends StatelessWidget {
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
+                if (store.catalogWarning.isNotEmpty)
+                  Text(
+                    store.catalogWarning,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 if (text.isNotEmpty && noticeLayout.visible)
                   LayoutSection(
                     layout: noticeLayout,
