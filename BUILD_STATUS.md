@@ -1,5 +1,9 @@
 # Implementation status — 14 September 2026
 
+Authentication migration update: [email/password and passwordless client verification, current production state, and exact deployment approval scope](docs/authentication-deployment.md). Client implementation is tested locally; the combined production deployment awaits approval.
+
+Latest verification: [Firebase production audit — 17 September 2026](docs/production-verification.md) and [responsive/Chrome validation](docs/responsive-validation.md). The older browser and deployment notes below are historical; consult these reports for current verified results and remaining blockers.
+
 Customer storefront and admin studio implemented; see README for capabilities and integration boundaries.
 
 ## Verified

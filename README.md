@@ -11,6 +11,10 @@ A Flutter customer marketplace and business admin panel for responsive web, Andr
 
 Without Firebase build configuration the app runs a labelled demo. Demo catalog edits persist on the current device; demo checkout never creates real orders. The wrapper locates the installed Flutter SDK and GitHub Desktop Git. Standard `flutter` commands also work with a healthy SDK command path.
 
+## Authentication migration
+
+The current client supports email/password with email verification, password reset, and passwordless email links. See [the tested migration and exact deployment scope](docs/authentication-deployment.md) before using production: the provider configuration has changed, but the combined client/functions/rules publication awaits approval. Older SMS/PIN descriptions below describe the previous release.
+
 ## Included
 
 - Responsive storefront, animated ticker, clickable auto-advancing promotions, nested categories, product/service filters, text search, image gallery, location pricing, cart and order-request checkout.

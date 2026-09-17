@@ -7,6 +7,7 @@ if (!projectId || !uid) throw Error('Usage: node functions/set-admin.js PROJECT_
 initializeApp({credential: applicationDefault(), projectId});
 (async () => {
   const user = await getAuth().getUser(uid);
+  if (!user.email || !user.emailVerified || user.disabled) throw Error('Owner must have an enabled, verified email account.');
   await getAuth().setCustomUserClaims(uid, {...user.customClaims, admin: true});
   console.log('Administrator access granted. Sign out and sign back in to refresh claims.');
 })().catch(e => { console.error(e.message); process.exitCode = 1; });

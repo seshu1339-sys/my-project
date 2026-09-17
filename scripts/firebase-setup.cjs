@@ -83,17 +83,21 @@ const mode = process.argv[2] || 'inspect';
     }
     console.log(JSON.stringify({runtimeServiceAccount: email, projectRoles: roles, selfTokenSigningConfigured: canSign()}, null, 2));
     return;
-  } else if (mode === 'lookup-owner' || mode === 'grant-owner') {
-    const phone = process.argv[3];
-    if (!/^\+[1-9]\d{7,14}$/.test(phone || '')) throw Error('Provide the explicitly authorized owner phone number in international format.');
+  } else if (mode === 'lookup-email-owner' || mode === 'grant-email-owner') {
+    const email = process.argv[3];
+    if (!email || !email.includes('@')) throw Error('Provide the explicitly authorized owner email.');
     let owner;
-    try { owner = await findUser(project, undefined, phone, undefined); }
-    catch (error) { if (error.message === 'No users found') { console.log(JSON.stringify({ownerAccountExists: false, nextStep: 'Sign in through SMS verification first.'})); return; } throw error; }
-    if (owner.disabled) throw Error('The owner account is disabled; no access changes made.');
-    if (mode === 'grant-owner') await setCustomClaim(project, owner.uid, {admin: true}, {merge: true});
+    try { owner = await findUser(project, email, undefined, undefined); }
+    catch (error) { if (error.message === 'No users found') { console.log(JSON.stringify({ownerAccountExists: false, nextStep: 'Register and verify your email first.'})); return; } throw error; }
+    if (owner.disabled || !owner.emailVerified) throw Error('Owner must have an enabled, verified email account.');
+    if (mode === 'grant-email-owner') await setCustomClaim(project, owner.uid, {admin: true}, {merge: true});
     const verified = await findUser(project, undefined, undefined, owner.uid);
-    console.log(JSON.stringify({ownerAccountExists: true, admin: JSON.parse(verified.customAttributes || '{}').admin === true}));
+    console.log(JSON.stringify({ownerAccountExists: true, emailVerified: verified.emailVerified, admin: JSON.parse(verified.customAttributes || '{}').admin === true}));
     return;
+  } else if (mode === 'configure-email' || mode === 'configure-email-link') {
+    await identity.patch(configPath + '?updateMask=signIn.email.enabled,signIn.email.passwordRequired,signIn.phoneNumber.enabled', {
+      signIn: {email: {enabled: true, passwordRequired: mode !== 'configure-email-link'}, phoneNumber: {enabled: false}},
+    });
   } else if (mode === 'configure-phone') {
     const config = (await identity.get(configPath, {headers: {'x-goog-user-project': project}})).body;
     const regions = config.smsRegionConfig?.allowlistOnly?.allowedRegions || [];
@@ -120,6 +124,8 @@ const mode = process.argv[2] || 'inspect';
     billingEnabled: billing.status === 'fulfilled' ? billing.value : 'check-failed',
     authentication: auth.status === 'fulfilled' ? {
       phoneEnabled: auth.value.body.signIn?.phoneNumber?.enabled === true,
+      emailEnabled: auth.value.body.signIn?.email?.enabled === true,
+      passwordRequired: auth.value.body.signIn?.email?.passwordRequired === true,
       authorizedDomains: auth.value.body.authorizedDomains,
       smsRegionConfig: auth.value.body.smsRegionConfig,
     } : {error: auth.reason.message},

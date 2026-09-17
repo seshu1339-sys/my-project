@@ -49,6 +49,8 @@ class Store extends ChangeNotifier {
   String paymentBrand = '', paymentLast4 = '';
   double? latitude, longitude;
   bool admin = false, ready = false;
+  String? pendingEmailLink;
+  String emailForSignInLink = '';
   User? get user => live ? FirebaseAuth.instance.currentUser : null;
   Entry get business =>
       entries('settings').where((e) => e.id == 'business').firstOrNull ??
@@ -68,6 +70,12 @@ class Store extends ChangeNotifier {
   int get count => cart.values.fold(0, (a, b) => a + b);
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
+    if (live) {
+      emailForSignInLink = prefs.getString('emailForSignInLink') ?? '';
+      if (FirebaseAuth.instance.isSignInWithEmailLink(Uri.base.toString())) {
+        pendingEmailLink = Uri.base.toString();
+      }
+    }
     pincode = prefs.getString('pincode') ?? '';
     address = prefs.getString('address') ?? '';
     latitude = prefs.getDouble('latitude');
@@ -109,6 +117,7 @@ class Store extends ChangeNotifier {
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
           admin =
               u != null &&
+              u.emailVerified &&
               (await u.getIdTokenResult()).claims?['admin'] == true;
           profileName = u?.displayName ?? '';
           if (u != null) {
@@ -298,6 +307,9 @@ class Store extends ChangeNotifier {
     if (user == null) {
       throw StateError('Please sign in first.');
     }
+    if (!user!.emailVerified) {
+      throw StateError('Verify your email in Your account before ordering.');
+    }
     final result = await FirebaseFunctions.instance
         .httpsCallable('placeOrder')
         .call({
@@ -313,19 +325,76 @@ class Store extends ChangeNotifier {
     return result.data['orderId'] as String;
   }
 
-  Future<void> login(String phone, String pin) async {
-    final result = await FirebaseFunctions.instance
-        .httpsCallable('pinLogin')
-        .call({'phone': phone, 'pin': pin});
-    await FirebaseAuth.instance.signInWithCustomToken(
-      result.data['token'] as String,
+  Future<void> login(String email, String password) async {
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
     );
   }
 
-  Future<void> setPin(String pin) async {
-    await FirebaseFunctions.instance.httpsCallable('setPin').call({'pin': pin});
-    // Reset revokes old sessions. Start a fresh custom-token session with the new PIN.
-    await FirebaseAuth.instance.signOut();
+  Future<void> sendSignInLink(String email) async {
+    await FirebaseAuth.instance.setLanguageCode(language);
+    await FirebaseAuth.instance.sendSignInLinkToEmail(
+      email: email,
+      actionCodeSettings: ActionCodeSettings(
+        url: 'https://e-commerce-app-a3897.web.app/?emailSignIn=1',
+        handleCodeInApp: true,
+      ),
+    );
+    // Only remember the address after sending succeeds. Never put it in the URL.
+    emailForSignInLink = email;
+    await (await SharedPreferences.getInstance()).setString(
+      'emailForSignInLink',
+      email,
+    );
+  }
+
+  Future<void> completeSignInLink(String email, String link) async {
+    if (!FirebaseAuth.instance.isSignInWithEmailLink(link)) {
+      throw StateError('Use the complete sign-in link from your email.');
+    }
+    await FirebaseAuth.instance.signInWithEmailLink(
+      email: email,
+      emailLink: link,
+    );
+    await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    pendingEmailLink = null;
+    emailForSignInLink = '';
+    await (await SharedPreferences.getInstance()).remove('emailForSignInLink');
+    notifyListeners();
+  }
+
+  Future<void> registerEmail(String email, String password) async {
+    await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    await sendVerificationEmail();
+  }
+
+  Future<void> sendVerificationEmail() async {
+    final current = user;
+    if (current == null) throw StateError('Sign in first.');
+    await FirebaseAuth.instance.setLanguageCode(language);
+    await current.sendEmailVerification();
+  }
+
+  Future<bool> refreshEmailVerification() async {
+    await user?.reload();
+    final current = user;
+    if (current == null) {
+      notifyListeners();
+      return false;
+    }
+    final token = await current.getIdTokenResult(true);
+    admin = current.emailVerified && token.claims?['admin'] == true;
+    notifyListeners();
+    return current.emailVerified;
+  }
+
+  Future<void> resetPassword(String email) async {
+    await FirebaseAuth.instance.setLanguageCode(language);
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
   }
 
   Future<void> updateProfile(String name) async {
@@ -338,7 +407,7 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    if (live) await notifications.disable();
+    if (live && user?.emailVerified == true) await notifications.disable();
     await FirebaseAuth.instance.signOut();
     cart.clear();
     notifyListeners();

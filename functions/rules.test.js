@@ -7,9 +7,12 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
   try {
     const anonymous = env.unauthenticatedContext().firestore();
-    const alice = env.authenticatedContext('alice').firestore();
-    const bob = env.authenticatedContext('bob').firestore();
-    const admin = env.authenticatedContext('owner', {admin: true}).firestore();
+    const alice = env.authenticatedContext('alice', {email_verified: true}).firestore();
+    const bob = env.authenticatedContext('bob', {email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const unverified = env.authenticatedContext('new', {admin: true, email_verified: false}).firestore();
+    await assertFails(setDoc(doc(unverified, 'products/nope'), {name: 'Denied'}));
+    await assertFails(setDoc(doc(unverified, 'users/new'), {name: 'Denied'}));
     await assertSucceeds(setDoc(doc(admin, 'products/p1'), {name: 'Test', active: true}));
     await assertSucceeds(getDoc(doc(anonymous, 'products/p1')));
     await assertFails(setDoc(doc(alice, 'products/p1'), {price: 1}));

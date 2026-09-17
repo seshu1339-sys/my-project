@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/store.dart';
 import '../services/localization.dart';
 import 'shared.dart';
+import 'email_link.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key, required this.store});
@@ -15,19 +15,24 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  final phone = TextEditingController(text: '+91'),
-      pin = TextEditingController(),
-      code = TextEditingController(),
+  final email = TextEditingController(),
+      password = TextEditingController(),
+      confirmPassword = TextEditingController(),
       name = TextEditingController();
-  String? verificationId;
-  ConfirmationResult? confirmation;
-  bool recovery = false, sent = false, verified = false, busy = false;
+  bool registering = false, busy = false;
   final cardBrand = TextEditingController(),
       cardLast4 = TextEditingController();
   Future<void> run(Future<void> Function() action) async {
     setState(() => busy = true);
     try {
       await action();
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        message(
+          context,
+          e.message ?? 'Authentication failed. Please try again.',
+        );
+      }
     } catch (e) {
       if (mounted) {
         message(context, e);
@@ -39,38 +44,20 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
-  Future<void> send() async {
-    if (!RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(phone.text.trim())) {
-      throw StateError('Enter your phone number with country code.');
+  void validateEmail() {
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
+      throw StateError('Enter a valid email address.');
     }
-    if (kIsWeb) {
-      confirmation = await FirebaseAuth.instance.signInWithPhoneNumber(
-        phone.text.trim(),
-      );
-      sent = true;
-    } else {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: phone.text.trim(),
-        verificationCompleted: (credential) async {
-          await FirebaseAuth.instance.signInWithCredential(credential);
-          if (mounted) {
-            setState(() => verified = true);
-          }
-        },
-        verificationFailed: (e) {
-          if (mounted) {
-            message(context, e.message ?? 'Verification failed');
-          }
-        },
-        codeSent: (id, token) {
-          if (mounted) {
-            setState(() {
-              verificationId = id;
-              sent = true;
-            });
-          }
-        },
-        codeAutoRetrievalTimeout: (id) => verificationId = id,
+  }
+
+  Future<void> resetPassword() async {
+    final address = widget.store.user?.email ?? email.text.trim();
+    if (widget.store.user == null) validateEmail();
+    await widget.store.resetPassword(address);
+    if (mounted) {
+      message(
+        context,
+        'If an account exists, a password reset email has been sent.',
       );
     }
   }
@@ -85,9 +72,9 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   void dispose() {
-    phone.dispose();
-    pin.dispose();
-    code.dispose();
+    email.dispose();
+    password.dispose();
+    confirmPassword.dispose();
     name.dispose();
     cardBrand.dispose();
     cardLast4.dispose();
@@ -113,11 +100,48 @@ class _AccountPageState extends State<AccountPage> {
                   style: TextStyle(fontSize: 26),
                 ),
                 const Text(
-                  'Phone sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.',
+                  'Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.',
                 ),
-              ] else if (widget.store.user != null && !recovery) ...[
+              ] else if (widget.store.user != null &&
+                  !widget.store.user!.emailVerified) ...[
+                const Text('Verify your email', style: TextStyle(fontSize: 24)),
+                const SizedBox(height: 12),
                 Text(
-                  widget.store.user!.phoneNumber ?? 'Your profile',
+                  'Open the verification link sent to ${widget.store.user!.email ?? 'your email'}, then return here. Check your spam folder too.',
+                ),
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          final verified = await widget.store
+                              .refreshEmailVerification();
+                          if (context.mounted && !verified) {
+                            message(
+                              context,
+                              'Your email is not verified yet. Open the email link first.',
+                            );
+                          }
+                        }),
+                  child: const Text('I have verified my email'),
+                ),
+                OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          await widget.store.sendVerificationEmail();
+                          if (context.mounted) {
+                            message(context, 'Verification email sent');
+                          }
+                        }),
+                  child: const Text('Resend verification email'),
+                ),
+                TextButton(
+                  onPressed: busy ? null : () => run(widget.store.logout),
+                  child: const Text('Log out / Use another email'),
+                ),
+              ] else if (widget.store.user != null) ...[
+                Text(
+                  widget.store.user!.email ?? 'Your profile',
                   style: const TextStyle(fontSize: 24),
                 ),
                 const SizedBox(height: 20),
@@ -217,11 +241,8 @@ class _AccountPageState extends State<AccountPage> {
                   label: const Text('Manage saved cards'),
                 ),
                 OutlinedButton(
-                  onPressed: () => setState(() {
-                    recovery = true;
-                    phone.text = widget.store.user!.phoneNumber ?? '+91';
-                  }),
-                  child: const Text('Change PIN with SMS verification'),
+                  onPressed: busy ? null : () => run(resetPassword),
+                  child: const Text('Reset password by email'),
                 ),
                 TextButton(
                   onPressed: () => run(widget.store.logout),
@@ -292,8 +313,8 @@ class _AccountPageState extends State<AccountPage> {
                 ),
               ] else ...[
                 Text(
-                  recovery
-                      ? 'Verify your mobile'
+                  registering
+                      ? 'Create your account'
                       : 'Welcome to your neighbourhood',
                   style: const TextStyle(
                     fontSize: 28,
@@ -302,9 +323,9 @@ class _AccountPageState extends State<AccountPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  recovery
-                      ? 'New account or forgot PIN? Verify your number by SMS, then choose a six-digit PIN.'
-                      : 'Sign in with your mobile number and six-digit PIN.',
+                  registering
+                      ? 'Register with email and password, then verify your email.'
+                      : 'Sign in with your email and password.',
                 ),
                 const SizedBox(height: 24),
                 DropdownButtonFormField<String>(
@@ -334,89 +355,98 @@ class _AccountPageState extends State<AccountPage> {
                 ),
                 const SizedBox(height: 14),
                 TextField(
-                  controller: phone,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Mobile number (+91…)',
-                  ),
+                  controller: email,
+                  enabled: !busy,
+                  keyboardType: TextInputType.emailAddress,
+                  autofillHints: const [AutofillHints.email],
+                  autocorrect: false,
+                  decoration: const InputDecoration(labelText: 'Email address'),
                 ),
                 const SizedBox(height: 14),
-                if (!recovery || verified)
-                  TextField(
-                    controller: pin,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    decoration: InputDecoration(
-                      labelText: verified
-                          ? 'New six-digit PIN'
-                          : 'Six-digit PIN',
-                    ),
-                  ),
-                if (recovery && !verified) ...[
-                  const Text(
-                    'By continuing, you agree to receive a verification SMS. Your number is processed by Google for authentication and abuse prevention.',
-                  ),
-                  OutlinedButton(
-                    onPressed: busy ? null : () => run(send),
-                    child: Text(sent ? 'Resend SMS code' : 'Send SMS code'),
-                  ),
-                  if (sent) ...[
-                    TextField(
-                      controller: code,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'SMS code'),
-                    ),
-                    FilledButton(
-                      onPressed: busy
-                          ? null
-                          : () => run(() async {
-                              if (kIsWeb) {
-                                await confirmation!.confirm(code.text.trim());
-                              } else {
-                                await FirebaseAuth.instance
-                                    .signInWithCredential(
-                                      PhoneAuthProvider.credential(
-                                        verificationId: verificationId!,
-                                        smsCode: code.text.trim(),
-                                      ),
-                                    );
-                              }
-                              verified = true;
-                            }),
-                      child: const Text('Verify number'),
-                    ),
+                TextField(
+                  controller: password,
+                  enabled: !busy,
+                  obscureText: true,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  autofillHints: [
+                    registering
+                        ? AutofillHints.newPassword
+                        : AutofillHints.password,
                   ],
-                ] else
-                  FilledButton(
-                    onPressed: busy
-                        ? null
-                        : () => run(() async {
-                            if (!RegExp(r'^\d{6}$').hasMatch(pin.text)) {
-                              throw StateError('Use exactly six digits.');
-                            }
-                            if (verified) {
-                              await widget.store.setPin(pin.text);
-                              recovery = false;
-                              verified = false;
-                            } else {
-                              await widget.store.login(
-                                phone.text.trim(),
-                                pin.text,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                ),
+                OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => EmailLinkPage(store: widget.store),
+                          ),
+                        ),
+                  child: const Text('Sign in with an email link'),
+                ),
+                if (registering) ...[
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: confirmPassword,
+                    enabled: !busy,
+                    obscureText: true,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm password',
+                    ),
+                  ),
+                ],
+                FilledButton(
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          validateEmail();
+                          if (password.text.isEmpty) {
+                            throw StateError('Enter your password.');
+                          }
+                          if (registering) {
+                            if (password.text.length < 6) {
+                              throw StateError(
+                                'Use at least six characters for your password.',
                               );
                             }
-                          }),
-                    child: Text(verified ? 'Save new PIN' : 'Sign in'),
-                  ),
+                            if (password.text != confirmPassword.text) {
+                              throw StateError('Passwords do not match.');
+                            }
+                            await widget.store.registerEmail(
+                              email.text.trim(),
+                              password.text,
+                            );
+                          } else {
+                            await widget.store.login(
+                              email.text.trim(),
+                              password.text,
+                            );
+                          }
+                          password.clear();
+                          confirmPassword.clear();
+                        }),
+                  child: Text(registering ? 'Create account' : 'Sign in'),
+                ),
                 TextButton(
                   onPressed: busy
                       ? null
-                      : () => setState(() => recovery = !recovery),
+                      : () => setState(() {
+                          registering = !registering;
+                          password.clear();
+                          confirmPassword.clear();
+                        }),
                   child: Text(
-                    recovery
-                        ? 'Back to PIN sign-in'
-                        : 'Create account / Forgot PIN',
+                    registering ? 'Back to sign in' : 'Create an account',
                   ),
+                ),
+                TextButton(
+                  onPressed: busy ? null : () => run(resetPassword),
+                  child: const Text('Forgot password?'),
                 ),
               ],
               if (busy) const LinearProgressIndicator(),

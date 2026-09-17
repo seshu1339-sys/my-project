@@ -17,7 +17,7 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex');
   assert(local.includes(Buffer.from(project)), 'Build is missing the live Firebase project');
   console.log('PASS: HTTPS website serves the exact Firebase-connected release.');
   if (process.argv.includes('--hosting-only')) return;
-  for (const [name, expectedStatus, expectedCode] of [['pinLogin', 400, 'INVALID_ARGUMENT'], ['setPin', 401, 'UNAUTHENTICATED'], ['placeOrder', 401, 'UNAUTHENTICATED']]) {
+  for (const [name, expectedStatus, expectedCode] of [['pinLogin', 400, 'FAILED_PRECONDITION'], ['setPin', 400, 'FAILED_PRECONDITION'], ['placeOrder', 401, 'UNAUTHENTICATED']]) {
     const result = await fetch(`https://us-central1-${project}.cloudfunctions.net/${name}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({data: {}}), signal: AbortSignal.timeout(60000)});
     const raw = await result.text();
     assert.match(result.headers.get('content-type') || '', /application\/json/, `${name}: HTTP ${result.status}, ${raw.slice(0, 180)}`);
