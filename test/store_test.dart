@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
+import 'package:ecommerce_app/domain/catalog.dart';
 
 void main() {
   test('wishlist toggles on and off and persists across restarts', () async {
@@ -49,5 +50,29 @@ void main() {
     final restarted = Store();
     await restarted.init();
     expect(restarted.language, 'hi');
+  });
+
+  test('delivery fee is zero by default and only applies once configured', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    final product = store
+        .entries('products')
+        .firstWhere((e) => e.text('name') == 'Farm-fresh vegetable box');
+    store.add(product);
+    expect(store.total, 249);
+    expect(store.deliveryFee, 0);
+    expect(store.grandTotal, 249);
+    await store.save('settings', Entry('business', {
+      ...store.business.data,
+      'deliveryFee': 30,
+      'freeDeliveryAbove': 500,
+    }));
+    expect(store.deliveryFee, 30);
+    expect(store.grandTotal, 279);
+    store.add(product, 2);
+    expect(store.total, 249 * 3);
+    expect(store.deliveryFee, 0, reason: 'above the free-delivery threshold');
+    expect(store.grandTotal, 249 * 3);
   });
 }

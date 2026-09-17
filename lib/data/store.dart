@@ -77,6 +77,17 @@ class Store extends ChangeNotifier {
     (subtotal, line) =>
         subtotal + (product(line.key)?.price(pincode) ?? 0) * line.value,
   );
+  // Client-side estimate for display only; placeOrder recomputes this
+  // authoritatively from settings/business at checkout time.
+  double get deliveryFee {
+    final fee = business.number('deliveryFee', 0);
+    if (fee <= 0) return 0;
+    final threshold = business.number('freeDeliveryAbove', 0);
+    if (threshold > 0 && total >= threshold) return 0;
+    return fee;
+  }
+
+  double get grandTotal => total + deliveryFee;
   int get count => cart.values.fold(0, (a, b) => a + b);
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();

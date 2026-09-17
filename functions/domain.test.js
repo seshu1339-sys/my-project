@@ -19,3 +19,27 @@ test('quote rejects expired promotions and invalid prices', () => {
   assert.throws(() => quote([{productId: 'p1', quantity: 1}], [{...product, endsAt: '2020-01-01'}], '560001'));
   assert.throws(() => quote([{productId: 'p1', quantity: 1}], [{...product, price: -1}], '999999'));
 });
+test('quote has no delivery fee unless the business configures one', () => {
+  const result = quote([{productId: 'p1', quantity: 1}], [product], '999999');
+  assert.equal(result.deliveryFee, 0);
+  assert.equal(result.subtotal, 100);
+  assert.equal(result.total, 100);
+});
+test('quote applies a flat delivery fee and waives it above the free-delivery threshold', () => {
+  const business = {deliveryFee: 30, freeDeliveryAbove: 500};
+  const small = quote([{productId: 'p1', quantity: 1}], [product], '999999', business);
+  assert.equal(small.subtotal, 100);
+  assert.equal(small.deliveryFee, 30);
+  assert.equal(small.total, 130);
+  const large = quote([{productId: 'p1', quantity: 6}], [{...product, stock: 10}], '999999', business);
+  assert.equal(large.subtotal, 600);
+  assert.equal(large.deliveryFee, 0);
+  assert.equal(large.total, 600);
+});
+test('quote ignores an invalid or non-positive delivery fee configuration', () => {
+  for (const business of [{deliveryFee: -5}, {deliveryFee: 0}, {deliveryFee: 'free'}, {deliveryFee: NaN}, null, undefined]) {
+    const result = quote([{productId: 'p1', quantity: 1}], [product], '999999', business);
+    assert.equal(result.deliveryFee, 0);
+    assert.equal(result.total, 100);
+  }
+});

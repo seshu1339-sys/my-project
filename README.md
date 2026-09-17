@@ -85,14 +85,14 @@ Sign out and back in (or reload the admin app) to refresh claims. Customers cann
 | `settings/business` | Identity and default radius | Admin |
 | `users/{uid}` | Display name | Owner |
 | `products/{id}/reviews/{uid}` | One editable review per customer | Owner, validated |
-| `orders/{id}` | Server-priced snapshot and status | Functions create; admin changes status; Functions restore stock on cancellation |
+| `orders/{id}` | Server-priced snapshot (lines, subtotal, deliveryFee, total) and status | Functions create; admin changes status; Functions restore stock on cancellation |
 | `_pins/{uid}` | Salted scrypt hashes | Functions only |
 | `_rateLimits/{digest}` | Transactional request limits | Functions only |
 | Storage `catalog/{file}` | JPEG/PNG/WebP under 5 MB | Admin |
 
 Public catalog documents, including hidden/scheduled records, are readable. Scheduling is a presentation control, not confidentiality. Never put private information in catalog documents.
 
-`pinLogin` and `setPin` are retired: they reject every call with an explicit error instead of issuing tokens, kept only so the old callable URLs fail loudly rather than disappear. `placeOrder` requires a verified email and checks identity, stock and server prices transactionally; deterministic request IDs prevent duplicate submission after network retries. Checkout creates a request, not a payment transaction. `reconcileCancelledOrderStock` watches `orders/{id}` and, the first time an order's status becomes `cancelled`, transactionally restores each line's quantity to `products/{id}.stock`; a `stockRestored` flag makes this idempotent if status is toggled again.
+`pinLogin` and `setPin` are retired: they reject every call with an explicit error instead of issuing tokens, kept only so the old callable URLs fail loudly rather than disappear. `placeOrder` requires a verified email and checks identity, stock and server prices transactionally; deterministic request IDs prevent duplicate submission after network retries. It also applies `settings/business`'s optional flat `deliveryFee` (waived once the order subtotal reaches `freeDeliveryAbove`), authoritatively, on the server — the client's own display of it is an estimate only. Checkout creates a request, not a payment transaction. `reconcileCancelledOrderStock` watches `orders/{id}` and, the first time an order's status becomes `cancelled`, transactionally restores each line's quantity to `products/{id}.stock`; a `stockRestored` flag makes this idempotent if status is toggled again. `notifyOrderStatus` sends a push notification to only the customer whose order just changed status.
 
 ## Verify
 
@@ -109,6 +109,6 @@ Rules tests explicitly skip without an emulator. Domain tests cover hashes and a
 
 ## Release boundaries
 
-Online payments/refunds, tax/delivery policies, dispatch, push notifications and recognition providers remain integrations. Service orders are requests, not appointment calendars. Reviews are authenticated, not purchase-verified. Cancelling an order automatically restores its reserved stock exactly once (`reconcileCancelledOrderStock`); this does not retroactively fix orders cancelled before that function was deployed. Each catalog collection's live listener is capped at 2,000 documents as a safety rail against runaway reads/cost, with a visible "showing the first 2,000 items" notice if a collection ever hits it; this is not paginated browsing, and a catalog that outgrows the cap needs a real paginated/server-searched catalog, a larger change. Further abuse controls are still needed.
+Online payments/refunds, tax, zone/distance-based delivery pricing, dispatch and recognition providers remain integrations; only a flat, optional business-wide delivery/service fee is implemented. Push notifications (price drops, new offers, order status) are implemented in code; real device delivery still needs the web VAPID key and, for iOS, APNs/Xcode setup. Service orders are requests, not appointment calendars. Reviews are authenticated, not purchase-verified. Cancelling an order automatically restores its reserved stock exactly once (`reconcileCancelledOrderStock`); this does not retroactively fix orders cancelled before that function was deployed. Each catalog collection's live listener is capped at 2,000 documents as a safety rail against runaway reads/cost, with a visible "showing the first 2,000 items" notice if a collection ever hits it; this is not paginated browsing, and a catalog that outgrows the cap needs a real paginated/server-searched catalog, a larger change. Further abuse controls are still needed.
 
 Android debug APKs are for review. The starter release signing uses the debug key and is unsuitable for Play Store publication. iOS requires macOS/Xcode, signing, APNs and physical-device testing. Replace public OpenStreetMap tiles with a suitable production provider at scale.

@@ -38,12 +38,13 @@ exports.placeOrder = onCall(options, async request => {
   await rateLimit(`order:${request.auth.uid}`, 20, 60 * 1000);
   const orderId = digest(`${request.auth.uid}:${requestId}`);
   const orderRef = db.collection('orders').doc(orderId);
+  const businessRef = db.collection('settings').doc('business');
   return db.runTransaction(async tx => {
     if ((await tx.get(orderRef)).exists) return {orderId};
     const refs = items.map(i => db.collection('products').doc(i.productId));
-    const snapshots = await tx.getAll(...refs);
+    const [businessSnapshot, ...snapshots] = await tx.getAll(businessRef, ...refs);
     let result;
-    try { result = quote(items, snapshots.map(s => s.data()), pincode); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
+    try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data()); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
     tx.create(orderRef, {userId: request.auth.uid, ...result, pincode, address: address.trim(), status: 'submitted', paymentStatus: 'pending_arrangement', createdAt: FieldValue.serverTimestamp()});
     refs.forEach((ref, i) => tx.update(ref, {stock: snapshots[i].data().stock - items[i].quantity}));
     return {orderId};

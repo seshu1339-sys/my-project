@@ -94,6 +94,8 @@ const fields = <String, Map<String, String>>{
     'description': 'Office / head office details',
     'imageUrl': 'Logo URL',
     'radiusKm': 'Default nearby radius (km)',
+    'deliveryFee': 'Delivery / service fee (₹, 0 = none)',
+    'freeDeliveryAbove': 'Free delivery above order total (₹, 0 = always charge)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
   },
   'sectionSettings': {
@@ -515,6 +517,8 @@ class _EntryEditorState extends State<EntryEditor> {
     'latitude',
     'longitude',
     'radiusKm',
+    'deliveryFee',
+    'freeDeliveryAbove',
     'width',
     'height',
     'fontSize',

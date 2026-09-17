@@ -822,12 +822,39 @@ class _CartPageState extends State<CartPage> {
                     },
                   ),
                 const SizedBox(height: 24),
-                Text(
-                  'Subtotal ${money(widget.store.total)}',
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Builder(
+                  builder: (context) {
+                    final deliveryConfigured =
+                        widget.store.business.number('deliveryFee', 0) > 0;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Subtotal ${money(widget.store.total)}',
+                          style: TextStyle(
+                            fontSize: deliveryConfigured ? 18 : 26,
+                            fontWeight: deliveryConfigured
+                                ? FontWeight.normal
+                                : FontWeight.bold,
+                          ),
+                        ),
+                        if (deliveryConfigured) ...[
+                          Text(
+                            widget.store.deliveryFee > 0
+                                ? 'Delivery fee ${money(widget.store.deliveryFee)}'
+                                : 'Delivery fee Free',
+                          ),
+                          Text(
+                            'Total ${money(widget.store.grandTotal)}',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  },
                 ),
                 const Text(
                   'Prices and availability are checked again when you submit. Payment is arranged with the shop; online payments are not enabled.',
