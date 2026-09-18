@@ -10,6 +10,7 @@ import 'ui/email_link.dart';
 import 'ui/details.dart';
 import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
+import 'services/emulators.dart';
 import 'ui/shared.dart';
 import 'services/localization.dart';
 
@@ -24,6 +25,7 @@ Future<void> main() async {
   if (project.isNotEmpty) {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
+      await connectToEmulatorsIfConfigured();
       if (!kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) {

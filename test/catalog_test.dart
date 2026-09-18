@@ -13,6 +13,13 @@ void main() {
     expect(entry.price('560001'), 80);
     expect(entry.price('999999'), 100);
   });
+  test('text() falls back for a missing key and an explicit empty string alike', () {
+    const entry = Entry('one', {'unit': ''});
+    expect(entry.text('unit', 'each'), 'each');
+    expect(entry.text('name', 'Unnamed'), 'Unnamed');
+    const named = Entry('two', {'unit': 'kg'});
+    expect(named.text('unit', 'each'), 'kg');
+  });
   test('scheduling uses an inclusive start and exclusive end', () {
     const entry = Entry('one', {
       'startsAt': '2026-09-14T10:00:00Z',

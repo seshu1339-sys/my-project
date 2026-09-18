@@ -897,6 +897,14 @@ class _EntryEditorState extends State<EntryEditor> {
           return 'Enter a name';
         }
         if (numeric.contains(key)) {
+          // Blank is valid for every numeric field except coordinates: the
+          // form's own save() already defaults a blank value to zero, and for
+          // most of these fields (compareAtPrice, deliveryFee, stopAfter...)
+          // zero/blank is the documented "off"/"automatic" state. Latitude
+          // and longitude have no such default — 0,0 is a real, wrong place.
+          if (v.isEmpty && !['latitude', 'longitude'].contains(key)) {
+            return null;
+          }
           final n = num.tryParse(v);
           if (n == null || !n.isFinite) {
             return 'Enter a valid number';

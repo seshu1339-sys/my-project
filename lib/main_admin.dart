@@ -6,6 +6,7 @@ import 'data/store.dart';
 import 'ui/admin.dart';
 import 'ui/shared.dart';
 import 'services/firebase_startup.dart';
+import 'services/emulators.dart';
 
 // A separate entry point so the admin panel compiles into its own web
 // bundle, reachable only at its own build/deploy target, never from the
@@ -18,6 +19,7 @@ Future<void> main() async {
   if (project.isNotEmpty) {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
+      await connectToEmulatorsIfConfigured();
       live = true;
     } catch (e) {
       startupError =

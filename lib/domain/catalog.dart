@@ -6,8 +6,13 @@ class Entry {
   final String id;
   final Json data;
   const Entry(this.id, this.data);
-  String text(String key, [String fallback = '']) =>
-      data[key]?.toString() ?? fallback;
+  // An explicit empty string (e.g. an admin form field left blank) means
+  // "not set", same as a missing key — it must not shadow a real fallback
+  // such as text('unit', 'each').
+  String text(String key, [String fallback = '']) {
+    final value = data[key]?.toString();
+    return value == null || value.isEmpty ? fallback : value;
+  }
   double number(String key, [double fallback = 0]) => (data[key] is num)
       ? (data[key] as num).toDouble()
       : double.tryParse(text(key)) ?? fallback;
