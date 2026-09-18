@@ -11,11 +11,22 @@ import 'package:firebase_storage/firebase_storage.dart';
 /// EMULATOR_HOST defaults to localhost; Android emulators must override it
 /// to 10.0.2.2, which is the emulator's alias for the host machine's
 /// loopback address, not a real address to route to over a network.
+///
+/// bool.fromEnvironment/String.fromEnvironment only fold to their dart-define
+/// value in a genuine compile-time constant context; on some backends
+/// (confirmed: Android AOT) calling them directly inside a runtime `if`
+/// silently evaluates to their default instead of throwing, so every flag
+/// here is read into its own top-level const first.
+const _useEmulators = bool.fromEnvironment('USE_EMULATORS');
+const _emulatorHost = String.fromEnvironment(
+  'EMULATOR_HOST',
+  defaultValue: 'localhost',
+);
+
 Future<void> connectToEmulatorsIfConfigured() async {
-  if (!bool.fromEnvironment('USE_EMULATORS')) return;
-  const host = String.fromEnvironment('EMULATOR_HOST', defaultValue: 'localhost');
-  FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
-  await FirebaseAuth.instance.useAuthEmulator(host, 9099);
-  await FirebaseStorage.instance.useStorageEmulator(host, 9199);
-  FirebaseFunctions.instance.useFunctionsEmulator(host, 5001);
+  if (!_useEmulators) return;
+  FirebaseFirestore.instance.useFirestoreEmulator(_emulatorHost, 8080);
+  await FirebaseAuth.instance.useAuthEmulator(_emulatorHost, 9099);
+  await FirebaseStorage.instance.useStorageEmulator(_emulatorHost, 9199);
+  FirebaseFunctions.instance.useFunctionsEmulator(_emulatorHost, 5001);
 }
