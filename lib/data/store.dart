@@ -20,9 +20,17 @@ class Store extends ChangeNotifier {
   final FirebaseFirestore? database;
   FirebaseFirestore get firestore => database ?? FirebaseFirestore.instance;
   late final notifications = CustomerNotifications(firestore);
+  final Map<String, DateTime> _lastViewCounted = {};
+
+  /// Product interest: which signed-in customer viewed which product, and how
+  /// many times. A quick re-open of the same product is not counted again.
   Future<void> trackItemView(Entry entry) async {
     final uid = user?.uid;
     if (!live || uid == null) return;
+    final now = DateTime.now();
+    final last = _lastViewCounted['$uid:${entry.id}'];
+    if (last != null && now.difference(last) < const Duration(seconds: 30)) return;
+    _lastViewCounted['$uid:${entry.id}'] = now;
     try {
       await firestore
           .collection('products')
@@ -32,7 +40,8 @@ class Store extends ChangeNotifier {
           .set({
             'pincode': pincode,
             'lastViewedAt': FieldValue.serverTimestamp(),
-          });
+            'viewCount': FieldValue.increment(1),
+          }, SetOptions(merge: true));
     } catch (_) {
       /* Analytics must never prevent browsing. */
     }

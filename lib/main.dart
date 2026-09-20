@@ -11,6 +11,7 @@ import 'ui/email_link.dart';
 import 'ui/details.dart';
 import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
+import 'services/analytics.dart';
 import 'services/emulators.dart';
 import 'ui/shared.dart';
 import 'services/localization.dart';
@@ -50,6 +51,8 @@ Future<void> main() async {
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
   await store.init();
+  // Anonymous visit counting; only the customer app ever starts it.
+  if (live) Analytics.start();
   runApp(MarketApp(store: store));
   if (live) {
     FirebaseMessaging.onMessage.listen((message) {

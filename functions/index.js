@@ -4,6 +4,7 @@ const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
+const {normalizeEvent, recordEvent} = require('./analytics');
 const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
@@ -62,6 +63,15 @@ async function requireApplicationPhotos(uid) {
   }
   return paths;
 }
+// Anonymous, aggregate-only site and ad analytics (visits, ad impressions, clicks).
+// Visitors are random device ids; nothing personal is stored and clients cannot read it back.
+exports.trackEvent = onCall({...options, maxInstances: 5}, async request => {
+  let event;
+  try { event = normalizeEvent(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  await rateLimit(`track:${event.visitorId}`, 240, 60 * 1000);
+  await recordEvent(db, event);
+  return {ok: true};
+});
 // Keep legacy callable URLs explicit during migration; never issue PIN tokens.
 const retiredPhoneAuth = onCall(options, async () => {
   throw new HttpsError('failed-precondition', 'SMS/PIN sign-in has been replaced by verified email and password. Update the app and use email sign-in.');

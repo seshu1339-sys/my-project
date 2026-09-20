@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../services/analytics.dart';
 import '../services/search.dart';
 import 'home_promotions.dart';
 import 'home_widgets.dart';
@@ -93,11 +94,19 @@ class HomeContent extends StatelessWidget {
         : () => onAdd(entry),
   );
 
-  Widget promotion(Entry entry) => PromoCard(
+  Widget promotion(Entry entry) => ImpressionOnce(
     entry: entry,
-    onTap: () => preview('promotions')
-        ? onLocation()
-        : onPromotion(entry.text('target')),
+    child: PromoCard(
+      entry: entry,
+      onTap: () {
+        if (preview('promotions')) {
+          onLocation();
+          return;
+        }
+        Analytics.click(entry);
+        onPromotion(entry.text('target'));
+      },
+    ),
   );
 
   @override

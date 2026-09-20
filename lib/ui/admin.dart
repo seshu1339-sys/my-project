@@ -8,6 +8,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'shared.dart';
 import 'layout_editor.dart';
+import 'admin_insights.dart';
 
 const adminSections = <String, String>{
   'products': 'Products & services',
@@ -100,6 +101,7 @@ const fields = <String, Map<String, String>>{
     'freeDeliveryAbove': 'Free delivery above order total (₹, 0 = always charge)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
     'autoPublishVendorChanges': 'Auto-publish approved vendor changes (true / false)',
+    'priceDropAutoEnabled': 'Automatic price-drop alerts (true / false; blank = on)',
     'defaultPaymentMethod': 'Default payment (direct_vendor / cash_on_delivery / platform_collected)',
     'directVendorPaymentEnabled': 'Allow direct vendor payment (true / false)',
     'cashOnDeliveryEnabled': 'Allow cash on delivery (true / false)',
@@ -559,6 +561,14 @@ class _AdminPageState extends State<AdminPage> {
               ),
               icon: const Icon(Icons.report_problem_outlined),
               label: const Text('Complaints'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => AdminInsightsPage(store: widget.store)),
+              ),
+              icon: const Icon(Icons.insights),
+              label: const Text('Insights'),
             ),
           ],
         ),

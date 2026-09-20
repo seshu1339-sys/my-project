@@ -68,13 +68,27 @@ service cloud.firestore {
     }
     match /products/{productId}/viewers/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
+      // Product interest. Current apps also count views (viewCount goes up by exactly one per
+      // write); the server adds alert bookkeeping fields that clients can neither set nor change.
       allow create, update: if signedIn() && request.auth.uid == uid
         && exists(/databases/$(database)/documents/products/$(productId))
-        && request.resource.data.keys().hasOnly(['pincode', 'lastViewedAt'])
         && request.resource.data.pincode is string
         && request.resource.data.pincode.matches('^([0-9]{6})?$')
-        && request.resource.data.lastViewedAt == request.time;
+        && request.resource.data.lastViewedAt == request.time
+        && (
+          // older apps: the original two-field record
+          request.resource.data.keys().hasOnly(['pincode', 'lastViewedAt'])
+          // current apps: a counted view, touching only these fields
+          || (resource == null
+              ? request.resource.data.keys().hasOnly(['pincode', 'lastViewedAt', 'viewCount']) && request.resource.data.viewCount == 1
+              : request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pincode', 'lastViewedAt', 'viewCount'])
+                && request.resource.data.viewCount == resource.data.get('viewCount', 0) + 1)
+        );
     }
+    // Site and ad analytics: written only by the trackEvent function, readable only by the admin.
+    match /analyticsDaily/{id} { allow read: if admin(); allow write: if false; }
+    match /analyticsTotals/{id} { allow read: if admin(); allow write: if false; }
+    match /analyticsAds/{id} { allow read: if admin(); allow write: if false; }
     match /products/{productId}/reviews/{uid} {
       allow read: if true;
       allow delete: if admin() || (signedIn() && request.auth.uid == uid);

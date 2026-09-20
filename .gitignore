@@ -55,3 +55,6 @@ firebase-config*.json
 android/key.properties
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Emulator-only switches (never deployed)
+functions/.env.local

@@ -55,6 +55,36 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Site/ad analytics, product-interest counts, price-alert admin controls
+
+**Audit first (what already existed, reused):** email-link auth, vendor photos,
+Pending Approval, per-vendor fee, `notifyPriceDrop` + `send()` + the
+`_notificationDeliveries` duplicate claim, `notificationSubscribers`, push tokens,
+`products/{id}/viewers` (interest), per-promotion scroll speed/stop controls.
+**Missing and added:** visitor/ad analytics, view *counts*, an admin eligible-customer
+list, automatic/manual alert controls, per-price dedupe.
+
+**Added:** `trackEvent` callable + `functions/analytics.js` (anonymous device id,
+aggregate counters only, sharded, unique counts via hashed expiring markers in
+`analyticsSeen` - enable a Firestore TTL policy on `analyticsSeen.expiresAt`);
+collections `analyticsDaily|Totals|Ads` (admin-read, server-write). Client:
+`lib/services/analytics.dart` (customer app only). Impressions count only when an
+ad is >=50% on screen; clicks per tap; `?ad=<promotionId>` credits visits to an ad.
+`trackItemView` now increments `viewCount` (30 s throttle; rules allow +1 only).
+`notifications.js`: dedupe key `priceDrop:{product}:{pincode}:{price}` (7-day
+re-alert window), setting `priceDropAutoEnabled` (blank = on), callables
+`priceAlertAudience` / `sendPriceDropAlerts` (admin only). Admin > Insights screen.
+
+**Verification:** analyze clean, Flutter 48/48, backend 29/29 (emulators, none skipped). Live: web +
+Android tracking, interest counts, alerts (dry-run), ad scroll, fees, plus regression of vendor
+onboarding, fee/payment, shop verification, complaints, admin sections. Nothing deployed/committed.
+
+**Testing notes:** emulators cannot deliver FCM. `functions/.env.local`
+(`PUSH_DRY_RUN=true`, git-ignored, emulator-only) records would-be pushes in
+`_pushDryRun`. Real push delivery is NOT verified. A base-price edit does not alert
+customers who have a pincode-specific price (existing, intended). Backend tests now
+run one file at a time (`--test-concurrency=1`) because they share an emulator.
+
 ### 2026-09-20 — Vendor onboarding: email link -> full registration + 2 photos -> admin review -> unlock
 
 **Flow:** Vendor App login now leads with the *existing* Email Link auth
