@@ -55,6 +55,43 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Added separate vendor app and secure vendor publishing workflow
+
+**What changed:** Extended the existing customer/admin Firebase system with a
+separate Vendor App entry point (`lib/main_vendor.dart`) and vendor workspace.
+Vendor registration and approval, admin shop GPS verification, vendor product/
+price/shop change submissions, auto-publish policy, pending audit records with
+old/new values, rejection reasons, vendor order status updates, and vendor
+change history are now backed by callable Cloud Functions. Firebase Hosting
+has a separate `vendor` target for `build/vendor_web`.
+
+**Purchase and ratings security:** Customers can request a five-minute,
+single-use purchase code only for a fulfilled order and their current GPS
+location. Vendors redeem it only while inside the admin-verified shop radius;
+the server transaction consumes it exactly once. Review writes are now
+callable-only, require a verified purchase of the exact product, prevent a
+second rating by the same customer, and flag rapid review patterns for admin
+inspection. Direct Firestore review writes remain denied by rules.
+
+**Files touched:** `functions/index.js`, `functions/domain.js`, backend tests,
+`firestore.rules`, `firebase.json`, `lib/data/store.dart`, customer account and
+review UI, `lib/main_vendor.dart`, `lib/ui/vendor.dart`, and the existing admin
+moderation UI.
+
+**Verification:** `flutter analyze`, `flutter test`, Functions syntax checks,
+Functions unit tests, Firebase JSON parsing, and `git diff --check` pass.
+
+**Pending:** Deploying Functions, Firestore rules, and the three Hosting
+targets remains a user-run production action under the repository safety rule.
+Real FCM and production payment/delivery verification remain pending. The
+vendor UI currently provides the core registration, publishing, order status,
+and purchase verification workflows; complaints and payment settlement remain
+follow-up modules.
+
+**Next recommended step:** Run the local emulator integration tests with the
+new callable flows, then deploy Functions/rules and build the vendor target
+with the same Firebase dart-defines used by the customer/admin builds.
+
 ### 2026-09-20 — Android release signing configured; signed release APK built
 
 **What changed:** The release build type was signing with the Flutter

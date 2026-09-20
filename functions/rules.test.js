@@ -42,7 +42,8 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(updateDoc(doc(admin, 'orders/o1'), {total: 1}));
     await assertSucceeds(updateDoc(doc(admin, 'orders/o1'), {status: 'confirmed'}));
     const review = {userId: 'alice', name: 'Alice', rating: 5, text: 'Great', updatedAt: serverTimestamp()};
-    await assertSucceeds(setDoc(doc(alice, 'products/p1/reviews/alice'), review));
+    // Review creation is callable-only so a client cannot bypass purchase verification.
+    await assertFails(setDoc(doc(alice, 'products/p1/reviews/alice'), review));
     await assertFails(setDoc(doc(bob, 'products/p1/reviews/alice'), review));
     await assertFails(setDoc(doc(alice, 'products/p1/reviews/alice'), {...review, rating: 9}));
   } finally { await env.cleanup(); }

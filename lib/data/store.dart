@@ -360,6 +360,27 @@ class Store extends ChangeNotifier {
     return result.data['orderId'] as String;
   }
 
+  Future<Map<String, dynamic>> call(String name, Map<String, dynamic> data) async {
+    if (!live) throw StateError('This action requires a connected Firebase project.');
+    final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
+    return Map<String, dynamic>.from(result.data as Map);
+  }
+
+  Future<String> registerVendor({required String name, String description = '', String address = ''}) async {
+    final result = await call('registerVendor', { 'name': name, 'description': description, 'address': address });
+    return result['status'] as String;
+  }
+
+  Future<String> submitVendorChange({required String type, required String collection, required String docId, required Map<String, dynamic> changes}) async {
+    final result = await call('submitVendorChange', {'type': type, 'collection': collection, 'docId': docId, 'changes': changes});
+    return result['status'] as String;
+  }
+
+  Future<String> issuePurchaseCode(String orderId, {required double latitude, required double longitude}) async {
+    final result = await call('issuePurchaseCode', {'orderId': orderId, 'latitude': latitude, 'longitude': longitude});
+    return result['code'] as String;
+  }
+
   Future<void> login(String email, String password) async {
     await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: email,

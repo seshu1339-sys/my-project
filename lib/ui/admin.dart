@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
@@ -97,6 +98,7 @@ const fields = <String, Map<String, String>>{
     'deliveryFee': 'Delivery / service fee (₹, 0 = none)',
     'freeDeliveryAbove': 'Free delivery above order total (₹, 0 = always charge)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
+    'autoPublishVendorChanges': 'Auto-publish approved vendor changes (true / false)',
   },
   'sectionSettings': {
     'section': 'Section (header, logo, user, search, notice, promo, offers, categories, products, boxes, ads, background)',
@@ -287,6 +289,89 @@ class AdminPage extends StatefulWidget {
   State<AdminPage> createState() => _AdminPageState();
 }
 
+class VendorModerationPage extends StatelessWidget {
+  const VendorModerationPage({super.key, required this.store});
+  final Store store;
+  Future<void> decide(BuildContext context, String function, Map<String, dynamic> data) async {
+    try {
+      await FirebaseFunctions.instance.httpsCallable(function).call(data);
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Decision saved')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Vendor approvals and publishing'), actions: [
+          TextButton.icon(onPressed: () => _verifyShop(context), icon: const Icon(Icons.location_on), label: const Text('Verify shop')),
+        ]),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          Text('Vendor applications', style: Theme.of(context).textTheme.titleLarge),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorApplications').where('status', isEqualTo: 'pending').limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending applications.')),
+            ]),
+          ),
+          const SizedBox(height: 24),
+          Text('Pending public changes', style: Theme.of(context).textTheme.titleLarge),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorChanges').where('status', isEqualTo: 'pending').limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              for (final doc in snapshot.data?.docs ?? const []) _changeTile(context, doc),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending changes.')),
+            ]),
+          ),
+          const SizedBox(height: 24),
+          const Text('The Business profile editor controls Auto-publish vendor changes. Rejected changes remain unpublished and their reason is visible to the vendor.'),
+        ]),
+      );
+  Future<void> _verifyShop(BuildContext context) async {
+    final vendor = TextEditingController(), shop = TextEditingController(), latitude = TextEditingController(), longitude = TextEditingController(), radius = TextEditingController(text: '1');
+    final submit = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+      title: const Text('Verify vendor shop location'),
+      content: SingleChildScrollView(child: Column(children: [
+        TextField(controller: vendor, decoration: const InputDecoration(labelText: 'Vendor ID')),
+        TextField(controller: shop, decoration: const InputDecoration(labelText: 'Shop ID')),
+        TextField(controller: latitude, decoration: const InputDecoration(labelText: 'Latitude')),
+        TextField(controller: longitude, decoration: const InputDecoration(labelText: 'Longitude')),
+        TextField(controller: radius, decoration: const InputDecoration(labelText: 'Radius in km')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Verify'))],
+    ));
+    if (submit != true) return;
+    try {
+      await FirebaseFunctions.instance.httpsCallable('verifyVendorShop').call({'vendorId': vendor.text.trim(), 'shopId': shop.text.trim(), 'latitude': double.parse(latitude.text), 'longitude': double.parse(longitude.text), 'radiusKm': double.parse(radius.text)});
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop verified')));
+    } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
+  }
+  Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return Card(child: ListTile(
+      title: Text(data['name']?.toString() ?? doc.id),
+      subtitle: Text('${data['address'] ?? ''}\n${data['description'] ?? ''}'),
+      isThreeLine: true,
+      trailing: Wrap(children: [
+        IconButton(tooltip: 'Approve', onPressed: () => decide(context, 'approveVendor', {'vendorId': doc.id, 'approved': true}), icon: const Icon(Icons.check)),
+        IconButton(tooltip: 'Reject', onPressed: () => decide(context, 'approveVendor', {'vendorId': doc.id, 'approved': false, 'reason': 'Application needs more information.'}), icon: const Icon(Icons.close)),
+      ]),
+    ));
+  }
+  Widget _changeTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return Card(child: ListTile(
+      title: Text('${data['vendorName'] ?? data['vendorId']} • ${data['type']}'),
+      subtitle: Text('${data['collection']}/${data['docId']}\nOld: ${data['oldValue']}\nNew: ${data['newValue']}'),
+      isThreeLine: true,
+      trailing: Wrap(children: [
+        IconButton(tooltip: 'Approve', onPressed: () => decide(context, 'reviewVendorChange', {'changeId': doc.id, 'approved': true}), icon: const Icon(Icons.check)),
+        IconButton(tooltip: 'Reject', onPressed: () => decide(context, 'reviewVendorChange', {'changeId': doc.id, 'approved': false, 'reason': 'Change needs review.'}), icon: const Icon(Icons.close)),
+      ]),
+    ));
+  }
+}
+
 class _AdminPageState extends State<AdminPage> {
   String section = 'products';
   @override
@@ -343,6 +428,14 @@ class _AdminPageState extends State<AdminPage> {
               ),
               icon: const Icon(Icons.receipt_long),
               label: const Text('Orders'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => VendorModerationPage(store: widget.store)),
+              ),
+              icon: const Icon(Icons.storefront),
+              label: const Text('Vendors'),
             ),
           ],
         ),

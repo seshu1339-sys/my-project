@@ -445,22 +445,16 @@ class _ReviewsState extends State<Reviews> {
                     }
                     setState(() => busy = true);
                     try {
-                      await FirebaseFirestore.instance
-                          .collection('products')
-                          .doc(widget.productId)
-                          .collection('reviews')
-                          .doc(widget.store.user!.uid)
-                          .set({
-                            'userId': widget.store.user!.uid,
-                            'name': widget.store.profileName.isEmpty
-                                ? 'Neighbour'
-                                : widget.store.profileName,
-                            'rating': rating,
-                            'text': review.text.trim(),
-                            'updatedAt': FieldValue.serverTimestamp(),
-                          });
+                      await widget.store.call('submitVerifiedReview', {
+                        'productId': widget.productId,
+                        'name': widget.store.profileName.isEmpty
+                            ? 'Neighbour'
+                            : widget.store.profileName,
+                        'rating': rating,
+                        'text': review.text.trim(),
+                      });
                       if (context.mounted) {
-                        message(context, 'Review saved');
+                        message(context, 'Verified review saved');
                         review.clear();
                       }
                     } catch (e) {

@@ -3,8 +3,8 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
-const {createHash} = require('node:crypto');
-const {quote} = require('./domain');
+const {createHash, randomInt} = require('node:crypto');
+const {quote, distanceKm, validCoordinate} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -22,6 +22,30 @@ async function rateLimit(key, limit, windowMs) {
     if (!fresh && data.count >= limit) throw new HttpsError('resource-exhausted', 'Too many attempts. Please try again later.');
     tx.set(ref, {count: fresh ? 1 : data.count + 1, until: fresh ? now + windowMs : data.until});
   });
+}
+function requireUser(request) {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  return request.auth.uid;
+}
+function requireAdmin(request) {
+  requireUser(request);
+  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+}
+function requireCoordinate(value, name) {
+  if (!validCoordinate(value)) throw new HttpsError('invalid-argument', `Provide a valid ${name}.`);
+  return value;
+}
+function publicChangeFields(type, changes) {
+  const allowed = {
+    price: ['price', 'compareAtPrice', 'prices'],
+    product: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'images', 'tags'],
+    shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
+  }[type];
+  if (!allowed || !changes || typeof changes !== 'object') throw new HttpsError('invalid-argument', 'Unsupported public change.');
+  const keys = Object.keys(changes);
+  if (!keys.length || keys.some(key => !allowed.includes(key))) throw new HttpsError('invalid-argument', 'Unsupported public change field.');
+  return Object.fromEntries(keys.map(key => [key, changes[key]]));
 }
 // Keep legacy callable URLs explicit during migration; never issue PIN tokens.
 const retiredPhoneAuth = onCall(options, async () => {
@@ -45,10 +69,144 @@ exports.placeOrder = onCall(options, async request => {
     const [businessSnapshot, ...snapshots] = await tx.getAll(businessRef, ...refs);
     let result;
     try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data()); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
-    tx.create(orderRef, {userId: request.auth.uid, ...result, pincode, address: address.trim(), status: 'submitted', paymentStatus: 'pending_arrangement', createdAt: FieldValue.serverTimestamp()});
+    tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), status: 'submitted', paymentStatus: 'pending_arrangement', createdAt: FieldValue.serverTimestamp()});
     refs.forEach((ref, i) => tx.update(ref, {stock: snapshots[i].data().stock - items[i].quantity}));
     return {orderId};
   });
+});
+exports.registerVendor = onCall(options, async request => {
+  const uid = requireUser(request);
+  const data = request.data || {};
+  if (typeof data.name !== 'string' || data.name.trim().length < 2 || data.name.length > 120) throw new HttpsError('invalid-argument', 'Provide a shop name.');
+  const applicationRef = db.collection('vendorApplications').doc(uid);
+  const existing = await applicationRef.get();
+  if (existing.exists && existing.data().status === 'approved') throw new HttpsError('already-exists', 'This account is already an approved vendor.');
+  await applicationRef.set({
+    vendorId: uid, name: data.name.trim(), description: String(data.description || '').trim().slice(0, 1000),
+    address: String(data.address || '').trim().slice(0, 500), status: 'pending', updatedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+  return {status: 'pending'};
+});
+exports.approveVendor = onCall(options, async request => {
+  requireAdmin(request);
+  const {vendorId, approved, reason = ''} = request.data || {};
+  if (typeof vendorId !== 'string' || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide vendor and decision.');
+  const applicationRef = db.collection('vendorApplications').doc(vendorId);
+  const application = await applicationRef.get();
+  if (!application.exists) throw new HttpsError('not-found', 'Vendor application not found.');
+  const data = application.data();
+  const batch = db.batch();
+  batch.set(applicationRef, {status: approved ? 'approved' : 'rejected', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+  if (approved) {
+    const vendorRef = db.collection('vendors').doc(vendorId);
+    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  }
+  await batch.commit();
+  return {status: approved ? 'approved' : 'rejected'};
+});
+exports.verifyVendorShop = onCall(options, async request => {
+  requireAdmin(request);
+  const {vendorId, shopId, latitude, longitude, radiusKm} = request.data || {};
+  requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
+  if (typeof vendorId !== 'string' || typeof shopId !== 'string' || !Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 100) throw new HttpsError('invalid-argument', 'Provide valid shop verification details.');
+  await db.collection('vendors').doc(vendorId).set({shopId, verified: true, latitude, longitude, radiusKm, verifiedAt: FieldValue.serverTimestamp()}, {merge: true});
+  await db.collection('shops').doc(shopId).set({ownerId: vendorId, verified: true, latitude, longitude, radiusKm}, {merge: true});
+  return {verified: true};
+});
+exports.submitVendorChange = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {type, collection, docId, changes} = request.data || {};
+  const allowedCollection = type === 'shop' ? 'shops' : 'products';
+  if (collection !== allowedCollection || typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)) throw new HttpsError('invalid-argument', 'Invalid change target.');
+  const safeChanges = publicChangeFields(type, changes);
+  const vendor = (await db.collection('vendors').doc(uid).get()).data();
+  if (!vendor || vendor.status !== 'approved' || vendor.verified !== true) throw new HttpsError('permission-denied', 'Your shop must be approved and verified first.');
+  const target = db.collection(collection).doc(docId);
+  const current = await target.get();
+  if (!current.exists || (current.data().ownerId && current.data().ownerId !== uid)) throw new HttpsError('not-found', 'Public item not found.');
+  const autoPublish = (await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges === true;
+  const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId, oldValue: Object.fromEntries(Object.keys(safeChanges).map(key => [key, current.data()[key] ?? null])), newValue: safeChanges, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
+  if (autoPublish) await target.set({...safeChanges, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  else await db.collection('vendorChanges').add(change);
+  return {status: change.status};
+});
+exports.reviewVendorChange = onCall(options, async request => {
+  requireAdmin(request);
+  const {changeId, approved, reason = ''} = request.data || {};
+  if (typeof changeId !== 'string' || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide change and decision.');
+  const changeRef = db.collection('vendorChanges').doc(changeId);
+  return db.runTransaction(async tx => {
+    const snapshot = await tx.get(changeRef);
+    const change = snapshot.data();
+    if (!snapshot.exists || change.status !== 'pending') throw new HttpsError('failed-precondition', 'This change was already reviewed.');
+    tx.update(changeRef, {status: approved ? 'approved' : 'rejected', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()});
+    if (approved) tx.set(db.collection(change.collection).doc(change.docId), {...change.newValue, ownerId: change.vendorId, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    return {status: approved ? 'approved' : 'rejected'};
+  });
+});
+exports.issuePurchaseCode = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {orderId, latitude, longitude} = request.data || {};
+  requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
+  if (typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide an order.');
+  const order = await db.collection('orders').doc(orderId).get();
+  if (!order.exists || order.data().userId !== uid || order.data().status !== 'fulfilled') throw new HttpsError('failed-precondition', 'Only fulfilled orders can be verified.');
+  const code = String(randomInt(100000, 1000000));
+  const codeRef = db.collection('purchaseCodes').doc(digest(`${uid}:${orderId}:${code}`));
+  await codeRef.set({orderId, customerId: uid, latitude, longitude, expiresAt: Date.now() + 5 * 60 * 1000, used: false, createdAt: FieldValue.serverTimestamp()});
+  return {code, expiresInSeconds: 300};
+});
+exports.redeemPurchaseCode = onCall(options, async request => {
+  const vendorId = requireUser(request);
+  const {code, orderId, latitude, longitude} = request.data || {};
+  requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
+  if (typeof code !== 'string' || !/^\d{6}$/.test(code) || typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide a valid code and order.');
+  const vendor = (await db.collection('vendors').doc(vendorId).get()).data();
+  if (!vendor || vendor.status !== 'approved' || vendor.verified !== true) throw new HttpsError('permission-denied', 'Verified vendor access required.');
+  // Codes are customer-bound; find the matching short-lived code without exposing it in reads.
+  const matches = await db.collection('purchaseCodes').where('orderId', '==', orderId).where('used', '==', false).limit(10).get();
+  let matchedRef, matched;
+  for (const candidate of matches.docs) if (candidate.id.endsWith(digest(`${candidate.data().customerId}:${orderId}:${code}`).slice(-64))) { matchedRef = candidate.ref; matched = candidate.data(); break; }
+  if (!matchedRef || !matched || matched.expiresAt < Date.now()) throw new HttpsError('failed-precondition', 'Code is invalid or expired.');
+  const shop = (await db.collection('shops').doc(vendor.shopId).get()).data();
+  const radius = Number(shop?.radiusKm || vendor.radiusKm);
+  if (!validCoordinate(shop?.latitude) || !validCoordinate(shop?.longitude) || !Number.isFinite(radius) || distanceKm(latitude, longitude, shop.latitude, shop.longitude) > radius) throw new HttpsError('permission-denied', 'You must be inside the verified shop radius.');
+  await db.runTransaction(async tx => {
+    const fresh = await tx.get(matchedRef);
+    if (!fresh.exists || fresh.data().used || fresh.data().expiresAt < Date.now()) throw new HttpsError('failed-precondition', 'Code is invalid or already used.');
+    tx.update(matchedRef, {used: true, usedBy: vendorId, usedAt: FieldValue.serverTimestamp()});
+    tx.set(db.collection('verifiedPurchases').doc(`${matched.customerId}_${orderId}`), {customerId: matched.customerId, vendorId, shopId: vendor.shopId, orderId, status: 'verified', verifiedAt: FieldValue.serverTimestamp()}, {merge: true});
+  });
+  return {verified: true};
+});
+exports.submitVerifiedReview = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {productId, rating, text, name} = request.data || {};
+  if (typeof productId !== 'string' || !Number.isInteger(rating) || rating < 1 || rating > 5 || typeof text !== 'string' || !text.trim() || text.length > 1000) throw new HttpsError('invalid-argument', 'Provide a valid review.');
+  const purchases = await db.collection('verifiedPurchases').where('customerId', '==', uid).where('status', '==', 'verified').limit(20).get();
+  let purchasedProduct = false;
+  for (const purchase of purchases.docs) {
+    const order = await db.collection('orders').doc(purchase.data().orderId).get();
+    if (order.exists && order.data().lines?.some(line => line.productId === productId)) { purchasedProduct = true; break; }
+  }
+  if (!purchasedProduct) throw new HttpsError('permission-denied', 'Only verified purchases of this product can be reviewed.');
+  const reviewRef = db.collection('products').doc(productId).collection('reviews').doc(uid);
+  if ((await reviewRef.get()).exists) throw new HttpsError('already-exists', 'You already rated this product.');
+  await reviewRef.create({userId: uid, name: String(name || '').slice(0, 100), rating, text: text.trim(), verifiedPurchase: true, updatedAt: FieldValue.serverTimestamp()});
+  const previousReviews = await db.collectionGroup('reviews').where('userId', '==', uid).limit(4).get();
+  if (previousReviews.size >= 3) await db.collection('suspiciousReviews').add({userId: uid, productId, reason: 'Multiple verified reviews in a short period', createdAt: FieldValue.serverTimestamp(), reviewed: false});
+  return {created: true};
+});
+exports.updateVendorOrder = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {orderId, status} = request.data || {};
+  if (typeof orderId !== 'string' || !['confirmed', 'fulfilled', 'cancelled'].includes(status)) throw new HttpsError('invalid-argument', 'Provide a valid order status.');
+  const vendor = (await db.collection('vendors').doc(uid).get()).data();
+  const orderRef = db.collection('orders').doc(orderId);
+  const order = await orderRef.get();
+  if (!vendor || vendor.status !== 'approved' || !order.exists || !order.data().shopIds?.includes(vendor.shopId)) throw new HttpsError('permission-denied', 'You cannot update this order.');
+  await orderRef.update({status});
+  return {status};
 });
 // Cancelling an order must return its reserved stock exactly once, however many
 // times an admin toggles status; a stockRestored flag makes the transaction idempotent.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../data/store.dart';
 import '../services/localization.dart';
@@ -302,7 +303,18 @@ class _AccountPageState extends State<AccountPage> {
                             (d) => ListTile(
                               title: Text('Order ${d.id}'),
                               subtitle: Text(d.data()['status'].toString()),
-                              trailing: Text(money(d.data()['total'] as num)),
+                              trailing: d.data()['status'] == 'fulfilled'
+                                  ? TextButton(
+                                      onPressed: () => run(() async {
+                                        final pageContext = context;
+                                        final position = await Geolocator.getCurrentPosition();
+                                        final code = await widget.store.issuePurchaseCode(d.id, latitude: position.latitude, longitude: position.longitude);
+                                        if (!pageContext.mounted) return;
+                                        await showDialog<void>(context: pageContext, builder: (dialogContext) => AlertDialog(title: const Text('Your one-time purchase code'), content: Text(code), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))]));
+                                      }),
+                                      child: const Text('Get code'),
+                                    )
+                                  : Text(money(d.data()['total'] as num)),
                             ),
                           )
                           .toList(),

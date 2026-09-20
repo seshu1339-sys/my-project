@@ -4,7 +4,8 @@
   "functions": [{"source": "functions", "codebase": "default"}],
   "hosting": [
     {"target": "customer", "public": "build/web", "ignore": ["firebase.json", "**/.*", "**/node_modules/**"], "rewrites": [{"source": "**", "destination": "/index.html"}]},
-    {"target": "admin", "public": "build/admin_web", "ignore": ["firebase.json", "**/.*", "**/node_modules/**"], "rewrites": [{"source": "**", "destination": "/index.html"}]}
+    {"target": "admin", "public": "build/admin_web", "ignore": ["firebase.json", "**/.*", "**/node_modules/**"], "rewrites": [{"source": "**", "destination": "/index.html"}]},
+    {"target": "vendor", "public": "build/vendor_web", "ignore": ["firebase.json", "**/.*", "**/node_modules/**"], "rewrites": [{"source": "**", "destination": "/index.html"}]}
   ],
   "emulators": {"auth": {"port": 9099}, "functions": {"port": 5001}, "firestore": {"port": 8080}, "storage": {"port": 9199}, "ui": {"enabled": true}}
 }

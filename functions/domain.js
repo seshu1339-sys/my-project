@@ -37,4 +37,16 @@ function quote(items, products, pincode, business = {}, now = new Date()) {
   const total = Math.round((subtotal + deliveryFee) * 100) / 100;
   return {lines, subtotal, deliveryFee, total};
 }
-module.exports = {hashPin, verifyPin, quote};
+function distanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
+  const toRadians = value => value * Math.PI / 180;
+  const dLat = toRadians(latitudeB - latitudeA);
+  const dLng = toRadians(longitudeB - longitudeA);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(latitudeA)) * Math.cos(toRadians(latitudeB))
+    * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function validCoordinate(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
+}
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate};

@@ -3,6 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function admin() { return signedIn() && request.auth.token.admin == true; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
       allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
       allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
@@ -18,6 +19,29 @@ service cloud.firestore {
         && (!('paymentBrand' in request.resource.data) || (request.resource.data.paymentBrand is string && request.resource.data.paymentBrand.size() <= 30))
         && (!('paymentLast4' in request.resource.data) || (request.resource.data.paymentLast4 is string && request.resource.data.paymentLast4.size() <= 4))
         && (!('wishlist' in request.resource.data) || (request.resource.data.wishlist is list && request.resource.data.wishlist.size() <= 500));
+    }
+    match /vendorApplications/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /vendors/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /vendorChanges/{changeId} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /purchaseCodes/{codeId} {
+      allow read, write: if false;
+    }
+    match /verifiedPurchases/{purchaseId} {
+      allow read: if signedIn() && (resource.data.customerId == request.auth.uid || resource.data.vendorId == request.auth.uid || admin());
+      allow write: if false;
+    }
+    match /suspiciousReviews/{reviewId} {
+      allow read: if admin();
+      allow write: if false;
     }
     match /users/{uid}/pushTokens/{tokenId} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
@@ -44,17 +68,11 @@ service cloud.firestore {
     }
     match /products/{productId}/reviews/{uid} {
       allow read: if true;
-      allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['userId', 'name', 'rating', 'text', 'updatedAt'])
-        && request.resource.data.userId == uid
-        && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-        && request.resource.data.name is string && request.resource.data.name.size() <= 100
-        && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
-        && request.resource.data.updatedAt == request.time;
       allow delete: if admin() || (signedIn() && request.auth.uid == uid);
     }
     match /orders/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin()
+        || (get(/databases/$(database)/documents/vendors/$(request.auth.uid)).data.shopId in resource.data.shopIds));
       allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['submitted', 'confirmed', 'fulfilled', 'cancelled'];
     }

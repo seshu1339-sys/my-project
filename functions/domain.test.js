@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -42,4 +42,11 @@ test('quote ignores an invalid or non-positive delivery fee configuration', () =
     assert.equal(result.deliveryFee, 0);
     assert.equal(result.total, 100);
   }
+});
+test('shop radius helpers reject invalid coordinates and measure distance', () => {
+  assert.equal(distanceKm(12.9716, 77.5946, 12.9716, 77.5946), 0);
+  assert(distanceKm(0, 0, 0, 1) > 111);
+  assert(validCoordinate(-90));
+  assert(!validCoordinate(181));
+  assert(!validCoordinate('12.9'));
 });
