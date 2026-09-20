@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
@@ -390,9 +391,14 @@ class VendorModerationPage extends StatelessWidget {
     final data = doc.data();
     return Card(child: ExpansionTile(
       title: Text(data['name']?.toString() ?? doc.id),
-      subtitle: Text('Vendor ID: ${doc.id} • ${data['status']}'),
+      subtitle: Text('Vendor ID: ${doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}'),
       children: [
-        for (final entry in data.entries) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
+        // The two mandatory photos are stored separately; both are shown for review.
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 16, runSpacing: 12, children: [
+          _ApplicationPhoto(label: 'Vendor photo', path: data['vendorPhotoPath']?.toString()),
+          _ApplicationPhoto(label: 'Shop photo', path: data['shopPhotoPath']?.toString()),
+        ])),
+        for (final entry in data.entries.where((e) => e.key != 'vendorPhotoPath' && e.key != 'shopPhotoPath')) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
         OverflowBar(children: [
           IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
           IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
@@ -412,6 +418,31 @@ class VendorModerationPage extends StatelessWidget {
       ]),
     ));
   }
+}
+
+/// One private application photo, fetched with the admin's own Storage access.
+class _ApplicationPhoto extends StatelessWidget {
+  const _ApplicationPhoto({required this.label, required this.path});
+  final String label;
+  final String? path;
+  @override
+  Widget build(BuildContext context) => SizedBox(width: 200, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+    const SizedBox(height: 4),
+    if (path == null) Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label missing'))
+    else FutureBuilder<String>(
+      future: FirebaseStorage.instance.ref(path!).getDownloadURL(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label could not load'));
+        if (!snapshot.hasData) return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+        final url = snapshot.data!;
+        return Semantics(button: true, label: 'View $label full size', child: InkWell(
+          onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(child: InteractiveViewer(child: Image.network(url)))),
+          child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(url, height: 150, width: 200, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label could not load')))),
+        ));
+      },
+    ),
+  ]));
 }
 
 class ComplaintModerationPage extends StatelessWidget {

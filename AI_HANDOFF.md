@@ -55,6 +55,40 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Vendor onboarding: email link -> full registration + 2 photos -> admin review -> unlock
+
+**Flow:** Vendor App login now leads with the *existing* Email Link auth
+(`EmailLinkPage`, now takes an optional `continueUrl` so the vendor site gets
+its own link; customer default unchanged). Only a verified email sees the
+registration form (owner name, phone, shop name, category, address, pincode,
+description + two mandatory photos). Photos upload to separate private Storage
+paths `vendorApplications/{uid}/vendorPhoto|shopPhoto`. `registerVendor` (server)
+re-validates every field and checks both objects exist; status becomes `pending`
+("Pending Approval" screen). Admin tile shows both photos + all details;
+`approveVendor` refuses to approve without both photos. Approval (fee OFF, or fee
+confirmed) unlocks the dashboard: add product/material with photo, my products
+(price / stock / photo), orders with confirm/fulfil/cancel. Same data model
+(`vendorApplications`, `vendors`, `vendorChanges`); no new auth mode.
+
+**Security changes:** `submitVendorChange` now needs `vendors.status=='approved'`
+(GPS `verified` is no longer required for business features, still required for
+purchase-code redemption); vendors may only change items they own or that belong
+to their own shop; new types `newProduct`/`stock`; all values validated
+(`domain.js`). `storage.rules`: private application photos (owner writes only
+before submit/after rejection; owner+admin read), `vendorProducts/{uid}` writable
+only by an approved vendor. Resubmission clears the previous decision fields.
+New product/price/stock changes still follow the existing policy: held for admin
+approval unless Auto-publish is on.
+
+**Tests:** `functions/vendor-storage.test.js` (rules), `domain.test.js`,
+`test/vendor_test.dart`. Live: web + Android + 70 API access checks (scratchpad).
+
+**Not deployed.** Deploy needs Storage rules + Functions + hosting (user-run).
+Unverified in production: Admin SDK default bucket in Functions, Storage CORS
+for admin photo previews on web, Storage cross-service rules permission.
+**Android note:** no deep links, so the emailed link opens the customer site;
+the vendor pastes the link into the app (same fallback as customers).
+
 ### 2026-09-20 — Live end-to-end test (Android + Web) and 4 bug fixes
 
 **What was done:** Ran customer, vendor and admin apps for real against the

@@ -1,12 +1,34 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function verified() { return request.auth != null && request.auth.token.email_verified == true; }
+    function isImage() {
+      return request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
     match /catalog/{file} {
       allow read: if true;
       allow create, update: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.admin == true
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
       allow delete: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.admin == true;
+    }
+    // Private vendor application photos: the owner may upload the two named
+    // photos only before submitting (or after a rejection); only the owner and
+    // the main admin can read them. They are never public.
+    match /vendorApplications/{uid}/{file} {
+      allow read: if verified() && (request.auth.uid == uid || request.auth.token.admin == true);
+      allow create, update: if verified() && request.auth.uid == uid
+        && file in ['vendorPhoto', 'shopPhoto'] && isImage()
+        && (!firestore.exists(/databases/(default)/documents/vendorApplications/$(uid))
+          || firestore.get(/databases/(default)/documents/vendorApplications/$(uid)).data.status == 'rejected');
+    }
+    // Product/material photos: only an approved vendor may upload, into its own folder.
+    match /vendorProducts/{uid}/{file} {
+      allow read: if true;
+      allow create, update: if verified() && request.auth.uid == uid && isImage()
+        && firestore.exists(/databases/(default)/documents/vendors/$(uid))
+        && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
     }
     match /{allPaths=**} { allow read, write: if false; }
   }

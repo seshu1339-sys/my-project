@@ -6,8 +6,9 @@ import '../data/store.dart';
 import 'shared.dart';
 
 class EmailLinkPage extends StatefulWidget {
-  const EmailLinkPage({super.key, required this.store});
+  const EmailLinkPage({super.key, required this.store, this.continueUrl});
   final Store store;
+  final String? continueUrl;
   @override
   State<EmailLinkPage> createState() => _EmailLinkPageState();
 }
@@ -46,7 +47,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
           if (Navigator.canPop(context)) Navigator.pop(context);
         }
       } else {
-        await widget.store.sendSignInLink(address);
+        await widget.store.sendSignInLink(address, continueUrl: widget.continueUrl);
         if (mounted) setState(() => sent = true);
       }
     } on FirebaseAuthException catch (e) {

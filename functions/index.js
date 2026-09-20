@@ -3,8 +3,9 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
+const {getStorage} = require('firebase-admin/storage');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -37,15 +38,29 @@ function requireCoordinate(value, name) {
   return value;
 }
 function publicChangeFields(type, changes) {
-  const allowed = {
-    price: ['price', 'compareAtPrice', 'prices'],
-    product: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'images', 'tags'],
-    shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
-  }[type];
+  const allowed = productChangeFields[type];
   if (!allowed || !changes || typeof changes !== 'object') throw new HttpsError('invalid-argument', 'Unsupported public change.');
   const keys = Object.keys(changes);
   if (!keys.length || keys.some(key => !allowed.includes(key))) throw new HttpsError('invalid-argument', 'Unsupported public change field.');
-  return Object.fromEntries(keys.map(key => [key, changes[key]]));
+  const safe = Object.fromEntries(keys.map(key => [key, changes[key]]));
+  try { validateVendorChange(type, safe); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  return safe;
+}
+// The two mandatory application photos live at fixed, separate paths so they
+// can never be confused with each other or with public catalog images.
+const applicationPhotos = {vendorPhoto: 'Upload a clear personal photo of the vendor before submitting.', shopPhoto: 'Upload a photo of the actual shop before submitting.'};
+async function requireApplicationPhotos(uid) {
+  const bucket = getStorage().bucket();
+  const paths = {};
+  for (const [name, missing] of Object.entries(applicationPhotos)) {
+    const file = bucket.file(`vendorApplications/${uid}/${name}`);
+    const [exists] = await file.exists();
+    if (!exists) throw new HttpsError('failed-precondition', missing);
+    const [metadata] = await file.getMetadata();
+    if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', missing);
+    paths[name + 'Path'] = file.name;
+  }
+  return paths;
 }
 // Keep legacy callable URLs explicit during migration; never issue PIN tokens.
 const retiredPhoneAuth = onCall(options, async () => {
@@ -124,14 +139,17 @@ exports.reviewComplaint = onCall(options, async request => {
 });
 exports.registerVendor = onCall(options, async request => {
   const uid = requireUser(request);
-  const data = request.data || {};
-  if (typeof data.name !== 'string' || data.name.trim().length < 2 || data.name.length > 120) throw new HttpsError('invalid-argument', 'Provide a shop name.');
+  let details;
+  try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
+  const photos = await requireApplicationPhotos(uid);
   await applicationRef.set({
-    vendorId: uid, name: data.name.trim(), description: String(data.description || '').trim().slice(0, 1000),
-    address: String(data.address || '').trim().slice(0, 500), status: 'pending', updatedAt: FieldValue.serverTimestamp(),
+    vendorId: uid, ...details, ...photos, email: request.auth.token.email || null,
+    status: 'pending', submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+    // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
+    ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
   return {status: 'pending'};
 });
@@ -145,6 +163,7 @@ exports.approveVendor = onCall(options, async request => {
   const application = await applicationRef.get();
   if (!application.exists) throw new HttpsError('not-found', 'Vendor application not found.');
   const data = application.data();
+  if (approved && (!data.vendorPhotoPath || !data.shopPhotoPath)) throw new HttpsError('failed-precondition', 'The application is missing the vendor or shop photo, so it cannot be approved.');
   const batch = db.batch();
   const nextStatus = !approved ? 'rejected' : fee.required ? 'payment_required' : 'approved';
   batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
@@ -193,19 +212,33 @@ exports.verifyVendorShop = onCall(options, async request => {
 exports.submitVendorChange = onCall(options, async request => {
   const uid = requireUser(request);
   const {type, collection, docId, changes} = request.data || {};
+  const isNew = type === 'newProduct';
   const allowedCollection = type === 'shop' ? 'shops' : 'products';
-  if (collection !== allowedCollection || typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)) throw new HttpsError('invalid-argument', 'Invalid change target.');
+  if (collection !== allowedCollection || (!isNew && (typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)))) throw new HttpsError('invalid-argument', 'Invalid change target.');
   const safeChanges = publicChangeFields(type, changes);
+  // Business features unlock only once the office/admin has approved the vendor.
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
-  if (!vendor || vendor.status !== 'approved' || vendor.verified !== true) throw new HttpsError('permission-denied', 'Your shop must be approved and verified first.');
-  const target = db.collection(collection).doc(docId);
-  const current = await target.get();
-  if (!current.exists || (current.data().ownerId && current.data().ownerId !== uid)) throw new HttpsError('not-found', 'Public item not found.');
+  if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can use business features.');
+  const targetId = isNew ? db.collection(collection).doc().id : docId;
+  const target = db.collection(collection).doc(targetId);
+  let oldValue = {}, newValue = safeChanges;
+  if (isNew) {
+    newValue = {...safeChanges, kind: safeChanges.kind || 'product', stock: safeChanges.stock ?? 0, shopId: vendor.shopId, active: true};
+  } else {
+    const current = await target.get();
+    const data = current.data();
+    // A vendor may only change items it owns, or unowned items that belong to its own shop.
+    const mine = current.exists && (data.ownerId ? data.ownerId === uid : (collection === 'shops' ? targetId === vendor.shopId : data.shopId === vendor.shopId));
+    if (!mine) throw new HttpsError('not-found', 'Public item not found.');
+    oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
+  }
   const autoPublish = flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
-  const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId, oldValue: Object.fromEntries(Object.keys(safeChanges).map(key => [key, current.data()[key] ?? null])), newValue: safeChanges, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
-  if (autoPublish) await target.set({...safeChanges, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
-  else await db.collection('vendorChanges').add(change);
-  return {status: change.status};
+  const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId: targetId, oldValue, newValue, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
+  if (autoPublish) {
+    await target.set({...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    await db.collection('vendorChanges').add(change);
+  } else await db.collection('vendorChanges').add(change);
+  return {status: change.status, docId: targetId};
 });
 exports.reviewVendorChange = onCall(options, async request => {
   requireAdmin(request);

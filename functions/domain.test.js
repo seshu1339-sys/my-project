@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -64,4 +64,27 @@ test('vendor fee is optional or normalized to a bounded custom amount', () => {
   assert.deepEqual(vendorFee(true, 750.456), {required: true, amount: 750.46});
   assert.throws(() => vendorFee(true, 0));
   assert.throws(() => vendorFee(true, 10000001));
+});
+test('vendor application requires every detail and rejects malformed ones', () => {
+  const ok = {ownerName: 'Ravi Kumar', phone: '+91 98765 43210', name: 'Ravi Stores', shopCategory: 'Grocery', address: '12 MG Road', pincode: '560001', description: 'Fresh vegetables daily'};
+  assert.deepEqual(vendorApplication({...ok, name: '  Ravi   Stores '}), ok);
+  for (const key of Object.keys(ok)) assert.throws(() => vendorApplication({...ok, [key]: ''}), undefined, `${key} must be required`);
+  assert.throws(() => vendorApplication({...ok, pincode: '5600'}));
+  assert.throws(() => vendorApplication({...ok, phone: 'call me'}));
+  assert.throws(() => vendorApplication({...ok, description: 'short'}));
+  assert.throws(() => vendorApplication({...ok, ownerName: 123}));
+});
+test('vendor product changes validate prices, stock, images and new-product essentials', () => {
+  assert.doesNotThrow(() => validateVendorChange('newProduct', {name: 'Cement bag', price: 380, stock: 40, unit: 'bag', kind: 'product', imageUrl: 'https://example.test/a.jpg'}));
+  assert.throws(() => validateVendorChange('newProduct', {name: 'Cement bag'}));                 // price required
+  assert.throws(() => validateVendorChange('newProduct', {price: 10}));                          // name required
+  assert.throws(() => validateVendorChange('newProduct', {name: 'X Y', price: 10, kind: 'weapon'}));
+  assert.throws(() => validateVendorChange('price', {price: -1}));
+  assert.throws(() => validateVendorChange('price', {price: '10'}));
+  assert.doesNotThrow(() => validateVendorChange('price', {prices: {'560001': 12}}));
+  assert.throws(() => validateVendorChange('price', {prices: {abc: 12}}));
+  assert.doesNotThrow(() => validateVendorChange('stock', {stock: 0}));
+  assert.throws(() => validateVendorChange('stock', {stock: 1.5}));
+  assert.throws(() => validateVendorChange('stock', {}));
+  assert.throws(() => validateVendorChange('product', {imageUrl: 'javascript:alert(1)'}));
 });

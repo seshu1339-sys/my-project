@@ -53,7 +53,7 @@ class EmailTestStore extends Store {
   }
 
   @override
-  Future<void> sendSignInLink(String email) async {
+  Future<void> sendSignInLink(String email, {String? continueUrl}) async {
     action = 'send-link';
     submittedEmail = email;
   }
