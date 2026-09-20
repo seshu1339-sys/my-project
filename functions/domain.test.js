@@ -62,7 +62,10 @@ test('payment toggles saved as text by the admin form behave like booleans', () 
 test('vendor fee is optional or normalized to a bounded custom amount', () => {
   assert.deepEqual(vendorFee(false, 0), {required: false, amount: 0});
   assert.deepEqual(vendorFee(true, 750.456), {required: true, amount: 750.46});
-  assert.throws(() => vendorFee(true, 0));
+  assert.deepEqual(vendorFee(true, 0), {required: false, amount: 0}); // ₹0 = nothing to pay
+  assert.deepEqual(vendorFee(true, 1000), {required: true, amount: 1000});
+  assert.throws(() => vendorFee(true, -5));
+  assert.throws(() => vendorFee(true, 'abc'));
   assert.throws(() => vendorFee(true, 10000001));
 });
 test('vendor application requires every detail and rejects malformed ones', () => {

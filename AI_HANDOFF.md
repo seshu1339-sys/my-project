@@ -55,6 +55,23 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Vendor fee of ₹0, and right-rail ads auto-scroll by default
+
+**Vendor fee:** the admin can set Fee Required ON with any positive amount (for
+example 1000) or ₹0. A fee of ₹0 means nothing to pay: the vendor is approved
+directly and never sees the payment screen (`vendorFee` in `functions/domain.js`).
+Negative or non-numeric amounts are still rejected. The admin dialog now refuses a
+blank or unreadable amount instead of treating it as 0 (which would have approved a
+vendor for free) and says "Enter 0 for no payment".
+
+**Ads:** right-rail ads and boxes now auto-scroll by default (`scrollEnabled`
+defaults to true; the admin can still turn it off per promotion, with speed and
+stop-after unchanged). The animation pauses while an ad is off screen: it no longer
+wastes battery on phones and no longer keeps the accessibility tree from going idle.
+
+**Files:** `functions/domain.js` + test, `lib/ui/admin.dart`, `lib/ui/home_promotions.dart`.
+**Verification:** analyze clean, Flutter 48/48, backend 29/29. Live on Web and Android: fee OFF / ON with 0 / 1000 / 250.75, invalid amounts rejected, ad scrolls by default and the admin can stop and restart it. Not deployed.
+
 ### 2026-09-20 — Site/ad analytics, product-interest counts, price-alert admin controls
 
 **Audit first (what already existed, reused):** email-link auth, vendor photos,

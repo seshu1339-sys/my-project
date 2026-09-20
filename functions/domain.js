@@ -62,7 +62,9 @@ function paymentOptions(business = {}) {
 }
 function vendorFee(feeRequired, amount) {
   if (feeRequired !== true) return {required: false, amount: 0};
-  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 10000000) throw Error('Provide a valid vendor fee amount.');
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0 || amount > 10000000) throw Error('Provide a valid vendor fee amount.');
+  // A fee of ₹0 means there is nothing to pay: the vendor proceeds exactly as if the fee were off.
+  if (amount === 0) return {required: false, amount: 0};
   return {required: true, amount: Math.round(amount * 100) / 100};
 }
 // Required vendor + shop details. Every field is mandatory; the account email

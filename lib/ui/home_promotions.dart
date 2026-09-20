@@ -617,8 +617,35 @@ class _ScheduledPromoState extends State<ScheduledPromo>
   bool paused = false;
   double cycle = 1;
   String signature = '';
+  Timer? watch;
+  bool onScreen = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // An ad scrolled out of view must not keep animating: it wastes battery
+    // and produces frames nobody sees. Pause while hidden, resume when shown.
+    watch = Timer.periodic(const Duration(milliseconds: 400), (_) => syncVisibility());
+  }
+
+  void syncVisibility() {
+    if (!mounted) return;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return;
+    final window = Offset.zero & MediaQuery.sizeOf(context);
+    final visible = !(box.localToGlobal(Offset.zero) & box.size).intersect(window).isEmpty;
+    if (visible == onScreen) return;
+    onScreen = visible;
+    if (!visible) {
+      animation.stop();
+    } else if (!paused && widget.entry.text('scrollEnabled', 'true') == 'true') {
+      animation.repeat();
+    }
+  }
+
   @override
   void dispose() {
+    watch?.cancel();
     stop?.cancel();
     animation.dispose();
     super.dispose();
@@ -631,14 +658,14 @@ class _ScheduledPromoState extends State<ScheduledPromo>
     cycle = extent;
     stop?.cancel();
     animation.stop();
-    final enabled = widget.entry.text('scrollEnabled', 'false') == 'true';
+    final enabled = widget.entry.text('scrollEnabled', 'true') == 'true';
     paused = !enabled || widget.entry.text('playback', 'running') != 'running';
     animation.duration = Duration(
       milliseconds: (extent / layout.n('speed', 25, 10, 300) * 1000)
           .round()
           .clamp(1000, 120000),
     );
-    if (!paused) animation.repeat();
+    if (!paused && onScreen) animation.repeat();
     final seconds = layout.n('stopAfter', 0, 0, 3600);
     if (seconds > 0 && !paused) {
       stop = Timer(Duration(milliseconds: (seconds * 1000).round()), () {
@@ -662,7 +689,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
       final height = layout.height(240, floor: 120);
       final gap = layout.n('spacing', 16, 0, 64);
       configure(height + gap, layout);
-      final moving = widget.entry.text('scrollEnabled', 'false') == 'true';
+      final moving = widget.entry.text('scrollEnabled', 'true') == 'true';
       final width = layout.width(c.maxWidth, fallback: c.maxWidth, floor: 140);
       final position = widget.entry.text('position', 'start');
       Widget card() => SizedBox(

@@ -316,14 +316,20 @@ class VendorModerationPage extends StatelessWidget {
       title: Text(approved ? 'Review vendor application' : 'Reject vendor application'),
       content: approved ? Column(mainAxisSize: MainAxisSize.min, children: [
         SwitchListTile(title: const Text('Fee required'), value: feeRequired, onChanged: (value) => setDialogState(() => feeRequired = value)),
-        if (feeRequired) TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Custom vendor fee amount')),
+        if (feeRequired) TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Custom vendor fee amount', helperText: 'Any amount, for example 1000. Enter 0 for no payment.')),
         TextField(controller: reason, decoration: const InputDecoration(labelText: 'Review note (optional)')),
       ]) : TextField(controller: reason, maxLines: 3, decoration: const InputDecoration(labelText: 'Rejection reason')),
       actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: Text(approved ? 'Save review' : 'Reject'))],
     )));
     if (submit != true) { amount.dispose(); reason.dispose(); return; }
     if (!context.mounted) { amount.dispose(); reason.dispose(); return; }
-    final feeAmount = double.tryParse(amount.text.trim()) ?? 0;
+    // ₹0 means no payment, so a blank or unreadable amount must never be treated as 0.
+    final feeAmount = double.tryParse(amount.text.trim());
+    if (approved && feeRequired && (feeAmount == null || feeAmount < 0)) {
+      amount.dispose(); reason.dispose();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid fee amount, for example 1000. Enter 0 for no payment.')));
+      return;
+    }
     await decide(context, 'approveVendor', {'vendorId': vendorId, 'approved': approved, 'feeRequired': approved && feeRequired, 'feeAmount': approved && feeRequired ? feeAmount : 0, 'reason': reason.text.trim()});
     amount.dispose(); reason.dispose();
   }
@@ -796,7 +802,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       'spacing': '16',
                       'animationMs': '6000',
                       'stopAfter': '0',
-                      'scrollEnabled': 'false',
+                      'scrollEnabled': 'true',
                       'position': 'start',
                       'animationSpeed': '600',
                       'displayDuration': '6000',
