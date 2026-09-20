@@ -716,6 +716,7 @@ class CartPage extends StatefulWidget {
 class _CartPageState extends State<CartPage> {
   final address = TextEditingController();
   bool busy = false;
+  String paymentMethod = 'direct_vendor';
   final requestId = DateTime.now().microsecondsSinceEpoch.toString();
   @override
   void initState() {
@@ -851,8 +852,23 @@ class _CartPageState extends State<CartPage> {
                   },
                 ),
                 const Text(
-                  'Prices and availability are checked again when you submit. Payment is arranged with the shop; online payments are not enabled.',
+                  'Prices and availability are checked again when you submit. Payment follows the shop payment policy.',
                 ),
+                Builder(builder: (context) {
+                  final business = widget.store.business;
+                  final methods = <String, String>{
+                    if (business.text('directVendorPaymentEnabled', 'true') != 'false') 'direct_vendor': 'Pay vendor directly',
+                    if (business.text('cashOnDeliveryEnabled') == 'true') 'cash_on_delivery': 'Cash on delivery',
+                    if (business.text('platformCollectionEnabled') == 'true') 'platform_collected': 'Platform payment (future)',
+                  };
+                  if (!methods.containsKey(paymentMethod)) paymentMethod = methods.keys.firstOrNull ?? 'direct_vendor';
+                  return DropdownButtonFormField<String>(
+                    initialValue: paymentMethod,
+                    decoration: const InputDecoration(labelText: 'Payment option'),
+                    items: methods.entries.map((entry) => DropdownMenuItem(value: entry.key, child: Text(entry.value))).toList(),
+                    onChanged: busy ? null : (value) => setState(() => paymentMethod = value ?? 'direct_vendor'),
+                  );
+                }),
                 const SizedBox(height: 20),
                 if (widget.store.pincode.isEmpty)
                   const Text(
@@ -893,6 +909,7 @@ class _CartPageState extends State<CartPage> {
                             final id = await widget.store.checkout(
                               address.text.trim(),
                               requestId,
+                              paymentMethod: paymentMethod,
                             );
                             if (context.mounted) {
                               message(

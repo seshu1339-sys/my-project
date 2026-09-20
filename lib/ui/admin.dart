@@ -99,6 +99,11 @@ const fields = <String, Map<String, String>>{
     'freeDeliveryAbove': 'Free delivery above order total (₹, 0 = always charge)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
     'autoPublishVendorChanges': 'Auto-publish approved vendor changes (true / false)',
+    'defaultPaymentMethod': 'Default payment (direct_vendor / cash_on_delivery / platform_collected)',
+    'directVendorPaymentEnabled': 'Allow direct vendor payment (true / false)',
+    'cashOnDeliveryEnabled': 'Allow cash on delivery (true / false)',
+    'platformCollectionEnabled': 'Enable future platform-collected payment (true / false)',
+    'directVendorPaymentInstructions': 'Direct vendor payment instructions',
   },
   'sectionSettings': {
     'section': 'Section (header, logo, user, search, notice, promo, offers, categories, products, boxes, ads, background)',
@@ -372,6 +377,48 @@ class VendorModerationPage extends StatelessWidget {
   }
 }
 
+class ComplaintModerationPage extends StatelessWidget {
+  const ComplaintModerationPage({super.key, required this.store});
+  final Store store;
+  Future<void> review(BuildContext context, String id, String status) async {
+    final resolution = TextEditingController();
+    final submit = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+      title: Text('$status complaint'),
+      content: TextField(controller: resolution, maxLines: 4, decoration: const InputDecoration(labelText: 'Resolution or review note')),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Save'))],
+    ));
+    if (submit != true) return;
+    try {
+      await FirebaseFunctions.instance.httpsCallable('reviewComplaint').call({'complaintId': id, 'status': status, 'resolution': resolution.text.trim()});
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint updated')));
+    } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
+    resolution.dispose();
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Complaint review')),
+    body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: store.firestore.collection('complaints').limit(100).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const Center(child: Text('Complaints could not load.'));
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (snapshot.data!.docs.isEmpty) return const Center(child: Text('No complaints.'));
+        return ListView(padding: const EdgeInsets.all(20), children: [
+          for (final doc in snapshot.data!.docs) Card(child: ExpansionTile(
+            title: Text(doc.data()['subject']?.toString() ?? doc.id),
+            subtitle: Text('${doc.data()['status']} • Customer ${doc.data()['customerId']}'),
+            children: [
+              ListTile(title: Text(doc.data()['resolution']?.toString() ?? 'No resolution yet.')),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: doc.reference.collection('messages').snapshots(), builder: (_, messages) => Column(children: [for (final message in messages.data?.docs ?? const []) ListTile(dense: true, title: Text(message.data()['body']?.toString() ?? ''), subtitle: Text(message.data()['authorRole']?.toString() ?? ''))])),
+              OverflowBar(children: [TextButton(onPressed: () => review(context, doc.id, 'in_review'), child: const Text('In review')), TextButton(onPressed: () => review(context, doc.id, 'resolved'), child: const Text('Resolve')), TextButton(onPressed: () => review(context, doc.id, 'closed'), child: const Text('Close'))]),
+            ],
+          )),
+        ]);
+      },
+    ),
+  );
+}
+
 class _AdminPageState extends State<AdminPage> {
   String section = 'products';
   @override
@@ -436,6 +483,14 @@ class _AdminPageState extends State<AdminPage> {
               ),
               icon: const Icon(Icons.storefront),
               label: const Text('Vendors'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => ComplaintModerationPage(store: widget.store)),
+              ),
+              icon: const Icon(Icons.report_problem_outlined),
+              label: const Text('Complaints'),
             ),
           ],
         ),
@@ -860,6 +915,12 @@ class _EntryEditorState extends State<EntryEditor> {
           (key == 'position' ? ['start', 'center', 'end'] : ['false', 'true'])
               .map((v) => DropdownMenuItem(value: v, child: Text(v)))
               .toList();
+    } else if (key == 'defaultPaymentMethod') {
+      options = const [
+        DropdownMenuItem(value: 'direct_vendor', child: Text('Customer pays vendor directly')),
+        DropdownMenuItem(value: 'cash_on_delivery', child: Text('Cash on delivery')),
+        DropdownMenuItem(value: 'platform_collected', child: Text('Platform collected (future)')),
+      ];
     } else if (['categoryId', 'parentId', 'shopId'].contains(key)) {
       options = [
         const DropdownMenuItem(value: '', child: Text('None')),

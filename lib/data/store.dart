@@ -333,7 +333,7 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> checkout(String deliveryAddress, String requestId) async {
+  Future<String> checkout(String deliveryAddress, String requestId, {String paymentMethod = 'direct_vendor'}) async {
     if (!live) {
       throw StateError(
         'Demo checkout preview only. Connect Firebase to place orders.',
@@ -354,6 +354,7 @@ class Store extends ChangeNotifier {
           'pincode': pincode,
           'address': deliveryAddress,
           'requestId': requestId,
+          'paymentMethod': paymentMethod,
         });
     cart.clear();
     notifyListeners();
@@ -379,6 +380,15 @@ class Store extends ChangeNotifier {
   Future<String> issuePurchaseCode(String orderId, {required double latitude, required double longitude}) async {
     final result = await call('issuePurchaseCode', {'orderId': orderId, 'latitude': latitude, 'longitude': longitude});
     return result['code'] as String;
+  }
+
+  Future<String> createComplaint({String? orderId, String? productId, String? vendorId, required String subject, required String description}) async {
+    final result = await call('createComplaint', {'orderId': orderId, 'productId': productId, 'vendorId': vendorId, 'subject': subject, 'description': description});
+    return result['complaintId'] as String;
+  }
+
+  Future<void> addComplaintMessage(String complaintId, String body) async {
+    await call('addComplaintMessage', {'complaintId': complaintId, 'body': body});
   }
 
   Future<void> login(String email, String password) async {

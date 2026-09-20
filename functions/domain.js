@@ -49,4 +49,11 @@ function distanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
 function validCoordinate(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
 }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate};
+function paymentOptions(business = {}) {
+  return {
+    direct_vendor: business.directVendorPaymentEnabled !== false,
+    cash_on_delivery: business.cashOnDeliveryEnabled === true,
+    platform_collected: business.platformCollectionEnabled === true,
+  };
+}
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions};

@@ -45,6 +45,27 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
+  Future<void> showComplaintDialog() async {
+    final subject = TextEditingController(), description = TextEditingController();
+    final submit = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Open a complaint'),
+        content: SingleChildScrollView(child: Column(children: [
+          TextField(controller: subject, decoration: const InputDecoration(labelText: 'Subject')),
+          TextField(controller: description, maxLines: 5, decoration: const InputDecoration(labelText: 'What happened?')),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Submit'))],
+      ),
+    );
+    if (submit != true) { subject.dispose(); description.dispose(); return; }
+    await run(() async {
+      await widget.store.createComplaint(subject: subject.text, description: description.text);
+      if (mounted) message(context, 'Complaint submitted. You can follow its full history here.');
+    });
+    subject.dispose(); description.dispose();
+  }
+
   void validateEmail() {
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
       throw StateError('Enter a valid email address.');
@@ -278,6 +299,13 @@ class _AccountPageState extends State<AccountPage> {
                   child: const Text('Disable alerts for my account'),
                 ),
                 const Text('Your orders', style: TextStyle(fontSize: 22)),
+                OutlinedButton.icon(onPressed: busy ? null : showComplaintDialog, icon: const Icon(Icons.report_problem_outlined), label: const Text('Open a complaint')),
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance.collection('complaints').where('customerId', isEqualTo: widget.store.user!.uid).limit(30).snapshots(),
+                  builder: (context, snap) => Column(children: [
+                    for (final complaint in snap.data?.docs ?? const []) ListTile(title: Text(complaint.data()['subject']?.toString() ?? 'Complaint'), subtitle: Text('${complaint.data()['status']} • ${complaint.data()['resolution'] ?? 'Awaiting review'}')),
+                  ]),
+                ),
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: FirebaseFirestore.instance
                       .collection('orders')

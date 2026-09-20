@@ -55,6 +55,40 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Added configurable payment policy and complaint review
+
+**What changed:** Added future-ready payment policy settings to the existing
+Admin business profile: customer pays vendor directly, cash on delivery, and
+platform-collected payment with vendor settlement. Direct vendor payment is
+the backward-compatible default; cash on delivery and platform collection are
+opt-in toggles. Checkout now sends and stores the selected method and a
+corresponding payment status. Platform collection is configuration-ready only;
+no platform gateway or settlement is enabled or deployed.
+
+**Complaints:** Added secure callable-backed complaint cases with customer,
+vendor, and order/product context; full message history; participant replies;
+admin status transitions (`open`, `in_review`, `resolved`, `closed`); and
+resolution notes. Customer account UI can open and track complaints, and the
+central Admin Panel can inspect histories and review them. Firestore rules
+allow history reads only to the participants or admins; clients cannot write
+cases or messages directly.
+
+**Files touched:** `functions/index.js`, `functions/domain.js` and tests,
+`firestore.rules`, `lib/data/store.dart`, customer cart/account UI, and the
+existing admin UI/settings editor.
+
+**Verification:** `flutter analyze`, `flutter test`, Functions syntax checks,
+Functions unit tests, Firebase JSON parsing, and `git diff --check` pass.
+
+**Pending:** No deployment was performed as requested. Payment gateway,
+platform settlement, refunds, and payout reconciliation remain deliberately
+disabled. Vendor-facing complaint reply UI can be expanded in a follow-up;
+the callable and secure history model are in place.
+
+**Next recommended step:** Exercise payment toggles and complaint history
+against the local Firebase Emulator Suite, then plan the future platform
+payment provider and settlement ledger independently of order checkout.
+
 ### 2026-09-20 — Added separate vendor app and secure vendor publishing workflow
 
 **What changed:** Extended the existing customer/admin Firebase system with a

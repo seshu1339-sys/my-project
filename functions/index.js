@@ -4,7 +4,7 @@ const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -57,6 +57,7 @@ exports.placeOrder = onCall(options, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email before ordering.');
   const {items, pincode, address, requestId} = request.data || {};
+  const requestedPaymentMethod = request.data?.paymentMethod;
   if (typeof pincode !== 'string' || !/^\d{6}$/.test(pincode) || typeof address !== 'string' || address.trim().length < 10 || address.length > 1000 || typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)) throw new HttpsError('invalid-argument', 'Provide a valid address, pincode and request ID.');
   if (!Array.isArray(items) || !items.length || items.length > 50 || items.some(i => typeof i?.productId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(i.productId))) throw new HttpsError('invalid-argument', 'Invalid items.');
   await rateLimit(`order:${request.auth.uid}`, 20, 60 * 1000);
@@ -69,10 +70,57 @@ exports.placeOrder = onCall(options, async request => {
     const [businessSnapshot, ...snapshots] = await tx.getAll(businessRef, ...refs);
     let result;
     try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data()); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
-    tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), status: 'submitted', paymentStatus: 'pending_arrangement', createdAt: FieldValue.serverTimestamp()});
+    const business = businessSnapshot.data() || {};
+    const methods = paymentOptions(business);
+    const paymentMethod = requestedPaymentMethod || business.defaultPaymentMethod || 'direct_vendor';
+    if (typeof paymentMethod !== 'string' || methods[paymentMethod] !== true) throw new HttpsError('failed-precondition', 'This payment method is not currently available.');
+    const paymentStatus = paymentMethod === 'platform_collected' ? 'pending_platform_collection' : paymentMethod === 'cash_on_delivery' ? 'pending_cash_on_delivery' : 'pending_vendor_direct';
+    tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), status: 'submitted', paymentMethod, paymentStatus, createdAt: FieldValue.serverTimestamp()});
     refs.forEach((ref, i) => tx.update(ref, {stock: snapshots[i].data().stock - items[i].quantity}));
     return {orderId};
   });
+});
+exports.createComplaint = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {orderId, productId, vendorId, subject, description} = request.data || {};
+  if (typeof subject !== 'string' || subject.trim().length < 3 || subject.length > 160 || typeof description !== 'string' || description.trim().length < 5 || description.length > 3000) throw new HttpsError('invalid-argument', 'Provide a subject and description.');
+  if (![orderId, productId, vendorId].some(value => typeof value === 'string' && value.length > 0)) throw new HttpsError('invalid-argument', 'Choose an order, product, or vendor.');
+  let resolvedVendorId = typeof vendorId === 'string' ? vendorId : null;
+  if (orderId) {
+    const order = await db.collection('orders').doc(orderId).get();
+    if (!order.exists) throw new HttpsError('not-found', 'Order not found.');
+    const data = order.data();
+    const vendor = (await db.collection('vendors').where('shopId', 'in', data.shopIds || ['__none__']).limit(1).get()).docs[0];
+    resolvedVendorId = vendor?.id || resolvedVendorId;
+    if (data.userId !== uid && !data.shopIds?.includes((await db.collection('vendors').doc(uid).get()).data()?.shopId)) throw new HttpsError('permission-denied', 'You cannot complain about this order.');
+  }
+  const complaintRef = db.collection('complaints').doc();
+  const complaint = {customerId: uid, vendorId: resolvedVendorId, orderId: orderId || null, productId: productId || null, subject: subject.trim(), status: 'open', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()};
+  await complaintRef.set(complaint);
+  await complaintRef.collection('messages').add({authorId: uid, authorRole: 'customer', body: description.trim(), createdAt: FieldValue.serverTimestamp()});
+  return {complaintId: complaintRef.id};
+});
+exports.addComplaintMessage = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {complaintId, body} = request.data || {};
+  if (typeof complaintId !== 'string' || typeof body !== 'string' || body.trim().length < 1 || body.length > 3000) throw new HttpsError('invalid-argument', 'Provide a complaint message.');
+  const complaintRef = db.collection('complaints').doc(complaintId);
+  const complaint = (await complaintRef.get()).data();
+  if (!complaint || complaint.status === 'closed') throw new HttpsError('failed-precondition', 'This complaint is closed.');
+  const vendor = (await db.collection('vendors').doc(uid).get()).data();
+  const allowed = complaint.customerId === uid || complaint.vendorId === uid || vendor?.shopId === complaint.vendorId;
+  if (!allowed && request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'You cannot reply to this complaint.');
+  await complaintRef.collection('messages').add({authorId: uid, authorRole: request.auth.token.admin === true ? 'admin' : complaint.customerId === uid ? 'customer' : 'vendor', body: body.trim(), createdAt: FieldValue.serverTimestamp()});
+  await complaintRef.update({updatedAt: FieldValue.serverTimestamp()});
+  return {sent: true};
+});
+exports.reviewComplaint = onCall(options, async request => {
+  requireAdmin(request);
+  const {complaintId, status, resolution} = request.data || {};
+  if (typeof complaintId !== 'string' || !['open', 'in_review', 'resolved', 'closed'].includes(status) || typeof resolution !== 'string' || resolution.length > 1000) throw new HttpsError('invalid-argument', 'Provide a valid complaint decision.');
+  await db.collection('complaints').doc(complaintId).update({status, resolution: resolution.trim(), reviewedBy: request.auth.uid, updatedAt: FieldValue.serverTimestamp()});
+  await db.collection('complaints').doc(complaintId).collection('messages').add({authorId: request.auth.uid, authorRole: 'admin', body: resolution.trim() || `Status changed to ${status}.`, createdAt: FieldValue.serverTimestamp()});
+  return {status};
 });
 exports.registerVendor = onCall(options, async request => {
   const uid = requireUser(request);
