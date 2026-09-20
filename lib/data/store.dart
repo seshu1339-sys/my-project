@@ -372,6 +372,11 @@ class Store extends ChangeNotifier {
     return result['status'] as String;
   }
 
+  Future<String> submitVendorFeePayment(String paymentReference) async {
+    final result = await call('submitVendorFeePayment', {'paymentReference': paymentReference});
+    return result['status'] as String;
+  }
+
   Future<String> submitVendorChange({required String type, required String collection, required String docId, required Map<String, dynamic> changes}) async {
     final result = await call('submitVendorChange', {'type': type, 'collection': collection, 'docId': docId, 'changes': changes});
     return result['status'] as String;

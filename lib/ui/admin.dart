@@ -305,6 +305,25 @@ class VendorModerationPage extends StatelessWidget {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
   }
+  Future<void> reviewApplication(BuildContext context, String vendorId, {required bool approved}) async {
+    var feeRequired = false;
+    final amount = TextEditingController(text: '500');
+    final reason = TextEditingController();
+    final submit = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+      title: Text(approved ? 'Review vendor application' : 'Reject vendor application'),
+      content: approved ? Column(mainAxisSize: MainAxisSize.min, children: [
+        SwitchListTile(title: const Text('Fee required'), value: feeRequired, onChanged: (value) => setDialogState(() => feeRequired = value)),
+        if (feeRequired) TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Custom vendor fee amount')),
+        TextField(controller: reason, decoration: const InputDecoration(labelText: 'Review note (optional)')),
+      ]) : TextField(controller: reason, maxLines: 3, decoration: const InputDecoration(labelText: 'Rejection reason')),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: Text(approved ? 'Save review' : 'Reject'))],
+    )));
+    if (submit != true) { amount.dispose(); reason.dispose(); return; }
+    if (!context.mounted) { amount.dispose(); reason.dispose(); return; }
+    final feeAmount = double.tryParse(amount.text.trim()) ?? 0;
+    await decide(context, 'approveVendor', {'vendorId': vendorId, 'approved': approved, 'feeRequired': approved && feeRequired, 'feeAmount': approved && feeRequired ? feeAmount : 0, 'reason': reason.text.trim()});
+    amount.dispose(); reason.dispose();
+  }
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Vendor approvals and publishing'), actions: [
@@ -317,6 +336,22 @@ class VendorModerationPage extends StatelessWidget {
             builder: (context, snapshot) => Column(children: [
               for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc),
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending applications.')),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          Text('Vendor fee payments awaiting confirmation', style: Theme.of(context).textTheme.titleLarge),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorApplications').where('status', isEqualTo: 'payment_submitted').limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              for (final doc in snapshot.data?.docs ?? const []) Card(child: ListTile(
+                title: Text(doc.data()['name']?.toString() ?? doc.id),
+                subtitle: Text('Amount: ${doc.data()['feeAmount']} • Reference: ${doc.data()['paymentReference']}'),
+                trailing: Wrap(children: [
+                  IconButton(tooltip: 'Confirm paid', onPressed: () => decide(context, 'confirmVendorFeePayment', {'vendorId': doc.id, 'paid': true}), icon: const Icon(Icons.check)),
+                  IconButton(tooltip: 'Reject payment', onPressed: () => decide(context, 'confirmVendorFeePayment', {'vendorId': doc.id, 'paid': false}), icon: const Icon(Icons.close)),
+                ]),
+              )),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No vendor fee payments awaiting confirmation.')),
             ]),
           ),
           const SizedBox(height: 24),
@@ -353,14 +388,16 @@ class VendorModerationPage extends StatelessWidget {
   }
   Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
-    return Card(child: ListTile(
+    return Card(child: ExpansionTile(
       title: Text(data['name']?.toString() ?? doc.id),
-      subtitle: Text('${data['address'] ?? ''}\n${data['description'] ?? ''}'),
-      isThreeLine: true,
-      trailing: Wrap(children: [
-        IconButton(tooltip: 'Approve', onPressed: () => decide(context, 'approveVendor', {'vendorId': doc.id, 'approved': true}), icon: const Icon(Icons.check)),
-        IconButton(tooltip: 'Reject', onPressed: () => decide(context, 'approveVendor', {'vendorId': doc.id, 'approved': false, 'reason': 'Application needs more information.'}), icon: const Icon(Icons.close)),
-      ]),
+      subtitle: Text('Vendor ID: ${doc.id} • ${data['status']}'),
+      children: [
+        for (final entry in data.entries) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
+        OverflowBar(children: [
+          IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
+          IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
+        ]),
+      ],
     ));
   }
   Widget _changeTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {

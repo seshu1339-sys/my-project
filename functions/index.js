@@ -4,7 +4,7 @@ const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -128,7 +128,7 @@ exports.registerVendor = onCall(options, async request => {
   if (typeof data.name !== 'string' || data.name.trim().length < 2 || data.name.length > 120) throw new HttpsError('invalid-argument', 'Provide a shop name.');
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
-  if (existing.exists && existing.data().status === 'approved') throw new HttpsError('already-exists', 'This account is already an approved vendor.');
+  if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
   await applicationRef.set({
     vendorId: uid, name: data.name.trim(), description: String(data.description || '').trim().slice(0, 1000),
     address: String(data.address || '').trim().slice(0, 500), status: 'pending', updatedAt: FieldValue.serverTimestamp(),
@@ -137,20 +137,49 @@ exports.registerVendor = onCall(options, async request => {
 });
 exports.approveVendor = onCall(options, async request => {
   requireAdmin(request);
-  const {vendorId, approved, reason = ''} = request.data || {};
+  const {vendorId, approved, reason = '', feeRequired = false, feeAmount = 0} = request.data || {};
   if (typeof vendorId !== 'string' || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide vendor and decision.');
+  let fee;
+  try { fee = vendorFee(feeRequired, feeAmount); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const applicationRef = db.collection('vendorApplications').doc(vendorId);
   const application = await applicationRef.get();
   if (!application.exists) throw new HttpsError('not-found', 'Vendor application not found.');
   const data = application.data();
   const batch = db.batch();
-  batch.set(applicationRef, {status: approved ? 'approved' : 'rejected', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
-  if (approved) {
+  const nextStatus = !approved ? 'rejected' : fee.required ? 'payment_required' : 'approved';
+  batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+  if (approved && !fee.required) {
     const vendorRef = db.collection('vendors').doc(vendorId);
     batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   }
   await batch.commit();
-  return {status: approved ? 'approved' : 'rejected'};
+  return {status: nextStatus, feeAmount: fee.amount};
+});
+exports.submitVendorFeePayment = onCall(options, async request => {
+  const uid = requireUser(request);
+  const {paymentReference = ''} = request.data || {};
+  const applicationRef = db.collection('vendorApplications').doc(uid);
+  const application = (await applicationRef.get()).data();
+  if (!application || application.status !== 'payment_required' || application.feeRequired !== true) throw new HttpsError('failed-precondition', 'Vendor fee payment is not currently required.');
+  if (typeof paymentReference !== 'string' || paymentReference.trim().length < 2 || paymentReference.length > 200) throw new HttpsError('invalid-argument', 'Provide a payment reference.');
+  await applicationRef.update({status: 'payment_submitted', feePaymentStatus: 'submitted', paymentReference: paymentReference.trim(), paymentSubmittedAt: FieldValue.serverTimestamp()});
+  return {status: 'payment_submitted'};
+});
+exports.confirmVendorFeePayment = onCall(options, async request => {
+  requireAdmin(request);
+  const {vendorId, paid} = request.data || {};
+  if (typeof vendorId !== 'string' || typeof paid !== 'boolean') throw new HttpsError('invalid-argument', 'Provide vendor and payment decision.');
+  const applicationRef = db.collection('vendorApplications').doc(vendorId);
+  const application = await applicationRef.get();
+  if (!application.exists || application.data().status !== 'payment_submitted') throw new HttpsError('failed-precondition', 'No submitted vendor fee payment exists.');
+  const batch = db.batch();
+  batch.set(applicationRef, {status: paid ? 'approved' : 'payment_required', feePaymentStatus: paid ? 'paid' : 'rejected', paymentDecisionAt: FieldValue.serverTimestamp()}, {merge: true});
+  if (paid) {
+    const data = application.data();
+    batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  }
+  await batch.commit();
+  return {status: paid ? 'approved' : 'payment_required'};
 });
 exports.verifyVendorShop = onCall(options, async request => {
   requireAdmin(request);

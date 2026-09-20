@@ -13,7 +13,7 @@ class VendorPage extends StatefulWidget {
 
 class _VendorPageState extends State<VendorPage> {
   final name = TextEditingController(), description = TextEditingController(), address = TextEditingController();
-  final docId = TextEditingController(), value = TextEditingController(), orderId = TextEditingController(), code = TextEditingController();
+  final docId = TextEditingController(), value = TextEditingController(), orderId = TextEditingController(), code = TextEditingController(), paymentReference = TextEditingController();
   String type = 'product';
   bool busy = false;
   Store get store => widget.store;
@@ -34,6 +34,8 @@ class _VendorPageState extends State<VendorPage> {
         builder: (context, snapshot) {
           final application = snapshot.data?.data();
           if (application == null || application['status'] == 'rejected') return _applicationForm(application);
+          if (application['status'] == 'payment_required') return _feePayment(application);
+          if (application['status'] == 'payment_submitted') return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Your payment reference was submitted for administrator confirmation.')));
           if (application['status'] != 'approved') return Center(child: Text('Application ${application['status']}. Await administrator review.'));
           return _workspace(uid);
         },
@@ -49,6 +51,18 @@ class _VendorPageState extends State<VendorPage> {
       const SizedBox(height: 16),
       FilledButton(onPressed: busy ? null : () => run(() async { await store.registerVendor(name: name.text.trim(), description: description.text, address: address.text); }), child: const Text('Submit for approval')),
       if (previous?['decisionReason'] != null) Text('Administrator reason: ${previous!['decisionReason']}'),
+    ]),
+  ))));
+  Widget _feePayment(Map<String, dynamic> application) => Center(child: SingleChildScrollView(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: Padding(
+    padding: const EdgeInsets.all(24), child: Column(children: [
+      const Text('Vendor registration reviewed', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 12),
+      Text('Administrator fee: ${application['feeAmount']}'),
+      const SizedBox(height: 8),
+      const Text('Complete the vendor fee payment using the instructions provided by the administrator, then enter the payment reference below.'),
+      TextField(controller: paymentReference, decoration: const InputDecoration(labelText: 'Payment reference')),
+      const SizedBox(height: 16),
+      FilledButton(onPressed: busy ? null : () => run(() async { await store.submitVendorFeePayment(paymentReference.text.trim()); }), child: const Text('Submit payment reference')),
     ]),
   ))));
   Widget _workspace(String uid) => ListView(padding: const EdgeInsets.all(20), children: [
@@ -86,5 +100,5 @@ class _VendorPageState extends State<VendorPage> {
   ]);
   Widget _demo() => Scaffold(appBar: AppBar(title: const Text('Vendor studio')), body: const Center(child: Text('Connect Firebase to apply and manage a vendor shop.')));
   @override
-  void dispose() { name.dispose(); description.dispose(); address.dispose(); docId.dispose(); value.dispose(); orderId.dispose(); code.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); description.dispose(); address.dispose(); docId.dispose(); value.dispose(); orderId.dispose(); code.dispose(); paymentReference.dispose(); super.dispose(); }
 }

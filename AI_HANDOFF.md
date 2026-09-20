@@ -55,6 +55,33 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Added post-review vendor fee workflow
+
+**What changed:** Updated only the vendor registration workflow. Customer
+registration and checkout have no registration fee. Admin now sees the full
+vendor application details in an expandable review record and chooses Fee
+Required ON/OFF. When ON, the admin enters any positive custom amount (for
+example 500, 750, 1000); when OFF, the vendor proceeds without payment.
+
+**Review-gated payment:** Admin approval transitions a fee-required vendor to
+`payment_required`; only that post-review status renders the Vendor App payment
+screen. The vendor submits a payment reference, then Admin confirms or rejects
+it. Only confirmation creates the approved vendor record. Fee-off approvals
+create the approved vendor immediately. Re-submission cannot bypass an active
+application or fee decision.
+
+**Files touched:** `functions/index.js`, `functions/domain.js` and tests,
+`lib/data/store.dart`, `lib/ui/vendor.dart`, and `lib/ui/admin.dart`.
+
+**Verification:** `flutter analyze`, `flutter test`, Functions syntax checks,
+Functions unit tests, Firebase JSON parsing, and `git diff --check` pass.
+
+**Pending:** No deployment was performed. This workflow records fee payment
+references for admin confirmation; no external vendor-fee gateway was added.
+
+**Next recommended step:** Test one fee-OFF and one fee-ON application through
+the local emulator, including admin rejection and payment confirmation.
+
 ### 2026-09-20 — Added configurable payment policy and complaint review
 
 **What changed:** Added future-ready payment policy settings to the existing

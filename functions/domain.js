@@ -56,4 +56,9 @@ function paymentOptions(business = {}) {
     platform_collected: business.platformCollectionEnabled === true,
   };
 }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions};
+function vendorFee(feeRequired, amount) {
+  if (feeRequired !== true) return {required: false, amount: 0};
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 10000000) throw Error('Provide a valid vendor fee amount.');
+  return {required: true, amount: Math.round(amount * 100) / 100};
+}
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee};

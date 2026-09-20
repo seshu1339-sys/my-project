@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -53,4 +53,10 @@ test('shop radius helpers reject invalid coordinates and measure distance', () =
 test('payment configuration defaults to direct vendor payment and keeps platform collection opt-in', () => {
   assert.deepEqual(paymentOptions(), {direct_vendor: true, cash_on_delivery: false, platform_collected: false});
   assert.deepEqual(paymentOptions({directVendorPaymentEnabled: false, cashOnDeliveryEnabled: true, platformCollectionEnabled: true}), {direct_vendor: false, cash_on_delivery: true, platform_collected: true});
+});
+test('vendor fee is optional or normalized to a bounded custom amount', () => {
+  assert.deepEqual(vendorFee(false, 0), {required: false, amount: 0});
+  assert.deepEqual(vendorFee(true, 750.456), {required: true, amount: 750.46});
+  assert.throws(() => vendorFee(true, 0));
+  assert.throws(() => vendorFee(true, 10000001));
 });
