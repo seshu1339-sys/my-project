@@ -55,6 +55,45 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Live end-to-end test (Android + Web) and 4 bug fixes
+
+**What was done:** Ran customer, vendor and admin apps for real against the
+local Firebase emulators (project `demo-neighbourly-e2e`; nothing touched
+production). Web driven with Playwright + system Chrome (Flutter semantics
+enabled), Android driven on the `Medium_Phone` AVD via adb/uiautomator. Covered
+customer register/login/search/category/cart/checkout (direct + COD), vendor
+registration -> admin review -> fee ON/OFF -> payment submit/reject/confirm,
+vendor change publishing, complaints, admin sections, responsive 390/768/1440.
+
+**Bugs fixed (uncommitted):**
+1. Admin settings form saves toggles as text ("true"), backend required boolean
+   `true` -> COD, platform collection and vendor auto-publish were silently
+   ignored server-side (customer was offered COD, order rejected). Fixed in
+   `functions/domain.js` (`flagOn`/`flagOff`) + `functions/index.js`; test added.
+2. Customer "Open a complaint" could never succeed (server requires an order,
+   dialog sent none). Dialog now has an order picker (`lib/ui/account.dart`).
+3. Vendor App "Orders" count queried a `vendorId` field orders don't have (always
+   0). Now queries `shopIds array-contains <vendor shopId>` (`lib/ui/vendor.dart`).
+4. Vendor payment screen never showed the admin's review note (the only place
+   the admin can give payment instructions). Now shown as "Administrator note".
+
+**Open / not fixed:** Vendor App has no create-account screen (vendors must
+register in the customer app first); vendor application collects no
+email/phone; Vendor App has no order status or complaint reply UI; register form
+places the email-link button between Password and Confirm; after a rejected fee
+payment the reference field keeps the old text.
+
+**Test-harness notes:** Android emulator mode needs an API key shaped `AIza...`
+and a full `FIREBASE_AUTH_DOMAIN` (fake keys make Installations/Auth throw) -
+this was the earlier "Android PERMISSION_DENIED" mystery, not an app bug. Web
+session persistence across reload cannot be checked with the emulator (SDK
+does the persisted-user lookup before `useAuthEmulator` is applied).
+`functions` email-flow tests hard-code project `demo-neighbourly`; run them with
+`firebase emulators:exec --project demo-neighbourly`.
+
+**Verification:** `flutter analyze` clean, `flutter test` 43/43, backend 21/21
+with emulators (0 skipped). No deployment performed.
+
 ### 2026-09-20 — Added post-review vendor fee workflow
 
 **What changed:** Updated only the vendor registration workflow. Customer

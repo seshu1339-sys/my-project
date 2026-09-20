@@ -58,6 +58,7 @@ class _VendorPageState extends State<VendorPage> {
       const Text('Vendor registration reviewed', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
       const SizedBox(height: 12),
       Text('Administrator fee: ${application['feeAmount']}'),
+      if ((application['decisionReason'] ?? '').toString().trim().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Administrator note: ${application['decisionReason']}')),
       const SizedBox(height: 8),
       const Text('Complete the vendor fee payment using the instructions provided by the administrator, then enter the payment reference below.'),
       TextField(controller: paymentReference, decoration: const InputDecoration(labelText: 'Payment reference')),
@@ -95,7 +96,13 @@ class _VendorPageState extends State<VendorPage> {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verified purchase recorded')));
       }), child: const Text('Verify purchase')),
     ]))),
-    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('orders').where('vendorId', isEqualTo: uid).limit(50).snapshots(), builder: (_, snapshot) => ListTile(leading: const Icon(Icons.receipt_long), title: const Text('Orders'), subtitle: Text('${snapshot.data?.docs.length ?? 0} vendor orders'))),
+    // Orders carry the shops they include (shopIds), not a vendor id, and the rules
+    // only let a vendor read orders containing its own shop.
+    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('vendors').doc(uid).snapshots(), builder: (_, vendor) {
+      final shopId = vendor.data?.data()?['shopId'];
+      if (shopId is! String) return const ListTile(leading: Icon(Icons.receipt_long), title: Text('Orders'), subtitle: Text('0 vendor orders'));
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('orders').where('shopIds', arrayContains: shopId).limit(50).snapshots(), builder: (_, snapshot) => ListTile(leading: const Icon(Icons.receipt_long), title: const Text('Orders'), subtitle: Text('${snapshot.data?.docs.length ?? 0} vendor orders')));
+    }),
     StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('vendorChanges').where('vendorId', isEqualTo: uid).limit(50).snapshots(), builder: (_, snapshot) => ListTile(leading: const Icon(Icons.pending_actions), title: const Text('Change history'), subtitle: Text('${snapshot.data?.docs.length ?? 0} submitted changes'))),
   ]);
   Widget _demo() => Scaffold(appBar: AppBar(title: const Text('Vendor studio')), body: const Center(child: Text('Connect Firebase to apply and manage a vendor shop.')));

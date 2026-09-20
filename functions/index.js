@@ -4,7 +4,7 @@ const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -201,7 +201,7 @@ exports.submitVendorChange = onCall(options, async request => {
   const target = db.collection(collection).doc(docId);
   const current = await target.get();
   if (!current.exists || (current.data().ownerId && current.data().ownerId !== uid)) throw new HttpsError('not-found', 'Public item not found.');
-  const autoPublish = (await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges === true;
+  const autoPublish = flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
   const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId, oldValue: Object.fromEntries(Object.keys(safeChanges).map(key => [key, current.data()[key] ?? null])), newValue: safeChanges, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
   if (autoPublish) await target.set({...safeChanges, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   else await db.collection('vendorChanges').add(change);

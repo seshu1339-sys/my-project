@@ -49,11 +49,15 @@ function distanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
 function validCoordinate(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
 }
+// The admin settings form saves every non-numeric field as text, so a toggle
+// arrives as the string "true"/"false" as often as a real boolean.
+function flagOn(value) { return value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true'); }
+function flagOff(value) { return value === false || (typeof value === 'string' && value.trim().toLowerCase() === 'false'); }
 function paymentOptions(business = {}) {
   return {
-    direct_vendor: business.directVendorPaymentEnabled !== false,
-    cash_on_delivery: business.cashOnDeliveryEnabled === true,
-    platform_collected: business.platformCollectionEnabled === true,
+    direct_vendor: !flagOff(business.directVendorPaymentEnabled),
+    cash_on_delivery: flagOn(business.cashOnDeliveryEnabled),
+    platform_collected: flagOn(business.platformCollectionEnabled),
   };
 }
 function vendorFee(feeRequired, amount) {
@@ -61,4 +65,4 @@ function vendorFee(feeRequired, amount) {
   if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 10000000) throw Error('Provide a valid vendor fee amount.');
   return {required: true, amount: Math.round(amount * 100) / 100};
 }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee};
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn};
