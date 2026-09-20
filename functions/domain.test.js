@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -90,4 +90,14 @@ test('vendor product changes validate prices, stock, images and new-product esse
   assert.throws(() => validateVendorChange('stock', {stock: 1.5}));
   assert.throws(() => validateVendorChange('stock', {}));
   assert.throws(() => validateVendorChange('product', {imageUrl: 'javascript:alert(1)'}));
+});
+test('vendor order status only moves forward and finished orders are final', () => {
+  assert.equal(orderTransitionAllowed('submitted', 'confirmed'), true);
+  assert.equal(orderTransitionAllowed('submitted', 'cancelled'), true);
+  assert.equal(orderTransitionAllowed('confirmed', 'fulfilled'), true);
+  assert.equal(orderTransitionAllowed('confirmed', 'cancelled'), true);
+  assert.equal(orderTransitionAllowed('submitted', 'fulfilled'), false);      // must be confirmed first
+  for (const done of ['fulfilled', 'cancelled']) for (const next of ['submitted', 'confirmed', 'fulfilled', 'cancelled']) assert.equal(orderTransitionAllowed(done, next), false, `${done} -> ${next}`);
+  assert.equal(orderTransitionAllowed('confirmed', 'confirmed'), false);
+  assert.equal(orderTransitionAllowed(undefined, 'confirmed'), false);
 });

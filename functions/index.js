@@ -6,7 +6,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {normalizeEvent, recordEvent} = require('./analytics');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
 const db = getFirestore();
@@ -173,6 +173,8 @@ exports.approveVendor = onCall(options, async request => {
   const application = await applicationRef.get();
   if (!application.exists) throw new HttpsError('not-found', 'Vendor application not found.');
   const data = application.data();
+  // A decision is made once: an approved vendor cannot be flipped to rejected here (the vendor record would stay active).
+  if (data.status !== 'pending') throw new HttpsError('failed-precondition', 'Only a pending application can be approved or rejected.');
   if (approved && (!data.vendorPhotoPath || !data.shopPhotoPath)) throw new HttpsError('failed-precondition', 'The application is missing the vendor or shop photo, so it cannot be approved.');
   const batch = db.batch();
   const nextStatus = !approved ? 'rejected' : fee.required ? 'payment_required' : 'approved';
@@ -325,6 +327,7 @@ exports.updateVendorOrder = onCall(options, async request => {
   const orderRef = db.collection('orders').doc(orderId);
   const order = await orderRef.get();
   if (!vendor || vendor.status !== 'approved' || !order.exists || !order.data().shopIds?.includes(vendor.shopId)) throw new HttpsError('permission-denied', 'You cannot update this order.');
+  if (!orderTransitionAllowed(order.data().status, status)) throw new HttpsError('failed-precondition', `A ${order.data().status} order cannot be changed to ${status}.`);
   await orderRef.update({status});
   return {status};
 });

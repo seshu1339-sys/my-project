@@ -35,6 +35,11 @@ class EmailTestStore extends Store {
     notifyListeners();
   }
 
+  void signOutForTest() {
+    current = null;
+    notifyListeners();
+  }
+
   @override
   Future<void> resetPassword(String email) async {
     action = 'reset';
@@ -156,4 +161,25 @@ void main() {
       expect(find.text('Your orders'), findsNothing);
     },
   );
+  testWidgets('after registering and signing out, the sign-in form is shown, not registration', (
+    tester,
+  ) async {
+    final store = EmailTestStore();
+    await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
+    await tester.tap(find.text('Create an account'));
+    await tester.pumpAndSettle();
+    await tester.enterText(field('Email address'), 'owner@example.com');
+    await tester.enterText(field('Password'), 'example-password');
+    await tester.enterText(field('Confirm password'), 'example-password');
+    await tester.ensureVisible(find.text('Create account'));
+    await tester.tap(find.text('Create account'));
+    await tester.pumpAndSettle();
+    expect(store.action, 'register');
+    store.signOutForTest();
+    await tester.pumpAndSettle();
+    expect(find.text('Create your account'), findsNothing);
+    expect(find.text('Welcome to your neighbourhood'), findsOneWidget);
+    expect(field('Confirm password'), findsNothing);
+    expect(find.text('Sign in'), findsOneWidget);
+  });
 }

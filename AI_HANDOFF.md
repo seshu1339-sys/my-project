@@ -55,6 +55,32 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-20 — Full verification pass (customer/vendor/admin, Web + Android) and 4 fixes
+
+Clean builds from `5187dc9`, fresh emulators, then every role on every surface (Web:
+customer, vendor, admin; Android: customer, vendor). Code review alongside. Fixed:
+1. **Location permission never requested** (Android): customer "Get code" and vendor
+   "Verify purchase" failed with "User denied permissions" on a fresh install. New
+   `lib/services/location.dart` (`currentPosition()`: service check, permission prompt,
+   20 s limit) used by both.
+2. **Stale registration form** after register -> logout (Web and Android): fixed in
+   `account.dart`; widget test added in `test/email_auth_test.dart`.
+3. **`approveVendor` had no state guard**: an approved application could be flipped to
+   "rejected" while the `vendors` record stayed active. Now only `pending` can be decided.
+4. **`updateVendorOrder` allowed any transition** (reopen cancelled = stock drift, cancel
+   fulfilled). Now forward-only (`orderTransitionAllowed` in `domain.js`, unit tested).
+
+**Reviewed, NOT fixed (needs a decision):** `notifyNewOffers` re-reads every subscriber x
+offer every 15 min (cost grows with subscribers); `createComplaint` accepts any `vendorId`
+and has no rate limit; `addComplaintMessage` compares `vendor.shopId` with `complaint.vendorId`;
+`trackEvent` is unauthenticated so counts can be inflated; web-push link is hard-coded to the
+production URL; no admin action to suspend/revoke an approved vendor; admin order dropdown can
+still reopen a cancelled order; purchase codes have no per-order issue limit.
+
+**Test-driving notes:** headless Chrome crashes on a mouse-wheel scroll while a Flutter field is
+focused; `uiautomator` cannot dump while an animation runs; `adb emu` is not `adb shell emu`.
+**Verification:** analyze clean, Flutter 49/49, backend 30/30 (emulators, none skipped).
+
 ### 2026-09-20 — Vendor fee of ₹0, and right-rail ads auto-scroll by default
 
 **Vendor fee:** the admin can set Fee Required ON with any positive amount (for

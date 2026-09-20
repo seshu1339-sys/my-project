@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
+import '../services/location.dart';
 
 import '../data/store.dart';
 import '../services/localization.dart';
@@ -356,7 +356,7 @@ class _AccountPageState extends State<AccountPage> {
                                   ? TextButton(
                                       onPressed: () => run(() async {
                                         final pageContext = context;
-                                        final position = await Geolocator.getCurrentPosition();
+                                        final position = await currentPosition();
                                         final code = await widget.store.issuePurchaseCode(d.id, latitude: position.latitude, longitude: position.longitude);
                                         if (!pageContext.mounted) return;
                                         await showDialog<void>(context: pageContext, builder: (dialogContext) => AlertDialog(title: const Text('Your one-time purchase code'), content: Text(code), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))]));
@@ -480,6 +480,8 @@ class _AccountPageState extends State<AccountPage> {
                               email.text.trim(),
                               password.text,
                             );
+                            // Registration is done; the sign-in form must be what shows after a later logout.
+                            if (mounted) setState(() => registering = false);
                           } else {
                             await widget.store.login(
                               email.text.trim(),

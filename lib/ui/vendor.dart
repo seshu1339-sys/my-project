@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:geolocator/geolocator.dart';
+import '../services/location.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
@@ -394,7 +394,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
       TextField(controller: orderId, decoration: const InputDecoration(labelText: 'Order ID')),
       TextField(controller: code, decoration: const InputDecoration(labelText: 'Six-digit customer code')),
       FilledButton(onPressed: busy ? null : () => run(() async {
-        final position = await Geolocator.getCurrentPosition();
+        final position = await currentPosition();
         await store.call('redeemPurchaseCode', {'orderId': orderId.text.trim(), 'code': code.text.trim(), 'latitude': position.latitude, 'longitude': position.longitude});
         toast('Verified purchase recorded');
       }), child: const Text('Verify purchase')),

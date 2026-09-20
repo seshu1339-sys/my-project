@@ -108,4 +108,8 @@ function validateVendorChange(type, changes) {
   if (changes.imageUrl !== undefined && changes.imageUrl !== '' && (typeof changes.imageUrl !== 'string' || !/^https?:\/\//.test(changes.imageUrl) || changes.imageUrl.length > 2000)) throw Error('Image must be an uploaded photo.');
   if (changes.prices !== undefined && (typeof changes.prices !== 'object' || changes.prices === null || Object.entries(changes.prices).some(([k, v]) => !/^\d{6}$/.test(k) || typeof v !== 'number' || !(v >= 0)))) throw Error('Location prices must be pincode=amount pairs.');
 }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, vendorApplication, validateVendorChange, productChangeFields};
+// An order only moves forward. A finished order (fulfilled or cancelled) is final: cancelling
+// restores stock exactly once, so reopening one would leave its stock un-reserved.
+const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
+function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields};
