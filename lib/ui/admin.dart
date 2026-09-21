@@ -61,6 +61,7 @@ const fields = <String, Map<String, String>>{
     'name': 'Headline / ticker text',
     'description': 'Supporting text',
     'placement': 'Display location',
+    'notifySubscribers': 'Push notification to subscribers',
     'target': 'Click action (shops / category:ID / product:ID / https://…)',
     'imageUrl': 'Image URL',
     'width': 'Width (0 = automatic, up to 3840 px)',
@@ -1049,6 +1050,12 @@ class _EntryEditorState extends State<EntryEditor> {
           (key == 'position' ? ['start', 'center', 'end'] : ['false', 'true'])
               .map((v) => DropdownMenuItem(value: v, child: Text(v)))
               .toList();
+    } else if (key == 'notifySubscribers') {
+      options = const [
+        DropdownMenuItem(value: '', child: Text('Automatic (all offers except the ticker)')),
+        DropdownMenuItem(value: 'true', child: Text('Always notify subscribers')),
+        DropdownMenuItem(value: 'false', child: Text('Never notify subscribers')),
+      ];
     } else if (key == 'defaultPaymentMethod') {
       options = const [
         DropdownMenuItem(value: 'direct_vendor', child: Text('Customer pays vendor directly')),

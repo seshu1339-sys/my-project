@@ -55,6 +55,26 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-21 — Offer push notifications to all subscribers (commit 2 of 2; NOT deployed)
+
+Rebuilt in `functions/notifications.js` (+ `notifications-domain.js`); fixes the earlier review finding (every
+subscriber x offer re-read every 15 min, tickers spamming). Each promotion is claimed once per go-live time on the
+promotion itself (`notifiedKey/notifiedAt/notifiedCount`), so the 15-minute check reads only promotions.
+`notifyOfferPublished` (Firestore trigger) sends as soon as an offer is published; the schedule catches offers whose
+`startsAt` arrives later. Sent to every `notificationSubscribers.enabled` user with a device, 25 in parallel, through
+the existing `send()` helper (per-user dedupe, opt-in and token checks are unchanged); editing an offer does not
+resend, changing `startsAt` does. Admin controls (Insights screen, now "Insights and notifications"): global switch
+`settings/business.offerNotificationsEnabled` (blank = on), per-offer `notifySubscribers` (blank = automatic,
+`true` = always, `false` = never; tickers skipped unless `true`; dropdown in the promotion editor), and "Send now"
+(`sendOfferNotification`, repeatable at most hourly per offer, works while the switch is off). `offerAudienceSize`
+gives the subscriber count. Existing analytics were not changed.
+
+**Tests:** `functions/offers.test.js` (PUSH_DRY_RUN), 2 new unit tests in `notifications-domain.test.js`. Live on
+emulators (Web admin): publish, edit (no resend), never-notify, Send now, double click, switch off/on, ticker, scheduled.
+**NOT tested:** real FCM delivery (dry-run only); the 15-minute schedule (the emulator does not fire schedules; the
+`releaseOffer` logic it calls is covered); Android (no client change beyond the shared admin screens).
+**Deploy note:** new functions `sendOfferNotification`, `offerAudienceSize`, `notifyOfferPublished`; no rules or indexes.
+
 ### 2026-09-21 — Admin can suspend and reinstate a vendor (commit 1 of 2; NOT deployed)
 
 New admin callable `setVendorSuspension` (`functions/index.js`) and UI in the admin Vendors page

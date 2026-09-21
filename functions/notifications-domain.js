@@ -18,4 +18,20 @@ function priceDrop(before, after, pincode, now = Date.now()) {
 function priceAlertKey(productId, pincode, value) {
   return `priceDrop:${productId}:${pincode || 'any'}:${value}`;
 }
-module.exports = {active, price, priceDrop, priceAlertKey, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};
+// ---- Offer notifications
+// The admin form saves toggles as text, so accept "true"/"false" as well as booleans.
+const isOn = v => v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true');
+const isOff = v => v === false || (typeof v === 'string' && v.trim().toLowerCase() === 'false');
+// A promotion tells subscribers when it goes live unless the admin turned that off for it.
+// The scrolling ticker is an announcement line, not an offer, so it only notifies when asked to.
+function offerNotifiable(data, now = Date.now()) {
+  if (!active(data, now) || isOff(data.notifySubscribers)) return false;
+  return data.placement !== 'ticker' || isOn(data.notifySubscribers);
+}
+// One notification per promotion per go-live time; rescheduling the start notifies again.
+const offerKey = (promotionId, data) => `offer:${promotionId}:${data.startsAt || 'initial'}`;
+function offerCopy(data) {
+  const body = [data.name || data.title, data.description].filter(v => typeof v === 'string' && v.trim()).join(' - ').slice(0, 180);
+  return {title: 'New offer', body: body || 'A new offer is available. Open the shop to explore.'};
+}
+module.exports = {active, price, priceDrop, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};

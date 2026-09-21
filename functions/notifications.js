@@ -1,12 +1,12 @@
 'use strict';
-const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
+const {onDocumentUpdated, onDocumentWritten} = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
-const {active, priceDrop, price, priceAlertKey, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
+const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
 const {flagOff} = require('./domain');
 const db = getFirestore();
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -109,17 +109,62 @@ exports.notifyOrderStatus = onDocumentUpdated({document: 'orders/{orderId}', reg
     type: 'orderStatus', orderId: event.params.orderId, status: after.status,
   });
 });
-// Polling also catches offers whose scheduled start arrives without a document edit.
+// ---- Offer notifications to every subscriber.
+// Each promotion is claimed once per go-live time (notifiedKey on the promotion itself), so the
+// scheduled check reads only the promotions, never every subscriber, and a retried run or a later
+// edit never notifies twice. The per-customer delivery claim in send() is a second safeguard.
+const FAN_OUT = 25; // subscribers processed in parallel
+async function fanOutOffer(promotionId, data, eventKey) {
+  const notification = offerCopy(data), extra = {type: 'offer', promotionId};
+  const counts = {sent: 0, duplicate: 0, noDevice: 0};
+  let batch = [];
+  const flush = async () => {
+    const results = await Promise.all(batch.map(uid => send(uid, eventKey, notification, extra).catch(error => { console.warn('Offer delivery failed', {promotionId, error: String(error).slice(0, 120)}); return 'failed'; })));
+    for (const status of results) { if (status === 'sent') counts.sent++; else if (status === 'duplicate') counts.duplicate++; else counts.noDevice++; }
+    batch = [];
+  };
+  for await (const subscriber of pages(db.collection('notificationSubscribers').where('enabled', '==', true).orderBy('__name__'))) {
+    batch.push(subscriber.id);
+    if (batch.length >= FAN_OUT) await flush();
+  }
+  if (batch.length) await flush();
+  return counts;
+}
+/// Notifies subscribers about one promotion if it is due. [force] is the admin's manual "send now":
+/// it ignores the automatic on/off switch and the per-offer flag, and may repeat at most hourly.
+async function releaseOffer(promotionId, {force = false, now = Date.now()} = {}) {
+  const ref = db.collection('promotions').doc(promotionId);
+  if (!force && flagOff(((await db.collection('settings').doc('business').get()).data() || {}).offerNotificationsEnabled)) return {status: 'disabled'};
+  const claimed = await db.runTransaction(async tx => {
+    const data = (await tx.get(ref)).data();
+    if (!data) return null;
+    if (force ? !active(data, now) : !offerNotifiable(data, now)) return {status: 'not-due'};
+    const key = offerKey(promotionId, data);
+    if (!force && data.notifiedKey === key) return {status: 'already-sent'};
+    tx.update(ref, {notifiedKey: key, notifiedAt: FieldValue.serverTimestamp(), notifiedCount: 0});
+    return {status: 'claimed', data, key};
+  });
+  if (!claimed) return {status: 'not-found'};
+  if (claimed.status !== 'claimed') return claimed;
+  const eventKey = force ? `${claimed.key}:manual:${Math.floor(now / 3600000)}` : claimed.key;
+  const counts = await fanOutOffer(promotionId, claimed.data, eventKey);
+  await ref.update({notifiedCount: counts.sent});
+  return {status: 'sent', ...counts};
+}
+// An offer goes out as soon as the admin publishes it...
+exports.notifyOfferPublished = onDocumentWritten({document: 'promotions/{promotionId}', region: 'asia-south1', maxInstances: 3, timeoutSeconds: 540}, async event => {
+  if (!event.data?.after?.exists) return;
+  const before = event.data.before?.data(), after = event.data.after.data();
+  // Our own bookkeeping writes must not re-trigger.
+  if (before && after.notifiedKey !== before.notifiedKey) return;
+  await releaseOffer(event.params.promotionId);
+});
+// ...and this check catches offers whose scheduled start arrives without any edit.
 exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
   for await (const offer of pages(db.collection('promotions').orderBy('__name__'))) {
     const data = offer.data();
-    if (!active(data)) continue;
-    const key = `offer:${offer.id}:${data.startsAt || 'initial'}`;
-    for await (const subscriber of pages(db.collection('notificationSubscribers').orderBy('__name__'))) {
-      if (subscriber.data().enabled) await send(subscriber.id, key, {
-        title: 'New offer', body: data.name || data.title || 'A new offer is available. Open the shop to explore.',
-      }, {type: 'offer', promotionId: offer.id});
-    }
+    if (!offerNotifiable(data) || data.notifiedKey === offerKey(offer.id, data)) continue;
+    await releaseOffer(offer.id);
   }
 });
 
@@ -183,4 +228,19 @@ exports.sendPriceDropAlerts = onCall(adminOptions, async request => {
     summary.results.push({uid: row.uid, status});
   }
   return summary;
+});
+
+// ---- Admin: send an offer to every subscriber now, and see how many that is.
+exports.sendOfferNotification = onCall({...adminOptions, timeoutSeconds: 540}, async request => {
+  requireAdmin(request);
+  const {promotionId} = request.data || {};
+  if (typeof promotionId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(promotionId)) throw new HttpsError('invalid-argument', 'Choose an offer.');
+  const result = await releaseOffer(promotionId, {force: true});
+  if (result.status === 'not-found') throw new HttpsError('not-found', 'Offer not found.');
+  if (result.status === 'not-due') throw new HttpsError('failed-precondition', 'Only an offer that is live right now can be sent.');
+  return result;
+});
+exports.offerAudienceSize = onCall(adminOptions, async request => {
+  requireAdmin(request);
+  return {subscribers: (await db.collection('notificationSubscribers').where('enabled', '==', true).count().get()).data().count};
 });

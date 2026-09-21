@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
 
 /// Site and ad statistics, plus the price-drop alert audience and controls.
 /// Reads the aggregates written by the trackEvent function and the interest
@@ -31,6 +32,7 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
   void initState() {
     super.initState();
     load();
+    loadSubscribers();
   }
 
   Map<String, num> _sum(Iterable<Map<String, dynamic>> docs) {
@@ -203,9 +205,96 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
     ]);
   }
 
+  // ---- Offer notifications: every subscriber is told once when an offer goes live.
+  int? subscribers;
+  String? sendingOffer;
+
+  bool get offersAutoOn => store.business.text('offerNotificationsEnabled', 'true').trim().toLowerCase() != 'false';
+
+  Future<void> loadSubscribers() async {
+    try {
+      final result = await FirebaseFunctions.instance.httpsCallable('offerAudienceSize').call();
+      if (mounted) setState(() => subscribers = (result.data as Map)['subscribers'] as int?);
+    } catch (_) {
+      // The count is informational; the section still works without it.
+    }
+  }
+
+  Future<void> setOffersAuto(bool on) async {
+    try {
+      await store.firestore.collection('settings').doc('business').set({'offerNotificationsEnabled': on ? 'true' : 'false'}, SetOptions(merge: true));
+      if (mounted) setState(() => notice = on ? 'Automatic offer notifications are ON.' : 'Automatic offer notifications are OFF. "Send now" still works.');
+    } catch (e) {
+      if (mounted) setState(() => notice = 'Could not change the setting: $e');
+    }
+  }
+
+  Future<void> sendOffer(Entry offer) async {
+    final ok = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+      title: const Text('Send offer notification'),
+      content: Text('"${offer.text('name', offer.id)}" will be sent as a push notification to ${subscribers ?? 'all'} subscriber(s) who have alerts on and a registered device. Anyone who already received it this hour is skipped.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Send now'))],
+    ));
+    if (ok != true) return;
+    setState(() => sendingOffer = offer.id);
+    try {
+      final result = await FirebaseFunctions.instance.httpsCallable('sendOfferNotification').call({'promotionId': offer.id});
+      final r = Map<String, dynamic>.from(result.data as Map);
+      if (mounted) setState(() => notice = 'Offer sent to ${r['sent']} subscriber(s). Already notified: ${r['duplicate']}. No device or alerts off: ${r['noDevice']}.');
+    } catch (e) {
+      if (mounted) setState(() => notice = 'Offer could not be sent: $e');
+    }
+    if (mounted) setState(() => sendingOffer = null);
+  }
+
+  String _offerMode(Entry offer) {
+    final flag = offer.text('notifySubscribers').trim().toLowerCase();
+    if (flag == 'false') return 'Never notifies';
+    if (flag == 'true') return 'Always notifies';
+    return offer.text('placement') == 'ticker' ? 'Ticker: not notified unless set to Always' : 'Notifies automatically';
+  }
+
+  String _offerStatus(Entry offer) {
+    final now = DateTime.now();
+    final start = DateTime.tryParse(offer.text('startsAt')), end = DateTime.tryParse(offer.text('endsAt'));
+    if (!offer.active) return 'Hidden';
+    if (start != null && now.isBefore(start)) return 'Scheduled';
+    if (end != null && !now.isBefore(end)) return 'Ended';
+    return 'Live';
+  }
+
+  Widget _offers() {
+    final offers = store.entries('promotions');
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Semantics(container: true, child: Text('Offer notifications', style: Theme.of(context).textTheme.titleLarge)),
+      const SizedBox(height: 4),
+      Semantics(container: true, child: Text('A live offer is sent once as a push notification to every subscriber with alerts on and a registered device${subscribers == null ? '' : ' ($subscribers subscriber(s) right now)'}. Editing an offer does not send it again; changing its start time does.')),
+      SwitchListTile(
+        title: const Text('Automatic offer notifications'),
+        subtitle: const Text('When ON, an offer notifies subscribers as soon as it goes live. Turn OFF to send only with "Send now". Each offer can also be set to Always or Never notify in its own settings.'),
+        value: offersAutoOn, onChanged: setOffersAuto,
+      ),
+      if (offers.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('No offers yet.')),
+      for (final offer in offers) Card(child: ListTile(
+        title: Text(offer.text('name', offer.id)),
+        subtitle: Text('${offer.text('placement', 'carousel')} • ${_offerStatus(offer)} • ${_offerMode(offer)} • ${_lastNotified(offer)}'),
+        trailing: OutlinedButton(
+          onPressed: sendingOffer != null || !offer.visibleAt(DateTime.now()) ? null : () => sendOffer(offer),
+          child: Text(sendingOffer == offer.id ? 'Sending...' : 'Send now'),
+        ),
+      )),
+    ]);
+  }
+
+  String _lastNotified(Entry offer) {
+    final at = offer.data['notifiedAt'];
+    if (at is! Timestamp) return 'Not sent yet';
+    return 'Last sent ${at.toDate().toLocal().toString().substring(0, 16)} to ${offer.data['notifiedCount'] ?? 0}';
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Insights and price alerts')),
+    appBar: AppBar(title: const Text('Insights and notifications')),
     body: ListenableBuilder(listenable: store, builder: (context, _) => ListView(padding: const EdgeInsets.all(20), children: [
       if (loading) const LinearProgressIndicator(),
       if (error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
@@ -213,6 +302,8 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
       _statistics(),
       const Divider(height: 40),
       _alerts(),
+      const Divider(height: 40),
+      _offers(),
     ])),
   );
 }
