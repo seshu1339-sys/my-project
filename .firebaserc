@@ -1,1 +1,21 @@
-{"projects":{"default":"e-commerce-app-a3897"}}
+{
+  "projects": {
+    "default": "e-commerce-app-a3897"
+  },
+  "targets": {
+    "e-commerce-app-a3897": {
+      "hosting": {
+        "customer": [
+          "e-commerce-app-a3897"
+        ],
+        "admin": [
+          "e-commerce-app-a3897-admin"
+        ],
+        "vendor": [
+          "e-commerce-app-a3897-vendor"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
