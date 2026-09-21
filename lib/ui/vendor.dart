@@ -78,10 +78,36 @@ class _VendorPageState extends State<VendorPage> {
           if (status == 'payment_required') return _feePayment(application);
           if (status == 'payment_submitted') return const _Message(title: 'Payment submitted', body: 'Your payment reference was submitted for administrator confirmation.');
           if (status != 'approved') return _Message(title: 'Application $status', body: 'Await administrator review.');
-          return VendorWorkspace(store: store, uid: uid);
+          // Suspension is kept on the vendor record (the application stays "approved"); the server
+          // refuses every business action for a suspended vendor, this screen just explains why.
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendors').doc(uid).snapshots(),
+            builder: (context, vendor) {
+              if (vendor.connectionState == ConnectionState.waiting && !vendor.hasData) return const Center(child: CircularProgressIndicator());
+              final record = vendor.data?.data();
+              if (record?['status'] == 'suspended') return _suspended(record!);
+              return VendorWorkspace(store: store, uid: uid);
+            },
+          );
         },
       ),
     );
+  }
+
+  Widget _suspended(Map<String, dynamic> vendor) {
+    final reason = '${vendor['suspensionReason'] ?? ''}'.trim();
+    return Center(child: SingleChildScrollView(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: Padding(
+      padding: const EdgeInsets.all(24), child: Column(children: [
+        const Icon(Icons.block, size: 48),
+        const SizedBox(height: 12),
+        const Text('Account suspended', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        const Text('Your vendor account has been suspended by the administrator. Your shop and products are hidden from customers and you cannot add products, change prices or stock, or handle orders.', textAlign: TextAlign.center),
+        if (reason.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text('Reason: $reason', textAlign: TextAlign.center)),
+        const SizedBox(height: 12),
+        const Text('Contact the administrator to have your account reinstated. Everything will reappear as before once it is.', textAlign: TextAlign.center),
+      ]),
+    ))));
   }
 
   Widget _pending(Map<String, dynamic> application) => Center(child: SingleChildScrollView(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 520), child: Padding(

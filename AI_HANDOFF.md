@@ -55,6 +55,23 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-21 — Admin can suspend and reinstate a vendor (commit 1 of 2; NOT deployed)
+
+New admin callable `setVendorSuspension` (`functions/index.js`) and UI in the admin Vendors page
+("Active and suspended vendors": Suspend needs a reason, Reinstate). It reuses the existing gate:
+`vendors.status` becomes `suspended`, and every business callable and the Storage rules already require
+`approved`, so the vendor is locked out at once. The vendor's own products (`ownerId`), its shop's products and
+its shop are hidden with `hiddenBySuspension: <vendorId>`; Reinstate restores only those, so something the admin
+hid earlier stays hidden. `reviewVendorChange` refuses to publish a suspended vendor's queued changes (rejecting
+still works). The vendor app shows "Account suspended" + the reason (`vendor.dart` streams `vendors/{uid}`; the
+application stays `approved`). Only an `approved` vendor can be suspended; a reason of 3+ characters is required.
+Login is not blocked, only business actions.
+
+**Tests:** `functions/vendor-suspension.test.js` (emulators). Live on emulators: Web admin/vendor/customer
+suspend+reinstate, Android vendor app (live switch, cold start, reinstate).
+**NOT tested:** Storage-rule lockout of a suspended vendor's uploads (rule unchanged, relies on `status == approved`).
+**Deploy note:** new function `setVendorSuspension`; no rules or indexes changed.
+
 ### 2026-09-20 — Full verification pass (customer/vendor/admin, Web + Android) and 4 fixes
 
 Clean builds from `5187dc9`, fresh emulators, then every role on every surface (Web:

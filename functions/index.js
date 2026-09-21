@@ -186,6 +186,43 @@ exports.approveVendor = onCall(options, async request => {
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
 });
+// Hides (or restores) everything a vendor sells: the products it created, the products of its
+// shop, and its shop. Only items this function hid are restored, so an admin's own choice to
+// hide something is never overridden.
+async function setVendorCatalogVisibility(vendorId, shopId, hide) {
+  const found = new Map();
+  const add = snapshot => snapshot.docs.forEach(doc => found.set(doc.ref.path, doc));
+  add(await db.collection('products').where('ownerId', '==', vendorId).get());
+  if (typeof shopId === 'string' && shopId) add(await db.collection('products').where('shopId', '==', shopId).get());
+  add(await db.collection('shops').where('ownerId', '==', vendorId).get());
+  let batch = db.batch(), pending = 0, changed = 0;
+  for (const doc of found.values()) {
+    const item = doc.data();
+    if (hide) { if (item.active === false) continue; batch.update(doc.ref, {active: false, hiddenBySuspension: vendorId}); }
+    else { if (item.hiddenBySuspension !== vendorId) continue; batch.update(doc.ref, {active: true, hiddenBySuspension: FieldValue.delete()}); }
+    changed++;
+    if (++pending === 400) { await batch.commit(); batch = db.batch(); pending = 0; }
+  }
+  if (pending) await batch.commit();
+  return changed;
+}
+exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async request => {
+  requireAdmin(request);
+  const {vendorId, suspended, reason = ''} = request.data || {};
+  if (typeof vendorId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(vendorId) || typeof suspended !== 'boolean' || typeof reason !== 'string') throw new HttpsError('invalid-argument', 'Provide the vendor and whether to suspend or reinstate.');
+  const note = reason.trim().slice(0, 500);
+  if (suspended && note.length < 3) throw new HttpsError('invalid-argument', 'Give the vendor a reason for the suspension.');
+  const vendorRef = db.collection('vendors').doc(vendorId);
+  const vendor = (await vendorRef.get()).data();
+  if (!vendor) throw new HttpsError('not-found', 'Vendor not found.');
+  if (suspended && vendor.status !== 'approved') throw new HttpsError('failed-precondition', 'Only an approved vendor can be suspended.');
+  if (!suspended && vendor.status !== 'suspended') throw new HttpsError('failed-precondition', 'This vendor is not suspended.');
+  // Change the vendor first: every business function checks status === 'approved', so access stops at once.
+  if (suspended) await vendorRef.update({status: 'suspended', suspensionReason: note, suspendedAt: FieldValue.serverTimestamp(), suspendedBy: request.auth.uid});
+  else await vendorRef.update({status: 'approved', reinstatedAt: FieldValue.serverTimestamp(), reinstatedBy: request.auth.uid, suspensionReason: FieldValue.delete()});
+  const items = await setVendorCatalogVisibility(vendorId, vendor.shopId, suspended);
+  return {status: suspended ? 'suspended' : 'approved', itemsChanged: items};
+});
 exports.submitVendorFeePayment = onCall(options, async request => {
   const uid = requireUser(request);
   const {paymentReference = ''} = request.data || {};
@@ -261,6 +298,7 @@ exports.reviewVendorChange = onCall(options, async request => {
     const snapshot = await tx.get(changeRef);
     const change = snapshot.data();
     if (!snapshot.exists || change.status !== 'pending') throw new HttpsError('failed-precondition', 'This change was already reviewed.');
+    if (approved && (await tx.get(db.collection('vendors').doc(change.vendorId))).data()?.status !== 'approved') throw new HttpsError('failed-precondition', 'This vendor is not active, so its change cannot be published.');
     tx.update(changeRef, {status: approved ? 'approved' : 'rejected', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()});
     if (approved) tx.set(db.collection(change.collection).doc(change.docId), {...change.newValue, ownerId: change.vendorId, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     return {status: approved ? 'approved' : 'rejected'};

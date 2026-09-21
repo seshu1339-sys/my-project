@@ -364,6 +364,17 @@ class VendorModerationPage extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 24),
+          Text('Active and suspended vendors', style: Theme.of(context).textTheme.titleLarge),
+          const Text('Suspending a vendor stops all its business actions at once and hides its shop and products from customers. Reinstating restores everything.'),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendors').where('status', whereIn: ['approved', 'suspended']).limit(200).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Vendors could not load.')),
+              for (final doc in snapshot.data?.docs ?? const []) _vendorTile(context, doc),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No approved vendors yet.')),
+            ]),
+          ),
+          const SizedBox(height: 24),
           Text('Pending public changes', style: Theme.of(context).textTheme.titleLarge),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorChanges').where('status', isEqualTo: 'pending').limit(100).snapshots(),
@@ -412,6 +423,45 @@ class VendorModerationPage extends StatelessWidget {
           IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
         ]),
       ],
+    ));
+  }
+  Future<void> _setSuspension(BuildContext context, String vendorId, String name, {required bool suspend}) async {
+    final reason = TextEditingController();
+    final go = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+      title: Text(suspend ? 'Suspend $name?' : 'Reinstate $name?'),
+      content: suspend
+          ? Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('The vendor is locked out immediately and its shop and products are hidden from customers. The vendor sees the reason below.'),
+              TextField(controller: reason, maxLines: 3, maxLength: 500, onChanged: (_) => setDialogState(() {}), decoration: const InputDecoration(labelText: 'Reason for suspension (required)')),
+            ])
+          : const Text('The vendor can trade again and the shop and products hidden by the suspension are shown to customers again.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
+        FilledButton(onPressed: suspend && reason.text.trim().length < 3 ? null : () => Navigator.pop(dialog, true), child: Text(suspend ? 'Suspend vendor' : 'Reinstate vendor')),
+      ],
+    )));
+    final note = reason.text.trim();
+    reason.dispose();
+    if (go != true || !context.mounted) return;
+    try {
+      final result = await FirebaseFunctions.instance.httpsCallable('setVendorSuspension').call({'vendorId': vendorId, 'suspended': suspend, 'reason': note});
+      final count = (result.data as Map)['itemsChanged'];
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(suspend ? '$name suspended. $count item(s) hidden from customers.' : '$name reinstated. $count item(s) shown again.')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+  Widget _vendorTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    final suspended = data['status'] == 'suspended';
+    final name = data['name']?.toString() ?? doc.id;
+    final reason = '${data['suspensionReason'] ?? ''}'.trim();
+    return Card(child: ListTile(
+      title: Text(name),
+      subtitle: Text('Vendor ID: ${doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'),
+      trailing: suspended
+          ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
+          : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
     ));
   }
   Widget _changeTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
