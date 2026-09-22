@@ -406,7 +406,7 @@ class _ReviewsState extends State<Reviews> {
                     (d) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                        '${'★' * (d.data()['rating'] as num).toInt()} • ${d.data()['name']}',
+                        '${'★' * (d.data()['rating'] as num).toInt()} • ${(d.data()['name'] as String?)?.isNotEmpty == true ? d.data()['name'] : 'Neighbour'}',
                       ),
                       subtitle: Text(d.data()['text'] as String),
                     ),
