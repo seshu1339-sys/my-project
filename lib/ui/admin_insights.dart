@@ -119,11 +119,20 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
     if (mounted) setState(() => sending = false);
   }
 
-  Widget _tile(String label, String value) => SizedBox(width: 170, child: Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label, style: const TextStyle(fontSize: 12)),
-    const SizedBox(height: 6),
-    Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-  ]))));
+  Widget _tile(String label, String value, {bool warn = false}) => SizedBox(width: 170, child: Card(
+    color: warn ? Colors.red.shade50 : null,
+    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 12)),
+      const SizedBox(height: 6),
+      Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: warn ? Colors.red.shade900 : null)),
+    ])),
+  ));
+
+  Widget _storageTile() {
+    final gb = _n(total['bytesUsed']) / (1024 * 1024 * 1024);
+    final threshold = double.tryParse(store.business.text('storageWarningGb'));
+    return _tile('Storage used', '${gb.toStringAsFixed(2)} GB • ${_n(total['objectCount'])} file(s)', warn: threshold != null && gb > threshold);
+  }
 
   String _adName(String id) {
     final e = store.entries('promotions').where((p) => p.id == id);
@@ -152,6 +161,7 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
       _tile('Ad clicks, last $days days', '${_n(period['adClicks'])}'),
       _tile('Click-through rate (CTR)', _pct(_n(period['adClicks']), _n(period['adImpressions']))),
       _tile('Visits from ads, last $days days', '${_n(period['visitsFromAds'])}'),
+      _storageTile(),
     ]),
     const SizedBox(height: 16),
     Text('Per ad (all time)', style: Theme.of(context).textTheme.titleMedium),

@@ -9,6 +9,9 @@ const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
 Object.assign(exports, require('./notifications'));
+Object.assign(exports, require('./vendor-photos'));
+Object.assign(exports, require('./exclusives'));
+Object.assign(exports, require('./storage-maintenance'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
@@ -268,6 +271,13 @@ exports.submitVendorChange = onCall(options, async request => {
   // Business features unlock only once the office/admin has approved the vendor.
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can use business features.');
+  // When the admin has turned on the Product Image Library, a regular product's main photo must
+  // come from an approved library entry — off by default so existing free uploads keep working
+  // until the admin has actually populated the library.
+  if (safeChanges.imageUrl && ['newProduct', 'product'].includes(type) && flagOn((await db.collection('settings').doc('business').get()).data()?.productImageLibraryEnforced)) {
+    const match = await db.collection('productImageLibrary').where('imageUrl', '==', safeChanges.imageUrl).where('active', '==', true).limit(1).get();
+    if (match.empty) throw new HttpsError('invalid-argument', 'Choose a photo from the Product Image Library.');
+  }
   const targetId = isNew ? db.collection(collection).doc().id : docId;
   const target = db.collection(collection).doc(targetId);
   let oldValue = {}, newValue = safeChanges;

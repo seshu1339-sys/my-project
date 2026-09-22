@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../services/location.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
 
 /// Returns every reason the registration must not be submitted yet. Mirrors the
 /// server-side checks in functions/domain.js so nothing incomplete is sent.
@@ -285,9 +287,10 @@ class VendorWorkspace extends StatefulWidget {
 class _VendorWorkspaceState extends State<VendorWorkspace> {
   final docId = TextEditingController(), value = TextEditingController(), orderId = TextEditingController(), code = TextEditingController();
   final pName = TextEditingController(), pPrice = TextEditingController(), pStock = TextEditingController(), pUnit = TextEditingController(), pDescription = TextEditingController();
+  final xName = TextEditingController(), xPrice = TextEditingController(), xDuration = TextEditingController();
   String type = 'product';
-  String? categoryId, productImageUrl;
-  Uint8List? productImageBytes;
+  String? categoryId, productImageUrl, exclusiveImageUrl;
+  Uint8List? productImageBytes, exclusiveImageBytes;
   bool busy = false;
   Store get store => widget.store;
   String get uid => widget.uid;
@@ -300,6 +303,32 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
   String published(String status) => status == 'approved' ? 'Published' : 'Pending administrator approval';
 
   Future<XFile?> pickImage() => ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+
+  // Off by default: existing free-upload behaviour is preserved until the admin has populated
+  // the Product Image Library and explicitly turns this on.
+  bool get libraryEnforced => store.business.text('productImageLibraryEnforced', 'false').trim().toLowerCase() == 'true';
+
+  /// Lets the vendor pick an already-approved image instead of uploading its own; the same
+  /// image URL is reused across every product that picks it (no duplicate file per vendor).
+  Future<Entry?> pickLibraryImage() {
+    final images = store.entries('productImageLibrary').where((e) => e.active).toList();
+    return showDialog<Entry>(context: context, builder: (dialog) => AlertDialog(
+      title: const Text('Choose a product image'),
+      content: SizedBox(width: 420, child: images.isEmpty
+          ? const Text('No approved images are available yet. Ask the administrator to add some to the Product Image Library.')
+          : SingleChildScrollView(child: Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final img in images) Semantics(button: true, label: 'Choose ${img.text('name', img.id)}', child: InkWell(
+                onTap: () => Navigator.pop(dialog, img),
+                child: SizedBox(width: 110, child: Column(children: [
+                  ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(img.text('imageUrl'), width: 100, height: 100, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
+                  Text(img.text('name', img.id), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                ])),
+              )),
+            ])),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel'))],
+    ));
+  }
 
   Future<void> addProduct() async {
     final price = double.tryParse(pPrice.text.trim());
@@ -317,6 +346,23 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
     for (final c in [pName, pPrice, pStock, pUnit, pDescription]) { c.clear(); }
     setState(() { productImageUrl = null; productImageBytes = null; categoryId = null; });
     toast(published(status));
+  }
+
+  Future<void> changeProductPhoto(String productId) async {
+    if (libraryEnforced) {
+      final chosen = await pickLibraryImage();
+      if (chosen == null) return;
+      await run(() async {
+        toast(published(await store.submitVendorChange(type: 'product', collection: 'products', docId: productId, changes: {'imageUrl': chosen.text('imageUrl')})));
+      });
+    } else {
+      await run(() async {
+        final file = await pickImage();
+        if (file == null) return;
+        final url = await store.upload(file, folder: 'vendorProducts/$uid');
+        toast(published(await store.submitVendorChange(type: 'product', collection: 'products', docId: productId, changes: {'imageUrl': url})));
+      });
+    }
   }
 
   Future<num?> askNumber(String title, String label, {required bool integer, String initial = ''}) async {
@@ -340,11 +386,118 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
     ...children,
   ])));
 
+  Widget _shopPhotosSection() => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('vendorShopPhotos').where('vendorId', isEqualTo: uid).snapshots(),
+    builder: (context, snapshot) {
+      final bySlot = <int, Map<String, dynamic>>{
+        for (final doc in snapshot.data?.docs ?? const []) (doc.data()['slot'] as num).toInt(): doc.data(),
+      };
+      return _card('Shop photos', [
+        Wrap(spacing: 16, runSpacing: 12, children: [for (final slot in [1, 2]) _shopPhotoSlot(slot, bySlot[slot])]),
+      ], note: 'Up to 2 photos of your shop. Each stays pending until the administrator approves it, and is hidden from customers until then.');
+    },
+  );
+
+  Widget _shopPhotoSlot(int slot, Map<String, dynamic>? data) {
+    final status = data?['status'] as String?;
+    final path = data?['path'] as String?;
+    final reason = (data?['decisionReason'] ?? '').toString();
+    return SizedBox(width: 160, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ClipRRect(borderRadius: BorderRadius.circular(8), child: path == null
+          ? Container(width: 160, height: 120, color: Colors.black12, child: const Icon(Icons.storefront_outlined))
+          : FutureBuilder<String>(
+              future: FirebaseStorage.instance.ref(path).getDownloadURL(),
+              builder: (context, snap) => snap.hasData
+                  ? Image.network(snap.data!, width: 160, height: 120, fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))
+                  : Container(width: 160, height: 120, color: Colors.black12),
+            )),
+      const SizedBox(height: 4),
+      Text(switch (status) {
+        'pending' => 'Pending admin review',
+        'approved' => 'Approved',
+        'rejected' => 'Rejected${reason.isEmpty ? '' : ': $reason'}',
+        _ => 'Empty slot',
+      }),
+      OutlinedButton(onPressed: busy ? null : () => run(() async {
+        final file = await pickImage();
+        if (file == null) return;
+        await store.uploadShopPhoto(slot, file);
+        await store.call('submitShopPhoto', {'slot': slot});
+        toast('Photo submitted for admin review');
+      }), child: Text(path == null ? 'Upload' : 'Replace')),
+    ]));
+  }
+
+  Widget _exclusivesSection(Map<String, dynamic>? vendorData) {
+    if (vendorData?['specialCategoryExclusives'] != true) return const SizedBox.shrink();
+    final maxDays = (vendorData?['exclusivesMaxDurationDays'] as num?)?.toInt() ?? 0;
+    return _card('Special Category Exclusives', [
+      TextField(controller: xName, decoration: const InputDecoration(labelText: 'Item or design name')),
+      TextField(controller: xPrice, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price')),
+      TextField(controller: xDuration, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Active duration in days (up to $maxDays)')),
+      const SizedBox(height: 8),
+      if (exclusiveImageBytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(exclusiveImageBytes!, height: 120, fit: BoxFit.cover)),
+      Wrap(spacing: 8, children: [
+        OutlinedButton.icon(onPressed: busy ? null : () => run(() async {
+          final file = await pickImage();
+          if (file == null) return;
+          final bytes = await file.readAsBytes();
+          final url = await store.upload(file, folder: 'vendorProducts/$uid');
+          if (mounted) setState(() { exclusiveImageUrl = url; exclusiveImageBytes = bytes; });
+        }), icon: const Icon(Icons.upload), label: const Text('Upload photo')),
+        FilledButton(onPressed: busy ? null : () => run(() async {
+          final price = double.tryParse(xPrice.text.trim());
+          final days = int.tryParse(xDuration.text.trim());
+          if (xName.text.trim().length < 2) throw StateError('Enter a name for the item.');
+          if (price == null || price < 0) throw StateError('Enter a valid price.');
+          if (days == null || days < 1) throw StateError('Enter the active duration in days.');
+          if (exclusiveImageUrl == null) throw StateError('Upload a photo first.');
+          await store.call('submitExclusiveItem', {'name': xName.text.trim(), 'price': price, 'imageUrl': exclusiveImageUrl, 'durationDays': days});
+          for (final c in [xName, xPrice, xDuration]) { c.clear(); }
+          setState(() { exclusiveImageUrl = null; exclusiveImageBytes = null; });
+          toast('Exclusive item published');
+        }), child: const Text('Publish exclusive item')),
+      ]),
+      const SizedBox(height: 12),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: store.firestore.collection('products').where('ownerId', isEqualTo: uid).where('isExclusive', isEqualTo: true).where('active', isEqualTo: true).snapshots(),
+        builder: (context, snapshot) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Active exclusives', style: Theme.of(context).textTheme.titleSmall),
+          for (final doc in snapshot.data?.docs ?? const []) ListTile(
+            contentPadding: EdgeInsets.zero, dense: true,
+            title: Text('${doc.data()['name']}'), subtitle: Text('₹${doc.data()['price']} • expires ${(doc.data()['expiresAt'] ?? '').toString().substring(0, 10)}'),
+          ),
+          if ((snapshot.data?.docs ?? const []).isEmpty) const Text('No active exclusive items yet.'),
+        ]),
+      ),
+      const SizedBox(height: 8),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: store.firestore.collection('products').where('ownerId', isEqualTo: uid).where('isExclusive', isEqualTo: true).where('active', isEqualTo: false).snapshots(),
+        builder: (context, snapshot) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Archived (reactivate within 15 days)', style: Theme.of(context).textTheme.titleSmall),
+          for (final doc in snapshot.data?.docs ?? const []) ListTile(
+            contentPadding: EdgeInsets.zero, dense: true,
+            title: Text('${doc.data()['name']}'), subtitle: Text('₹${doc.data()['price']}'),
+            trailing: OutlinedButton(onPressed: busy ? null : () => run(() async {
+              final days = await askNumber('Reactivate item', 'Active duration in days (up to $maxDays)', integer: true);
+              if (days == null) return;
+              await store.call('reactivateExclusiveItem', {'productId': doc.id, 'durationDays': days.toInt()});
+              toast('Item reactivated');
+            }), child: const Text('Reactivate')),
+          ),
+          if ((snapshot.data?.docs ?? const []).isEmpty) const Text('Nothing archived right now.'),
+        ]),
+      ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
     Text('Approved vendor workspace', style: Theme.of(context).textTheme.headlineSmall),
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
+    const SizedBox(height: 20),
+    _shopPhotosSection(),
     const SizedBox(height: 20),
     _card('Add a product or material', [
       TextField(controller: pName, decoration: const InputDecoration(labelText: 'Product or material name')),
@@ -358,15 +511,22 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
         onChanged: (v) => setState(() => categoryId = v),
       ),
       const SizedBox(height: 8),
-      if (productImageBytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(productImageBytes!, height: 120, fit: BoxFit.cover)),
+      if (productImageBytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(productImageBytes!, height: 120, fit: BoxFit.cover))
+      else if (productImageUrl != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(productImageUrl!, height: 120, fit: BoxFit.cover)),
       Wrap(spacing: 8, children: [
-        OutlinedButton.icon(onPressed: busy ? null : () => run(() async {
-          final file = await pickImage();
-          if (file == null) return;
-          final bytes = await file.readAsBytes();
-          final url = await store.upload(file, folder: 'vendorProducts/$uid');
-          if (mounted) setState(() { productImageUrl = url; productImageBytes = bytes; });
-        }), icon: const Icon(Icons.upload), label: const Text('Upload product photo')),
+        if (libraryEnforced)
+          OutlinedButton.icon(onPressed: busy ? null : () async {
+            final chosen = await pickLibraryImage();
+            if (chosen != null && mounted) setState(() { productImageUrl = chosen.text('imageUrl'); productImageBytes = null; });
+          }, icon: const Icon(Icons.photo_library_outlined), label: const Text('Choose from image library'))
+        else
+          OutlinedButton.icon(onPressed: busy ? null : () => run(() async {
+            final file = await pickImage();
+            if (file == null) return;
+            final bytes = await file.readAsBytes();
+            final url = await store.upload(file, folder: 'vendorProducts/$uid');
+            if (mounted) setState(() { productImageUrl = url; productImageBytes = bytes; });
+          }), icon: const Icon(Icons.upload), label: const Text('Upload product photo')),
         FilledButton(onPressed: busy ? null : () => run(addProduct), child: const Text('Submit product')),
       ]),
     ]),
@@ -392,19 +552,14 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                 if (n == null) return;
                 toast(published(await store.submitVendorChange(type: 'stock', collection: 'products', docId: doc.id, changes: {'stock': n.toInt()})));
               })),
-              IconButton(tooltip: 'Change photo', icon: const Icon(Icons.add_photo_alternate_outlined), onPressed: busy ? null : () => run(() async {
-                final file = await pickImage();
-                if (file == null) return;
-                final url = await store.upload(file, folder: 'vendorProducts/$uid');
-                toast(published(await store.submitVendorChange(type: 'product', collection: 'products', docId: doc.id, changes: {'imageUrl': url})));
-              })),
+              IconButton(tooltip: 'Change photo', icon: const Icon(Icons.add_photo_alternate_outlined), onPressed: busy ? null : () => changeProductPhoto(doc.id)),
             ]),
           ),
         ]);
       },
     ),
     _card('Submit a product or shop change', [
-      DropdownButton<String>(value: type, items: const [DropdownMenuItem(value: 'product', child: Text('Product detail')), DropdownMenuItem(value: 'price', child: Text('Price')), DropdownMenuItem(value: 'shop', child: Text('Shop detail'))], onChanged: (value) => setState(() => type = value!)),
+      DropdownButton<String>(value: type, isExpanded: true, items: const [DropdownMenuItem(value: 'product', child: Text('Product detail')), DropdownMenuItem(value: 'price', child: Text('Price')), DropdownMenuItem(value: 'shop', child: Text('Shop detail'))], onChanged: (value) => setState(() => type = value!)),
       TextField(controller: docId, decoration: const InputDecoration(labelText: 'Product or shop ID')),
       TextField(controller: value, maxLines: 3, decoration: const InputDecoration(labelText: 'New value (for prices use a number)')),
       const SizedBox(height: 8),
@@ -425,6 +580,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
         toast('Verified purchase recorded');
       }), child: const Text('Verify purchase')),
     ], note: 'Enter the customer one-time code and the current shop location when the purchase is collected.'),
+    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('vendors').doc(uid).snapshots(), builder: (_, vendor) => _exclusivesSection(vendor.data?.data())),
     // Orders carry the shops they include (shopIds), not a vendor id, and the rules
     // only let a vendor read orders containing its own shop.
     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: store.firestore.collection('vendors').doc(uid).snapshots(), builder: (_, vendor) {
@@ -468,7 +624,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
 
   @override
   void dispose() {
-    for (final c in [docId, value, orderId, code, pName, pPrice, pStock, pUnit, pDescription]) { c.dispose(); }
+    for (final c in [docId, value, orderId, code, pName, pPrice, pStock, pUnit, pDescription, xName, xPrice, xDuration]) { c.dispose(); }
     super.dispose();
   }
 }

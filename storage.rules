@@ -24,9 +24,20 @@ service firebase.storage {
           || firestore.get(/databases/(default)/documents/vendorApplications/$(uid)).data.status == 'rejected');
     }
     // Product/material photos: only an approved vendor may upload, into its own folder.
+    // Special Category Exclusives photos reuse this same path/rule (see functions/exclusives.js).
     match /vendorProducts/{uid}/{file} {
       allow read: if true;
       allow create, update: if verified() && request.auth.uid == uid && isImage()
+        && firestore.exists(/databases/(default)/documents/vendors/$(uid))
+        && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
+    }
+    // Up to 2 shop photos per vendor, fixed filenames so the max-2 rule needs no count query.
+    // Public read (the Firestore vendorShopPhotos doc's status gates customer visibility);
+    // write is limited to the owning, approved vendor.
+    match /vendorShopPhotos/{uid}/{file} {
+      allow read: if true;
+      allow create, update: if verified() && request.auth.uid == uid
+        && file in ['shopPhoto1', 'shopPhoto2'] && isImage()
         && firestore.exists(/databases/(default)/documents/vendors/$(uid))
         && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
     }

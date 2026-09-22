@@ -15,6 +15,7 @@ const adminSections = <String, String>{
   'categories': 'Categories',
   'shops': 'Shops',
   'promotions': 'Promotions',
+  'productImageLibrary': 'Product Image Library',
   'settings': 'Business profile',
   'scrollingText': 'Scrolling Text Settings',
   'theme': 'Theme Settings',
@@ -36,6 +37,12 @@ const fields = <String, Map<String, String>>{
     'images': 'Additional image URLs (one per line)',
     'tags': 'Search keywords',
     'prices': 'Pincode prices (one per line: 560001=249)',
+    'order': 'Display order',
+  },
+  'productImageLibrary': {
+    'name': 'Item name',
+    'imageUrl': 'Image',
+    'tags': 'Search keywords (optional)',
     'order': 'Display order',
   },
   'categories': {
@@ -108,6 +115,9 @@ const fields = <String, Map<String, String>>{
     'cashOnDeliveryEnabled': 'Allow cash on delivery (true / false)',
     'platformCollectionEnabled': 'Enable future platform-collected payment (true / false)',
     'directVendorPaymentInstructions': 'Direct vendor payment instructions',
+    'productImageLibraryEnforced': 'Require vendors to pick from the Product Image Library (true / false; blank = off)',
+    'exclusiveExpiryNoticeDays': 'Warn exclusives vendors this many days before an item expires (blank = 2)',
+    'storageWarningGb': 'Warn when Storage usage exceeds this many GB (optional)',
   },
   'sectionSettings': {
     'section': 'Section (header, logo, user, search, notice, promo, offers, categories, products, boxes, ads, background)',
@@ -376,6 +386,16 @@ class VendorModerationPage extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 24),
+          Text('Pending shop photos', style: Theme.of(context).textTheme.titleLarge),
+          const Text('Each vendor may upload up to 2 shop photos. A photo stays hidden from customers until approved here, and is deleted automatically if left unreviewed for 15 days.'),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorShopPhotos').where('status', isEqualTo: 'pending').limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              for (final doc in snapshot.data?.docs ?? const []) _shopPhotoTile(context, doc),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending shop photos.')),
+            ]),
+          ),
+          const SizedBox(height: 24),
           Text('Pending public changes', style: Theme.of(context).textTheme.titleLarge),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorChanges').where('status', isEqualTo: 'pending').limit(100).snapshots(),
@@ -457,13 +477,72 @@ class VendorModerationPage extends StatelessWidget {
     final suspended = data['status'] == 'suspended';
     final name = data['name']?.toString() ?? doc.id;
     final reason = '${data['suspensionReason'] ?? ''}'.trim();
+    final exclusives = data['specialCategoryExclusives'] == true;
     return Card(child: ListTile(
       title: Text(name),
-      subtitle: Text('Vendor ID: ${doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'),
-      trailing: suspended
-          ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
-          : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
+      subtitle: Text('Vendor ID: ${doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'
+          '${exclusives ? ' • Exclusives up to ${data['exclusivesMaxDurationDays']} day(s)' : ''}'),
+      trailing: Wrap(spacing: 8, children: [
+        OutlinedButton(onPressed: () => _setExclusivesPermission(context, doc.id, name, currentlyEnabled: exclusives, currentMaxDays: (data['exclusivesMaxDurationDays'] as num?)?.toInt()), child: Text(exclusives ? 'Exclusives: on' : 'Exclusives: off')),
+        suspended
+            ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
+            : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
+      ]),
     ));
+  }
+  Future<void> _setExclusivesPermission(BuildContext context, String vendorId, String name, {required bool currentlyEnabled, int? currentMaxDays}) async {
+    var enabled = currentlyEnabled;
+    final maxDays = TextEditingController(text: '${currentMaxDays ?? 30}');
+    final go = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
+      title: Text('Special Category Exclusives — $name'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('When enabled, this vendor can publish its own one-off design/product entries immediately, with no separate review per item.'),
+        SwitchListTile(title: const Text('Enabled for this vendor'), value: enabled, onChanged: (value) => setDialogState(() => enabled = value)),
+        if (enabled) TextField(controller: maxDays, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Maximum active duration per item (days)')),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Save'))],
+    )));
+    final days = int.tryParse(maxDays.text.trim());
+    maxDays.dispose();
+    if (go != true || !context.mounted) return;
+    if (enabled && (days == null || days < 1)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a maximum duration of 1 day or more.')));
+      return;
+    }
+    try {
+      await FirebaseFunctions.instance.httpsCallable('setVendorExclusivesPermission').call({'vendorId': vendorId, 'enabled': enabled, if (enabled) 'maxDurationDays': days});
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(enabled ? 'Exclusives enabled for $name (up to $days day(s))' : 'Exclusives disabled for $name')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+  Widget _shopPhotoTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return Card(child: ListTile(
+      leading: _ApplicationPhoto(label: 'Slot ${data['slot']}', path: data['path']?.toString()),
+      title: Text('${data['vendorName'] ?? data['vendorId']}'),
+      subtitle: Text('Shop photo, slot ${data['slot']}'),
+      trailing: Wrap(children: [
+        IconButton(tooltip: 'Approve', onPressed: () => _reviewShopPhoto(context, data['vendorId'].toString(), (data['slot'] as num).toInt(), approved: true), icon: const Icon(Icons.check)),
+        IconButton(tooltip: 'Reject', onPressed: () => _reviewShopPhoto(context, data['vendorId'].toString(), (data['slot'] as num).toInt(), approved: false), icon: const Icon(Icons.close)),
+      ]),
+    ));
+  }
+  Future<void> _reviewShopPhoto(BuildContext context, String vendorId, int slot, {required bool approved}) async {
+    var reason = '';
+    if (!approved) {
+      final controller = TextEditingController();
+      final ok = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(
+        title: const Text('Reject shop photo'),
+        content: TextField(controller: controller, maxLines: 3, decoration: const InputDecoration(labelText: 'Reason (shown to the vendor)')),
+        actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Reject'))],
+      ));
+      reason = controller.text.trim();
+      controller.dispose();
+      if (ok != true) return;
+    }
+    if (!context.mounted) return;
+    await decide(context, 'reviewShopPhoto', {'vendorId': vendorId, 'slot': slot, 'approved': approved, 'reason': reason});
   }
   Widget _changeTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
@@ -579,6 +658,16 @@ class _AdminPageState extends State<AdminPage> {
                       entry.id == section,
           )
           .toList();
+      final navTargets = <String, (IconData, WidgetBuilder)>{
+        'Orders': (Icons.receipt_long, (_) => AdminOrders(store: widget.store)),
+        'Vendors': (Icons.storefront, (_) => VendorModerationPage(store: widget.store)),
+        'Complaints': (Icons.report_problem_outlined, (_) => ComplaintModerationPage(store: widget.store)),
+        'Insights': (Icons.insights, (_) => AdminInsightsPage(store: widget.store)),
+      };
+      void openNav(String label) => Navigator.push(context, MaterialPageRoute<void>(builder: navTargets[label]!.$2));
+      // Below ~680px, 5 AppBar actions in a row would overflow; collapse the four navigation
+      // buttons into one menu there and keep today's full row on wider screens.
+      final narrow = MediaQuery.sizeOf(context).width < 680;
       return Scaffold(
         appBar: AppBar(
           title: const Text('Business studio'),
@@ -593,40 +682,18 @@ class _AdminPageState extends State<AdminPage> {
                 ),
               ),
             ),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => AdminOrders(store: widget.store),
-                ),
-              ),
-              icon: const Icon(Icons.receipt_long),
-              label: const Text('Orders'),
-            ),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(builder: (_) => VendorModerationPage(store: widget.store)),
-              ),
-              icon: const Icon(Icons.storefront),
-              label: const Text('Vendors'),
-            ),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(builder: (_) => ComplaintModerationPage(store: widget.store)),
-              ),
-              icon: const Icon(Icons.report_problem_outlined),
-              label: const Text('Complaints'),
-            ),
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(builder: (_) => AdminInsightsPage(store: widget.store)),
-              ),
-              icon: const Icon(Icons.insights),
-              label: const Text('Insights'),
-            ),
+            if (narrow)
+              PopupMenuButton<String>(
+                tooltip: 'More',
+                onSelected: openNav,
+                itemBuilder: (context) => [
+                  for (final entry in navTargets.entries)
+                    PopupMenuItem(value: entry.key, child: Row(children: [Icon(entry.value.$1, size: 20), const SizedBox(width: 12), Text(entry.key)])),
+                ],
+              )
+            else
+              for (final label in navTargets.keys)
+                TextButton.icon(onPressed: () => openNav(label), icon: Icon(navTargets[label]!.$1), label: Text(label)),
           ],
         ),
         body: Column(
@@ -759,6 +826,18 @@ class _AdminPageState extends State<AdminPage> {
     );
     if (confirmed != true) return;
     try {
+      // The library is the one collection whose sole purpose is holding an image; deleting the
+      // entry without its Storage object would immediately orphan it (the daily cleanup would
+      // eventually catch it too, but there is no reason to wait).
+      if (section == 'productImageLibrary' && entry.text('imageUrl').isNotEmpty) {
+        try {
+          await FirebaseStorage.instance
+              .refFromURL(entry.text('imageUrl'))
+              .delete();
+        } catch (_) {
+          // Best-effort: an already-missing or unreachable object must not block deleting the entry.
+        }
+      }
       await widget.store.delete(
         section == 'scrollingText' ||
                 section == 'theme' ||
@@ -818,6 +897,8 @@ class _EntryEditorState extends State<EntryEditor> {
     'spacing',
     'animationMs',
     'stopAfter',
+    'exclusiveExpiryNoticeDays',
+    'storageWarningGb',
   };
   @override
   void initState() {
@@ -980,7 +1061,9 @@ class _EntryEditorState extends State<EntryEditor> {
       builder: (dialog) => AlertDialog(
         title: Text('$title preview'),
         content: Container(
-          width: 420,
+          // A phone-width dialog has less than 420px available once the default AlertDialog
+          // inset padding is subtracted; never request more than actually fits.
+          width: (MediaQuery.sizeOf(context).width - 80).clamp(240, 420),
           padding: EdgeInsets.all(
             double.tryParse(controllers['padding']?.text ?? '') ?? 16,
           ),

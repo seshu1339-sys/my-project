@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -653,6 +654,8 @@ class ShopPage extends StatelessWidget {
               longitude: store.longitude,
             ),
             const SizedBox(height: 16),
+            _ShopPhotos(store: store, shopId: shop.id),
+            const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: () async {
                 final uri = Uri.https('www.google.com', '/maps/dir/', {
@@ -704,6 +707,34 @@ class ShopPage extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Only shop photos the admin has approved are ever shown here — a pending or rejected
+/// submission stays invisible to customers.
+class _ShopPhotos extends StatelessWidget {
+  const _ShopPhotos({required this.store, required this.shopId});
+  final Store store;
+  final String shopId;
+  @override
+  Widget build(BuildContext context) {
+    final approved = store
+        .entries('vendorShopPhotos')
+        .where((e) => e.text('shopId') == shopId && e.text('status') == 'approved')
+        .toList();
+    if (approved.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final photo in approved)
+        FutureBuilder<String>(
+          future: FirebaseStorage.instance.ref(photo.text('path')).getDownloadURL(),
+          builder: (context, snapshot) => snapshot.hasData
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(snapshot.data!, width: 140, height: 100, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                )
+              : const SizedBox(width: 140, height: 100),
+        ),
+    ]);
+  }
 }
 
 class CartPage extends StatefulWidget {

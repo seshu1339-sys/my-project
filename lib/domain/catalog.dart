@@ -49,6 +49,8 @@ const collections = [
   'shops',
   'promotions',
   'settings',
+  'productImageLibrary',
+  'vendorShopPhotos',
 ];
 
 Map<String, List<Entry>> demoCatalog() => {
@@ -240,4 +242,6 @@ Map<String, List<Entry>> demoCatalog() => {
       'active': true,
     }),
   ],
+  'productImageLibrary': [],
+  'vendorShopPhotos': [],
 };

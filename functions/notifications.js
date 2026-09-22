@@ -244,3 +244,6 @@ exports.offerAudienceSize = onCall(adminOptions, async request => {
   requireAdmin(request);
   return {subscribers: (await db.collection('notificationSubscribers').where('enabled', '==', true).count().get()).data().count};
 });
+// Exposed for reuse by other function modules (e.g. functions/storage-maintenance.js), which
+// otherwise only see the onCall/onSchedule handlers above via index.js's Object.assign(exports, ...).
+exports._internal = {send, pages, hash};

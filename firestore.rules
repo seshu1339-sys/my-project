@@ -5,8 +5,8 @@ service cloud.firestore {
     function admin() { return signedIn() && request.auth.token.admin == true; }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
-      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
-      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings'];
+      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary'];
+      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary'];
     }
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || admin());
@@ -30,6 +30,13 @@ service cloud.firestore {
     }
     match /vendorChanges/{changeId} {
       allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    // Up to 2 shop photos per vendor, each pending until the admin approves it. No
+    // sensitive data here (status/timestamps only), so read is public like products/shops —
+    // clients filter to status == 'approved' before showing one to a customer.
+    match /vendorShopPhotos/{docId} {
+      allow read: if true;
       allow write: if false;
     }
     match /purchaseCodes/{codeId} {

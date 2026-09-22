@@ -129,7 +129,8 @@ class _StorefrontState extends State<Storefront> {
       builder: (dialog) => AlertDialog(
         title: const Text('Where are you shopping?'),
         content: SizedBox(
-          width: 400,
+          // Never request more than actually fits once the default AlertDialog inset is subtracted.
+          width: (MediaQuery.sizeOf(context).width - 80).clamp(240, 400),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

@@ -1,1 +1,40 @@
-{"indexes": [], "fieldOverrides": []}
+{
+  "indexes": [
+    {
+      "collectionGroup": "vendorShopPhotos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "submittedAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isExclusive", "order": "ASCENDING"},
+        {"fieldPath": "active", "order": "ASCENDING"},
+        {"fieldPath": "expiresAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "isExclusive", "order": "ASCENDING"},
+        {"fieldPath": "active", "order": "ASCENDING"},
+        {"fieldPath": "archivedAt", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "ownerId", "order": "ASCENDING"},
+        {"fieldPath": "isExclusive", "order": "ASCENDING"},
+        {"fieldPath": "active", "order": "ASCENDING"}
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

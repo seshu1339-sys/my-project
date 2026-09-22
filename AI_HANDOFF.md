@@ -55,6 +55,63 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-09-22 — Vendor shop photos, Product Image Library, Special Category Exclusives, storage housekeeping, responsive fixes (NOT deployed)
+
+One integrated update, implemented as one commit because the changes are genuinely interdependent (shared files:
+`lib/ui/vendor.dart`'s `VendorWorkspace`, `functions/storage-maintenance.js`). Reused existing systems throughout
+rather than building parallel ones — see the plan file this session wrote to `~/.claude/plans/` for the full design
+reasoning; summary below.
+
+**Vendor shop photos** (`functions/vendor-photos.js`, new `vendorShopPhotos` collection, doc id `{uid}_{slot}`,
+slot 1 or 2): `submitShopPhoto`/`reviewShopPhoto` callables, mirroring the existing `vendorApplications`
+photo-approval shape. Pending until admin-approved; rejecting deletes the Storage object immediately. New Storage
+rule `vendorShopPhotos/{uid}/{file}` (fixed filenames `shopPhoto1`/`shopPhoto2`). `ShopPage` shows only
+`status=='approved'` photos (`lib/ui/details.dart`). Vendor UI: new "Shop photos" card in `VendorWorkspace`. Admin
+UI: new "Pending shop photos" section in `VendorModerationPage`, reusing `_ApplicationPhoto`.
+
+**Product Image Library** (`productImageLibrary` collection, plugged into the existing generic `EntryEditor`/
+`fields`/`adminSections` system in `admin.dart` — no new widget classes). Vendors pick a library image instead of
+uploading their own **only when** `settings/business.productImageLibraryEnforced` is `'true'` (default off, so
+existing free-upload behaviour is unchanged until the admin has populated the library and turns it on — this is
+the one place I deliberately deviated from an unconditional rule, to avoid bricking the vendor "add product" flow
+on day one). Enforced server-side too, inside `submitVendorChange` (`functions/index.js`): a library-picked
+`imageUrl` must match an `active` library entry. Picking reuses the same URL (no duplicate file per vendor).
+
+**Special Category Exclusives** (`functions/exclusives.js`): per-vendor `specialCategoryExclusives`/
+`exclusivesMaxDurationDays` on `vendors/{uid}`, set via a new admin dialog (`_setExclusivesPermission` in
+`admin.dart`, styled after the existing fee/suspension dialogs). Once granted, items auto-publish immediately (no
+per-item review queue) as ordinary `products` docs (`isExclusive:true`, `ownerId`, `expiresAt`) — they already
+appear on `ShopPage`/the product grid via the existing `active`/`shopId` filtering, so no new customer screen was
+needed. Vendor UI: new "Special Category Exclusives" card in `VendorWorkspace` (create/active list/archived list
+with Reactivate).
+
+**Expiry lifecycle + storage housekeeping** (`functions/storage-maintenance.js`, two `onSchedule` exports):
+`dailyStorageMaintenance` — expires unreviewed shop photos after 15 days (Storage object + Firestore doc deleted);
+notifies the vendor before an exclusive item expires (`settings/business.exclusiveExpiryNoticeDays`, default 2,
+via the existing `send()` helper, exposed from `functions/notifications.js` as `exports._internal` for reuse);
+auto-archives (`active:false`) an exclusive item at expiry; auto-deletes an archived item (Storage + Firestore)
+after 15 days unless reactivated. Also sweeps two narrowly-scoped orphan cases (`vendorShopPhotos/`,
+`vendorProducts/`), each with a 24h grace period. `weeklyStorageUsage` — records bucket size/object count to
+`analyticsTotals/storageUsage` (reuses that collection's existing admin-only-read rule); shown as a new stat tile
+in `admin_insights.dart`, highlighted if over the optional `settings/business.storageWarningGb`.
+
+**Responsive fixes** (narrow — the app was already solid, confirmed via 3 Explore agents): the admin `AppBar`'s 4
+nav buttons collapse into a `PopupMenuButton` below ~680px; two hard-coded dialog widths
+(`EntryEditor.preview()`'s 420px, `storefront.dart`'s "Where are you shopping?" 400px) now clamp to the viewport;
+one missing `isExpanded: true` on a vendor dropdown. `wireframe_home.dart`/`home_promotions.dart`/layout
+settings/editor were deliberately **not** touched — no real bug there.
+
+**New indexes** (`firestore.indexes.json`, was empty): `vendorShopPhotos` (status, submittedAt); `products`
+(isExclusive, active, expiresAt) and (isExclusive, active, archivedAt) for the lifecycle queries; `products`
+(ownerId, isExclusive, active) for the vendor's own active/archived exclusives lists.
+
+**Tests**: `functions/{vendor-photos,exclusives,storage-maintenance,product-image-library}.test.js` (new, all
+emulator-gated), `test/admin_responsive_test.dart` (new, sweeps 360/390/430/768/1024/1440px). Backend 38/38,
+Flutter 55/55, analyze clean. Live-verified on the emulators (Playwright, `demo-neighbourly-e2e`): shop photo
+upload → admin approve/reject → customer visibility; library populate → toggle on → vendor picker → confirmed
+image URL reuse (not duplicated); exclusives permission grant → publish (photo+name+price+duration as one write)
+→ archive → reactivate; storage-usage tile. **Not deployed.**
+
 ### 2026-09-21 — Offer push notifications to all subscribers (commit 2 of 2; NOT deployed)
 
 Rebuilt in `functions/notifications.js` (+ `notifications-domain.js`); fixes the earlier review finding (every

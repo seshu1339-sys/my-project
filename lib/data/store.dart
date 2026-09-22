@@ -562,6 +562,20 @@ class Store extends ChangeNotifier {
     return image.bytes;
   }
 
+  /// Stores one of an approved vendor's 2 shop photos at its fixed slot path
+  /// ([slot] is 1 or 2). The caller still has to call the submitShopPhoto
+  /// function afterwards so it goes to pending admin review.
+  Future<Uint8List> uploadShopPhoto(int slot, XFile file) async {
+    if (slot != 1 && slot != 2) throw ArgumentError('Shop photo slot must be 1 or 2.');
+    final uid = user?.uid;
+    if (uid == null) throw StateError('Sign in first.');
+    final image = await _readImage(file);
+    await FirebaseStorage.instance
+        .ref('vendorShopPhotos/$uid/shopPhoto$slot')
+        .putData(image.bytes, SettableMetadata(contentType: image.type));
+    return image.bytes;
+  }
+
   @override
   void dispose() {
     if (live) notifications.dispose();
