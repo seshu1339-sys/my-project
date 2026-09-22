@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/location.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'shop_map.dart';
 
 /// Returns every reason the registration must not be submitted yet. Mirrors the
 /// server-side checks in functions/domain.js so nothing incomplete is sent.
@@ -20,6 +22,7 @@ List<String> vendorApplicationErrors({
   required String description,
   required bool hasVendorPhoto,
   required bool hasShopPhoto,
+  required bool hasLocation,
 }) {
   bool between(String v, int min, int max) => v.trim().length >= min && v.trim().length <= max;
   return [
@@ -32,6 +35,7 @@ List<String> vendorApplicationErrors({
     if (!between(description, 10, 1000)) 'Describe the shop (at least 10 characters).',
     if (!hasVendorPhoto) 'Upload a clear personal photo of the vendor.',
     if (!hasShopPhoto) 'Upload a photo of the actual shop.',
+    if (!hasLocation) "Capture the shop's GPS location.",
   ];
 }
 
@@ -182,6 +186,27 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
   String? uploading;
   List<String> errors = const [];
   bool busy = false;
+  // The shop's current GPS location, captured automatically when this form opens. Always captured
+  // fresh (never pre-filled from a previous rejected attempt) so it reflects where the vendor is now.
+  Position? position;
+  String? locationError;
+  bool capturingLocation = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _captureLocation();
+  }
+
+  Future<void> _captureLocation() async {
+    setState(() { capturingLocation = true; locationError = null; });
+    try {
+      final result = await currentPosition(action: "capture your shop's location");
+      if (mounted) setState(() { position = result; capturingLocation = false; });
+    } catch (e) {
+      if (mounted) setState(() { locationError = '$e'.replaceFirst('Bad state: ', ''); capturingLocation = false; });
+    }
+  }
 
   void toast(Object message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$message')));
 
@@ -207,7 +232,7 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
     final problems = vendorApplicationErrors(
       ownerName: ownerName.text, phone: phone.text, shopName: shopName.text, shopCategory: shopCategory.text,
       address: address.text, pincode: pincode.text, description: description.text,
-      hasVendorPhoto: vendorReady, hasShopPhoto: shopReady,
+      hasVendorPhoto: vendorReady, hasShopPhoto: shopReady, hasLocation: position != null,
     );
     setState(() => errors = problems);
     if (problems.isNotEmpty) return;
@@ -216,6 +241,7 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
       await widget.store.registerVendor(
         ownerName: ownerName.text.trim(), phone: phone.text.trim(), name: shopName.text.trim(), shopCategory: shopCategory.text.trim(),
         address: address.text.trim(), pincode: pincode.text.trim(), description: description.text.trim(),
+        latitude: position!.latitude, longitude: position!.longitude,
       );
     } catch (e) {
       if (mounted) toast(e);
@@ -238,12 +264,27 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
     ]),
   ])));
 
+  Widget get _locationCard => Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    const Text('Shop location', style: TextStyle(fontWeight: FontWeight.bold)),
+    const Text('Your current GPS location is captured automatically and required to register.'),
+    const SizedBox(height: 8),
+    if (capturingLocation) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Row(children: [SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)), SizedBox(width: 12), Text('Capturing your location...')]))
+    else if (position != null) ...[
+      ClipRRect(borderRadius: BorderRadius.circular(8), child: ShopMap(shops: [Entry('me', {'name': 'Your location', 'latitude': position!.latitude, 'longitude': position!.longitude})], height: 160)),
+      const SizedBox(height: 8),
+      Text('Location captured: ${position!.latitude.toStringAsFixed(5)}, ${position!.longitude.toStringAsFixed(5)}'),
+    ] else if (locationError != null)
+      Text(locationError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+    const SizedBox(height: 8),
+    OutlinedButton.icon(onPressed: capturingLocation ? null : _captureLocation, icon: const Icon(Icons.my_location), label: Text(position != null ? 'Recapture location' : 'Try again')),
+  ])));
+
   @override
   Widget build(BuildContext context) => Center(child: SingleChildScrollView(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: Padding(
     padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(widget.previous == null ? 'Vendor registration' : 'Update your vendor application', style: Theme.of(context).textTheme.headlineSmall),
       const SizedBox(height: 4),
-      const Text('Your email is verified. Complete every field and upload both photos, then submit for office approval.'),
+      const Text('Your email is verified. Complete every field, capture your shop location and upload both photos, then submit for office approval.'),
       if (widget.previous?['decisionReason'] != null && widget.previous?['status'] == 'rejected') Padding(padding: const EdgeInsets.only(top: 8), child: Text('Application rejected. Administrator reason: ${widget.previous!['decisionReason']}', style: TextStyle(color: Theme.of(context).colorScheme.error))),
       const SizedBox(height: 16),
       InputDecorator(decoration: const InputDecoration(labelText: 'Verified email', border: OutlineInputBorder()), child: Text(widget.email)),
@@ -255,6 +296,8 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
       TextField(controller: address, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop address')),
       TextField(controller: pincode, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Pincode', counterText: '')),
       TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Shop description')),
+      const SizedBox(height: 12),
+      _locationCard,
       const SizedBox(height: 12),
       _photo(kind: 'vendorPhoto', title: 'Vendor photo', hint: 'A clear personal photo of the vendor (owner).', bytes: vendorBytes, ready: vendorReady),
       _photo(kind: 'shopPhoto', title: 'Shop photo', hint: 'A separate photo of the actual shop.', bytes: shopBytes, ready: shopReady),

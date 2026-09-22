@@ -69,13 +69,19 @@ test('vendor fee is optional or normalized to a bounded custom amount', () => {
   assert.throws(() => vendorFee(true, 10000001));
 });
 test('vendor application requires every detail and rejects malformed ones', () => {
-  const ok = {ownerName: 'Ravi Kumar', phone: '+91 98765 43210', name: 'Ravi Stores', shopCategory: 'Grocery', address: '12 MG Road', pincode: '560001', description: 'Fresh vegetables daily'};
+  const ok = {ownerName: 'Ravi Kumar', phone: '+91 98765 43210', name: 'Ravi Stores', shopCategory: 'Grocery', address: '12 MG Road', pincode: '560001', description: 'Fresh vegetables daily', latitude: 12.9716, longitude: 77.5946};
   assert.deepEqual(vendorApplication({...ok, name: '  Ravi   Stores '}), ok);
   for (const key of Object.keys(ok)) assert.throws(() => vendorApplication({...ok, [key]: ''}), undefined, `${key} must be required`);
   assert.throws(() => vendorApplication({...ok, pincode: '5600'}));
   assert.throws(() => vendorApplication({...ok, phone: 'call me'}));
   assert.throws(() => vendorApplication({...ok, description: 'short'}));
   assert.throws(() => vendorApplication({...ok, ownerName: 123}));
+  // The shop's GPS location, captured on the device — required, and out of range is rejected.
+  assert.throws(() => vendorApplication({...ok, latitude: undefined}), /GPS location/);
+  assert.throws(() => vendorApplication({...ok, longitude: undefined}), /GPS location/);
+  assert.throws(() => vendorApplication({...ok, latitude: '12.9'}));   // a string, not a number
+  assert.throws(() => vendorApplication({...ok, latitude: 200}));       // outside +/-180
+  assert.doesNotThrow(() => vendorApplication({...ok, latitude: -33.87, longitude: 151.21})); // Sydney: valid, far away
 });
 test('vendor product changes validate prices, stock, images and new-product essentials', () => {
   assert.doesNotThrow(() => validateVendorChange('newProduct', {name: 'Cement bag', price: 380, stock: 40, unit: 'bag', kind: 'product', imageUrl: 'https://example.test/a.jpg'}));

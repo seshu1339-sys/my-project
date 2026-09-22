@@ -15,6 +15,8 @@ class _RecordingStore extends Store {
     required String address,
     required String pincode,
     required String description,
+    required double latitude,
+    required double longitude,
   }) async {
     registrations++;
     return 'pending';
@@ -31,9 +33,11 @@ List<String> errors({
   String description = 'Fresh vegetables daily',
   bool vendorPhoto = true,
   bool shopPhoto = true,
+  bool location = true,
 }) => vendorApplicationErrors(
   ownerName: owner, phone: phone, shopName: shop, shopCategory: category, address: address,
   pincode: pincode, description: description, hasVendorPhoto: vendorPhoto, hasShopPhoto: shopPhoto,
+  hasLocation: location,
 );
 
 void main() {
@@ -47,6 +51,11 @@ void main() {
     expect(errors(address: 'abc'), hasLength(1));
     expect(errors(pincode: '5600'), hasLength(1));
     expect(errors(description: 'short'), hasLength(1));
+  });
+
+  test('the shop GPS location is mandatory and reported separately', () {
+    expect(errors(location: false), ["Capture the shop's GPS location."]);
+    expect(errors(location: false, vendorPhoto: false), hasLength(2));
   });
 
   test('each photo is mandatory and reported separately', () {

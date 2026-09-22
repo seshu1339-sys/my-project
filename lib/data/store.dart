@@ -385,6 +385,8 @@ class Store extends ChangeNotifier {
     required String address,
     required String pincode,
     required String description,
+    required double latitude,
+    required double longitude,
   }) async {
     final result = await call('registerVendor', {
       'ownerName': ownerName,
@@ -394,6 +396,8 @@ class Store extends ChangeNotifier {
       'address': address,
       'pincode': pincode,
       'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
     });
     return result['status'] as String;
   }

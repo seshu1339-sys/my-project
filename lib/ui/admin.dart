@@ -9,6 +9,7 @@ import '../domain/catalog.dart';
 import 'shared.dart';
 import 'layout_editor.dart';
 import 'admin_insights.dart';
+import 'shop_map.dart';
 
 const adminSections = <String, String>{
   'products': 'Products & services',
@@ -438,6 +439,15 @@ class VendorModerationPage extends StatelessWidget {
           _ApplicationPhoto(label: 'Vendor photo', path: data['vendorPhotoPath']?.toString()),
           _ApplicationPhoto(label: 'Shop photo', path: data['shopPhotoPath']?.toString()),
         ])),
+        if (data['latitude'] is num && data['longitude'] is num)
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Shop location captured at registration', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ClipRRect(borderRadius: BorderRadius.circular(8), child: ShopMap(
+              shops: [Entry(doc.id, {'name': data['name'] ?? doc.id, 'latitude': data['latitude'], 'longitude': data['longitude']})],
+              height: 200,
+            )),
+          ])),
         for (final entry in data.entries.where((e) => e.key != 'vendorPhotoPath' && e.key != 'shopPhotoPath')) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
         OverflowBar(children: [
           IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
@@ -483,6 +493,13 @@ class VendorModerationPage extends StatelessWidget {
       subtitle: Text('Vendor ID: ${doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'
           '${exclusives ? ' • Exclusives up to ${data['exclusivesMaxDurationDays']} day(s)' : ''}'),
       trailing: Wrap(spacing: 8, children: [
+        if (data['latitude'] is num && data['longitude'] is num)
+          IconButton(tooltip: 'View shop location', icon: const Icon(Icons.map_outlined), onPressed: () => showDialog<void>(context: context, builder: (_) => Dialog(child: Padding(padding: const EdgeInsets.all(16), child: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ShopMap(shops: [Entry(doc.id, {'name': name, 'latitude': data['latitude'], 'longitude': data['longitude']})], height: 260),
+          ]))))),
+        ),
         OutlinedButton(onPressed: () => _setExclusivesPermission(context, doc.id, name, currentlyEnabled: exclusives, currentMaxDays: (data['exclusivesMaxDurationDays'] as num?)?.toInt()), child: Text(exclusives ? 'Exclusives: on' : 'Exclusives: off')),
         suspended
             ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))

@@ -9,6 +9,7 @@ import 'home_widgets.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
 import 'shared.dart';
+import 'shop_map.dart';
 
 /// The existing homepage composition, now constrained by its actual viewport.
 class WireframeHome extends StatelessWidget {

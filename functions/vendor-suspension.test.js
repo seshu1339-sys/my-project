@@ -53,7 +53,7 @@ test('admin can suspend and reinstate a vendor; access and catalog follow', {ski
   await fns.reviewVendorChange.run({...admin, data: {changeId: pendingChange2.id, approved: false, reason: 'suspended'}});
   // a suspended vendor cannot re-apply either
   await db.collection('vendorApplications').doc('susV').set({status: 'approved'});
-  await assert.rejects(() => fns.registerVendor.run({...vendor, data: {ownerName: 'Sus Owner', phone: '9876543210', name: 'Sus Shop', shopCategory: 'General', address: '1 Road Street', pincode: '560001', description: 'A shop description'}}), /already under review|photo/i);
+  await assert.rejects(() => fns.registerVendor.run({...vendor, data: {ownerName: 'Sus Owner', phone: '9876543210', name: 'Sus Shop', shopCategory: 'General', address: '1 Road Street', pincode: '560001', description: 'A shop description', latitude: 12.97, longitude: 77.59}}), /already under review|photo/i);
 
   // ---- reinstate
   const back = await suspend({vendorId: 'susV', suspended: false});

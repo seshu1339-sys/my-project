@@ -7,9 +7,11 @@ import 'package:geolocator/geolocator.dart';
 ///
 /// A fresh install has not been granted permission, so calling
 /// [Geolocator.getCurrentPosition] directly fails at once with "denied" and the
-/// system prompt never appears. Purchase codes (customer) and purchase
-/// verification (vendor) both need the position, so both go through this.
-Future<Position> currentPosition() async {
+/// system prompt never appears. Purchase codes (customer), purchase
+/// verification (vendor) and vendor registration all need the position, so
+/// all three go through this. [action] names what the position is for, so the
+/// permission-denied message reads naturally for whichever caller it is.
+Future<Position> currentPosition({String action = 'verify a purchase at the shop'}) async {
   if (!kIsWeb && !await Geolocator.isLocationServiceEnabled()) {
     throw StateError('Turn on location services on this device, then try again.');
   }
@@ -21,7 +23,7 @@ Future<Position> currentPosition() async {
     throw StateError(
       permission == LocationPermission.deniedForever
           ? 'Location permission is turned off. Allow it for this app in your device settings.'
-          : 'Location permission is needed to verify a purchase at the shop.',
+          : 'Location permission is needed to $action.',
     );
   }
   try {

@@ -79,10 +79,15 @@ function vendorApplication(data = {}) {
   if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error('Provide a valid contact phone number.');
   const pincode = typeof data.pincode === 'string' ? data.pincode.trim() : '';
   if (!/^\d{6}$/.test(pincode)) throw Error('Provide a valid six-digit pincode.');
+  // The vendor's own device GPS, captured at registration time. This is informational for the admin
+  // (shown on a map when reviewing) — it is never treated as an admin-verified location, so it never
+  // substitutes for the separate verifyVendorShop check that gates purchase-code redemption.
+  if (!validCoordinate(data.latitude) || !validCoordinate(data.longitude)) throw Error("Capture the shop's GPS location before submitting.");
   return {
     ownerName: text(data.ownerName, 2, 100, "the owner's full name"), phone,
     name: text(data.name, 2, 120, 'the shop name'), shopCategory: text(data.shopCategory, 2, 80, 'the shop category'),
     address: text(data.address, 5, 500, 'the shop address'), pincode, description: text(data.description, 10, 1000, 'a shop description'),
+    latitude: data.latitude, longitude: data.longitude,
   };
 }
 const productChangeFields = {

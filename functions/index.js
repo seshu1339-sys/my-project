@@ -184,7 +184,7 @@ exports.approveVendor = onCall(options, async request => {
   batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
   if (approved && !fee.required) {
     const vendorRef = db.collection('vendors').doc(vendorId);
-    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   }
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
@@ -247,7 +247,7 @@ exports.confirmVendorFeePayment = onCall(options, async request => {
   batch.set(applicationRef, {status: paid ? 'approved' : 'payment_required', feePaymentStatus: paid ? 'paid' : 'rejected', paymentDecisionAt: FieldValue.serverTimestamp()}, {merge: true});
   if (paid) {
     const data = application.data();
-    batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   }
   await batch.commit();
   return {status: paid ? 'approved' : 'payment_required'};
