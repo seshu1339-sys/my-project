@@ -25,7 +25,7 @@ class _ServicesPageState extends State<ServicesPage> {
     listenable: widget.store,
     builder: (context, _) {
       final services = const SmartSearch()
-          .text(widget.store.visible('products'), search.text)
+          .text(widget.store.visible('products'), search.text, widget.store.visible('categories'))
           .where((entry) => entry.text('kind') == 'service')
           .toList();
       return Scaffold(

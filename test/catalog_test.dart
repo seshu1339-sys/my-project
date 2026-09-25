@@ -40,6 +40,37 @@ void main() {
       'p5',
     );
   });
+  test('search indexes product names and category/subcategory names, including nested ones', () {
+    const categories = [
+      Entry('home', {'name': 'Home & living', 'parentId': ''}),
+      Entry('kitchen', {'name': 'Kitchen', 'parentId': 'home'}),
+      Entry('mugs', {'name': 'Mugs & cups', 'parentId': 'kitchen'}),
+      Entry('electronics', {'name': 'Electronics', 'parentId': ''}),
+    ];
+    const products = [
+      Entry('p1', {'name': 'Ceramic mug', 'categoryId': 'mugs'}),
+      Entry('p2', {'name': 'Wireless headphones', 'categoryId': 'electronics'}),
+    ];
+    const search = SmartSearch();
+    // A few letters of the product's own name.
+    expect(search.text(products, 'cera', categories).single.id, 'p1');
+    // The product's direct (leaf) subcategory name.
+    expect(search.text(products, 'mugs', categories).single.id, 'p1');
+    // A grandparent category name still finds the product nested two levels below it.
+    expect(search.text(products, 'home', categories).single.id, 'p1');
+    // Case-insensitive, partial, and does not also match the unrelated product.
+    final byParent = search.text(products, 'KITCH', categories);
+    expect(byParent.map((e) => e.id), ['p1']);
+    // No categories passed at all still degrades to plain name/description/tags matching.
+    expect(search.text(products, 'wireless').single.id, 'p2');
+    // A malformed/self-referential parentId chain must not hang or crash search.
+    const cyclic = [
+      Entry('a', {'name': 'Loop A', 'parentId': 'b'}),
+      Entry('b', {'name': 'Loop B', 'parentId': 'a'}),
+    ];
+    const cyclicProducts = [Entry('p3', {'name': 'Cyclic product', 'categoryId': 'a'})];
+    expect(search.text(cyclicProducts, 'loop a', cyclic).single.id, 'p3');
+  });
   test(
     'cart enforces stock, reprices by pincode and demo edits persist',
     () async {
