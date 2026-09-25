@@ -36,7 +36,7 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
         if (componentFields(component).contains('fontSize')) 'textColor',
         'borderColor',
         if (componentFields(component).contains('fontSize')) 'fontFamily',
-        if (component == 'notice') 'direction',
+        if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
         if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
       ])
         key: TextEditingController(text: saved.text(key)),
@@ -196,8 +196,10 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
                                 'textColor': 'Text color (#RRGGBB)',
                                 'borderColor': 'Border color (#RRGGBB)',
                                 'fontFamily': 'Font family',
-                                'direction': 'Direction (rtl / ltr)',
-                                'scrollEnabled': 'Scroll upward (true / false)',
+                                'direction': component == 'notice'
+                                    ? 'Direction (rtl / ltr)'
+                                    : 'Scroll direction (up / down)',
+                                'scrollEnabled': 'Scroll enabled — pause with false (true / false)',
                               }[field.key],
                           helperText: dimensionFields.containsKey(field.key)
                               ? '${dimensionFields[field.key]!.$2} – ${dimensionFields[field.key]!.$3}'
@@ -234,8 +236,11 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
                               !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(text)) {
                             return 'Use #RRGGBB';
                           } else if (field.key == 'direction' &&
-                              !['rtl', 'ltr'].contains(text)) {
-                            return 'Use rtl or ltr';
+                              !(component == 'notice'
+                                      ? ['rtl', 'ltr']
+                                      : ['up', 'down'])
+                                  .contains(text)) {
+                            return component == 'notice' ? 'Use rtl or ltr' : 'Use up or down';
                           } else if (field.key == 'scrollEnabled' &&
                               !['true', 'false'].contains(text)) {
                             return 'Use true or false';

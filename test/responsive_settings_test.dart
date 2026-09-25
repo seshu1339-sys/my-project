@@ -245,6 +245,45 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('a scrolling advertisement has no gap between its looping copies', (
+    tester,
+  ) async {
+    // A 'spacing' value is set deliberately: it must NOT leak into the
+    // internal scroll loop (that was the bug — a blank strip flashing
+    // through the middle of the box on every cycle). It still only affects
+    // padding between separate ad boxes, set by the caller in wireframe_home.dart.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 280,
+            child: ScheduledPromo(
+              entry: const Entry('ad2', {
+                'name': 'Offer',
+                'height': 200,
+                'spacing': 40,
+                'scrollEnabled': true,
+                'speed': 20,
+              }),
+              onTap: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    final copies = find.byType(PromoCard);
+    expect(copies, findsNWidgets(2));
+    final tops = copies.evaluate().map((e) => tester.getTopLeft(find.byWidget(e.widget)).dy).toList()..sort();
+    expect(
+      tops[1] - tops[0],
+      closeTo(200, 0.5),
+      reason: 'the second copy must start exactly one card-height after the first, with no blank gap between them',
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('ticker moves in both directions and responds to pause', (
     tester,
   ) async {

@@ -687,11 +687,20 @@ class _ScheduledPromoState extends State<ScheduledPromo>
         MediaQuery.sizeOf(context).width,
       );
       final height = layout.height(240, floor: 120);
-      final gap = layout.n('spacing', 16, 0, 64);
-      configure(height + gap, layout);
+      // The loop distance must equal exactly one card's height: the visible
+      // window is also `height` tall, so the two stacked copies always tile
+      // it with no seam. Baking `gap` into this distance (as before) made the
+      // window briefly show blank space between the outgoing and incoming
+      // copy at the midpoint of every cycle — a visible gap flashing through
+      // the middle of the box while it scrolled.
+      configure(height, layout);
       final moving = widget.entry.text('scrollEnabled', 'true') == 'true';
       final width = layout.width(c.maxWidth, fallback: c.maxWidth, floor: 140);
       final position = widget.entry.text('position', 'start');
+      // 'up' (default, unchanged from before) reveals new content from the
+      // bottom; 'down' mirrors the same two-copy loop so content instead
+      // enters from the top. Any other/blank value falls back to 'up'.
+      final scrollsDown = widget.entry.text('direction', 'up') == 'down';
       Widget card() => SizedBox(
         height: height,
         child: SingleChildScrollView(
@@ -725,7 +734,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
                       offset: Offset(
                         0,
                         moving && !MediaQuery.of(context).disableAnimations
-                            ? -animation.value * cycle
+                            ? (scrollsDown ? animation.value - 1 : -animation.value) * cycle
                             : 0,
                       ),
                       child: OverflowBox(
@@ -734,10 +743,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
                         maxHeight: double.infinity,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
-                          children: [
-                            card(),
-                            if (moving) ...[SizedBox(height: gap), card()],
-                          ],
+                          children: [card(), if (moving) card()],
                         ),
                       ),
                     ),
