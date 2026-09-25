@@ -2,7 +2,7 @@ const {test} = require('node:test');
 const {readFileSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {doc, setDoc, getDoc, updateDoc, serverTimestamp} = require('firebase/firestore');
+const {doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp} = require('firebase/firestore');
 test('Firestore denies escalation, PIN access and forged orders; isolates customer data', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
   try {
@@ -10,7 +10,19 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     const alice = env.authenticatedContext('alice', {email_verified: true}).firestore();
     const bob = env.authenticatedContext('bob', {email_verified: true}).firestore();
     const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const staleAdmin = env.authenticatedContext('staleOwner', {admin: true, email_verified: true}).firestore();
+    const expiredAdmin = env.authenticatedContext('expiredOwner', {admin: true, email_verified: true}).firestore();
     const unverified = env.authenticatedContext('new', {admin: true, email_verified: false}).firestore();
+    // The admin claim alone no longer grants access: a fresh, unexpired
+    // _adminSessions doc (written only by functions/admin-otp.js after a
+    // successful email-OTP check) is also required. 'owner' has a valid one;
+    // 'staleOwner' never completed OTP; 'expiredOwner' completed it too long ago.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), '_adminSessions/owner'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+      await setDoc(doc(ctx.firestore(), '_adminSessions/expiredOwner'), {expiresAt: Timestamp.fromMillis(Date.now() - 1000)});
+    });
+    await assertFails(setDoc(doc(staleAdmin, 'products/noSession'), {name: 'Denied'}));
+    await assertFails(setDoc(doc(expiredAdmin, 'products/expiredSession'), {name: 'Denied'}));
     await assertFails(setDoc(doc(unverified, 'products/nope'), {name: 'Denied'}));
     await assertFails(setDoc(doc(unverified, 'users/new'), {name: 'Denied'}));
     await assertSucceeds(setDoc(doc(admin, 'products/p1'), {name: 'Test', active: true}));

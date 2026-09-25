@@ -4,10 +4,12 @@ const assert = require('node:assert/strict');
 // Real functions against the emulators; pushes are recorded in _pushDryRun instead of sent.
 test('offers reach every subscriber once; admin can switch off or send manually', {skip: !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST)}, async () => {
   process.env.PUSH_DRY_RUN = 'true';
-  const {getFirestore} = require('firebase-admin/firestore');
+  const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
   const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const wipe = async name => { for (const d of (await db.collection(name).get()).docs) await d.ref.delete(); };
   const dry = async () => (await db.collection('_pushDryRun').get()).docs.map(d => d.data());
   const promo = async id => (await db.collection('promotions').doc(id).get()).data();

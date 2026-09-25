@@ -2,7 +2,7 @@ const {test} = require('node:test');
 const {readFileSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {doc, setDoc, getDoc, getDocs, collection, serverTimestamp, increment} = require('firebase/firestore');
+const {doc, setDoc, getDoc, getDocs, collection, serverTimestamp, increment, Timestamp} = require('firebase/firestore');
 
 test('product interest: counted views, no tampering, server-only alert fields, admin-only analytics', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
@@ -12,6 +12,8 @@ test('product interest: counted views, no tampering, server-only alert fields, a
     const bob = env.authenticatedContext('bob', {email_verified: true}).firestore();
     const anon = env.unauthenticatedContext().firestore();
     const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    // Admin reads now also require a fresh OTP-verified session (see admin-otp.js / firestore.rules' adminSessionValid()).
+    await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), '_adminSessions/owner'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)}); });
     const ref = db => doc(db, 'products/p1/viewers/alice');
     const count = () => ({pincode: '560001', lastViewedAt: serverTimestamp(), viewCount: increment(1)});
 

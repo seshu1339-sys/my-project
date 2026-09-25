@@ -8,6 +8,7 @@ const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
 const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
 const {flagOff} = require('./domain');
+const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 const hash = value => createHash('sha256').update(value).digest('hex');
 async function* pages(query) {
@@ -170,9 +171,10 @@ exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asi
 
 // ---- Admin: who is eligible for a product's price alert, and manual sending.
 const adminOptions = {region: 'us-central1', maxInstances: 5, invoker: 'public'};
-function requireAdmin(request) {
+async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
   if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  await requireAdminSession(request.auth.uid);
 }
 async function loadAudience(productId) {
   if (typeof productId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(productId)) throw new HttpsError('invalid-argument', 'Choose a product.');
@@ -210,12 +212,12 @@ async function loadAudience(productId) {
   return {productRef, product, viewers, rows};
 }
 exports.priceAlertAudience = onCall(adminOptions, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {product, rows} = await loadAudience(request.data?.productId);
   return {product: {id: request.data.productId, name: product.name || '', price: product.price ?? null}, rows, truncated: rows.length >= 500};
 });
 exports.sendPriceDropAlerts = onCall(adminOptions, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {productId, uids} = request.data || {};
   if (uids !== undefined && (!Array.isArray(uids) || uids.length > 500 || uids.some(u => typeof u !== 'string'))) throw new HttpsError('invalid-argument', 'Invalid customer list.');
   const {product, viewers, rows} = await loadAudience(productId);
@@ -232,7 +234,7 @@ exports.sendPriceDropAlerts = onCall(adminOptions, async request => {
 
 // ---- Admin: send an offer to every subscriber now, and see how many that is.
 exports.sendOfferNotification = onCall({...adminOptions, timeoutSeconds: 540}, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {promotionId} = request.data || {};
   if (typeof promotionId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(promotionId)) throw new HttpsError('invalid-argument', 'Choose an offer.');
   const result = await releaseOffer(promotionId, {force: true});
@@ -241,7 +243,7 @@ exports.sendOfferNotification = onCall({...adminOptions, timeoutSeconds: 540}, a
   return result;
 });
 exports.offerAudienceSize = onCall(adminOptions, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   return {subscribers: (await db.collection('notificationSubscribers').where('enabled', '==', true).count().get()).data().count};
 });
 // Exposed for reuse by other function modules (e.g. functions/storage-maintenance.js), which

@@ -21,6 +21,8 @@ test('price alerts: eligibility, manual send, no duplicates, automatic on/off, a
   // oldest first (document ids are random)
   const dry = async () => (await db.collection('_pushDryRun').get()).docs.map(d => d.data()).sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
   const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const pid = 'alert-p1';
   const mkUser = async (uid, email) => { try { await getAuth().createUser({uid, email}); } catch { /* already exists */ } };
   const recent = Timestamp.fromMillis(Date.now() - 86400000), old = Timestamp.fromMillis(Date.now() - 120 * 86400000);

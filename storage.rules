@@ -6,18 +6,28 @@ service firebase.storage {
       return request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
     }
+    // Mirrors firestore.rules' adminSessionValid(): the admin custom claim alone
+    // is not enough once email OTP is required (functions/admin-otp.js is the
+    // only writer of _adminSessions). Without this, a direct Storage write would
+    // bypass the OTP requirement entirely, since Storage rules never go through
+    // the callable functions that enforce it.
+    function adminSessionValid() {
+      return firestore.exists(/databases/(default)/documents/_adminSessions/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/_adminSessions/$(request.auth.uid)).data.expiresAt.toMillis() > request.time.toMillis();
+    }
+    function isAdmin() { return verified() && request.auth.token.admin == true && adminSessionValid(); }
     match /catalog/{file} {
       allow read: if true;
-      allow create, update: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.admin == true
+      allow create, update: if isAdmin()
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/(jpeg|png|webp)');
-      allow delete: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.admin == true;
+      allow delete: if isAdmin();
     }
     // Private vendor application photos: the owner may upload the two named
     // photos only before submitting (or after a rejection); only the owner and
     // the main admin can read them. They are never public.
     match /vendorApplications/{uid}/{file} {
-      allow read: if verified() && (request.auth.uid == uid || request.auth.token.admin == true);
+      allow read: if verified() && (request.auth.uid == uid || isAdmin());
       allow create, update: if verified() && request.auth.uid == uid
         && file in ['vendorPhoto', 'shopPhoto'] && isImage()
         && (!firestore.exists(/databases/(default)/documents/vendorApplications/$(uid))

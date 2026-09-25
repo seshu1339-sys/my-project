@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 
 test('Special Category Exclusives: permission, publish, expiry lifecycle', {skip: !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST)}, async () => {
   process.env.PUSH_DRY_RUN = 'true';
-  const {getFirestore} = require('firebase-admin/firestore');
+  const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
   const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const vendor = {auth: {uid: 'exV', token: {email_verified: true}}};
   const wipe = async name => { for (const d of (await db.collection(name).get()).docs) await d.ref.delete(); };
   const setPermission = (data, ctx = admin) => fns.setVendorExclusivesPermission.run({...ctx, data});

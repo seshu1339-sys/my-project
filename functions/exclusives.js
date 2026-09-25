@@ -6,6 +6,7 @@
 // they already appear on ShopPage/the product grid via the existing active/shopId filtering.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
+const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
@@ -13,9 +14,10 @@ function requireUser(request) {
   if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
   return request.auth.uid;
 }
-function requireAdmin(request) {
+async function requireAdmin(request) {
   requireUser(request);
   if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  await requireAdminSession(request.auth.uid);
 }
 const ARCHIVE_WINDOW_MS = 15 * 86400000;
 function validName(value) {
@@ -44,7 +46,7 @@ function validDuration(days, vendor) {
 }
 // Admin: grant or revoke the permission, and set the vendor's own maximum item duration.
 exports.setVendorExclusivesPermission = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, enabled, maxDurationDays} = request.data || {};
   if (typeof vendorId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(vendorId) || typeof enabled !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor and whether to enable the permission.');
   const vendorRef = db.collection('vendors').doc(vendorId);

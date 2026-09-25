@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -9,10 +10,12 @@ import 'data/store.dart';
 import 'ui/storefront.dart';
 import 'ui/email_link.dart';
 import 'ui/details.dart';
+import 'ui/admin_auth.dart';
 import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/emulators.dart';
+import 'services/admin_route.dart';
 import 'ui/shared.dart';
 import 'services/localization.dart';
 
@@ -35,6 +38,12 @@ Future<void> main() async {
           firebaseMessagingBackgroundHandler,
         );
       }
+      // The hidden admin route always starts at the password step: any
+      // session already persisted in this browser (from an earlier visit, or
+      // from the customer site sharing the same Firebase project) is signed
+      // out before the admin UI is ever built, so a direct reload can never
+      // skip straight past the password check.
+      if (kIsWeb && isAdminRoute) await FirebaseAuth.instance.signOut();
       live = true;
     } catch (e) {
       startupError = 'Firebase could not start. Check the supplied project configuration and restart.';
@@ -51,6 +60,10 @@ Future<void> main() async {
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
   await store.init();
+  if (kIsWeb && isAdminRoute) {
+    runApp(AdminEntryApp(store: store));
+    return;
+  }
   // Anonymous visit counting; only the customer app ever starts it.
   if (live) Analytics.start();
   runApp(MarketApp(store: store));

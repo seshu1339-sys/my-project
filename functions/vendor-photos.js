@@ -5,6 +5,7 @@
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
+const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
@@ -12,9 +13,10 @@ function requireUser(request) {
   if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
   return request.auth.uid;
 }
-function requireAdmin(request) {
+async function requireAdmin(request) {
   requireUser(request);
   if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  await requireAdminSession(request.auth.uid);
 }
 const SLOTS = [1, 2];
 const slotFile = slot => `shopPhoto${slot}`;
@@ -50,7 +52,7 @@ exports.submitShopPhoto = onCall(options, async request => {
 // (nothing unapproved lingers) and leaves the record so the vendor sees why; re-uploading to the
 // same slot works normally afterwards.
 exports.reviewShopPhoto = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, slot, approved, reason = ''} = request.data || {};
   if (typeof vendorId !== 'string' || !SLOTS.includes(slot) || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor, slot and decision.');
   const ref = db.collection('vendorShopPhotos').doc(photoDocId(vendorId, slot));

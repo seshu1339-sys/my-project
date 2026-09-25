@@ -2,7 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
-    function admin() { return signedIn() && request.auth.token.admin == true; }
+    // Password + admin claim alone no longer grants admin access: a recent,
+    // successful email-OTP verification (functions/admin-otp.js, which is the
+    // only writer of _adminSessions) must also exist and not have expired.
+    // This closes the same gap for every DIRECT client read/write below that
+    // functions/admin-session.js closes for callable functions.
+    function adminSessionValid() {
+      return exists(/databases/$(database)/documents/_adminSessions/$(request.auth.uid))
+        && get(/databases/$(database)/documents/_adminSessions/$(request.auth.uid)).data.expiresAt > request.time;
+    }
+    function admin() { return signedIn() && request.auth.token.admin == true && adminSessionValid(); }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
       allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary'];

@@ -2,10 +2,12 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
 test('admin can suspend and reinstate a vendor; access and catalog follow', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
-  const {getFirestore} = require('firebase-admin/firestore');
+  const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
   const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const vendor = {auth: {uid: 'susV', token: {email_verified: true}}};
   const suspend = (data, ctx = admin) => fns.setVendorSuspension.run({...ctx, data});
   await db.collection('vendors').doc('susV').set({vendorId: 'susV', name: 'Sus Shop', shopId: 'susShop', status: 'approved', verified: true});

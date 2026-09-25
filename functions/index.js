@@ -8,10 +8,12 @@ const {normalizeEvent, recordEvent} = require('./analytics');
 const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
+const {requireAdminSession} = require('./admin-session');
 Object.assign(exports, require('./notifications'));
 Object.assign(exports, require('./vendor-photos'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
+Object.assign(exports, require('./admin-otp'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
@@ -33,9 +35,10 @@ function requireUser(request) {
   if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
   return request.auth.uid;
 }
-function requireAdmin(request) {
+async function requireAdmin(request) {
   requireUser(request);
   if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  await requireAdminSession(request.auth.uid);
 }
 function requireCoordinate(value, name) {
   if (!validCoordinate(value)) throw new HttpsError('invalid-argument', `Provide a valid ${name}.`);
@@ -143,7 +146,7 @@ exports.addComplaintMessage = onCall(options, async request => {
   return {sent: true};
 });
 exports.reviewComplaint = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {complaintId, status, resolution} = request.data || {};
   if (typeof complaintId !== 'string' || !['open', 'in_review', 'resolved', 'closed'].includes(status) || typeof resolution !== 'string' || resolution.length > 1000) throw new HttpsError('invalid-argument', 'Provide a valid complaint decision.');
   await db.collection('complaints').doc(complaintId).update({status, resolution: resolution.trim(), reviewedBy: request.auth.uid, updatedAt: FieldValue.serverTimestamp()});
@@ -167,7 +170,7 @@ exports.registerVendor = onCall(options, async request => {
   return {status: 'pending'};
 });
 exports.approveVendor = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, approved, reason = '', feeRequired = false, feeAmount = 0} = request.data || {};
   if (typeof vendorId !== 'string' || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide vendor and decision.');
   let fee;
@@ -210,7 +213,7 @@ async function setVendorCatalogVisibility(vendorId, shopId, hide) {
   return changed;
 }
 exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, suspended, reason = ''} = request.data || {};
   if (typeof vendorId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(vendorId) || typeof suspended !== 'boolean' || typeof reason !== 'string') throw new HttpsError('invalid-argument', 'Provide the vendor and whether to suspend or reinstate.');
   const note = reason.trim().slice(0, 500);
@@ -237,7 +240,7 @@ exports.submitVendorFeePayment = onCall(options, async request => {
   return {status: 'payment_submitted'};
 });
 exports.confirmVendorFeePayment = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, paid} = request.data || {};
   if (typeof vendorId !== 'string' || typeof paid !== 'boolean') throw new HttpsError('invalid-argument', 'Provide vendor and payment decision.');
   const applicationRef = db.collection('vendorApplications').doc(vendorId);
@@ -253,7 +256,7 @@ exports.confirmVendorFeePayment = onCall(options, async request => {
   return {status: paid ? 'approved' : 'payment_required'};
 });
 exports.verifyVendorShop = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {vendorId, shopId, latitude, longitude, radiusKm} = request.data || {};
   requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
   if (typeof vendorId !== 'string' || typeof shopId !== 'string' || !Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 100) throw new HttpsError('invalid-argument', 'Provide valid shop verification details.');
@@ -300,7 +303,7 @@ exports.submitVendorChange = onCall(options, async request => {
   return {status: change.status, docId: targetId};
 });
 exports.reviewVendorChange = onCall(options, async request => {
-  requireAdmin(request);
+  await requireAdmin(request);
   const {changeId, approved, reason = ''} = request.data || {};
   if (typeof changeId !== 'string' || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide change and decision.');
   const changeRef = db.collection('vendorChanges').doc(changeId);

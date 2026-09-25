@@ -3,6 +3,7 @@ const {readFileSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
 const {ref, uploadBytes, getBytes} = require('firebase/storage');
+const {doc, setDoc, Timestamp} = require('firebase/firestore');
 const jpeg = () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const jpegMeta = {contentType: 'image/jpeg'};
 // Needs both emulators because the Storage rules read Firestore vendor records.
@@ -20,6 +21,8 @@ test('vendor photos: private application photos, approved-only product photos', 
     const other = env.authenticatedContext('vendor2', {email_verified: true}).storage();
     const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).storage();
     const app = (s, path = 'vendorApplications/vendor1/vendorPhoto', meta = jpegMeta, bytes = jpeg()) => uploadBytes(ref(s, path), bytes, meta);
+    // Admin Storage access now also requires a fresh OTP-verified session (see admin-otp.js / storage.rules' adminSessionValid()).
+    await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), '_adminSessions/owner'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)}));
 
     // --- application photos, before any application exists
     await assertSucceeds(app(vendor));
