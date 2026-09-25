@@ -49,7 +49,11 @@ class WireframeHome extends StatelessWidget {
         .visible('categories')
         .where((e) => e.text('parentId').isEmpty)
         .toList();
-    final products = searchService.text(store.visible('products'), search.text);
+    final products = searchService.text(
+      store.visible('products'),
+      search.text,
+      store.visible('categories'),
+    );
     final promotions = store.visible('promotions');
     final offers = promotions
         .where((e) => e.text('placement') == 'carousel')
@@ -88,6 +92,36 @@ class WireframeHome extends StatelessWidget {
         : ticker.text('text').isNotEmpty
         ? ticker.text('text')
         : tickerPromo?.text('name') ?? '';
+    final tickerSection = text.isNotEmpty && noticeLayout.visible
+        ? LayoutSection(
+            layout: noticeLayout,
+            child: TickerStrip(
+              text: text,
+              height: ComponentLayout(ticker, noticeLayout.viewport).height(40, floor: 32),
+              fontSize: ComponentLayout(ticker, noticeLayout.viewport).font(14),
+              fontFamily: ticker.text('fontFamily'),
+              fontWeight: FontWeight.values.firstWhere(
+                (w) => w.value == ticker.number('fontWeight', 400),
+                orElse: () => FontWeight.normal,
+              ),
+              speed: clampedNumber(ticker, 'speed', 70, 10, 300),
+              padding: clampedNumber(ticker, 'padding', 8, 0, 48),
+              reverse: ticker.text('direction', 'rtl') == 'ltr',
+              backgroundColor: colorFromHex(
+                ticker.text('backgroundColor'),
+                const Color(0xff174c38),
+              ),
+              textColor: colorFromHex(ticker.text('textColor'), Colors.white),
+              backgroundImage: ticker.text('backgroundImage'),
+              brightness: ticker.number('brightness', 1),
+              opacity: ticker.number('opacity', 1),
+              radius: clampedNumber(ticker, 'radius', 8, 0, 80),
+              borderColor: ticker.text('borderColor'),
+              borderWidth: clampedNumber(ticker, 'borderWidth', 0, 0, 8),
+              playback: ticker.text('playback', 'running'),
+            ),
+          )
+        : const SizedBox.shrink();
     final page = layoutFor(context, settings, 'background');
     final categoryLayout = layoutFor(context, settings, 'categories');
     final productLayout = layoutFor(context, settings, 'products');
@@ -156,47 +190,6 @@ class WireframeHome extends StatelessWidget {
                     store.catalogWarning,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                if (text.isNotEmpty && noticeLayout.visible)
-                  LayoutSection(
-                    layout: noticeLayout,
-                    child: TickerStrip(
-                      text: text,
-                      height: ComponentLayout(
-                        ticker,
-                        page.viewport,
-                      ).height(40, floor: 32),
-                      fontSize: ComponentLayout(ticker, page.viewport).font(14),
-                      fontFamily: ticker.text('fontFamily'),
-                      fontWeight: FontWeight.values.firstWhere(
-                        (w) => w.value == ticker.number('fontWeight', 400),
-                        orElse: () => FontWeight.normal,
-                      ),
-                      speed: clampedNumber(ticker, 'speed', 70, 10, 300),
-                      padding: clampedNumber(ticker, 'padding', 8, 0, 48),
-                      reverse: ticker.text('direction', 'rtl') == 'ltr',
-                      backgroundColor: colorFromHex(
-                        ticker.text('backgroundColor'),
-                        const Color(0xff174c38),
-                      ),
-                      textColor: colorFromHex(
-                        ticker.text('textColor'),
-                        Colors.white,
-                      ),
-                      backgroundImage: ticker.text('backgroundImage'),
-                      brightness: ticker.number('brightness', 1),
-                      opacity: ticker.number('opacity', 1),
-                      radius: clampedNumber(ticker, 'radius', 8, 0, 80),
-                      borderColor: ticker.text('borderColor'),
-                      borderWidth: clampedNumber(
-                        ticker,
-                        'borderWidth',
-                        0,
-                        0,
-                        8,
-                      ),
-                      playback: ticker.text('playback', 'running'),
                     ),
                   ),
                 SizedBox(height: page.gap),
@@ -277,129 +270,141 @@ class WireframeHome extends StatelessWidget {
                           ),
                       ],
                     );
+                    final reorderedSections = <String, Widget>{
+                      'notice': tickerSection,
+                      'promo': LayoutSection(
+                        layout: layoutFor(context, settings, 'promo'),
+                        child: HeroCarousel(
+                          entries: offers,
+                          appearance: sectionConfig(settings, 'promo'),
+                          onTap: onPromotion,
+                          reverse:
+                              offers.isNotEmpty &&
+                              offers.first.text('direction', 'rtl') == 'ltr',
+                          speed: offers.isEmpty
+                              ? 600
+                              : offers.first.number('speed', 600),
+                        ),
+                      ),
+                      'categories': LayoutSection(
+                        layout: ComponentLayout(
+                          Entry(categoryLayout.entry.id, {
+                            'visible': categoryLayout.visible,
+                            'margin': categoryLayout.margin,
+                          }),
+                          categoryLayout.viewport,
+                        ),
+                        child: Column(
+                          key: categoriesKey,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HomeSectionHeading(
+                              title: 'Categories',
+                              subtitle: 'Browse your everyday essentials',
+                              appearance: categoryLayout.entry,
+                            ),
+                            if (categories.isEmpty)
+                              const Text(
+                                'Categories will appear here when available.',
+                              ),
+                            LayoutBuilder(
+                              builder: (context, grid) {
+                                final columns = categoryLayout.columns(
+                                  grid.maxWidth,
+                                  preferred: 170,
+                                  minimum: 125,
+                                );
+                                final tileWidth =
+                                    (grid.maxWidth -
+                                        (columns - 1) * categoryLayout.gap) /
+                                    columns;
+                                return Wrap(
+                                  spacing: categoryLayout.gap,
+                                  runSpacing: categoryLayout.gap,
+                                  children: [
+                                    for (final (i, category)
+                                        in categories.indexed)
+                                      SizedBox(
+                                        width: tileWidth,
+                                        height: categoryLayout.height(
+                                          tileWidth,
+                                          floor: tileWidth,
+                                        ),
+                                        child: HomeCategoryTile(
+                                          entry: category,
+                                          selected: false,
+                                          onTap: () =>
+                                              onCategory(category.id),
+                                          index: i,
+                                          appearance: categoryLayout.styled(
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      'popular': LayoutSection(
+                        layout: layoutFor(context, settings, 'popular'),
+                        child: Column(
+                          key: productsKey,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HomeSectionHeading(
+                              title: search.text.isEmpty
+                                  ? 'Popular Products'
+                                  : 'Search results',
+                              subtitle: search.text.isEmpty
+                                  ? 'Products and services from your neighbourhood'
+                                  : '${products.length} matching items',
+                              appearance: sectionConfig(settings, 'popular'),
+                            ),
+                            if (products.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text(
+                                  'No matching products. Try another search.',
+                                ),
+                              ),
+                            if (productLayout.visible)
+                              HomeProductGrid(
+                                entries: products,
+                                appearance: productLayout.entry,
+                                itemBuilder: (entry) => HomeProductTile(
+                                  entry: entry,
+                                  price: entry.price(store.pincode),
+                                  appearance: productLayout.styled(
+                                    context,
+                                    fontSize: 16,
+                                  ),
+                                  onOpen: () => onProduct(entry),
+                                  onAdd:
+                                      entry.number('stock') >
+                                          (store.cart[entry.id] ?? 0)
+                                      ? () => onAdd(entry)
+                                      : null,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    };
+                    final orderedSectionKeys = [...reorderableHomeSections]
+                      ..sort(
+                        (a, b) => sectionOrder(
+                          settings,
+                          a,
+                        ).compareTo(sectionOrder(settings, b)),
+                      );
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        LayoutSection(
-                          layout: layoutFor(context, settings, 'promo'),
-                          child: HeroCarousel(
-                            entries: offers,
-                            appearance: sectionConfig(settings, 'promo'),
-                            onTap: onPromotion,
-                            reverse:
-                                offers.isNotEmpty &&
-                                offers.first.text('direction', 'rtl') == 'ltr',
-                            speed: offers.isEmpty
-                                ? 600
-                                : offers.first.number('speed', 600),
-                          ),
-                        ),
-                        LayoutSection(
-                          layout: ComponentLayout(
-                            Entry(categoryLayout.entry.id, {
-                              'visible': categoryLayout.visible,
-                              'margin': categoryLayout.margin,
-                            }),
-                            categoryLayout.viewport,
-                          ),
-                          child: Column(
-                            key: categoriesKey,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              HomeSectionHeading(
-                                title: 'Categories',
-                                subtitle: 'Browse your everyday essentials',
-                                appearance: categoryLayout.entry,
-                              ),
-                              if (categories.isEmpty)
-                                const Text(
-                                  'Categories will appear here when available.',
-                                ),
-                              LayoutBuilder(
-                                builder: (context, grid) {
-                                  final columns = categoryLayout.columns(
-                                    grid.maxWidth,
-                                    preferred: 170,
-                                    minimum: 125,
-                                  );
-                                  final tileWidth =
-                                      (grid.maxWidth -
-                                          (columns - 1) * categoryLayout.gap) /
-                                      columns;
-                                  return Wrap(
-                                    spacing: categoryLayout.gap,
-                                    runSpacing: categoryLayout.gap,
-                                    children: [
-                                      for (final (i, category)
-                                          in categories.indexed)
-                                        SizedBox(
-                                          width: tileWidth,
-                                          height: categoryLayout.height(
-                                            tileWidth,
-                                            floor: tileWidth,
-                                          ),
-                                          child: HomeCategoryTile(
-                                            entry: category,
-                                            selected: false,
-                                            onTap: () =>
-                                                onCategory(category.id),
-                                            index: i,
-                                            appearance: categoryLayout.styled(
-                                              context,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        LayoutSection(
-                          layout: layoutFor(context, settings, 'popular'),
-                          child: Column(
-                            key: productsKey,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              HomeSectionHeading(
-                                title: search.text.isEmpty
-                                    ? 'Popular Products'
-                                    : 'Search results',
-                                subtitle: search.text.isEmpty
-                                    ? 'Products and services from your neighbourhood'
-                                    : '${products.length} matching items',
-                                appearance: sectionConfig(settings, 'popular'),
-                              ),
-                              if (products.isEmpty)
-                                const Padding(
-                                  padding: EdgeInsets.all(24),
-                                  child: Text(
-                                    'No matching products. Try another search.',
-                                  ),
-                                ),
-                              if (productLayout.visible)
-                                HomeProductGrid(
-                                  entries: products,
-                                  appearance: productLayout.entry,
-                                  itemBuilder: (entry) => HomeProductTile(
-                                    entry: entry,
-                                    price: entry.price(store.pincode),
-                                    appearance: productLayout.styled(
-                                      context,
-                                      fontSize: 16,
-                                    ),
-                                    onOpen: () => onProduct(entry),
-                                    onAdd:
-                                        entry.number('stock') >
-                                            (store.cart[entry.id] ?? 0)
-                                        ? () => onAdd(entry)
-                                        : null,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                        for (final key in orderedSectionKeys)
+                          reorderedSections[key]!,
                         LayoutSection(
                           layout: nearby,
                           child: Column(

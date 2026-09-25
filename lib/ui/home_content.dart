@@ -94,6 +94,17 @@ class HomeContent extends StatelessWidget {
         : () => onAdd(entry),
   );
 
+  /// An admin-set height (0 = automatic) clips a section to that height and
+  /// makes it independently scrollable, instead of resizing its content.
+  Widget clamped(Entry config, Widget child) {
+    final height = config.number('height', 0);
+    if (height <= 0) return child;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: height),
+      child: SingleChildScrollView(child: child),
+    );
+  }
+
   Widget promotion(Entry entry) => ImpressionOnce(
     entry: entry,
     child: PromoCard(
@@ -120,6 +131,7 @@ class HomeContent extends StatelessWidget {
     final productAppearance = sectionConfig(settings, 'products');
     final offersAppearance = sectionConfig(settings, 'offers');
     final searchAppearance = sectionConfig(settings, 'search');
+    final promotionsAppearance = sectionConfig(settings, 'promotions');
     final selected = <String>{category};
     for (var i = 0; i < categories.length; i++) {
       for (final c in categories) {
@@ -131,7 +143,7 @@ class HomeContent extends StatelessWidget {
     final filtered =
         search.text.isNotEmpty || category.isNotEmpty || mode != 'all';
     final products = searchService
-        .text(entries('products'), search.text)
+        .text(entries('products'), search.text, categories)
         .where(
           (p) =>
               (category.isEmpty || selected.contains(p.text('categoryId'))) &&
@@ -216,6 +228,245 @@ class HomeContent extends StatelessWidget {
       onPressed: onLocation,
       child: Text(located ? 'Change' : 'Set location'),
     );
+    final orderedSections = <String, Widget>{
+      'notice': scrolling.active && tickerTextValue.isNotEmpty
+          ? Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: TickerStrip(
+                text: tickerTextValue,
+                textColor: colorFromHex(
+                  scrolling.text('textColor'),
+                  Colors.white,
+                ),
+                backgroundColor: colorFromHex(
+                  scrolling.text('backgroundColor'),
+                  const Color(0xff174c38),
+                ),
+                fontFamily: scrolling.text('fontFamily'),
+                fontSize: scrolling.number('fontSize', 12),
+                fontWeight: FontWeight.values.firstWhere(
+                  (weight) =>
+                      weight.value ==
+                      scrolling.number('fontWeight', 400).round(),
+                  orElse: () => FontWeight.normal,
+                ),
+                speed: scrolling.number('speed', 70).clamp(10, 300),
+                height: scrolling.number('height', 36).clamp(24, 120),
+                padding: scrolling.number('padding', 9).clamp(0, 40),
+                reverse: scrolling.text('direction', 'rtl') == 'ltr',
+                backgroundImage: scrolling.text('backgroundImage'),
+                brightness: scrolling.number('brightness', 1),
+                opacity: scrolling.number('opacity', 1),
+                borderColor: scrolling.text('borderColor'),
+                borderWidth: scrolling.number('borderWidth'),
+                radius: scrolling.number('radius'),
+                playback: scrolling.text('playback', 'running'),
+              ),
+            )
+          : const SizedBox.shrink(),
+      'promo': clamped(
+        promotionsAppearance,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 22),
+            HeroCarousel(
+              entries: carousel,
+              reverse:
+                  carousel.isNotEmpty &&
+                  carousel.first.text('direction', 'rtl') == 'ltr',
+              speed: carousel.isEmpty
+                  ? 600
+                  : carousel.first.number('speed', 600),
+              onTap: (target) =>
+                  preview('promotions') ? onLocation() : onPromotion(target),
+            ),
+            Wrap(
+              spacing: 24,
+              runSpacing: 12,
+              children: const [
+                _Benefit(
+                  icon: Icons.storefront_outlined,
+                  label: 'Discover local shops',
+                ),
+                _Benefit(
+                  icon: Icons.location_on_outlined,
+                  label: 'Prices for your area',
+                ),
+                _Benefit(
+                  icon: Icons.handyman_outlined,
+                  label: 'Everyday services',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      'categories': clamped(
+        categoryAppearance,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (sectionVisible(categoryAppearance))
+              HomeSectionHeading(
+                key: categoriesKey,
+                title: 'Find your everyday',
+                subtitle: 'A little of everything, right around the corner.',
+                appearance: categoryAppearance,
+              ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  HomeCategoryTile(
+                    entry: const Entry('all', {'name': 'Explore all'}),
+                    selected: category.isEmpty,
+                    onTap: () => onCategory(''),
+                    index: 0,
+                  ),
+                  for (final (index, c) in categories.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: HomeCategoryTile(
+                        entry: c,
+                        selected: category == c.id,
+                        onTap: () => onCategory(c.id),
+                        index: index + 1,
+                        appearance: categoryAppearance,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      'popular': clamped(
+        productAppearance,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  HomeSectionHeading(
+                    key: productsKey,
+                    title: filtered ? 'Your local finds' : 'Featured products',
+                    subtitle: filtered
+                        ? '${featured.length} matching finds'
+                        : 'Everyday essentials. A few new favourites.',
+                    action: filtered
+                        ? () {
+                            search.clear();
+                            onCategory('');
+                          }
+                        : null,
+                    actionLabel: 'Reset',
+                    appearance: productAppearance,
+                  ),
+                  if (filtered)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final item in [
+                            ('all', 'Everything'),
+                            ('product', 'Products'),
+                            ('service', 'Services'),
+                          ])
+                            ChoiceChip(
+                              label: Text(item.$2),
+                              selected: mode == item.$1,
+                              onSelected: (_) => onMode(item.$1),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (featured.isEmpty)
+                    const _Empty(
+                      text: 'No matching finds yet. Try another search or category.',
+                    )
+                  else
+                    HomeProductGrid(entries: featured, itemBuilder: product),
+                  if (!filtered) ...[
+                    HomeSectionHeading(
+                      title: 'Nearby shops',
+                      subtitle: located
+                          ? 'Shops serving your selected location.'
+                          : 'Set your location to discover shops near you.',
+                      action: located ? onShops : onLocation,
+                      actionLabel: located ? 'View all' : 'Locate me',
+                    ),
+                    if (shops.isEmpty)
+                      const _Empty(
+                        text: 'No shops found for this location yet. Try another pincode.',
+                      )
+                    else
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final shop in shops.take(8))
+                              Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: HomeShopTile(
+                                  entry: shop,
+                                  preview: preview('shops'),
+                                  onTap: preview('shops')
+                                      ? null
+                                      : () => onShop(shop),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    HomeSectionHeading(
+                      title: 'A helping hand at home',
+                      subtitle: 'Plumbing, electrical work and more, from local professionals.',
+                      action: () => onMode('service'),
+                    ),
+                    if (services.isEmpty)
+                      const _Empty(
+                        text: 'Local services will appear here as they become available.',
+                      )
+                    else
+                      HomeProductGrid(entries: services, itemBuilder: product),
+                  ],
+                ],
+              ),
+            ),
+            if (wide && ads.isNotEmpty) ...[
+              const SizedBox(width: 24),
+              SizedBox(
+                width: adWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const HomeSectionHeading(
+                      title: 'Local spotlight',
+                      subtitle: 'More from your neighbourhood.',
+                    ),
+                    for (final ad in ads)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom: clampedNumber(ad, 'spacing', 16, 0, 80),
+                        ),
+                        child: SizedBox(
+                          width: ad.number('width', 260).clamp(180, adWidth),
+                          child: promotion(ad),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    };
     return Container(
       decoration: pageDecoration,
       child: SingleChildScrollView(
@@ -316,45 +567,6 @@ class HomeContent extends StatelessWidget {
                             ],
                           ),
                         ),
-                      if (scrolling.active && tickerTextValue.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: TickerStrip(
-                            text: tickerTextValue,
-                            textColor: colorFromHex(
-                              scrolling.text('textColor'),
-                              Colors.white,
-                            ),
-                            backgroundColor: colorFromHex(
-                              scrolling.text('backgroundColor'),
-                              const Color(0xff174c38),
-                            ),
-                            fontFamily: scrolling.text('fontFamily'),
-                            fontSize: scrolling.number('fontSize', 12),
-                            fontWeight: FontWeight.values.firstWhere(
-                              (weight) =>
-                                  weight.value ==
-                                  scrolling.number('fontWeight', 400).round(),
-                              orElse: () => FontWeight.normal,
-                            ),
-                            speed: scrolling.number('speed', 70).clamp(10, 300),
-                            height: scrolling
-                                .number('height', 36)
-                                .clamp(24, 120),
-                            padding: scrolling
-                                .number('padding', 9)
-                                .clamp(0, 40),
-                            reverse:
-                                scrolling.text('direction', 'rtl') == 'ltr',
-                            backgroundImage: scrolling.text('backgroundImage'),
-                            brightness: scrolling.number('brightness', 1),
-                            opacity: scrolling.number('opacity', 1),
-                            borderColor: scrolling.text('borderColor'),
-                            borderWidth: scrolling.number('borderWidth'),
-                            radius: scrolling.number('radius'),
-                            playback: scrolling.text('playback', 'running'),
-                          ),
-                        ),
                       if (!store.live || preview('products'))
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
@@ -378,213 +590,14 @@ class HomeContent extends StatelessWidget {
                             ),
                           ),
                         ),
-                      const SizedBox(height: 22),
-                      HeroCarousel(
-                        entries: carousel,
-                        reverse:
-                            carousel.isNotEmpty &&
-                            carousel.first.text('direction', 'rtl') == 'ltr',
-                        speed: carousel.isEmpty
-                            ? 600
-                            : carousel.first.number('speed', 600),
-                        onTap: (target) => preview('promotions')
-                            ? onLocation()
-                            : onPromotion(target),
-                      ),
-                      Wrap(
-                        spacing: 24,
-                        runSpacing: 12,
-                        children: const [
-                          _Benefit(
-                            icon: Icons.storefront_outlined,
-                            label: 'Discover local shops',
-                          ),
-                          _Benefit(
-                            icon: Icons.location_on_outlined,
-                            label: 'Prices for your area',
-                          ),
-                          _Benefit(
-                            icon: Icons.handyman_outlined,
-                            label: 'Everyday services',
-                          ),
-                        ],
-                      ),
-                      if (sectionVisible(categoryAppearance))
-                        HomeSectionHeading(
-                          key: categoriesKey,
-                          title: 'Find your everyday',
-                          subtitle: 'A little of everything, right around the corner.',
-                          appearance: categoryAppearance,
-                        ),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            HomeCategoryTile(
-                              entry: const Entry('all', {
-                                'name': 'Explore all',
-                              }),
-                              selected: category.isEmpty,
-                              onTap: () => onCategory(''),
-                              index: 0,
-                            ),
-                            for (final (index, c) in categories.indexed)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 10),
-                                child: HomeCategoryTile(
-                                  entry: c,
-                                  selected: category == c.id,
-                                  onTap: () => onCategory(c.id),
-                                  index: index + 1,
-                                  appearance: categoryAppearance,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                HomeSectionHeading(
-                                  key: productsKey,
-                                  title: filtered
-                                      ? 'Your local finds'
-                                      : 'Featured products',
-                                  subtitle: filtered
-                                      ? '${featured.length} matching finds'
-                                      : 'Everyday essentials. A few new favourites.',
-                                  action: filtered
-                                      ? () {
-                                          search.clear();
-                                          onCategory('');
-                                        }
-                                      : null,
-                                  actionLabel: 'Reset',
-                                  appearance: productAppearance,
-                                ),
-                                if (filtered)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        for (final item in [
-                                          ('all', 'Everything'),
-                                          ('product', 'Products'),
-                                          ('service', 'Services'),
-                                        ])
-                                          ChoiceChip(
-                                            label: Text(item.$2),
-                                            selected: mode == item.$1,
-                                            onSelected: (_) => onMode(item.$1),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                if (featured.isEmpty)
-                                  const _Empty(
-                                    text: 'No matching finds yet. Try another search or category.',
-                                  )
-                                else
-                                  HomeProductGrid(
-                                    entries: featured,
-                                    itemBuilder: product,
-                                  ),
-                                if (!filtered) ...[
-                                  HomeSectionHeading(
-                                    title: 'Nearby shops',
-                                    subtitle: located
-                                        ? 'Shops serving your selected location.'
-                                        : 'Set your location to discover shops near you.',
-                                    action: located ? onShops : onLocation,
-                                    actionLabel: located
-                                        ? 'View all'
-                                        : 'Locate me',
-                                  ),
-                                  if (shops.isEmpty)
-                                    const _Empty(
-                                      text: 'No shops found for this location yet. Try another pincode.',
-                                    )
-                                  else
-                                    SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          for (final shop in shops.take(8))
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 12,
-                                              ),
-                                              child: HomeShopTile(
-                                                entry: shop,
-                                                preview: preview('shops'),
-                                                onTap: preview('shops')
-                                                    ? null
-                                                    : () => onShop(shop),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  HomeSectionHeading(
-                                    title: 'A helping hand at home',
-                                    subtitle: 'Plumbing, electrical work and more, from local professionals.',
-                                    action: () => onMode('service'),
-                                  ),
-                                  if (services.isEmpty)
-                                    const _Empty(
-                                      text: 'Local services will appear here as they become available.',
-                                    )
-                                  else
-                                    HomeProductGrid(
-                                      entries: services,
-                                      itemBuilder: product,
-                                    ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (wide && ads.isNotEmpty) ...[
-                            const SizedBox(width: 24),
-                            SizedBox(
-                              width: adWidth,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const HomeSectionHeading(
-                                    title: 'Local spotlight',
-                                    subtitle: 'More from your neighbourhood.',
-                                  ),
-                                  for (final ad in ads)
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: clampedNumber(
-                                          ad,
-                                          'spacing',
-                                          16,
-                                          0,
-                                          80,
-                                        ),
-                                      ),
-                                      child: SizedBox(
-                                        width: ad
-                                            .number('width', 260)
-                                            .clamp(180, adWidth),
-                                        child: promotion(ad),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      for (final key in [...reorderableHomeSections]
+                        ..sort(
+                          (a, b) => sectionOrder(
+                            settings,
+                            a,
+                          ).compareTo(sectionOrder(settings, b)),
+                        ))
+                        orderedSections[key]!,
                       if (!filtered) ...[
                         HomeSectionHeading(
                           title: 'Best offers',

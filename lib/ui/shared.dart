@@ -32,6 +32,25 @@ bool sectionVisible(Entry config) =>
     config.id.isEmpty ||
     (config.data['visible'] != 'false' && config.data['visible'] != false);
 
+/// Home page sections an administrator can drag into a different top-down
+/// order from the Page view preview. These are layout-component keys (the
+/// same ones `layoutComponents`/`layoutFor` in layout_settings.dart use, and
+/// what `WireframeHome` actually renders) rather than content-collection
+/// names, so an 'order' written here is read by the real customer page.
+const reorderableHomeSections = ['notice', 'promo', 'categories', 'popular'];
+
+const _defaultSectionOrder = {
+  'notice': 10.0,
+  'promo': 20.0,
+  'categories': 30.0,
+  'popular': 40.0,
+};
+
+double sectionOrder(List<Entry> settings, String section) {
+  final stored = sectionConfig(settings, section).number('order', -1);
+  return stored >= 0 ? stored : (_defaultSectionOrder[section] ?? 999);
+}
+
 TextStyle sectionTextStyle(
   Entry config, {
   double fontSize = 14,

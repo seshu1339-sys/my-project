@@ -23,7 +23,7 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
-      final narrow = width < 680;
+      final narrow = width < 820;
       // Below the breakpoint the 4 navigation buttons collapse into one menu; above it
       // they stay a plain row of labelled buttons. Either way nothing may overflow.
       expect(find.byTooltip('More'), narrow ? findsOneWidget : findsNothing);

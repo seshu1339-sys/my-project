@@ -355,6 +355,7 @@ class VendorModerationPage extends StatelessWidget {
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorApplications').where('status', isEqualTo: 'pending').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Vendor applications could not load.')),
               for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc),
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending applications.')),
             ]),
@@ -364,6 +365,7 @@ class VendorModerationPage extends StatelessWidget {
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorApplications').where('status', isEqualTo: 'payment_submitted').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Vendor fee payments could not load.')),
               for (final doc in snapshot.data?.docs ?? const []) Card(child: ListTile(
                 title: Text(doc.data()['name']?.toString() ?? doc.id),
                 subtitle: Text('Amount: ${doc.data()['feeAmount']} • Reference: ${doc.data()['paymentReference']}'),
@@ -392,6 +394,7 @@ class VendorModerationPage extends StatelessWidget {
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorShopPhotos').where('status', isEqualTo: 'pending').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Pending shop photos could not load.')),
               for (final doc in snapshot.data?.docs ?? const []) _shopPhotoTile(context, doc),
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending shop photos.')),
             ]),
@@ -401,6 +404,7 @@ class VendorModerationPage extends StatelessWidget {
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorChanges').where('status', isEqualTo: 'pending').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Pending changes could not load.')),
               for (final doc in snapshot.data?.docs ?? const []) _changeTile(context, doc),
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending changes.')),
             ]),
@@ -644,6 +648,220 @@ class ComplaintModerationPage extends StatelessWidget {
 
 class _AdminPageState extends State<AdminPage> {
   String section = 'products';
+  bool pageView = false;
+
+  // Sections that correspond to something the customer actually sees on the
+  // page, in roughly the order it appears there. Anything not listed here
+  // (business profile, theme, section customization, the image library) has
+  // no single on-page spot to click, so it only lives behind the gear menu.
+  static const _onPageSections = ['scrollingText', 'categories', 'products', 'promotions', 'shops'];
+
+  static const _resizeStep = 40.0;
+  static const _maxSectionHeight = 1200.0;
+
+  // The content section an admin taps into (e.g. 'products', the Firestore
+  // collection) is a different key from the layout component that actually
+  // controls that section's on-page size (e.g. 'popular', what WireframeHome
+  // reads via layoutFor). Resize/reorder always act on the layout key.
+  Future<void> _setSectionHeight(String layoutKey, double height) async {
+    final saved = sectionConfig(widget.store.entries('settings'), layoutKey);
+    await widget.store.save(
+      'settings',
+      Entry('section_$layoutKey', {...saved.data, 'height': height}),
+    );
+  }
+
+  Widget _pagePreviewBlock(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String targetSection,
+    String? layoutKey,
+    int? reorderIndex,
+    bool resizable = false,
+  }) {
+    final resizeKey = layoutKey ?? targetSection;
+    final height = resizable
+        ? sectionConfig(widget.store.entries('settings'), resizeKey).number('height', 0)
+        : 0.0;
+    return Card(
+      key: ValueKey(targetSection),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() {
+              section = targetSection;
+              pageView = false;
+            }),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  if (reorderIndex != null)
+                    ReorderableDragStartListener(
+                      index: reorderIndex,
+                      child: const Padding(
+                        padding: EdgeInsets.only(right: 12),
+                        child: Icon(Icons.drag_indicator),
+                      ),
+                    ),
+                  Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Chip(
+                    avatar: const Icon(Icons.edit_outlined, size: 16),
+                    label: Text(adminSections[targetSection] ?? targetSection, style: const TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (resizable)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.height, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    height <= 0 ? 'Height: automatic' : 'Height: ${height.round()}px',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Decrease size',
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: height <= 0
+                        ? null
+                        : () => _setSectionHeight(resizeKey, (height - _resizeStep).clamp(0, _maxSectionHeight)),
+                  ),
+                  IconButton(
+                    tooltip: 'Increase size',
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => _setSectionHeight(
+                      resizeKey,
+                      ((height <= 0 ? 200 : height) + _resizeStep).clamp(0, _maxSectionHeight),
+                    ),
+                  ),
+                  if (height > 0)
+                    IconButton(
+                      tooltip: 'Reset to automatic size',
+                      icon: const Icon(Icons.settings_backup_restore),
+                      onPressed: () => _setSectionHeight(resizeKey, 0),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reorderSections(int oldIndex, int newIndex) async {
+    final settings = widget.store.entries('settings');
+    final keys = [...reorderableHomeSections]
+      ..sort((a, b) => sectionOrder(settings, a).compareTo(sectionOrder(settings, b)));
+    final moved = keys.removeAt(oldIndex);
+    keys.insert(newIndex, moved);
+    for (final (index, key) in keys.indexed) {
+      final saved = sectionConfig(settings, key);
+      await widget.store.save(
+        'settings',
+        Entry('section_$key', {...saved.data, 'order': (index + 1) * 10.0}),
+      );
+    }
+  }
+
+  Widget _pagePreview(BuildContext context) {
+    final settings = widget.store.entries('settings');
+    final ticker = settings.where((e) => e.id == 'scrollingText').firstOrNull;
+    final categories = widget.store.entries('categories');
+    final products = widget.store.entries('products');
+    final promotions = widget.store.entries('promotions');
+    final shops = widget.store.entries('shops');
+    // Layout key (what WireframeHome/order actually reads) -> the content
+    // section that block opens when tapped, plus its preview title/subtitle.
+    final blockContent = <String, (String, String, String, IconData)>{
+      'notice': (
+        'scrollingText',
+        'Scrolling notice / ticker',
+        (ticker?.text('text') ?? '').isEmpty ? 'No scrolling text set yet.' : ticker!.text('text'),
+        Icons.campaign_outlined,
+      ),
+      'categories': (
+        'categories',
+        'Categories',
+        categories.isEmpty ? 'No categories yet.' : categories.take(5).map((c) => c.text('name', c.id)).join(', '),
+        Icons.grid_view_outlined,
+      ),
+      'popular': (
+        'products',
+        'Products & services',
+        '${products.length} item(s) — ${products.take(3).map((p) => p.text('name', p.id)).join(', ')}',
+        Icons.shopping_bag_outlined,
+      ),
+      'promo': (
+        'promotions',
+        'Promotions (banner carousel)',
+        promotions.isEmpty ? 'No promotions yet.' : '${promotions.length} entr${promotions.length == 1 ? 'y' : 'ies'}',
+        Icons.local_offer_outlined,
+      ),
+    };
+    final orderedKeys = [...reorderableHomeSections]
+      ..sort((a, b) => sectionOrder(settings, a).compareTo(sectionOrder(settings, b)));
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const Text(
+          'This mirrors what customers see on the site. Tap any section to edit it directly. '
+          'Drag the handle to reorder a section top-to-bottom, use + / − to resize it. '
+          'Anything not shown here (business profile, theme, section sizing) is under the gear icon above.',
+        ),
+        const SizedBox(height: 16),
+        ReorderableListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          onReorderItem: (oldIndex, newIndex) => _reorderSections(oldIndex, newIndex),
+          children: [
+            for (final (index, key) in orderedKeys.indexed)
+              _pagePreviewBlock(
+                context,
+                title: blockContent[key]!.$2,
+                subtitle: blockContent[key]!.$3,
+                icon: blockContent[key]!.$4,
+                targetSection: blockContent[key]!.$1,
+                layoutKey: key,
+                reorderIndex: index,
+                resizable: true,
+              ),
+          ],
+        ),
+        _pagePreviewBlock(
+          context,
+          title: 'Shops',
+          subtitle: shops.isEmpty
+              ? 'No shops yet.'
+              : '${shops.take(3).map((s) => s.text('name', s.id)).join(', ')} — always shown inside Products on the site',
+          icon: Icons.storefront_outlined,
+          targetSection: 'shops',
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.store,
@@ -682,13 +900,32 @@ class _AdminPageState extends State<AdminPage> {
         'Insights': (Icons.insights, (_) => AdminInsightsPage(store: widget.store)),
       };
       void openNav(String label) => Navigator.push(context, MaterialPageRoute<void>(builder: navTargets[label]!.$2));
-      // Below ~680px, 5 AppBar actions in a row would overflow; collapse the four navigation
+      // Below ~820px, the AppBar actions (page view toggle, other-settings menu, layout
+      // settings, sign out, plus 4 nav buttons) would overflow; collapse the four navigation
       // buttons into one menu there and keep today's full row on wider screens.
-      final narrow = MediaQuery.sizeOf(context).width < 680;
+      final narrow = MediaQuery.sizeOf(context).width < 820;
       return Scaffold(
         appBar: AppBar(
           title: const Text('Business studio'),
           actions: [
+            IconButton(
+              tooltip: pageView ? 'Switch to list view' : 'Switch to page view (click a section to edit it)',
+              icon: Icon(pageView ? Icons.list_alt_outlined : Icons.view_agenda_outlined),
+              onPressed: () => setState(() => pageView = !pageView),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Other settings (not shown on the page)',
+              icon: const Icon(Icons.settings_outlined),
+              onSelected: (value) => setState(() {
+                section = value;
+                pageView = false;
+              }),
+              itemBuilder: (context) => [
+                for (final key in adminSections.keys)
+                  if (!_onPageSections.contains(key))
+                    PopupMenuItem(value: key, child: Text(adminSections[key]!)),
+              ],
+            ),
             IconButton(
               tooltip: 'UI Customization / Layout Settings',
               icon: const Icon(Icons.dashboard_customize_outlined),
@@ -699,6 +936,12 @@ class _AdminPageState extends State<AdminPage> {
                 ),
               ),
             ),
+            if (widget.store.live)
+              TextButton.icon(
+                onPressed: widget.store.logout,
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign out'),
+              ),
             if (narrow)
               PopupMenuButton<String>(
                 tooltip: 'More',
@@ -713,7 +956,7 @@ class _AdminPageState extends State<AdminPage> {
                 TextButton.icon(onPressed: () => openNav(label), icon: Icon(navTargets[label]!.$1), label: Text(label)),
           ],
         ),
-        body: Column(
+        body: pageView ? _pagePreview(context) : Column(
           children: [
             if (!widget.store.live)
               Container(
@@ -1223,12 +1466,24 @@ class _EntryEditorState extends State<EntryEditor> {
               .toList();
     }
     if (options != null) {
+      // A DropdownButtonFormField crashes with an assertion error unless its
+      // initialValue is either null or matches exactly one item's value, and
+      // duplicate item values trip the same assertion. Stored data can drift
+      // out of sync with this fixed options list (a blank/never-set field, an
+      // old value no longer offered, or — for categoryId/parentId/shopId,
+      // whose items come from live store data — a stray duplicate id), so
+      // both are normalized defensively rather than trusted as already valid.
+      final uniqueOptions = <String, DropdownMenuItem<String>>{
+        for (final option in options) (option.value ?? ''): option,
+      }.values.toList();
+      final storedValue = controllers[key]?.text ?? '';
+      final initialValue = uniqueOptions.any((e) => e.value == storedValue)
+          ? storedValue
+          : null;
       return DropdownButtonFormField<String>(
-        initialValue: options.any((e) => e.value == controllers[key]!.text)
-            ? controllers[key]!.text
-            : '',
+        initialValue: initialValue,
         decoration: InputDecoration(labelText: label),
-        items: options,
+        items: uniqueOptions,
         onChanged: (v) => controllers[key]!.text = v ?? '',
         validator: (v) =>
             ['categoryId', 'shopId'].contains(key) && (v ?? '').isEmpty
