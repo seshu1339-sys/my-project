@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/search.dart';
+import '../services/strings.dart';
 import 'details.dart';
 import 'home_promotions.dart';
 import 'home_widgets.dart';
@@ -174,9 +175,9 @@ class WireframeHome extends StatelessWidget {
                   onAssistedSearch: onAssistedSearch,
                 ),
                 if (!store.live)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text('Demo marketplace • explore the experience'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Demo marketplace • explore the experience'.tr(context)),
                   ),
                 if (store.error.isNotEmpty)
                   Text(
@@ -299,13 +300,13 @@ class WireframeHome extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             HomeSectionHeading(
-                              title: 'Categories',
-                              subtitle: 'Browse your everyday essentials',
+                              title: 'Categories'.tr(context),
+                              subtitle: 'Browse your everyday essentials'.tr(context),
                               appearance: categoryLayout.entry,
                             ),
                             if (categories.isEmpty)
-                              const Text(
-                                'Categories will appear here when available.',
+                              Text(
+                                'Categories will appear here when available.'.tr(context),
                               ),
                             LayoutBuilder(
                               builder: (context, grid) {
@@ -355,19 +356,20 @@ class WireframeHome extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             HomeSectionHeading(
-                              title: search.text.isEmpty
-                                  ? 'Popular Products'
-                                  : 'Search results',
+                              title: (search.text.isEmpty
+                                      ? 'Popular Products'
+                                      : 'Search results')
+                                  .tr(context),
                               subtitle: search.text.isEmpty
-                                  ? 'Products and services from your neighbourhood'
-                                  : '${products.length} matching items',
+                                  ? 'Products and services from your neighbourhood'.tr(context)
+                                  : '{count} matching items'.tr(context, {'count': '${products.length}'}),
                               appearance: sectionConfig(settings, 'popular'),
                             ),
                             if (products.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(24),
+                              Padding(
+                                padding: const EdgeInsets.all(24),
                                 child: Text(
-                                  'No matching products. Try another search.',
+                                  'No matching products. Try another search.'.tr(context),
                                 ),
                               ),
                             if (productLayout.visible)
@@ -411,14 +413,16 @@ class WireframeHome extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               HomeSectionHeading(
-                                title: 'Nearby shops',
-                                subtitle: located
-                                    ? 'Shops serving your selected location'
-                                    : 'Choose a location or browse available shops',
+                                title: 'Nearby shops'.tr(context),
+                                subtitle: (located
+                                        ? 'Shops serving your selected location'
+                                        : 'Choose a location or browse available shops')
+                                    .tr(context),
                                 action: onLocation,
-                                actionLabel: located
-                                    ? 'Change location'
-                                    : 'Set location',
+                                actionLabel: (located
+                                        ? 'Change location'
+                                        : 'Set location')
+                                    .tr(context),
                                 appearance: nearby.entry,
                               ),
                               if (shops.isNotEmpty && located)
@@ -439,8 +443,8 @@ class WireframeHome extends StatelessWidget {
                                   ),
                                 ),
                               if (shops.isEmpty)
-                                const Text(
-                                  'No nearby shops found. You can change your pincode without enabling GPS.',
+                                Text(
+                                  'No nearby shops found. You can change your pincode without enabling GPS.'.tr(context),
                                 ),
                               for (final shop in shops)
                                 ListTile(

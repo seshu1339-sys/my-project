@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
 import '../services/analytics.dart';
+import '../services/strings.dart';
 import 'shared.dart';
 import 'home_hero_slide.dart';
 import 'layout_settings.dart';
@@ -95,9 +96,10 @@ class PromoCard extends StatelessWidget {
                   if (entry.text('imageUrl').isNotEmpty)
                     ProductArt(entry, height: 100),
                   Text(
-                    entry.text('placement') == 'ad'
-                        ? 'NEIGHBOURHOOD SPOTLIGHT'
-                        : 'CURATED FOR YOU',
+                    (entry.text('placement') == 'ad'
+                            ? 'NEIGHBOURHOOD SPOTLIGHT'
+                            : 'CURATED FOR YOU')
+                        .tr(context),
                     style: TextStyle(
                       fontSize: clampedNumber(
                         entry,
@@ -326,7 +328,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
                 children: [
                   for (var i = 0; i < pageCount; i++)
                     IconButton(
-                      tooltip: 'Show promotion ${i + 1}',
+                      tooltip: 'Show promotion {n}'.tr(context, {'n': '${i + 1}'}),
                       onPressed: () => controller.animateToPage(
                         i,
                         duration: const Duration(milliseconds: 400),
@@ -537,7 +539,7 @@ class _TickerStripState extends State<TickerStrip>
                 top: 0,
                 bottom: 0,
                 child: IconButton(
-                  tooltip: paused ? 'Resume notice' : 'Pause notice',
+                  tooltip: (paused ? 'Resume notice' : 'Pause notice').tr(context),
                   onPressed: () {
                     setState(() {
                       paused = !paused;
@@ -754,9 +756,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
                     right: 0,
                     top: 0,
                     child: IconButton(
-                      tooltip: paused
-                          ? 'Resume advertisement'
-                          : 'Pause advertisement',
+                      tooltip: (paused ? 'Resume advertisement' : 'Pause advertisement').tr(context),
                       onPressed: () => setState(() {
                         paused = !paused;
                         if (paused) {

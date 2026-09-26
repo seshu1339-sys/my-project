@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import '../services/strings.dart';
 import 'shared.dart';
 import 'layout_settings.dart';
 
@@ -245,7 +246,9 @@ class HomeProductTile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          preview ? 'PREVIEW' : '$discount% OFF',
+                          preview
+                              ? 'PREVIEW'.tr(context)
+                              : '{percent}% OFF'.tr(context, {'percent': '$discount'}),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -258,9 +261,10 @@ class HomeProductTile extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                entry.text('kind') == 'service'
-                    ? 'LOCAL EXPERT'
-                    : 'EVERYDAY PICK',
+                (entry.text('kind') == 'service'
+                        ? 'LOCAL EXPERT'
+                        : 'EVERYDAY PICK')
+                    .tr(context),
                 style: const TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
@@ -303,7 +307,9 @@ class HomeProductTile extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          entry.text('unit', 'each'),
+                          entry.data['unit'] == null
+                              ? 'each'.tr(context)
+                              : entry.text('unit'),
                           maxLines: 1,
                           style: const TextStyle(
                             fontSize: 11,
@@ -314,7 +320,7 @@ class HomeProductTile extends StatelessWidget {
                     ),
                   ),
                   IconButton.filledTonal(
-                    tooltip: 'Add ${entry.text('name')} to bag',
+                    tooltip: 'Add {name} to bag'.tr(context, {'name': entry.text('name')}),
                     onPressed: onAdd,
                     icon: Icon(
                       Icons.add,
@@ -415,8 +421,10 @@ class HomeShopTile extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 preview
-                    ? 'Sample shop • coming soon'
-                    : entry.text('address', 'Explore this local shop'),
+                    ? 'Sample shop • coming soon'.tr(context)
+                    : (entry.data['address'] == null
+                          ? 'Explore this local shop'.tr(context)
+                          : entry.text('address')),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.black54, fontSize: 12),
@@ -432,7 +440,7 @@ class HomeShopTile extends StatelessWidget {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      preview ? 'Preview' : 'Explore shop',
+                      (preview ? 'Preview' : 'Explore shop').tr(context),
                       style: const TextStyle(
                         color: Color(0xff176b50),
                         fontWeight: FontWeight.w600,

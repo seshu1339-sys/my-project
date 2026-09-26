@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/localization.dart';
+import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 
@@ -29,7 +30,7 @@ class ResponsiveHeader extends StatelessWidget {
   Future<void> office(BuildContext context) => showDialog<void>(
     context: context,
     builder: (dialog) => AlertDialog(
-      title: const Text('Office / Head Office'),
+      title: Text('Office / Head Office'.tr(dialog)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -50,7 +51,7 @@ class ResponsiveHeader extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialog),
-          child: const Text('Close'),
+          child: Text('Close'.tr(dialog)),
         ),
       ],
     ),
@@ -99,12 +100,12 @@ class ResponsiveHeader extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               IconButton(
-                tooltip: 'Your account',
+                tooltip: 'Your account'.tr(context),
                 onPressed: onAccount,
                 icon: const Icon(Icons.person_outline),
               ),
               IconButton(
-                tooltip: 'Shopping bag',
+                tooltip: 'Shopping bag'.tr(context),
                 onPressed: onCart,
                 icon: Badge(
                   isLabelVisible: store.count > 0,
@@ -113,12 +114,12 @@ class ResponsiveHeader extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: 'Settings',
+                tooltip: 'Settings'.tr(context),
                 onPressed: onAccount,
                 icon: const Icon(Icons.settings_outlined),
               ),
               PopupMenuButton<String>(
-                tooltip: 'Language',
+                tooltip: 'Language'.tr(context),
                 icon: const Icon(Icons.language),
                 onSelected: (value) async {
                   try {
@@ -188,14 +189,14 @@ class ResponsiveHeader extends StatelessWidget {
                         children: [
                           Text(
                             store.profileName.isEmpty
-                                ? 'Welcome'
+                                ? 'Welcome'.tr(context)
                                 : store.profileName,
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           Text(
                             store.address.isEmpty
                                 ? (store.pincode.isEmpty
-                                      ? 'Choose your location'
+                                      ? 'Choose your location'.tr(context)
                                       : store.pincode)
                                 : '${store.address} ${store.pincode}',
                           ),
@@ -206,9 +207,10 @@ class ResponsiveHeader extends StatelessWidget {
                               size: 18,
                             ),
                             label: Text(
-                              store.pincode.isEmpty && store.latitude == null
-                                  ? 'Set location'
-                                  : 'Change location',
+                              (store.pincode.isEmpty && store.latitude == null
+                                      ? 'Set location'
+                                      : 'Change location')
+                                  .tr(context),
                             ),
                           ),
                         ],
@@ -273,7 +275,7 @@ class ResponsiveHeader extends StatelessWidget {
                                   size: services.n('iconSize', 24, 16, 48),
                                 ),
                                 Text(
-                                  'Services',
+                                  'Services'.tr(context),
                                   style: sectionTextStyle(
                                     services.styled(context),
                                   ),
@@ -292,19 +294,18 @@ class ResponsiveHeader extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text(
-                                  'Office / Head Office',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
+                                Text(
+                                  'Office / Head Office'.tr(context),
+                                  style: const TextStyle(fontWeight: FontWeight.w700),
                                 ),
                                 Text(
-                                  store.business.text(
-                                    'address',
-                                    'Contact our office',
-                                  ),
+                                  store.business.text('address').isEmpty
+                                      ? 'Contact our office'.tr(context)
+                                      : store.business.text('address'),
                                 ),
                                 TextButton(
                                   onPressed: () => office(context),
-                                  child: const Text('Contact details'),
+                                  child: Text('Contact details'.tr(context)),
                                 ),
                               ],
                             ),
@@ -381,7 +382,7 @@ class ResponsiveSearchBox extends StatelessWidget {
           ),
           child: Row(
             children: [
-              icon('Search products', Icons.search, 'iconSize', onChanged),
+              icon('Search products'.tr(context), Icons.search, 'iconSize', onChanged),
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -389,8 +390,8 @@ class ResponsiveSearchBox extends StatelessWidget {
                   onSubmitted: (_) => onChanged(),
                   style: sectionTextStyle(layout.styled(context))
                       .copyWith(fontSize: font),
-                  decoration: const InputDecoration(
-                    hintText: 'Search products',
+                  decoration: InputDecoration(
+                    hintText: 'Search products'.tr(context),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -401,14 +402,14 @@ class ResponsiveSearchBox extends StatelessWidget {
               ),
               SizedBox(width: gap),
               icon(
-                'Voice search',
+                'Voice search'.tr(context),
                 Icons.mic_none,
                 'voiceIconSize',
                 () => onAssistedSearch(false),
               ),
               SizedBox(width: gap),
               icon(
-                'Camera search',
+                'Camera search'.tr(context),
                 Icons.camera_alt_outlined,
                 'imageIconSize',
                 () => onAssistedSearch(true),
@@ -443,7 +444,7 @@ class ContactActions extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: () => launch(context, Uri(scheme: 'tel', path: phone)),
           icon: const Icon(Icons.call_outlined),
-          label: const Text('Call'),
+          label: Text('Call'.tr(context)),
         ),
       if (whatsapp.isNotEmpty || phone.isNotEmpty)
         OutlinedButton.icon(
