@@ -41,9 +41,15 @@ class ResponsiveHeader extends StatelessWidget {
               Text(store.business.text('description')),
             const SizedBox(height: 16),
             SelectableText(store.business.text('phone')),
+            if (store.business.text('supportEmail').isNotEmpty)
+              SelectableText(store.business.text('supportEmail')),
+            if (store.business.text('websiteUrl').isNotEmpty)
+              SelectableText(store.business.text('websiteUrl')),
             ContactActions(
               phone: store.business.text('phone'),
               whatsapp: store.business.text('whatsapp'),
+              email: store.business.text('supportEmail'),
+              website: store.business.text('websiteUrl'),
             ),
           ],
         ),
@@ -423,8 +429,14 @@ class ResponsiveSearchBox extends StatelessWidget {
 }
 
 class ContactActions extends StatelessWidget {
-  const ContactActions({super.key, required this.phone, this.whatsapp = ''});
-  final String phone, whatsapp;
+  const ContactActions({
+    super.key,
+    required this.phone,
+    this.whatsapp = '',
+    this.email = '',
+    this.website = '',
+  });
+  final String phone, whatsapp, email, website;
   Future<void> launch(BuildContext context, Uri uri) async {
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
@@ -457,6 +469,18 @@ class ContactActions extends StatelessWidget {
           ),
           icon: const Icon(Icons.chat_outlined),
           label: const Text('WhatsApp'),
+        ),
+      if (email.isNotEmpty)
+        OutlinedButton.icon(
+          onPressed: () => launch(context, Uri(scheme: 'mailto', path: email)),
+          icon: const Icon(Icons.email_outlined),
+          label: const Text('Email'),
+        ),
+      if (website.isNotEmpty)
+        OutlinedButton.icon(
+          onPressed: () => launch(context, Uri.parse(website)),
+          icon: const Icon(Icons.public_outlined),
+          label: const Text('Website'),
         ),
     ],
   );

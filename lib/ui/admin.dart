@@ -9,7 +9,21 @@ import '../domain/catalog.dart';
 import 'shared.dart';
 import 'layout_editor.dart';
 import 'admin_insights.dart';
+import 'geo_target_picker.dart';
 import 'shop_map.dart';
+
+String _promotionAreaLabel(Entry promotion) {
+  final shape = promotion.text('geoShape', 'circle');
+  if (shape == 'rectangle') {
+    return parseRectangleField(promotion.data['targetRectangle']) != null ? 'Rectangle area' : 'No area targeting';
+  }
+  if (shape == 'polygon') {
+    return parsePolygonField(promotion.data['targetPolygon']) != null ? 'Polygon area' : 'No area targeting';
+  }
+  return (promotion.number('targetLatitude') != 0 || promotion.number('targetLongitude') != 0)
+      ? 'Circle area'
+      : 'No area targeting';
+}
 
 const adminSections = <String, String>{
   'products': 'Products & services',
@@ -71,6 +85,11 @@ const fields = <String, Map<String, String>>{
     'placement': 'Display location',
     'notifySubscribers': 'Push notification to subscribers',
     'target': 'Click action (shops / category:ID / product:ID / https://…)',
+    'targetPincode': 'Show only in this pincode (optional — blank shows everywhere)',
+    'targetLatitude': 'Show only near this latitude (optional, pairs with radius)',
+    'targetLongitude': 'Show only near this longitude (optional, pairs with radius)',
+    'targetRadiusKm': 'Radius around that point, km (default 10 if latitude/longitude set)',
+    'geoTargetArea': 'Target area (circle / rectangle / polygon)',
     'imageUrl': 'Image URL',
     'width': 'Width (0 = automatic, up to 3840 px)',
     'height': 'Height (120-1200 px)',
@@ -103,6 +122,8 @@ const fields = <String, Map<String, String>>{
     'address': 'Business address',
     'phone': 'Phone',
     'whatsapp': 'WhatsApp number (country code included)',
+    'supportEmail': 'Public support email (shown to everyone — never your personal inbox)',
+    'websiteUrl': 'Website URL',
     'description': 'Office / head office details',
     'imageUrl': 'Logo URL',
     'radiusKm': 'Default nearby radius (km)',
@@ -1034,7 +1055,8 @@ class _AdminPageState extends State<AdminPage> {
                             ),
                             title: Text(e.text('name')),
                             subtitle: Text(
-                              '${e.id} • ${e.active ? 'Published' : 'Hidden'} • Order ${e.number('order').toInt()}',
+                              '${e.id} • ${e.active ? 'Published' : 'Hidden'} • Order ${e.number('order').toInt()}'
+                              '${section == 'promotions' ? ' • ${_promotionAreaLabel(e)}' : ''}',
                             ),
                             trailing: Wrap(
                               spacing: 2,
@@ -1134,6 +1156,12 @@ class _EntryEditorState extends State<EntryEditor> {
   final form = GlobalKey<FormState>();
   late final Map<String, TextEditingController> controllers;
   bool active = true, busy = false;
+  // Set only once the geo-target picker is actually used this session; null
+  // means "leave whatever shape data this promotion already has untouched"
+  // (the spread in save() below already carries that forward).
+  String? pickedShape;
+  Map<String, double>? pickedRectangle;
+  List<Map<String, double>>? pickedPolygon;
   final numeric = {
     'price',
     'compareAtPrice',
@@ -1142,6 +1170,9 @@ class _EntryEditorState extends State<EntryEditor> {
     'latitude',
     'longitude',
     'radiusKm',
+    'targetLatitude',
+    'targetLongitude',
+    'targetRadiusKm',
     'searchRadiusDefaultKm',
     'searchRadiusMaxKm',
     'deliveryFee',
@@ -1186,6 +1217,8 @@ class _EntryEditorState extends State<EntryEditor> {
                       'searchRadiusPresetsKm': '2,5,10,25,50',
                       'searchRadiusDefaultKm': '10',
                       'searchRadiusMaxKm': '50',
+                      'supportEmail': 'info@locamarket.in',
+                      'websiteUrl': 'https://locamarket.in',
                       'kind': 'product',
                       'placement': 'carousel',
                       'width': '260',
@@ -1269,8 +1302,23 @@ class _EntryEditorState extends State<EntryEditor> {
               .split('\n')
               .where((l) => l.trim().isNotEmpty)
               .toList();
+        } else if (field.key == 'geoTargetArea') {
+          // Not a real Firestore field — handled below via pickedShape.
         } else {
           data[field.key] = value;
+        }
+      }
+      if (pickedShape != null) {
+        data['geoShape'] = pickedShape;
+        if (pickedShape == 'rectangle' && pickedRectangle != null) {
+          data['targetRectangle'] = pickedRectangle;
+        } else {
+          data.remove('targetRectangle');
+        }
+        if (pickedShape == 'polygon' && pickedPolygon != null) {
+          data['targetPolygon'] = pickedPolygon;
+        } else {
+          data.remove('targetPolygon');
         }
       }
       final start = DateTime.tryParse(data['startsAt']?.toString() ?? '');
@@ -1499,6 +1547,73 @@ class _EntryEditorState extends State<EntryEditor> {
             : null,
       );
     }
+    if (key == 'geoTargetArea') {
+      final entryData = widget.entry?.data;
+      final effectiveShape = pickedShape ?? entryData?['geoShape']?.toString() ?? 'circle';
+      final rectangle = pickedShape != null ? pickedRectangle : parseRectangleField(entryData?['targetRectangle']);
+      final polygon = pickedShape != null
+          ? pickedPolygon
+          : parsePolygonField(entryData?['targetPolygon'])?.map((p) => {'lat': p.$1, 'lng': p.$2}).toList();
+      final lat = double.tryParse(controllers['targetLatitude']?.text ?? '') ?? 0;
+      final lng = double.tryParse(controllers['targetLongitude']?.text ?? '') ?? 0;
+      final radius = double.tryParse(controllers['targetRadiusKm']?.text ?? '') ?? 0;
+      final summary = effectiveShape == 'rectangle'
+          ? (rectangle == null ? 'No rectangle drawn yet.' : 'Rectangle area set.')
+          : effectiveShape == 'polygon'
+          ? (polygon == null ? 'No polygon drawn yet.' : 'Polygon area set (${polygon.length} points).')
+          : (lat == 0 && lng == 0)
+          ? 'No location targeting yet (shows everywhere, or by pincode).'
+          : 'Circle: ${(radius > 0 ? radius : 10).round()} km around ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}.';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(summary),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final start = DateTime.tryParse(controllers['startsAt']?.text ?? '');
+              final end = DateTime.tryParse(controllers['endsAt']?.text ?? '');
+              final result = await Navigator.push<GeoTargetResult>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GeoTargetPicker(
+                    promotions: widget.store.entries('promotions'),
+                    excludeId: widget.entry?.id,
+                    windowStart: start,
+                    windowEnd: end,
+                    initialShape: effectiveShape,
+                    initialLatitude: lat,
+                    initialLongitude: lng,
+                    initialRadiusKm: radius,
+                    initialRectangle: rectangle,
+                    initialPolygon: polygon?.map((p) => (p['lat']!, p['lng']!)).toList(),
+                  ),
+                ),
+              );
+              if (result == null || !mounted) return;
+              setState(() {
+                pickedShape = result.shape;
+                pickedRectangle = result.rectangle;
+                pickedPolygon = result.polygon;
+                if (result.shape == 'circle') {
+                  controllers['targetLatitude']!.text = result.latitude.toString();
+                  controllers['targetLongitude']!.text = result.longitude.toString();
+                  controllers['targetRadiusKm']!.text = result.radiusKm.toString();
+                } else {
+                  controllers['targetLatitude']!.text = '0';
+                  controllers['targetLongitude']!.text = '0';
+                  controllers['targetRadiusKm']!.text = '0';
+                }
+              });
+            },
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('Choose area on map'),
+          ),
+        ],
+      );
+    }
     return TextFormField(
       controller: controllers[key],
       decoration: InputDecoration(
@@ -1567,11 +1682,15 @@ class _EntryEditorState extends State<EntryEditor> {
           if (n == null || !n.isFinite) {
             return 'Enter a valid number';
           }
-          if (!['latitude', 'longitude'].contains(key) && n < 0) {
+          if (!['latitude', 'longitude', 'targetLatitude', 'targetLongitude'].contains(key) && n < 0) {
             return 'Use zero or more';
           }
           if (key == 'latitude' && n.abs() > 90 ||
               key == 'longitude' && n.abs() > 180) {
+            return 'Outside coordinate range';
+          }
+          if (key == 'targetLatitude' && n.abs() > 90 ||
+              key == 'targetLongitude' && n.abs() > 180) {
             return 'Outside coordinate range';
           }
           if (key == 'stock' && n != n.round()) {
@@ -1586,10 +1705,19 @@ class _EntryEditorState extends State<EntryEditor> {
         if (key == 'pincode' && !RegExp(r'^\d{6}$').hasMatch(v)) {
           return 'Enter six digits';
         }
+        if (key == 'targetPincode' && v.isNotEmpty && !RegExp(r'^\d{6}$').hasMatch(v)) {
+          return 'Enter six digits';
+        }
         if (key == 'imageUrl' &&
             v.isNotEmpty &&
             Uri.tryParse(v)?.scheme != 'https') {
           return 'Use an HTTPS image URL';
+        }
+        if (key == 'websiteUrl' && v.isNotEmpty && Uri.tryParse(v)?.scheme != 'https') {
+          return 'Use an HTTPS website URL';
+        }
+        if (key == 'supportEmail' && v.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
+          return 'Enter a valid email address';
         }
         return null;
       },

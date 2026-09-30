@@ -169,7 +169,11 @@ class Store extends ChangeNotifier {
               /* Optional profile preferences must not block sign-in. */
             }
           }
-          await notifications.restore();
+          await notifications.restore(
+            pincode: pincode,
+            latitude: latitude,
+            longitude: longitude,
+          );
           notifyListeners();
         }),
       );
@@ -257,6 +261,9 @@ class Store extends ChangeNotifier {
     } else {
       await prefs.remove('latitude');
       await prefs.remove('longitude');
+    }
+    if (live) {
+      unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng));
     }
     notifyListeners();
   }

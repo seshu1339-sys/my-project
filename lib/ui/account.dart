@@ -297,7 +297,11 @@ class _AccountPageState extends State<AccountPage> {
                   onPressed: busy
                       ? null
                       : () => run(() async {
-                          await widget.store.notifications.enable();
+                          await widget.store.notifications.enable(
+                            pincode: widget.store.pincode,
+                            latitude: widget.store.latitude,
+                            longitude: widget.store.longitude,
+                          );
                           if (context.mounted) {
                             message(
                               context,

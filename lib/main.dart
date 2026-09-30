@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -16,6 +18,7 @@ import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
+import 'services/location.dart';
 import 'ui/shared.dart';
 import 'services/localization.dart';
 
@@ -68,6 +71,7 @@ Future<void> main() async {
   if (live) Analytics.start();
   runApp(MarketApp(store: store));
   if (live) {
+    unawaited(_refreshLocationOnOpen(store));
     FirebaseMessaging.onMessage.listen((message) {
       final notification = message.notification;
       if (notification != null) {
@@ -96,6 +100,23 @@ Future<void> main() async {
     } catch (_) {
       /* Unsupported messaging must not block the storefront. */
     }
+  }
+}
+
+// On every app open, refresh the customer's coordinates (never the manually
+// chosen pincode/address) so ads/offers and nearby search reflect where they
+// actually are right now. Never prompts for permission and never blocks
+// first paint; silently does nothing if permission was never granted.
+Future<void> _refreshLocationOnOpen(Store store) async {
+  await WidgetsBinding.instance.endOfFrame;
+  final position = await currentPositionIfPermitted();
+  if (position != null) {
+    await store.setLocation(
+      store.pincode,
+      store.address,
+      lat: position.latitude,
+      lng: position.longitude,
+    );
   }
 }
 

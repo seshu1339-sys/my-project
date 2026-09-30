@@ -45,6 +45,13 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(alice, 'users/alice/pushTokens/token'), {token: 'other', updatedAt: serverTimestamp()}));
     await assertSucceeds(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp()}));
     await assertFails(setDoc(doc(bob, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp()}));
+    // Optional last-known location, only ever written by the subscriber themselves.
+    await assertSucceeds(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), pincode: '560001', latitude: 12.9716, longitude: 77.5946}));
+    await assertFails(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), pincode: 'not-a-pincode'}));
+    await assertFails(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: 200}));
+    await assertFails(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), longitude: -200}));
+    await assertFails(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: '12.9'}));
+    await assertFails(setDoc(doc(bob, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: 12.9716, longitude: 77.5946}));
     await assertFails(setDoc(doc(alice, '_notificationDeliveries/fake'), {sent: true}));
     await assertFails(getDoc(doc(admin, '_pins/alice')));
     await assertFails(setDoc(doc(alice, 'orders/fake'), {userId: 'alice', total: 0}));

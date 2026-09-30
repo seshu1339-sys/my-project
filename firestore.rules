@@ -77,10 +77,17 @@ service cloud.firestore {
     }
     match /notificationSubscribers/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
+      // pincode/latitude/longitude are optional: only ever set for a customer
+      // who has already opted into push notifications, from the same
+      // last-known location already used client-side (never continuous
+      // background tracking).
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'pincode', 'latitude', 'longitude'])
         && request.resource.data.enabled is bool
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && (!('pincode' in request.resource.data) || (request.resource.data.pincode is string && request.resource.data.pincode.matches('^([0-9]{6})?$')))
+        && (!('latitude' in request.resource.data) || (request.resource.data.latitude is number && request.resource.data.latitude >= -90 && request.resource.data.latitude <= 90))
+        && (!('longitude' in request.resource.data) || (request.resource.data.longitude is number && request.resource.data.longitude >= -180 && request.resource.data.longitude <= 180));
     }
     match /products/{productId}/viewers/{uid} {
       allow read, delete: if signedIn() && request.auth.uid == uid;

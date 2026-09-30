@@ -34,3 +34,23 @@ Future<Position> currentPosition({String action = 'verify a purchase at the shop
     throw StateError('Your location could not be found in time. Move to an open area and try again.');
   }
 }
+
+/// A best-effort location refresh for app open: unlike [currentPosition],
+/// this never prompts for permission and never throws — it simply returns
+/// null unless permission was already granted and location services are on.
+/// This is what lets the app silently refresh "show only matching ads and
+/// offers nearby" on open, without an unexpected permission dialog.
+Future<Position?> currentPositionIfPermitted() async {
+  try {
+    if (!kIsWeb && !await Geolocator.isLocationServiceEnabled()) return null;
+    final permission = await Geolocator.checkPermission();
+    if (permission != LocationPermission.always && permission != LocationPermission.whileInUse) {
+      return null;
+    }
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 8)),
+    );
+  } catch (_) {
+    return null;
+  }
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
@@ -379,6 +380,174 @@ void main() {
     expect(store.business.text('searchRadiusPresetsKm'), '1,3,7');
     expect(store.business.number('searchRadiusDefaultKm'), 3);
     expect(store.business.number('searchRadiusMaxKm'), 7);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('picking a rectangle target area zeroes the old circle fields and saves the shape', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    const original = Entry('promo1', {
+      'name': 'Circle ad',
+      'placement': 'carousel',
+      'targetLatitude': 12.9,
+      'targetLongitude': 77.5,
+      'targetRadiusKm': 10,
+    });
+    await tester.pumpWidget(
+      MaterialApp(home: EntryEditor(store: store, collection: 'promotions', entry: original)),
+    );
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+
+    await tester.scrollUntilVisible(find.text('Choose area on map'), 300, scrollable: formScrollable);
+    expect(find.textContaining('Circle: 10 km'), findsOneWidget);
+    await tester.tap(find.text('Choose area on map'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Rectangle'));
+    await tester.pump();
+    final mapFinder = find.byType(FlutterMap);
+    final topLeft = tester.getTopLeft(mapFinder);
+    final mapSize = tester.getSize(mapFinder);
+    // flutter_map briefly holds a tap to see if it becomes a double-tap
+    // (zoom) gesture; the test must wait that out before the resulting
+    // onTap callback fires. The second point avoids the bottom-right corner,
+    // where the map's OpenStreetMap attribution control intercepts taps.
+    await tester.tapAt(topLeft + const Offset(20, 20));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tapAt(topLeft + Offset(mapSize.width - 20, mapSize.height / 2));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Use this area'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Rectangle area set'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    final saved = store.entries('promotions').firstWhere((e) => e.id == 'promo1');
+    expect(saved.data['geoShape'], 'rectangle');
+    expect(saved.data['targetRectangle'], isA<Map>());
+    expect(saved.number('targetLatitude'), 0);
+    expect(saved.number('targetLongitude'), 0);
+    expect(saved.number('targetRadiusKm'), 0);
+    expect(saved.data.containsKey('targetPolygon'), isFalse);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('editing an unrelated field on a shape-targeted promotion leaves its shape data untouched', (
+    tester,
+  ) async {
+    // Store.save() does a full, non-merge overwrite: this is the direct
+    // regression test for that hazard, proving EntryEditor's `{...?entry?.data}`
+    // spread really does carry forward geo-shape fields the picker was never
+    // reopened for.
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    const original = Entry('promo2', {
+      'name': 'Polygon ad',
+      'placement': 'carousel',
+      'geoShape': 'polygon',
+      'targetPolygon': [
+        {'lat': 12.90, 'lng': 77.50},
+        {'lat': 13.00, 'lng': 77.50},
+        {'lat': 12.95, 'lng': 77.70},
+      ],
+    });
+    await store.save('promotions', original);
+    await tester.pumpWidget(
+      MaterialApp(home: EntryEditor(store: store, collection: 'promotions', entry: original)),
+    );
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+
+    // Never touches "Choose area on map" — only an unrelated field changes.
+    await tester.enterText(find.widgetWithText(TextFormField, 'Headline / ticker text'), 'Polygon ad (updated)');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    final saved = store.entries('promotions').firstWhere((e) => e.id == 'promo2');
+    expect(saved.text('name'), 'Polygon ad (updated)');
+    expect(saved.data['geoShape'], 'polygon');
+    expect(parsePolygonField(saved.data['targetPolygon']), isNotNull);
+    expect(parsePolygonField(saved.data['targetPolygon'])!.length, 3);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('public support email and website save, and reject invalid values', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    await tester.pumpWidget(
+      MaterialApp(home: EntryEditor(store: store, collection: 'settings', entry: null)),
+    );
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+    final emailLabel = 'Public support email (shown to everyone — never your personal inbox)';
+    const websiteLabel = 'Website URL';
+
+    // A fresh business profile already defaults to the public support
+    // contact, never the operator's personal inbox. The website field sits
+    // right below it, so scrolling to email also brings it into the tree —
+    // one extra pump lets the newly-built sibling register with find.text.
+    await tester.scrollUntilVisible(find.text(emailLabel), 300, scrollable: formScrollable);
+    await tester.pump();
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, emailLabel)).controller!.text, 'info@locamarket.in');
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, websiteLabel)).controller!.text, 'https://locamarket.in');
+
+    // Bad values must not save — checked via store state (not the inline
+    // validator text, which scrolls out of the tree once "Save changes" is
+    // brought into view further down the same lazily-built list).
+    await tester.enterText(find.widgetWithText(TextFormField, emailLabel), 'not-an-email');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    expect(store.business.text('supportEmail'), '', reason: 'invalid email must not save');
+
+    // Scroll back up (negative delta) to reach the email field again, since
+    // "Save changes" is further down the same list.
+    await tester.scrollUntilVisible(find.text(emailLabel), -300, scrollable: formScrollable);
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextFormField, emailLabel), 'support@locamarket.in');
+    await tester.enterText(find.widgetWithText(TextFormField, websiteLabel), 'http://locamarket.in');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    expect(store.business.text('websiteUrl'), '', reason: 'a non-HTTPS website must not save');
+
+    await tester.scrollUntilVisible(find.text(emailLabel), -300, scrollable: formScrollable);
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextFormField, websiteLabel), 'https://locamarket.in');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(store.business.text('supportEmail'), 'support@locamarket.in');
+    expect(store.business.text('websiteUrl'), 'https://locamarket.in');
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();

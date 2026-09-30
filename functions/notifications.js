@@ -7,7 +7,7 @@ const {getMessaging} = require('firebase-admin/messaging');
 const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
 const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
-const {flagOff} = require('./domain');
+const {flagOff, promotionMatchesLocation} = require('./domain');
 const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -125,6 +125,10 @@ async function fanOutOffer(promotionId, data, eventKey) {
     batch = [];
   };
   for await (const subscriber of pages(db.collection('notificationSubscribers').where('enabled', '==', true).orderBy('__name__'))) {
+    const sub = subscriber.data();
+    // Geo-targeted promotions only reach subscribers whose last-known
+    // location we have; an untargeted promotion still reaches everyone.
+    if (!promotionMatchesLocation(data, {customerPincode: sub.pincode, customerLatitude: sub.latitude, customerLongitude: sub.longitude})) continue;
     batch.push(subscriber.id);
     if (batch.length >= FAN_OUT) await flush();
   }

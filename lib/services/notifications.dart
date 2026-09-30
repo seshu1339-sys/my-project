@@ -13,11 +13,13 @@ class CustomerNotifications {
   StreamSubscription<String>? _refresh;
   String? _token;
   String? _uid;
+  bool _enabled = false;
 
-  Future<void> restore() async {
+  Future<void> restore({String? pincode, double? latitude, double? longitude}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       await _refresh?.cancel();
+      _enabled = false;
       if (_uid != null) {
         try {
           await _messaging.deleteToken();
@@ -38,14 +40,14 @@ class CustomerNotifications {
       final settings = await _messaging.getNotificationSettings();
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
-        await enable();
+        await enable(pincode: pincode, latitude: latitude, longitude: longitude);
       }
     } catch (_) {
       /* Account screen provides an explicit registration retry. */
     }
   }
 
-  Future<void> enable() async {
+  Future<void> enable({String? pincode, double? latitude, double? longitude}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('Sign in before enabling alerts.');
     if (!await _messaging.isSupported()) {
@@ -71,7 +73,11 @@ class CustomerNotifications {
     await db.collection('notificationSubscribers').doc(uid).set({
       'enabled': true,
       'updatedAt': FieldValue.serverTimestamp(),
+      if (pincode != null && pincode.isNotEmpty) 'pincode': pincode,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
     });
+    _enabled = true;
     await _refresh?.cancel();
     _refresh = _messaging.onTokenRefresh.listen((token) async {
       try {
@@ -80,6 +86,31 @@ class CustomerNotifications {
         /* Retry by enabling alerts again. */
       }
     });
+  }
+
+  /// Best-effort last-known-location refresh, sent only for a customer who
+  /// has already opted into push notifications, and only at the same moments
+  /// the app already sets/refreshes location client-side — never polling,
+  /// never continuous background tracking.
+  Future<void> updateLocationIfEnabled({
+    String? pincode,
+    double? latitude,
+    double? longitude,
+  }) async {
+    if (!_enabled) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await db.collection('notificationSubscribers').doc(uid).set({
+        'enabled': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (pincode != null && pincode.isNotEmpty) 'pincode': pincode,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+      });
+    } catch (_) {
+      /* Best-effort; the next location change retries. */
+    }
   }
 
   Future<void> _save(String token) async {

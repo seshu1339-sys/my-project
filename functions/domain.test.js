@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed, pointInRectangle, pointInPolygon, promotionMatchesLocation} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -106,4 +106,56 @@ test('vendor order status only moves forward and finished orders are final', () 
   for (const done of ['fulfilled', 'cancelled']) for (const next of ['submitted', 'confirmed', 'fulfilled', 'cancelled']) assert.equal(orderTransitionAllowed(done, next), false, `${done} -> ${next}`);
   assert.equal(orderTransitionAllowed('confirmed', 'confirmed'), false);
   assert.equal(orderTransitionAllowed(undefined, 'confirmed'), false);
+});
+// ---- Promotion geo-targeting: mirrors test/geo_shape_matching_test.dart's
+// cases case-for-case, so client and server are verified to agree.
+test('pointInRectangle matches inside, outside and boundary points', () => {
+  const box = {north: 2, south: 1, east: 2, west: 1};
+  assert.equal(pointInRectangle(1.5, 1.5, box), true);
+  assert.equal(pointInRectangle(5, 5, box), false);
+  assert.equal(pointInRectangle(2, 1.5, box), true); // boundary counts as inside
+});
+test('pointInPolygon handles convex and concave rings, and fewer than 3 points', () => {
+  const square = [[1, 1], [1, 2], [2, 2], [2, 1]];
+  assert.equal(pointInPolygon(1.5, 1.5, square), true);
+  assert.equal(pointInPolygon(5, 5, square), false);
+  const lShape = [[0, 0], [0, 3], [1, 3], [1, 1], [3, 1], [3, 0]];
+  assert.equal(pointInPolygon(0.5, 0.5, lShape), true);
+  assert.equal(pointInPolygon(2, 2, lShape), false); // inside the notch, not the shape
+  assert.equal(pointInPolygon(1, 1, [[0, 0], [1, 1]]), false);
+});
+test('promotionMatchesLocation: an untargeted promotion reaches everyone', () => {
+  assert.equal(promotionMatchesLocation({name: 'Everywhere ad'}, {customerPincode: ''}), true);
+  assert.equal(promotionMatchesLocation({name: 'Everywhere ad'}, {customerPincode: '560001'}), true);
+});
+test('promotionMatchesLocation: a pincode-targeted promotion only matches that exact pincode', () => {
+  const promo = {targetPincode: '560001'};
+  assert.equal(promotionMatchesLocation(promo, {customerPincode: '560001'}), true);
+  assert.equal(promotionMatchesLocation(promo, {customerPincode: '560002'}), false);
+  assert.equal(promotionMatchesLocation(promo, {customerPincode: ''}), false);
+});
+test('promotionMatchesLocation: a circle-targeted promotion (default geoShape) matches within its radius', () => {
+  const promo = {targetLatitude: 12.9716, targetLongitude: 77.5946, targetRadiusKm: 5};
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 12.99, customerLongitude: 77.60}), true);
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 20, customerLongitude: 80}), false);
+  assert.equal(promotionMatchesLocation(promo, {}), false); // no customer coordinates known
+});
+test('promotionMatchesLocation: a rectangle-targeted promotion only matches inside its box', () => {
+  const promo = {geoShape: 'rectangle', targetRectangle: {north: 13.0, south: 12.9, east: 77.7, west: 77.5}};
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 12.95, customerLongitude: 77.6}), true);
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 20, customerLongitude: 80}), false);
+});
+test('promotionMatchesLocation: a polygon-targeted promotion only matches inside its ring', () => {
+  const promo = {
+    geoShape: 'polygon',
+    targetPolygon: [{lat: 12.90, lng: 77.50}, {lat: 13.00, lng: 77.50}, {lat: 12.95, lng: 77.70}],
+  };
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 12.95, customerLongitude: 77.55}), true);
+  assert.equal(promotionMatchesLocation(promo, {customerLatitude: 20, customerLongitude: 80}), false);
+});
+test('promotionMatchesLocation: a promotion saved before shape-targeting existed still matches as a circle', () => {
+  // No geoShape key at all — simulates a doc saved before this feature shipped.
+  const legacy = {targetLatitude: 12.9716, targetLongitude: 77.5946, targetRadiusKm: 5};
+  assert.equal(promotionMatchesLocation(legacy, {customerLatitude: 12.99, customerLongitude: 77.60}), true);
+  assert.equal(promotionMatchesLocation(legacy, {customerLatitude: 20, customerLongitude: 80}), false);
 });

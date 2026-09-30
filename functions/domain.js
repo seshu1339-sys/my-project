@@ -49,6 +49,73 @@ function distanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
 function validCoordinate(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
 }
+// ---- Promotion geo-targeting (mirrors lib/domain/catalog.dart field-for-field,
+// so client and server always agree on which customers a promotion reaches).
+function toNumber(value, fallback = 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') { const n = Number(value); if (Number.isFinite(n)) return n; }
+  return fallback;
+}
+function toText(value, fallback = '') {
+  if (value === undefined || value === null || value === '') return fallback;
+  return String(value);
+}
+function parseRectangleField(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const rectangle = {};
+  for (const key of ['north', 'south', 'east', 'west']) {
+    const value = raw[key];
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    rectangle[key] = value;
+  }
+  return rectangle;
+}
+function parsePolygonField(raw) {
+  if (!Array.isArray(raw)) return null;
+  const ring = [];
+  for (const point of raw) {
+    if (!point || typeof point !== 'object') return null;
+    const lat = point.lat, lng = point.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    ring.push([lat, lng]);
+  }
+  return ring.length >= 3 ? ring : null;
+}
+function pointInRectangle(lat, lng, rectangle) {
+  return lat <= rectangle.north && lat >= rectangle.south && lng <= rectangle.east && lng >= rectangle.west;
+}
+function pointInPolygon(lat, lng, ring) {
+  if (ring.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [latI, lngI] = ring[i], [latJ, lngJ] = ring[j];
+    if ((latI > lat) !== (latJ > lat) && lng < (lngJ - lngI) * (lat - latI) / (latJ - latI) + lngI) inside = !inside;
+  }
+  return inside;
+}
+// Does this promotion reach a customer at the given pincode/coordinates?
+// `geoShape` absent means 'circle', reproducing pre-shape-targeting behaviour
+// byte-for-byte for every promotion saved before this feature existed.
+function promotionMatchesLocation(promotion, {customerPincode, customerLatitude, customerLongitude} = {}) {
+  const data = promotion || {};
+  const targetPincode = toText(data.targetPincode);
+  const geoShape = toText(data.geoShape, 'circle');
+  const targetLatitude = toNumber(data.targetLatitude);
+  const targetLongitude = toNumber(data.targetLongitude);
+  const hasRadiusTarget = geoShape === 'circle' && (targetLatitude !== 0 || targetLongitude !== 0);
+  const rectangle = geoShape === 'rectangle' ? parseRectangleField(data.targetRectangle) : null;
+  const polygon = geoShape === 'polygon' ? parsePolygonField(data.targetPolygon) : null;
+  const hasShapeTarget = hasRadiusTarget || rectangle !== null || polygon !== null;
+  if (!targetPincode && !hasShapeTarget) return true;
+  if (hasShapeTarget) {
+    if (typeof customerLatitude !== 'number' || typeof customerLongitude !== 'number') return false;
+    if (rectangle) return pointInRectangle(customerLatitude, customerLongitude, rectangle);
+    if (polygon) return pointInPolygon(customerLatitude, customerLongitude, polygon);
+    const radiusKm = toNumber(data.targetRadiusKm) > 0 ? toNumber(data.targetRadiusKm) : 10;
+    return distanceKm(customerLatitude, customerLongitude, targetLatitude, targetLongitude) <= radiusKm;
+  }
+  return Boolean(customerPincode) && customerPincode === targetPincode;
+}
 // The admin settings form saves every non-numeric field as text, so a toggle
 // arrives as the string "true"/"false" as often as a real boolean.
 function flagOn(value) { return value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true'); }
@@ -117,4 +184,4 @@ function validateVendorChange(type, changes) {
 // restores stock exactly once, so reopening one would leave its stock un-reserved.
 const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
 function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields};
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation};

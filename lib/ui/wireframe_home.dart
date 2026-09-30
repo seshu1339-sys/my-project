@@ -55,7 +55,17 @@ class WireframeHome extends StatelessWidget {
       search.text,
       store.visible('categories'),
     );
-    final promotions = store.visible('promotions');
+    final promotions = store
+        .visible('promotions')
+        .where(
+          (e) => promotionMatchesLocation(
+            e,
+            customerPincode: store.pincode,
+            customerLatitude: store.latitude,
+            customerLongitude: store.longitude,
+          ),
+        )
+        .toList();
     final offers = promotions
         .where((e) => e.text('placement') == 'carousel')
         .toList();

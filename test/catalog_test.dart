@@ -71,6 +71,40 @@ void main() {
     const cyclicProducts = [Entry('p3', {'name': 'Cyclic product', 'categoryId': 'a'})];
     expect(search.text(cyclicProducts, 'loop a', cyclic).single.id, 'p3');
   });
+  test('an untargeted promotion (no target fields, or blank ones saved as 0) shows everywhere', () {
+    const untouched = Entry('a', {'name': 'Ad'});
+    // The admin form's generic save() writes 0 for every blank numeric field
+    // (never omits the key) — a promotion saved with the target fields left
+    // blank looks like this, not like the field being absent.
+    const savedBlank = Entry('b', {'name': 'Ad', 'targetLatitude': 0, 'targetLongitude': 0, 'targetRadiusKm': 0, 'targetPincode': ''});
+    for (final promo in [untouched, savedBlank]) {
+      expect(promotionMatchesLocation(promo, customerPincode: ''), isTrue);
+      expect(promotionMatchesLocation(promo, customerPincode: '560001', customerLatitude: 12, customerLongitude: 77), isTrue);
+    }
+  });
+
+  test('a pincode-targeted promotion only matches that exact pincode', () {
+    const promo = Entry('a', {'name': 'Ad', 'targetPincode': '560001'});
+    expect(promotionMatchesLocation(promo, customerPincode: '560001'), isTrue);
+    expect(promotionMatchesLocation(promo, customerPincode: '560002'), isFalse);
+    expect(promotionMatchesLocation(promo, customerPincode: ''), isFalse);
+  });
+
+  test('a radius-targeted promotion matches by GPS distance, defaulting to 10km', () {
+    // Roughly Bengaluru MG Road; a customer ~2km away should match, ~50km should not.
+    const promo = Entry('a', {'name': 'Ad', 'targetLatitude': 12.9716, 'targetLongitude': 77.5946});
+    expect(promotionMatchesLocation(promo, customerPincode: '', customerLatitude: 12.99, customerLongitude: 77.60), isTrue);
+    expect(promotionMatchesLocation(promo, customerPincode: '', customerLatitude: 13.4, customerLongitude: 77.9), isFalse);
+    // No GPS fix at all: must not fall back to a pincode match (there isn't one set anyway).
+    expect(promotionMatchesLocation(promo, customerPincode: '560001'), isFalse);
+  });
+
+  test('an explicit target radius overrides the 10km default', () {
+    const promo = Entry('a', {'name': 'Ad', 'targetLatitude': 12.9716, 'targetLongitude': 77.5946, 'targetRadiusKm': 100});
+    // ~50km away: inside the explicit 100km radius, would have failed the 10km default.
+    expect(promotionMatchesLocation(promo, customerPincode: '', customerLatitude: 13.4, customerLongitude: 77.9), isTrue);
+  });
+
   test(
     'cart enforces stock, reprices by pincode and demo edits persist',
     () async {
