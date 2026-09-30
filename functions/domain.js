@@ -157,6 +157,35 @@ function vendorApplication(data = {}) {
     latitude: data.latitude, longitude: data.longitude,
   };
 }
+// Field Assistant: a staff member's on-site shop details (only required when
+// they're onboarding a shop that isn't in the system yet — an existing shop
+// is referenced by id instead). Reuses vendorApplication()'s exact field
+// rules (name/address/pincode/GPS) minus the vendor-specific owner/phone/
+// description fields, which don't apply to a staff-captured shop.
+function fieldShopDetails(data = {}) {
+  const pincode = typeof data.pincode === 'string' ? data.pincode.trim() : '';
+  if (!/^\d{6}$/.test(pincode)) throw Error('Provide a valid six-digit pincode.');
+  // The GPS reading captured at the shop, same "never a substitute for
+  // verifyVendorShop" caveat as vendorApplication()'s own GPS field.
+  if (!validCoordinate(data.latitude) || !validCoordinate(data.longitude)) throw Error("Capture the shop's GPS location before submitting.");
+  return {
+    name: text(data.name, 2, 120, 'the shop name'),
+    address: text(data.address, 5, 500, 'the shop address'),
+    pincode,
+    latitude: data.latitude,
+    longitude: data.longitude,
+  };
+}
+// Field Assistant: the item a staff member captured (name/price/stock), reusing
+// validateVendorChange's exact money/stock/name bounds.
+function fieldItemDetails(data = {}) {
+  const name = text(data.name, 2, 120, 'the item name');
+  const price = data.price;
+  if (typeof price !== 'number' || !Number.isFinite(price) || price < 0 || price > 10000000) throw Error('price must be a number from 0 to 10000000.');
+  const stock = data.stock;
+  if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) throw Error('stock must be a whole number from 0 to 1000000.');
+  return {name, price, stock};
+}
 const productChangeFields = {
   price: ['price', 'compareAtPrice', 'prices'],
   stock: ['stock'],
@@ -184,4 +213,4 @@ function validateVendorChange(type, changes) {
 // restores stock exactly once, so reopening one would leave its stock un-reserved.
 const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
 function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation};
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails};

@@ -13,6 +13,9 @@
         ],
         "vendor": [
           "e-commerce-app-a3897-vendor"
+        ],
+        "field": [
+          "e-commerce-app-a3897-field"
         ]
       }
     }

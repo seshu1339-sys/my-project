@@ -48,6 +48,18 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+    // Field Assistant: a staff role doc (mirrors vendors/{uid}) and a pending-
+    // then-approved submission queue (mirrors vendorChanges). Kept entirely
+    // separate from the vendor collections above — a different role, reviewed
+    // in its own admin section, never merged with vendor moderation.
+    match /fieldStaff/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /fieldSubmissions/{id} {
+      allow read: if admin() || (signedIn() && resource.data.staffUid == request.auth.uid);
+      allow write: if false;
+    }
     match /purchaseCodes/{codeId} {
       allow read, write: if false;
     }

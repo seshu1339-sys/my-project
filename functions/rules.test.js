@@ -53,6 +53,19 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(alice, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: '12.9'}));
     await assertFails(setDoc(doc(bob, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: 12.9716, longitude: 77.5946}));
     await assertFails(setDoc(doc(alice, '_notificationDeliveries/fake'), {sent: true}));
+    // Field Assistant: a staff role doc and a submission queue, both function-write-only.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'fieldStaff/alice'), {uid: 'alice', status: 'active'});
+      await setDoc(doc(ctx.firestore(), 'fieldSubmissions/s1'), {staffUid: 'alice', status: 'pending'});
+    });
+    await assertSucceeds(getDoc(doc(alice, 'fieldStaff/alice')));
+    await assertSucceeds(getDoc(doc(admin, 'fieldStaff/alice')));
+    await assertFails(getDoc(doc(bob, 'fieldStaff/alice')));
+    await assertFails(setDoc(doc(alice, 'fieldStaff/alice'), {status: 'active'}));
+    await assertSucceeds(getDoc(doc(alice, 'fieldSubmissions/s1')));
+    await assertSucceeds(getDoc(doc(admin, 'fieldSubmissions/s1')));
+    await assertFails(getDoc(doc(bob, 'fieldSubmissions/s1')));
+    await assertFails(setDoc(doc(alice, 'fieldSubmissions/s1'), {status: 'approved'}));
     await assertFails(getDoc(doc(admin, '_pins/alice')));
     await assertFails(setDoc(doc(alice, 'orders/fake'), {userId: 'alice', total: 0}));
     await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'orders/o1'), {userId: 'alice', total: 100, status: 'submitted'}));

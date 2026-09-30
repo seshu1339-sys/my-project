@@ -30,6 +30,12 @@
       "public": "build/vendor_web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
+    },
+    {
+      "target": "field",
+      "public": "build/field_web",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "rewrites": [{"source": "**", "destination": "/index.html"}]
     }
   ],
   "emulators": {

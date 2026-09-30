@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed, pointInRectangle, pointInPolygon, promotionMatchesLocation} = require('./domain');
+const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -158,4 +158,22 @@ test('promotionMatchesLocation: a promotion saved before shape-targeting existed
   const legacy = {targetLatitude: 12.9716, targetLongitude: 77.5946, targetRadiusKm: 5};
   assert.equal(promotionMatchesLocation(legacy, {customerLatitude: 12.99, customerLongitude: 77.60}), true);
   assert.equal(promotionMatchesLocation(legacy, {customerLatitude: 20, customerLongitude: 80}), false);
+});
+// ---- Field Assistant: a staff member's on-site shop + item submission.
+test('fieldShopDetails accepts a complete shop and rejects missing/invalid fields', () => {
+  const ok = {name: 'Ramu Stores', address: '12 Market Road', pincode: '560001', latitude: 12.9716, longitude: 77.5946};
+  assert.deepEqual(fieldShopDetails(ok), ok);
+  assert.throws(() => fieldShopDetails({...ok, name: 'A'}), /shop name/);
+  assert.throws(() => fieldShopDetails({...ok, address: 'no'}), /shop address/);
+  assert.throws(() => fieldShopDetails({...ok, pincode: '123'}), /pincode/);
+  assert.throws(() => fieldShopDetails({...ok, latitude: undefined}), /GPS location/);
+  assert.throws(() => fieldShopDetails({...ok, longitude: 'not a number'}), /GPS location/);
+});
+test('fieldItemDetails accepts a valid item and rejects bad price/stock/name', () => {
+  assert.deepEqual(fieldItemDetails({name: 'Rice 5kg', price: 250, stock: 40}), {name: 'Rice 5kg', price: 250, stock: 40});
+  assert.throws(() => fieldItemDetails({name: 'R', price: 250, stock: 40}), /item name/);
+  assert.throws(() => fieldItemDetails({name: 'Rice 5kg', price: -1, stock: 40}), /price/);
+  assert.throws(() => fieldItemDetails({name: 'Rice 5kg', price: '250', stock: 40}), /price/);
+  assert.throws(() => fieldItemDetails({name: 'Rice 5kg', price: 250, stock: -1}), /stock/);
+  assert.throws(() => fieldItemDetails({name: 'Rice 5kg', price: 250, stock: 1.5}), /stock/);
 });

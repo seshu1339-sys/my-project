@@ -11,6 +11,7 @@ initializeApp();
 const {requireAdminSession} = require('./admin-session');
 Object.assign(exports, require('./notifications'));
 Object.assign(exports, require('./vendor-photos'));
+Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));

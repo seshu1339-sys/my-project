@@ -23,15 +23,17 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
-      final narrow = width < 820;
-      // Below the breakpoint the 4 navigation buttons collapse into one menu; above it
+      final narrow = width < 1100;
+      // Below the breakpoint the navigation buttons collapse into one menu; above it
       // they stay a plain row of labelled buttons. Either way nothing may overflow.
       expect(find.byTooltip('More'), narrow ? findsOneWidget : findsNothing);
       expect(find.text('Vendors'), narrow ? findsNothing : findsOneWidget);
+      expect(find.text('Field Assistants'), narrow ? findsNothing : findsOneWidget);
       if (narrow) {
         await tester.tap(find.byTooltip('More'));
         await tester.pump();
         expect(find.text('Vendors'), findsOneWidget);
+        expect(find.text('Field Assistants'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tapAt(const Offset(10, 10)); // dismiss the menu
         await tester.pump();

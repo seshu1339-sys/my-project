@@ -587,6 +587,19 @@ class Store extends ChangeNotifier {
     return image.bytes;
   }
 
+  /// Stores a field-staff item photo at its own per-submission path
+  /// (fieldSubmissions/$uid/$submissionId — one per visit, not a fixed slot).
+  /// The caller still has to call the submitFieldEntry function afterwards so
+  /// it goes to pending admin review.
+  Future<void> uploadFieldPhoto(String submissionId, XFile file) async {
+    final uid = user?.uid;
+    if (uid == null) throw StateError('Sign in first.');
+    final image = await _readImage(file);
+    await FirebaseStorage.instance
+        .ref('fieldSubmissions/$uid/$submissionId')
+        .putData(image.bytes, SettableMetadata(contentType: image.type));
+  }
+
   @override
   void dispose() {
     if (live) notifications.dispose();

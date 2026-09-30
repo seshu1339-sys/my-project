@@ -9,6 +9,7 @@ import '../domain/catalog.dart';
 import 'shared.dart';
 import 'layout_editor.dart';
 import 'admin_insights.dart';
+import 'field_moderation.dart';
 import 'geo_target_picker.dart';
 import 'shop_map.dart';
 
@@ -920,14 +921,15 @@ class _AdminPageState extends State<AdminPage> {
       final navTargets = <String, (IconData, WidgetBuilder)>{
         'Orders': (Icons.receipt_long, (_) => AdminOrders(store: widget.store)),
         'Vendors': (Icons.storefront, (_) => VendorModerationPage(store: widget.store)),
+        'Field Assistants': (Icons.badge_outlined, (_) => FieldModerationPage(store: widget.store)),
         'Complaints': (Icons.report_problem_outlined, (_) => ComplaintModerationPage(store: widget.store)),
         'Insights': (Icons.insights, (_) => AdminInsightsPage(store: widget.store)),
       };
       void openNav(String label) => Navigator.push(context, MaterialPageRoute<void>(builder: navTargets[label]!.$2));
-      // Below ~820px, the AppBar actions (page view toggle, other-settings menu, layout
-      // settings, sign out, plus 4 nav buttons) would overflow; collapse the four navigation
+      // Below ~1100px, the AppBar actions (page view toggle, other-settings menu, layout
+      // settings, sign out, plus the nav buttons) would overflow; collapse the navigation
       // buttons into one menu there and keep today's full row on wider screens.
-      final narrow = MediaQuery.sizeOf(context).width < 820;
+      final narrow = MediaQuery.sizeOf(context).width < 1100;
       return Scaffold(
         appBar: AppBar(
           title: const Text('Business studio'),
