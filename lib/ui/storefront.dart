@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../services/geocoding.dart';
 import '../services/search.dart';
 import 'account.dart';
 import 'details.dart';
+import 'location_picker.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import 'services_page.dart';
@@ -200,6 +203,47 @@ class _StorefrontState extends State<Storefront> {
                 },
                 icon: const Icon(Icons.my_location),
                 label: const Text('Use my current location'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final place = await showModalBottomSheet<NominatimPlace>(
+                    context: dialog,
+                    isScrollControlled: true,
+                    builder: (_) => const PlaceSearchSheet(),
+                  );
+                  if (place == null) return;
+                  await store.setLocation(
+                    '',
+                    place.displayName,
+                    lat: place.latitude,
+                    lng: place.longitude,
+                  );
+                  if (dialog.mounted) Navigator.pop(dialog);
+                },
+                icon: const Icon(Icons.search),
+                label: const Text('Search by place name'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final initial = store.latitude != null && store.longitude != null
+                      ? LatLng(store.latitude!, store.longitude!)
+                      : null;
+                  final point = await Navigator.of(dialog).push<LatLng>(
+                    MaterialPageRoute(builder: (_) => MapPinPickerPage(initialCenter: initial)),
+                  );
+                  if (point == null) return;
+                  await store.setLocation(
+                    '',
+                    'Pinned location',
+                    lat: point.latitude,
+                    lng: point.longitude,
+                  );
+                  if (dialog.mounted) Navigator.pop(dialog);
+                },
+                icon: const Icon(Icons.pin_drop_outlined),
+                label: const Text('Drop a pin on map'),
               ),
             ],
           ),

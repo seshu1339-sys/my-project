@@ -8,6 +8,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'shared.dart';
 import 'account.dart';
+import 'product_search.dart';
 import 'responsive_header.dart';
 import 'shop_map.dart';
 
@@ -498,6 +499,15 @@ class ShopsPage extends StatelessWidget {
           const Text(
             'Good shops, close by.',
             style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => ProductSearchPage(store: store)),
+            ),
+            icon: const Icon(Icons.travel_explore_outlined),
+            label: const Text('Search products near me'),
           ),
           const SizedBox(height: 12),
           Text(

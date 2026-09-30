@@ -346,4 +346,41 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
+
+  testWidgets('admin-set product search radius settings round-trip onto settings/business', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    await tester.pumpWidget(
+      MaterialApp(home: EntryEditor(store: store, collection: 'settings', entry: null)),
+    );
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+
+    for (final MapEntry(key: label, value: value) in {
+      'Product search radius presets, km (comma-separated, e.g. 2,5,10,25,50)': '1,3,7',
+      'Default product search radius (km)': '3',
+      'Maximum product search radius (km)': '7',
+    }.entries) {
+      await tester.scrollUntilVisible(find.text(label), 300, scrollable: formScrollable);
+      await tester.enterText(find.widgetWithText(TextFormField, label), value);
+    }
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(store.business.text('searchRadiusPresetsKm'), '1,3,7');
+    expect(store.business.number('searchRadiusDefaultKm'), 3);
+    expect(store.business.number('searchRadiusMaxKm'), 7);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
 }
