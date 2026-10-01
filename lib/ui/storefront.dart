@@ -214,7 +214,7 @@ class _StorefrontState extends State<Storefront> {
                   );
                   if (place == null) return;
                   await store.setLocation(
-                    '',
+                    store.pincode,
                     place.displayName,
                     lat: place.latitude,
                     lng: place.longitude,
@@ -235,7 +235,7 @@ class _StorefrontState extends State<Storefront> {
                   );
                   if (point == null) return;
                   await store.setLocation(
-                    '',
+                    store.pincode,
                     'Pinned location',
                     lat: point.latitude,
                     lng: point.longitude,

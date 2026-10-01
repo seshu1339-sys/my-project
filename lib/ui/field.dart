@@ -214,9 +214,14 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
   final itemPrice = TextEditingController();
   final itemStock = TextEditingController();
   late final String submissionId = '${DateTime.now().microsecondsSinceEpoch}';
-  Uint8List? photoBytes;
-  bool photoReady = false;
-  String? uploading;
+  // Admin-configurable (settings/business.fieldPhotoLimit), default 2 — a
+  // separate setting from vendor's own photo limit, never affecting it.
+  late final int photoLimit = store.business.number('fieldPhotoLimit', 2).round().clamp(1, 9);
+  // Slots fill in order (1, 2, 3...) so the resulting photoPaths stay
+  // contiguous, matching what submitFieldEntry expects; each filled slot can
+  // be replaced but not removed, mirroring vendor's own shop-photo slots.
+  final photoBytesBySlot = <int, Uint8List>{};
+  int? uploadingSlot;
   List<String> errors = const [];
   bool busy = false;
   Position? position;
@@ -244,19 +249,19 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
 
   void toast(Object message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$message')));
 
-  Future<void> pickPhoto(ImageSource source) async {
+  Future<void> pickPhoto(int slot, ImageSource source) async {
     try {
       final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
       if (file == null) return;
-      setState(() => uploading = 'photo');
+      setState(() => uploadingSlot = slot);
       final bytes = await file.readAsBytes();
-      await store.uploadFieldPhoto(submissionId, file);
+      await store.uploadFieldPhoto(submissionId, slot, file);
       if (!mounted) return;
-      setState(() { photoBytes = bytes; photoReady = true; errors = const []; });
+      setState(() { photoBytesBySlot[slot] = bytes; errors = const []; });
     } catch (e) {
       if (mounted) toast(e);
     } finally {
-      if (mounted) setState(() => uploading = null);
+      if (mounted) setState(() => uploadingSlot = null);
     }
   }
 
@@ -270,7 +275,7 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
       itemName: itemName.text,
       itemPrice: itemPrice.text,
       itemStock: itemStock.text,
-      hasPhoto: photoReady,
+      hasPhoto: photoBytesBySlot.isNotEmpty,
       hasLocation: position != null,
     );
   }
@@ -297,6 +302,7 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
           'stock': int.parse(itemStock.text.trim()),
         },
         'submissionId': submissionId,
+        'photoCount': photoBytesBySlot.length,
         'visitLatitude': position!.latitude,
         'visitLongitude': position!.longitude,
       });
@@ -363,18 +369,31 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
     OutlinedButton.icon(onPressed: capturingLocation ? null : _captureLocation, icon: const Icon(Icons.my_location), label: Text(position != null ? 'Recapture location' : 'Try again')),
   ])));
 
+  // At least one photo is required; slots fill in order (replacing an
+  // already-filled slot is allowed, but a slot can't be skipped) up to the
+  // admin-configured photoLimit.
   Widget get _photoSection => Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const Text('Item photo', style: TextStyle(fontWeight: FontWeight.bold)),
+    Text('Item photos (up to $photoLimit)', style: const TextStyle(fontWeight: FontWeight.bold)),
     const SizedBox(height: 8),
-    if (photoBytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(photoBytes!, height: 150, fit: BoxFit.cover))
-    else Container(height: 90, alignment: Alignment.center, decoration: BoxDecoration(border: Border.all(color: Colors.black26), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.add_a_photo_outlined)),
-    const SizedBox(height: 8),
-    Text(uploading == 'photo' ? 'Uploading...' : photoReady ? 'Photo uploaded' : 'Required: not uploaded yet'),
-    Wrap(spacing: 8, children: [
-      OutlinedButton.icon(onPressed: busy || uploading != null ? null : () => pickPhoto(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Choose photo')),
-      if (!kIsWeb) OutlinedButton.icon(onPressed: busy || uploading != null ? null : () => pickPhoto(ImageSource.camera), icon: const Icon(Icons.photo_camera_outlined), label: const Text('Take photo')),
+    Wrap(spacing: 16, runSpacing: 12, children: [
+      for (var slot = 1; slot <= photoLimit && slot <= photoBytesBySlot.length + 1; slot++) _photoSlot(slot),
     ]),
   ])));
+
+  Widget _photoSlot(int slot) {
+    final bytes = photoBytesBySlot[slot];
+    final busyHere = uploadingSlot == slot;
+    return SizedBox(width: 160, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (bytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(bytes, width: 160, height: 120, fit: BoxFit.cover))
+      else Container(width: 160, height: 120, alignment: Alignment.center, decoration: BoxDecoration(border: Border.all(color: Colors.black26), borderRadius: BorderRadius.circular(8)), child: const Icon(Icons.add_a_photo_outlined)),
+      const SizedBox(height: 4),
+      Text(busyHere ? 'Uploading...' : bytes != null ? 'Photo $slot uploaded' : 'Photo $slot'),
+      Wrap(spacing: 8, children: [
+        OutlinedButton.icon(onPressed: busy || uploadingSlot != null ? null : () => pickPhoto(slot, ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: Text(bytes == null ? 'Choose' : 'Replace')),
+        if (!kIsWeb) OutlinedButton.icon(onPressed: busy || uploadingSlot != null ? null : () => pickPhoto(slot, ImageSource.camera), icon: const Icon(Icons.photo_camera_outlined), label: const Text('Camera')),
+      ]),
+    ]));
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -399,7 +418,7 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
           for (final e in errors) Text('• $e', style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ])),
         const SizedBox(height: 16),
-        FilledButton(onPressed: busy || uploading != null ? null : submit, child: Text(busy ? 'Submitting...' : 'Submit for approval')),
+        FilledButton(onPressed: busy || uploadingSlot != null ? null : submit, child: Text(busy ? 'Submitting...' : 'Submit for approval')),
       ]),
     )))),
   );

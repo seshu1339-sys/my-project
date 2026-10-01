@@ -1,7 +1,8 @@
 'use strict';
-// Up to 2 shop photos per approved vendor. Each stays 'pending' until the admin approves or
-// rejects it; a scheduled cleanup (functions/storage-maintenance.js) deletes anything still
-// pending after 15 days. Mirrors the existing vendorApplications photo-approval shape.
+// Up to settings/business.vendorPhotoLimit shop photos per approved vendor (default 2, the
+// limit this app has always had). Each stays 'pending' until the admin approves or rejects it;
+// a scheduled cleanup (functions/storage-maintenance.js) deletes anything still pending after
+// 15 days. Mirrors the existing vendorApplications photo-approval shape.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -18,9 +19,17 @@ async function requireAdmin(request) {
   if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
-const SLOTS = [1, 2];
 const slotFile = slot => `shopPhoto${slot}`;
 const photoDocId = (uid, slot) => `${uid}_${slot}`;
+// Configurable, admin-set max shop photos per vendor — defaults to 2 (the
+// limit this app has always had). Deliberately not shared with Field
+// Assistant's own equivalent in field-assistant.js: the two are independent
+// settings and must never affect each other.
+async function vendorPhotoLimit() {
+  const business = (await db.collection('settings').doc('business').get()).data() || {};
+  const limit = Number(business.vendorPhotoLimit);
+  return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 2;
+}
 async function verifyUploadedImage(path) {
   const file = getStorage().bucket().file(path);
   const [exists] = await file.exists();
@@ -36,7 +45,8 @@ async function verifyUploadedImage(path) {
 exports.submitShopPhoto = onCall(options, async request => {
   const uid = requireUser(request);
   const {slot} = request.data || {};
-  if (!SLOTS.includes(slot)) throw new HttpsError('invalid-argument', 'Choose photo slot 1 or 2.');
+  const limit = await vendorPhotoLimit();
+  if (!Number.isInteger(slot) || slot < 1 || slot > limit) throw new HttpsError('invalid-argument', `Choose a photo slot from 1 to ${limit}.`);
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can add shop photos.');
   const path = `vendorShopPhotos/${uid}/${slotFile(slot)}`;
@@ -54,7 +64,11 @@ exports.submitShopPhoto = onCall(options, async request => {
 exports.reviewShopPhoto = onCall(options, async request => {
   await requireAdmin(request);
   const {vendorId, slot, approved, reason = ''} = request.data || {};
-  if (typeof vendorId !== 'string' || !SLOTS.includes(slot) || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor, slot and decision.');
+  // Reviews a slot that was already submitted, so this checks against the
+  // fixed storage-rules ceiling (1-9), not the live, possibly-since-lowered
+  // vendorPhotoLimit — a photo submitted under a higher limit must still be
+  // reviewable afterwards.
+  if (typeof vendorId !== 'string' || !Number.isInteger(slot) || slot < 1 || slot > 9 || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor, slot and decision.');
   const ref = db.collection('vendorShopPhotos').doc(photoDocId(vendorId, slot));
   const path = await db.runTransaction(async tx => {
     const snapshot = await tx.get(ref);

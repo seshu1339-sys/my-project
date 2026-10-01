@@ -525,6 +525,17 @@ class Store extends ChangeNotifier {
     if (live && user?.emailVerified == true) await notifications.disable();
     await FirebaseAuth.instance.signOut();
     cart.clear();
+    // Clear per-account local caches so a different account signing in next
+    // on this device never inherits this account's wishlist/payment display
+    // (the post-login listener merges cloud data into these, so leftover
+    // local state here would otherwise bleed into the next account's profile).
+    wishlist.clear();
+    paymentBrand = '';
+    paymentLast4 = '';
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('wishlist', const []);
+    await prefs.remove('paymentBrand');
+    await prefs.remove('paymentLast4');
     notifyListeners();
   }
 
@@ -573,11 +584,13 @@ class Store extends ChangeNotifier {
     return image.bytes;
   }
 
-  /// Stores one of an approved vendor's 2 shop photos at its fixed slot path
-  /// ([slot] is 1 or 2). The caller still has to call the submitShopPhoto
-  /// function afterwards so it goes to pending admin review.
+  /// Stores one of an approved vendor's shop photos at its fixed slot path
+  /// ([slot] is 1-9; the admin-configurable settings/business.vendorPhotoLimit,
+  /// default 2, is enforced server-side — this is only a client-side sanity
+  /// bound matching the storage.rules ceiling). The caller still has to call
+  /// the submitShopPhoto function afterwards so it goes to pending admin review.
   Future<Uint8List> uploadShopPhoto(int slot, XFile file) async {
-    if (slot != 1 && slot != 2) throw ArgumentError('Shop photo slot must be 1 or 2.');
+    if (slot < 1 || slot > 9) throw ArgumentError('Shop photo slot must be from 1 to 9.');
     final uid = user?.uid;
     if (uid == null) throw StateError('Sign in first.');
     final image = await _readImage(file);
@@ -587,16 +600,18 @@ class Store extends ChangeNotifier {
     return image.bytes;
   }
 
-  /// Stores a field-staff item photo at its own per-submission path
-  /// (fieldSubmissions/$uid/$submissionId — one per visit, not a fixed slot).
-  /// The caller still has to call the submitFieldEntry function afterwards so
-  /// it goes to pending admin review.
-  Future<void> uploadFieldPhoto(String submissionId, XFile file) async {
+  /// Stores one of a field-staff item's photos at its own per-submission,
+  /// per-index path (fieldSubmissions/$uid/${submissionId}_$index — not a
+  /// fixed slot the way vendor photos are, since a submission id is already
+  /// unique per visit). The admin-configurable settings/business.fieldPhotoLimit
+  /// (default 2) is enforced server-side. The caller still has to call
+  /// submitFieldEntry afterwards so it goes to pending admin review.
+  Future<void> uploadFieldPhoto(String submissionId, int index, XFile file) async {
     final uid = user?.uid;
     if (uid == null) throw StateError('Sign in first.');
     final image = await _readImage(file);
     await FirebaseStorage.instance
-        .ref('fieldSubmissions/$uid/$submissionId')
+        .ref('fieldSubmissions/$uid/${submissionId}_$index')
         .putData(image.bytes, SettableMetadata(contentType: image.type));
   }
 

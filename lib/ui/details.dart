@@ -686,6 +686,8 @@ class _CartPageState extends State<CartPage> {
   void initState() {
     super.initState();
     address.text = widget.store.address;
+    final configuredDefault = widget.store.business.text('defaultPaymentMethod');
+    if (configuredDefault.isNotEmpty) paymentMethod = configuredDefault;
   }
 
   @override

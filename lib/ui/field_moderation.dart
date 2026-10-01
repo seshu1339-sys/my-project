@@ -153,7 +153,9 @@ class FieldModerationPage extends StatelessWidget {
       title: Text('${item['name']}'),
       subtitle: Text('${data['staffName'] ?? data['staffUid']} • ₹${item['price']} • Stock ${item['stock']}'),
       children: [
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: _FieldPhoto(path: item['photoPath']?.toString())),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 12, runSpacing: 12, children: [
+          for (final p in (item['photoPaths'] as List? ?? const [])) _FieldPhoto(path: p?.toString()),
+        ])),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(
           shopId.isNotEmpty ? 'Existing shop: $shopId' : 'New shop: ${shop?['name']} • ${shop?['address']} • ${shop?['pincode']}',
         )),

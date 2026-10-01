@@ -41,7 +41,8 @@ service cloud.firestore {
       allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
       allow write: if false;
     }
-    // Up to 2 shop photos per vendor, each pending until the admin approves it. No
+    // Up to settings/business.vendorPhotoLimit shop photos per vendor (default 2), each
+    // pending until the admin approves it. No
     // sensitive data here (status/timestamps only), so read is public like products/shops —
     // clients filter to status == 'approved' before showing one to a customer.
     match /vendorShopPhotos/{docId} {

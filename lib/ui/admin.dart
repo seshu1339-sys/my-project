@@ -131,6 +131,8 @@ const fields = <String, Map<String, String>>{
     'searchRadiusPresetsKm': 'Product search radius presets, km (comma-separated, e.g. 2,5,10,25,50)',
     'searchRadiusDefaultKm': 'Default product search radius (km)',
     'searchRadiusMaxKm': 'Maximum product search radius (km)',
+    'vendorPhotoLimit': 'Vendor shop photo limit (1-9, default 2)',
+    'fieldPhotoLimit': 'Field Assistant item photo limit (1-9, default 2)',
     'deliveryFee': 'Delivery / service fee (₹, 0 = none)',
     'freeDeliveryAbove': 'Free delivery above order total (₹, 0 = always charge)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
@@ -415,7 +417,7 @@ class VendorModerationPage extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text('Pending shop photos', style: Theme.of(context).textTheme.titleLarge),
-          const Text('Each vendor may upload up to 2 shop photos. A photo stays hidden from customers until approved here, and is deleted automatically if left unreviewed for 15 days.'),
+          Text('Each vendor may upload up to ${store.business.number('vendorPhotoLimit', 2).round().clamp(1, 9)} shop photos. A photo stays hidden from customers until approved here, and is deleted automatically if left unreviewed for 15 days.'),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorShopPhotos').where('status', isEqualTo: 'pending').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [
@@ -1177,6 +1179,8 @@ class _EntryEditorState extends State<EntryEditor> {
     'targetRadiusKm',
     'searchRadiusDefaultKm',
     'searchRadiusMaxKm',
+    'vendorPhotoLimit',
+    'fieldPhotoLimit',
     'deliveryFee',
     'freeDeliveryAbove',
     'width',
@@ -1219,6 +1223,8 @@ class _EntryEditorState extends State<EntryEditor> {
                       'searchRadiusPresetsKm': '2,5,10,25,50',
                       'searchRadiusDefaultKm': '10',
                       'searchRadiusMaxKm': '50',
+                      'vendorPhotoLimit': '2',
+                      'fieldPhotoLimit': '2',
                       'supportEmail': 'info@locamarket.in',
                       'websiteUrl': 'https://locamarket.in',
                       'kind': 'product',
@@ -1697,6 +1703,9 @@ class _EntryEditorState extends State<EntryEditor> {
           }
           if (key == 'stock' && n != n.round()) {
             return 'Use a whole number';
+          }
+          if (['vendorPhotoLimit', 'fieldPhotoLimit'].contains(key) && v.isNotEmpty && (n < 1 || n > 9)) {
+            return 'Enter a number from 1 to 9';
           }
         }
         if (['startsAt', 'endsAt'].contains(key) &&

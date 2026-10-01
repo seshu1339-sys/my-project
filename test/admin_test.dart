@@ -552,4 +552,89 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
+
+  testWidgets('vendor and field-staff photo limits default to 2 and save independently of each other', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    const vendorLabel = 'Vendor shop photo limit (1-9, default 2)';
+    const fieldLabel = 'Field Assistant item photo limit (1-9, default 2)';
+    // A real underlying page beneath EntryEditor (like AdminPage in the real
+    // app) so a successful save's Navigator.pop() returns to it instead of
+    // emptying the Navigator's history — needed here because this test opens
+    // EntryEditor twice in a row, unlike every other single-save test above.
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: SizedBox())));
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    Future<void> openEditor(Entry? entry) async {
+      navigator.push(MaterialPageRoute<void>(builder: (_) => EntryEditor(store: store, collection: 'settings', entry: entry)));
+      await tester.pumpAndSettle();
+    }
+
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+
+    await openEditor(null);
+    // A fresh business profile already defaults both limits to 2, preserving
+    // the app's existing (previously hardcoded) vendor shop-photo behavior.
+    await tester.scrollUntilVisible(find.text(vendorLabel), 300, scrollable: formScrollable);
+    await tester.pump();
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, vendorLabel)).controller!.text, '2');
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, fieldLabel)).controller!.text, '2');
+
+    // Changing only the vendor limit must never touch the field-staff one.
+    await tester.enterText(find.widgetWithText(TextFormField, vendorLabel), '5');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(store.business.number('vendorPhotoLimit'), 5);
+    expect(store.business.number('fieldPhotoLimit'), 2, reason: 'changing the vendor limit must not affect the field-staff limit');
+
+    // Re-open the now-saved business profile for a second, independent edit —
+    // mirrors a real admin navigating back in to change one more setting.
+    await openEditor(Entry('business', store.business.data));
+    await tester.scrollUntilVisible(find.text(vendorLabel), 300, scrollable: formScrollable);
+    await tester.pump();
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, vendorLabel)).controller!.text, '5', reason: 'the vendor limit saved above is carried into this fresh edit');
+    await tester.scrollUntilVisible(find.text(fieldLabel), 300, scrollable: formScrollable);
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextFormField, fieldLabel), '3');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(store.business.number('fieldPhotoLimit'), 3);
+    expect(store.business.number('vendorPhotoLimit'), 5, reason: 'changing the field-staff limit must not affect the vendor limit');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('an out-of-range photo limit is rejected and does not save', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    await tester.pumpWidget(
+      MaterialApp(home: EntryEditor(store: store, collection: 'settings', entry: null)),
+    );
+    await tester.pumpAndSettle();
+    final formScrollable = find
+        .byWidgetPredicate(
+          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+        )
+        .first;
+    const fieldLabel = 'Field Assistant item photo limit (1-9, default 2)';
+
+    await tester.scrollUntilVisible(find.text(fieldLabel), 300, scrollable: formScrollable);
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextFormField, fieldLabel), '15');
+    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.tap(find.text('Save changes'));
+    await tester.pump();
+    expect(store.business.number('fieldPhotoLimit'), 0, reason: 'nothing saved yet — a fresh business profile has no stored value at all');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
 }

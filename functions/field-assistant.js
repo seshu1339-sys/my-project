@@ -69,6 +69,14 @@ exports.setFieldStaffSuspension = onCall(options, async request => {
   return {status: suspended ? 'suspended' : 'active'};
 });
 
+// Configurable, admin-set max item photos per field submission — defaults to
+// 2. Deliberately a separate, un-shared implementation from vendor-photos.js's
+// vendorPhotoLimit(): the two settings must never affect each other.
+async function fieldPhotoLimit() {
+  const business = (await db.collection('settings').doc('business').get()).data() || {};
+  const limit = Number(business.fieldPhotoLimit);
+  return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 2;
+}
 async function verifyUploadedPhoto(path) {
   const file = getStorage().bucket().file(path);
   const [exists] = await file.exists();
@@ -80,16 +88,19 @@ async function verifyUploadedPhoto(path) {
 }
 
 // Field staff: submit one visit's worth of data. The client has already uploaded
-// the item photo to fieldSubmissions/{uid}/{submissionId}; this callable verifies
-// it, validates the shop (only when onboarding a brand-new one) and item details,
-// and queues a 'pending' record. Nothing here touches products/shops directly.
+// 1..photoCount item photos to fieldSubmissions/{uid}/{submissionId}_{i}; this
+// callable verifies every one of them, validates the shop (only when onboarding
+// a brand-new one) and item details, and queues a 'pending' record. Nothing
+// here touches products/shops directly.
 exports.submitFieldEntry = onCall(options, async request => {
   const uid = requireUser(request);
   const staff = (await db.collection('fieldStaff').doc(uid).get()).data();
   if (!staff || staff.status !== 'active') throw new HttpsError('permission-denied', 'Your field staff access must be approved before you can submit entries.');
-  const {shopId = '', shop, item, submissionId, visitLatitude, visitLongitude} = request.data || {};
+  const {shopId = '', shop, item, submissionId, visitLatitude, visitLongitude, photoCount} = request.data || {};
   if (typeof shopId !== 'string') throw new HttpsError('invalid-argument', 'Invalid shop selection.');
   if (typeof submissionId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(submissionId)) throw new HttpsError('invalid-argument', 'Invalid submission id.');
+  const limit = await fieldPhotoLimit();
+  if (!Number.isInteger(photoCount) || photoCount < 1 || photoCount > limit) throw new HttpsError('invalid-argument', `Upload 1 to ${limit} item photo${limit === 1 ? '' : 's'}.`);
   // GPS is captured on every visit, whether the shop is new or already on file —
   // it's the staff member's proof of having actually been there.
   if (!validCoordinate(visitLatitude) || !validCoordinate(visitLongitude)) throw new HttpsError('invalid-argument', "Capture the shop's GPS location before submitting.");
@@ -102,24 +113,30 @@ exports.submitFieldEntry = onCall(options, async request => {
   }
   let itemDetails;
   try { itemDetails = fieldItemDetails(item || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  const photoPath = `fieldSubmissions/${uid}/${submissionId}`;
-  await verifyUploadedPhoto(photoPath);
+  const photoPaths = [];
+  for (let i = 1; i <= photoCount; i++) {
+    const path = `fieldSubmissions/${uid}/${submissionId}_${i}`;
+    await verifyUploadedPhoto(path);
+    photoPaths.push(path);
+  }
   const ref = db.collection('fieldSubmissions').doc();
   await ref.set({
     staffUid: uid, staffName: staff.name || '',
-    shopId, shop: shopDetails, item: {...itemDetails, photoPath},
+    shopId, shop: shopDetails, item: {...itemDetails, photoPaths},
     visitLatitude, visitLongitude,
     status: 'pending', submittedAt: FieldValue.serverTimestamp(),
   });
   return {status: 'pending', submissionId: ref.id};
 });
 
-// Admin: approve or reject a pending field submission. Rejecting deletes the
+// Admin: approve or reject a pending field submission. Rejecting deletes every
 // private Storage photo right away (nothing unapproved lingers). Approving
 // creates the shop (only if it was a new one) and the product with active:true,
-// copies the photo into the same public "catalog/" convention every other
-// admin-uploaded product photo already uses, and stamps both docs with who
-// captured them (the audit trail) before deleting the private original.
+// copies each photo into the same public "catalog/" convention every other
+// admin-uploaded product photo already uses — the first becomes imageUrl, the
+// rest become `images` (the existing multi-image gallery field products
+// already support, see lib/ui/details.dart) — and stamps both docs with who
+// captured them (the audit trail) before deleting the private originals.
 exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async request => {
   await requireAdmin(request);
   const {entryId, approved, reason = ''} = request.data || {};
@@ -128,13 +145,13 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
   const snapshot = await ref.get();
   if (!snapshot.exists || snapshot.data().status !== 'pending') throw new HttpsError('failed-precondition', 'This entry was already reviewed.');
   const data = snapshot.data();
-  const photoPath = data.item?.photoPath;
+  const photoPaths = Array.isArray(data.item?.photoPaths) ? data.item.photoPaths : [];
+  const bucket = getStorage().bucket();
   if (!approved) {
     await ref.update({status: 'rejected', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp(), decidedBy: request.auth.uid});
-    if (photoPath) await getStorage().bucket().file(photoPath).delete({ignoreNotFound: true});
+    await Promise.all(photoPaths.map(path => bucket.file(path).delete({ignoreNotFound: true})));
     return {status: 'rejected'};
   }
-  const bucket = getStorage().bucket();
   let shopId = data.shopId;
   const batch = db.batch();
   if (!shopId) {
@@ -143,19 +160,19 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
     batch.set(shopRef, {...data.shop, active: true, createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp()});
   }
   const productRef = db.collection('products').doc();
-  let imageUrl = '';
-  if (photoPath) {
-    const publicPath = `catalog/${productRef.id}.jpg`;
-    await bucket.file(photoPath).copy(bucket.file(publicPath));
-    imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
+  const imageUrls = [];
+  for (let i = 0; i < photoPaths.length; i++) {
+    const publicPath = `catalog/${productRef.id}_${i + 1}.jpg`;
+    await bucket.file(photoPaths[i]).copy(bucket.file(publicPath));
+    imageUrls.push(`https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`);
   }
   batch.set(productRef, {
     name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product',
-    shopId, imageUrl, active: true,
+    shopId, imageUrl: imageUrls[0] || '', images: imageUrls.slice(1), active: true,
     createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp(),
   });
   batch.update(ref, {status: 'approved', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp(), decidedBy: request.auth.uid, resolvedShopId: shopId, resolvedProductId: productRef.id});
   await batch.commit();
-  if (photoPath) await bucket.file(photoPath).delete({ignoreNotFound: true});
+  await Promise.all(photoPaths.map(path => bucket.file(path).delete({ignoreNotFound: true})));
   return {status: 'approved', shopId, productId: productRef.id};
 });

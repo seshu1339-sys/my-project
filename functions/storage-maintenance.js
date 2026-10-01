@@ -71,7 +71,8 @@ async function sweepOrphanShopPhotos(now) {
   for (const file of files) {
     const created = Date.parse(file.metadata?.timeCreated || '');
     if (!Number.isFinite(created) || created > cutoff) continue;
-    const match = file.name.match(/^vendorShopPhotos\/([^/]+)\/shopPhoto([12])$/);
+    // Matches any configured slot number (vendorPhotoLimit, default 2), not just 1-2.
+    const match = file.name.match(/^vendorShopPhotos\/([^/]+)\/shopPhoto([1-9])$/);
     if (!match) continue;
     const [, uid, slot] = match;
     const exists = (await db.collection('vendorShopPhotos').doc(`${uid}_${slot}`).get()).exists;

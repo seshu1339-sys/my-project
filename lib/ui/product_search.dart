@@ -102,7 +102,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       builder: (_) => const PlaceSearchSheet(),
     );
     if (place == null) return;
-    await store.setLocation('', place.displayName, lat: place.latitude, lng: place.longitude);
+    await store.setLocation(store.pincode, place.displayName, lat: place.latitude, lng: place.longitude);
     if (mounted) setState(() => locationError = null);
   }
 
@@ -114,7 +114,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       MaterialPageRoute(builder: (_) => MapPinPickerPage(initialCenter: initial)),
     );
     if (point == null) return;
-    await store.setLocation('', 'Pinned location', lat: point.latitude, lng: point.longitude);
+    await store.setLocation(store.pincode, 'Pinned location', lat: point.latitude, lng: point.longitude);
     if (mounted) setState(() => locationError = null);
   }
 
