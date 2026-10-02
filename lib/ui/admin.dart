@@ -12,6 +12,7 @@ import 'admin_insights.dart';
 import 'field_moderation.dart';
 import 'geo_target_picker.dart';
 import 'shop_map.dart';
+import 'admin_search.dart';
 
 String _promotionAreaLabel(Entry promotion) {
   final shape = promotion.text('geoShape', 'circle');
@@ -926,6 +927,7 @@ class _AdminPageState extends State<AdminPage> {
         'Field Assistants': (Icons.badge_outlined, (_) => FieldModerationPage(store: widget.store)),
         'Complaints': (Icons.report_problem_outlined, (_) => ComplaintModerationPage(store: widget.store)),
         'Insights': (Icons.insights, (_) => AdminInsightsPage(store: widget.store)),
+        'Search': (Icons.search, (_) => AdminSearchPage(store: widget.store)),
       };
       void openNav(String label) => Navigator.push(context, MaterialPageRoute<void>(builder: navTargets[label]!.$2));
       // Below ~1100px, the AppBar actions (page view toggle, other-settings menu, layout
