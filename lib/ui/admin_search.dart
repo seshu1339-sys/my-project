@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
-import 'admin.dart';
+import 'entry_editor.dart';
 import 'staff_detail_page.dart';
 import 'vendor_detail_page.dart';
 
@@ -106,13 +106,27 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendors').snapshots(),
             builder: (context, vendorSnapshot) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: store.firestore.collection('fieldStaff').snapshots(),
-              builder: (context, staffSnapshot) {
+              stream: store.firestore.collection('vendorApplications').snapshots(),
+              builder: (context, applicationSnapshot) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: store.firestore.collection('fieldStaff').snapshots(),
+                builder: (context, staffSnapshot) {
                 final query = search.text;
+                // A vendor that hasn't been decided yet has no `vendors` doc at
+                // all (approveVendor only creates one on approval) — only
+                // `vendorApplications`, keyed by the same uid. Merge both by
+                // uid so a brand-new pending application is still findable,
+                // without ever showing the same vendor twice once it's live.
+                final vendorIds = {
+                  for (final doc in vendorSnapshot.data?.docs ?? const []) doc.id,
+                  for (final doc in applicationSnapshot.data?.docs ?? const []) doc.id,
+                };
+                final vendorById = {for (final doc in vendorSnapshot.data?.docs ?? const []) doc.id: doc.data()};
+                final applicationById = {for (final doc in applicationSnapshot.data?.docs ?? const []) doc.id: doc.data()};
+                String vendorName(String id) => ((vendorById[id] ?? applicationById[id])!['name'] ?? id).toString();
                 final results = <_Result>[
-                  for (final doc in vendorSnapshot.data?.docs ?? const [])
-                    if (_matches(query, (doc.data()['name'] ?? doc.id).toString(), doc.data()['vendorCode'] as String?, doc.id))
-                      _Result(_Kind.vendor, doc.id, (doc.data()['name'] ?? doc.id).toString(), doc.data()['vendorCode'] as String?),
+                  for (final id in vendorIds)
+                    if (_matches(query, vendorName(id), vendorById[id]?['vendorCode'] as String?, id))
+                      _Result(_Kind.vendor, id, vendorName(id), vendorById[id]?['vendorCode'] as String?),
                   for (final doc in staffSnapshot.data?.docs ?? const [])
                     if (_matches(query, (doc.data()['name'] ?? doc.id).toString(), doc.data()['staffCode'] as String?, doc.id))
                       _Result(_Kind.staff, doc.id, (doc.data()['name'] ?? doc.id).toString(), doc.data()['staffCode'] as String?),
@@ -151,7 +165,8 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
                     ));
                   },
                 );
-              },
+                },
+              ),
             ),
           ),
         ),
