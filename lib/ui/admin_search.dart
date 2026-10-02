@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
-import 'entry_editor.dart';
+import 'admin.dart';
 import 'staff_detail_page.dart';
 import 'vendor_detail_page.dart';
 
