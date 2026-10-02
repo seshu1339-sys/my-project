@@ -231,6 +231,14 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
     Text('Approved vendor workspace', style: Theme.of(context).textTheme.headlineSmall),
+    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: store.firestore.collection('vendors').doc(uid).snapshots(),
+      builder: (context, snapshot) {
+        final code = snapshot.data?.data()?['vendorCode'] as String?;
+        if (code == null) return const SizedBox.shrink();
+        return Padding(padding: const EdgeInsets.only(top: 4), child: Text('Vendor ID: $code', style: Theme.of(context).textTheme.bodyMedium));
+      },
+    ),
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
     const SizedBox(height: 20),

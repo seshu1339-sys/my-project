@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:async';
 import 'dart:convert';
 
@@ -6,13 +5,19 @@ import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
+
+// Store's upload methods and vendor/complaint RPC-wrapper methods live in
+// their own extension files (zero call-site change — an extension method
+// calls identically to an instance method) — exported so every existing
+// `import '...store.dart'` keeps seeing `store.upload(...)`,
+// `store.registerVendor(...)` etc. exactly as before this split.
+export 'store_uploads.dart';
+export 'store_vendor_actions.dart';
 
 class Store extends ChangeNotifier {
   Store({this.live = false, this.database});
@@ -384,60 +389,6 @@ class Store extends ChangeNotifier {
     return Map<String, dynamic>.from(result.data as Map);
   }
 
-  Future<String> registerVendor({
-    required String ownerName,
-    required String phone,
-    required String name,
-    required String shopCategory,
-    required String address,
-    required String pincode,
-    required String description,
-    required double latitude,
-    required double longitude,
-  }) async {
-    final result = await call('registerVendor', {
-      'ownerName': ownerName,
-      'phone': phone,
-      'name': name,
-      'shopCategory': shopCategory,
-      'address': address,
-      'pincode': pincode,
-      'description': description,
-      'latitude': latitude,
-      'longitude': longitude,
-    });
-    return result['status'] as String;
-  }
-
-  Future<String> updateVendorOrder(String orderId, String status) async {
-    final result = await call('updateVendorOrder', {'orderId': orderId, 'status': status});
-    return result['status'] as String;
-  }
-
-  Future<String> submitVendorFeePayment(String paymentReference) async {
-    final result = await call('submitVendorFeePayment', {'paymentReference': paymentReference});
-    return result['status'] as String;
-  }
-
-  Future<String> submitVendorChange({required String type, required String collection, required String docId, required Map<String, dynamic> changes}) async {
-    final result = await call('submitVendorChange', {'type': type, 'collection': collection, 'docId': docId, 'changes': changes});
-    return result['status'] as String;
-  }
-
-  Future<String> issuePurchaseCode(String orderId, {required double latitude, required double longitude}) async {
-    final result = await call('issuePurchaseCode', {'orderId': orderId, 'latitude': latitude, 'longitude': longitude});
-    return result['code'] as String;
-  }
-
-  Future<String> createComplaint({String? orderId, String? productId, String? vendorId, required String subject, required String description}) async {
-    final result = await call('createComplaint', {'orderId': orderId, 'productId': productId, 'vendorId': vendorId, 'subject': subject, 'description': description});
-    return result['complaintId'] as String;
-  }
-
-  Future<void> addComplaintMessage(String complaintId, String body) async {
-    await call('addComplaintMessage', {'complaintId': complaintId, 'body': body});
-  }
-
   Future<void> login(String email, String password) async {
     await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: email,
@@ -537,82 +488,6 @@ class Store extends ChangeNotifier {
     await prefs.remove('paymentBrand');
     await prefs.remove('paymentLast4');
     notifyListeners();
-  }
-
-  Future<({Uint8List bytes, String ext, String type})> _readImage(XFile file) async {
-    if (!live) {
-      throw StateError(
-        'Image uploads require a connected Firebase project. You can use an image URL in the demo.',
-      );
-    }
-    final bytes = await file.readAsBytes();
-    if (bytes.length > 5 * 1024 * 1024) {
-      throw StateError('Choose an image smaller than 5 MB.');
-    }
-    final ext = file.name.split('.').last.toLowerCase();
-    final type = ext == 'png'
-        ? 'image/png'
-        : ext == 'webp'
-        ? 'image/webp'
-        : 'image/jpeg';
-    return (bytes: bytes, ext: ext, type: type);
-  }
-
-  /// Uploads to [folder] (admin catalog by default; a vendor passes its own
-  /// approved-vendor folder) and returns the public download URL.
-  Future<String> upload(XFile file, {String folder = 'catalog'}) async {
-    final image = await _readImage(file);
-    final ref = FirebaseStorage.instance.ref(
-      '$folder/${DateTime.now().microsecondsSinceEpoch}.${image.ext}',
-    );
-    await ref.putData(image.bytes, SettableMetadata(contentType: image.type));
-    return ref.getDownloadURL();
-  }
-
-  /// Stores one of the two mandatory vendor-application photos at its own fixed
-  /// private path ([kind] is 'vendorPhoto' or 'shopPhoto') and returns the bytes.
-  Future<Uint8List> uploadApplicationPhoto(String kind, XFile file) async {
-    if (kind != 'vendorPhoto' && kind != 'shopPhoto') {
-      throw ArgumentError('Unknown application photo.');
-    }
-    final uid = user?.uid;
-    if (uid == null) throw StateError('Sign in first.');
-    final image = await _readImage(file);
-    await FirebaseStorage.instance
-        .ref('vendorApplications/$uid/$kind')
-        .putData(image.bytes, SettableMetadata(contentType: image.type));
-    return image.bytes;
-  }
-
-  /// Stores one of an approved vendor's shop photos at its fixed slot path
-  /// ([slot] is 1-9; the admin-configurable settings/business.vendorPhotoLimit,
-  /// default 2, is enforced server-side — this is only a client-side sanity
-  /// bound matching the storage.rules ceiling). The caller still has to call
-  /// the submitShopPhoto function afterwards so it goes to pending admin review.
-  Future<Uint8List> uploadShopPhoto(int slot, XFile file) async {
-    if (slot < 1 || slot > 9) throw ArgumentError('Shop photo slot must be from 1 to 9.');
-    final uid = user?.uid;
-    if (uid == null) throw StateError('Sign in first.');
-    final image = await _readImage(file);
-    await FirebaseStorage.instance
-        .ref('vendorShopPhotos/$uid/shopPhoto$slot')
-        .putData(image.bytes, SettableMetadata(contentType: image.type));
-    return image.bytes;
-  }
-
-  /// Stores one of a field-staff item's photos at its own per-submission,
-  /// per-index path (fieldSubmissions/$uid/${submissionId}_$index — not a
-  /// fixed slot the way vendor photos are, since a submission id is already
-  /// unique per visit). The admin-configurable settings/business.fieldPhotoLimit
-  /// (default 2) is enforced server-side. The caller still has to call
-  /// submitFieldEntry afterwards so it goes to pending admin review.
-  Future<void> uploadFieldPhoto(String submissionId, int index, XFile file) async {
-    final uid = user?.uid;
-    if (uid == null) throw StateError('Sign in first.');
-    final image = await _readImage(file);
-    await FirebaseStorage.instance
-        .ref('fieldSubmissions/$uid/${submissionId}_$index')
-        .putData(image.bytes, SettableMetadata(contentType: image.type));
   }
 
   @override

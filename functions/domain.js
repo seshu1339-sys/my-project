@@ -176,6 +176,14 @@ function fieldShopDetails(data = {}) {
     longitude: data.longitude,
   };
 }
+// Field Assistant: a staff member's own registration details (name/phone),
+// required once, the first time they request access — reuses
+// vendorApplication()'s exact phone-format rule.
+function fieldStaffDetails(data = {}) {
+  const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
+  if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error('Provide a valid contact phone number.');
+  return {name: text(data.name, 2, 100, 'your full name'), phone};
+}
 // Field Assistant: the item a staff member captured (name/price/stock), reusing
 // validateVendorChange's exact money/stock/name bounds.
 function fieldItemDetails(data = {}) {
@@ -213,4 +221,4 @@ function validateVendorChange(type, changes) {
 // restores stock exactly once, so reopening one would leave its stock un-reserved.
 const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
 function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails};
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

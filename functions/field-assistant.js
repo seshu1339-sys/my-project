@@ -9,7 +9,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
-const {fieldShopDetails, fieldItemDetails, validCoordinate} = require('./domain');
+const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -26,14 +26,25 @@ async function requireAdmin(request) {
 
 // A signed-in, verified-email user asks to become a field staff member.
 // Idempotent: never downgrades an already-active/suspended record, only
-// creates the initial 'pending' one — safe to call every time the app opens.
+// creates the initial 'pending' one — safe to call every time the app opens,
+// as long as no fieldStaff/{uid} doc exists yet (the client only calls this
+// once the mandatory name/phone/photo registration step is complete; see
+// FieldRegistrationForm). The staff photo is mandatory: this verifies the
+// exact same way submitFieldEntry verifies an item photo, at the fixed path
+// fieldStaffApplications/{uid}/staffPhoto (storage.rules only allows that
+// upload before this doc exists, or again after a rejection, matching the
+// vendor application photo's own lifecycle).
 exports.requestFieldStaffAccess = onCall(options, async request => {
   const uid = requireUser(request);
   const ref = db.collection('fieldStaff').doc(uid);
   const existing = await ref.get();
   if (existing.exists) return {status: existing.data().status};
+  let details;
+  try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
   await ref.set({
-    uid, name: request.auth.token.name || '', email: request.auth.token.email || null,
+    uid, name: details.name, phone: details.phone, email: request.auth.token.email || null,
+    staffPhotoPath: `fieldStaffApplications/${uid}/staffPhoto`,
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
   return {status: 'pending'};
@@ -77,10 +88,10 @@ async function fieldPhotoLimit() {
   const limit = Number(business.fieldPhotoLimit);
   return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 2;
 }
-async function verifyUploadedPhoto(path) {
+async function verifyUploadedPhoto(path, label = 'the item photo') {
   const file = getStorage().bucket().file(path);
   const [exists] = await file.exists();
-  if (!exists) throw new HttpsError('failed-precondition', 'Upload the item photo before submitting.');
+  if (!exists) throw new HttpsError('failed-precondition', `Upload ${label} before submitting.`);
   const [metadata] = await file.getMetadata();
   if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) {
     throw new HttpsError('failed-precondition', 'The uploaded file is not a valid photo.');

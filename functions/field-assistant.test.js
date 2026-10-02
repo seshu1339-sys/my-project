@@ -26,12 +26,19 @@ test('field staff access, suspension and entry submission/review lifecycle', {
   const newShop = {name: 'Ramu Stores', address: '12 Market Road', pincode: '560001', latitude: 12.9716, longitude: 77.5946};
   const item = {name: 'Rice 5kg', price: 250, stock: 40};
 
-  // ---- self-registration is idempotent and starts pending
+  // ---- self-registration requires a name, phone and mandatory staff photo
   const uid = 'staff1';
-  let result = await fns.requestFieldStaffAccess.run(staffAuth(uid));
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}}), /photo/i, 'the staff photo is mandatory');
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {phone: '+911234567890'}}), /name/i, 'name is required');
+  await stagePhoto(`fieldStaffApplications/${uid}/staffPhoto`);
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One'}}), /phone/i, 'phone is required');
+
+  // ---- self-registration is idempotent and starts pending
+  let result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}});
   assert.equal(result.status, 'pending');
-  result = await fns.requestFieldStaffAccess.run(staffAuth(uid));
+  result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}});
   assert.equal(result.status, 'pending', 're-requesting is a no-op');
+  assert.equal((await db.collection('fieldStaff').doc(uid).get()).data().phone, '+911234567890');
 
   // ---- a pending (not yet approved) staff member cannot submit
   await stagePhotos(uid, 'blocked', 1);

@@ -15,6 +15,7 @@ Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
+Object.assign(exports, require('./ids'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
