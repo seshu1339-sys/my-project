@@ -55,6 +55,97 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-10-02 (later) — Vendor module split into smaller files (verified, COMMITTED)
+
+**Task:** modularize the complete Vendor module. Scope: `lib/ui/vendor.dart` (676 lines) and the app
+entry point `lib/main_vendor.dart`. Out of scope and not touched: `lib/ui/vendor_moderation.dart`
+(imported only by `admin.dart` — that's the admin-side vendor-approval UI, not part of the vendor app
+itself), `lib/data/store_vendor_actions.dart`/`store_uploads.dart` (already extracted from `store.dart`
+and wired in by the pre-existing uncommitted work from the previous entry — left exactly as found).
+
+**Unlike the previous entry's 4 barrel files, `vendor.dart` started in a clean, last-committed state**
+(not modified by the pre-existing uncommitted work), so this split is cleanly isolated from that other
+work — confirmed with `git diff --stat` excluding the new/changed vendor files before committing.
+
+**Split (barrel pattern, same as before — every existing `import 'vendor.dart'` keeps compiling with
+zero call-site changes):**
+- `lib/ui/vendor.dart` → now a barrel over `vendor_page.dart` (the top-level `vendorApplicationErrors()`
+  validation function, `VendorPage`/`_VendorPageState` — the status router between demo/unverified-
+  email/pending/fee-payment/suspended/workspace — and the private `_Message` helper it uses),
+  `vendor_registration_form.dart` (`VendorRegistrationForm`/`_VendorRegistrationFormState` — the
+  owner+shop+GPS+two-photo application form), `vendor_workspace.dart`
+  (`VendorWorkspace`/`_VendorWorkspaceState` — the approved-vendor dashboard: shop photos, add
+  product, product list with price/stock/photo actions, submit-a-change, verified-purchase redemption,
+  Special Category Exclusives, orders, change history — the single largest piece at ~350 lines).
+- `lib/main_vendor.dart` (120 lines) reviewed and left as-is — already small, and its 3 pieces
+  (`main()`, `VendorApp`, `VendorLoginPage`) have normal single-file bootstrap cohesion; splitting it
+  further would be splitting for its own sake.
+
+**Verification:** `flutter analyze` (whole project) — no issues. `flutter test` — all 131 tests pass,
+including `vendor_test.dart` (which imports `vendorApplicationErrors` straight from the barrel).
+`flutter build web -t lib/main_vendor.dart -o build/vendor_web` — builds successfully (the vendor app
+is its own Hosting target/build output, separate from the customer/admin bundle, so it needed its own
+explicit build check rather than relying on the default `flutter build web`).
+
+**Committed** (isolated from the unrelated pre-existing uncommitted work — see commit for exact files):
+only `lib/ui/vendor.dart`, the 3 new vendor files, and this log entry. Everything else in the working
+tree (admin.dart, functions/index.js, the Android package rename, store_vendor_actions.dart, etc.) was
+left exactly as found, still uncommitted, for the user/Codex to handle separately.
+
+### 2026-10-02 — Customer-app file split into smaller modules (verified, NOT committed)
+
+**Context found at start of task:** the working tree already had a large uncommitted diff spanning
+customer files, `admin.dart`, `store.dart`, test files, `functions/index.js`, and an unrelated Android
+package rename (`MainActivity.kt` moved) — not described anywhere in this log, likely from Codex per
+the user's own earlier note that they'd hand Codex a follow-up prompt. Asked the user how to handle it;
+they chose "leave it exactly as-is, split on top of it." So every file below was split starting from
+whatever was *already* sitting in the tree, not from the last commit — for `details.dart`,
+`home_promotions.dart`, `responsive_header.dart` and `home_widgets.dart` specifically, my changes are
+now layered on top of Codex's prior uncommitted edits to those same files, and the two cannot be
+cleanly separated at the line level any more.
+
+**Task:** split ONLY customer/user-app files into smaller modules — no business logic, Firebase
+behavior, permissions, routes, UI design or feature changes. Admin/vendor/field files were explicitly
+out of scope and were not opened or touched.
+
+**Backup taken first:** full working-tree copy (including untracked files and `.git`) at
+`C:\Users\Lappy\backups\ecommerce_app_backup_20261002_075944` (excludes `build/`, `.dart_tool/`,
+`android/.gradle`, `functions/node_modules`, `.idea`).
+
+**Files split (each barrel file below still exists and just `export`s the new files, so every existing
+`import` elsewhere keeps compiling unchanged — zero call-site changes needed anywhere in the app):**
+
+- `lib/ui/home_promotions.dart` → barrel over `home_impression_once.dart`, `home_promo_card.dart`
+  (also renamed the former private `_CompactBanner` to public `CompactBanner`, since a private class
+  can't live in its own file), `home_hero_carousel.dart`, `home_ticker_strip.dart`,
+  `home_scheduled_promo.dart`.
+- `lib/ui/details.dart` → barrel over `product_page.dart`, `category_page.dart`, `reviews.dart`,
+  `shops_page.dart`, `shop_page.dart`, `cart_page.dart`.
+- `lib/ui/responsive_header.dart` → barrel over `responsive_header_bar.dart` (the `ResponsiveHeader`
+  widget itself), `responsive_search_box.dart`, `contact_actions.dart`.
+- `lib/ui/home_widgets.dart` → barrel over `home_section_heading.dart`, `home_category_tile.dart`,
+  `home_product_tile.dart`, `home_product_grid.dart`, `home_shop_tile.dart`.
+- `lib/ui/account.dart` (556 → 393 lines; **not** a barrel, since it was one single `State` class, not
+  several top-level classes) → extracted `account_language_field.dart`, `account_complaints_section.dart`,
+  `account_orders_section.dart`, `account_payment_card_section.dart` as separate widgets, each taking
+  `store`/`busy`/`run` as constructor parameters so the page's single shared busy-lock and callbacks are
+  passed through unchanged rather than duplicated — this is pure code motion, not a behavior change.
+
+23 new files created, 5 files reduced in size (4 of them now pure re-export barrels). `product_search.dart`
+(323 lines) was reviewed but left alone — its only extra size is a private `_Match`/`_ProductLocationTile`
+tightly coupled to its one page, already smaller than everything above, not worth the same risk/effort.
+
+**Verification:** `flutter analyze` (whole project) — no issues. `flutter test` — all 131 tests pass.
+`flutter build web` — builds successfully. No `functions/` (Node) tests were run, since this task never
+touched backend code.
+
+**NOT committed.** The user's instruction for this task didn't ask for a commit, and — per the context
+note above — `admin.dart`/`functions/index.js`/the Android rename/several other new files in the tree
+are unreviewed, not mine, and can no longer be cleanly separated from my changes to the 4 barrel files.
+Committing now would bundle unreviewed third-party work under this commit; left for the user to decide
+once Codex's part of the tree is reviewed. **Next session: re-read `git status` before assuming this
+split is committed — it is not, as of this entry.**
+
 ### 2026-09-22 — Vendor shop photos, Product Image Library, Special Category Exclusives, storage housekeeping, responsive fixes (NOT deployed)
 
 One integrated update, implemented as one commit because the changes are genuinely interdependent (shared files:
