@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    Overlay for the admin/Master-Agent Hosting target only (see
+    scripts/build-admin-web.ps1) — copied on top of a byte-identical copy of
+    the customer build/web output, never a second Flutter compile. Only the
+    title/app-name/icon metadata below differs from web/index.html; the
+    compiled Dart/JS app (including the hidden-route OTP gate) is untouched.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Master control for Locamarket: admin panel, AI Agent, and integrations.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Locamarket Control">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Locamarket Control</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!--
+    You can customize the "flutter_bootstrap.js" script.
+    This is useful to provide a custom configuration to the Flutter loader
+    or to give the user feedback during the initialization process.
+
+    For more details:
+    * https://docs.flutter.dev/platform-integration/web/initialization
+  -->
+  <!--
+    AI Admin Agent (optional admin-only module, see lib/ui/ai_agent_*.dart):
+    the browser-side half of WebAuthn/Face ID registration and verification.
+    Pinned to match functions/package.json's @simplewebauthn/server major
+    version so the JSON shapes they exchange always agree. Used only inside
+    the AI Agent's protected-access gate; unrelated to every other screen.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@14.0.0/dist/bundle/index.umd.min.js" defer></script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

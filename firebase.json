@@ -21,7 +21,7 @@
     },
     {
       "target": "admin",
-      "public": "build/web",
+      "public": "build/admin_web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
     },

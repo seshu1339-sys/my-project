@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/location.dart';
 
 import '../data/store.dart';
-import '../services/localization.dart';
 import 'shared.dart';
+import 'account_complaints_section.dart';
+import 'account_language_field.dart';
+import 'account_orders_section.dart';
+import 'account_payment_card_section.dart';
 import 'email_link.dart';
 
 class AccountPage extends StatefulWidget {
@@ -204,82 +206,17 @@ class _AccountPageState extends State<AccountPage> {
                   child: const Text('Save profile'),
                 ),
                 const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      AppLocale.names.containsKey(widget.store.language)
-                      ? widget.store.language
-                      : 'en',
-                  decoration: const InputDecoration(
-                    labelText: 'Language / भाषा',
-                  ),
-                  items: AppLocale.names.entries
-                      .where(
-                        (entry) => AppLocale.enabled(
-                          widget.store.business.text('enabledLanguages'),
-                        ).any((locale) => locale.languageCode == entry.key),
-                      )
-                      .map(
-                        (entry) => DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) run(() => widget.store.setLanguage(value));
-                  },
+                AccountLanguageField(
+                  store: widget.store,
+                  onChanged: (value) => run(() => widget.store.setLanguage(value)),
                 ),
                 const SizedBox(height: 14),
-                const Text('Payment card', style: TextStyle(fontSize: 20)),
-                const Text(
-                  'Only the card brand and last four digits are stored.',
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: cardBrand,
-                        decoration: const InputDecoration(labelText: 'Brand'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: cardLast4,
-                        maxLength: 4,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Last 4'),
-                      ),
-                    ),
-                  ],
-                ),
-                OutlinedButton(
-                  onPressed: busy
-                      ? null
-                      : () => run(() async {
-                          if (!RegExp(r'^\d{4}$')
-                              .hasMatch(cardLast4.text.trim())) {
-                            throw StateError(
-                              'Enter the last four card digits.',
-                            );
-                          }
-                          await widget.store.setPaymentCard(
-                            cardBrand.text.trim().isEmpty
-                                ? 'Card'
-                                : cardBrand.text.trim(),
-                            cardLast4.text.trim(),
-                          );
-                          if (context.mounted) {
-                            message(context, 'Payment card saved');
-                          }
-                        }),
-                  child: const Text('Save payment card'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _manageSavedCards(context),
-                  icon: const Icon(Icons.credit_card_outlined),
-                  label: const Text('Manage saved cards'),
+                AccountPaymentCardSection(
+                  store: widget.store,
+                  busy: busy,
+                  run: run,
+                  cardBrand: cardBrand,
+                  cardLast4: cardLast4,
                 ),
                 OutlinedButton(
                   onPressed: busy ? null : () => run(resetPassword),
@@ -325,55 +262,8 @@ class _AccountPageState extends State<AccountPage> {
                 ),
                 const Text('Your orders', style: TextStyle(fontSize: 22)),
                 OutlinedButton.icon(onPressed: busy ? null : showComplaintDialog, icon: const Icon(Icons.report_problem_outlined), label: const Text('Open a complaint')),
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance.collection('complaints').where('customerId', isEqualTo: widget.store.user!.uid).limit(30).snapshots(),
-                  builder: (context, snap) => Column(children: [
-                    for (final complaint in snap.data?.docs ?? const []) ListTile(title: Text(complaint.data()['subject']?.toString() ?? 'Complaint'), subtitle: Text('${complaint.data()['status']} • ${complaint.data()['resolution'] ?? 'Awaiting review'}')),
-                  ]),
-                ),
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('orders')
-                      .where('userId', isEqualTo: widget.store.user!.uid)
-                      .snapshots(),
-                  builder: (context, snap) {
-                    if (snap.hasError) {
-                      return const Text(
-                        'Orders could not load. Please try again.',
-                      );
-                    }
-                    if (!snap.hasData) {
-                      return const LinearProgressIndicator();
-                    }
-                    if (snap.data!.docs.isEmpty) {
-                      return const Text(
-                        'Your first local find is waiting for you.',
-                      );
-                    }
-                    return Column(
-                      children: snap.data!.docs
-                          .map(
-                            (d) => ListTile(
-                              title: Text('Order ${d.id}'),
-                              subtitle: Text(d.data()['status'].toString()),
-                              trailing: d.data()['status'] == 'fulfilled'
-                                  ? TextButton(
-                                      onPressed: () => run(() async {
-                                        final pageContext = context;
-                                        final position = await currentPosition();
-                                        final code = await widget.store.issuePurchaseCode(d.id, latitude: position.latitude, longitude: position.longitude);
-                                        if (!pageContext.mounted) return;
-                                        await showDialog<void>(context: pageContext, builder: (dialogContext) => AlertDialog(title: const Text('Your one-time purchase code'), content: Text(code), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))]));
-                                      }),
-                                      child: const Text('Get code'),
-                                    )
-                                  : Text(money(d.data()['total'] as num)),
-                            ),
-                          )
-                          .toList(),
-                    );
-                  },
-                ),
+                AccountComplaintsSection(store: widget.store),
+                AccountOrdersSection(store: widget.store, run: run),
               ] else ...[
                 Text(
                   registering
@@ -391,30 +281,9 @@ class _AccountPageState extends State<AccountPage> {
                       : 'Sign in with your email and password.',
                 ),
                 const SizedBox(height: 24),
-                DropdownButtonFormField<String>(
-                  initialValue:
-                      AppLocale.names.containsKey(widget.store.language)
-                      ? widget.store.language
-                      : 'en',
-                  decoration: const InputDecoration(
-                    labelText: 'Language / भाषा',
-                  ),
-                  items: AppLocale.names.entries
-                      .where(
-                        (entry) => AppLocale.enabled(
-                          widget.store.business.text('enabledLanguages'),
-                        ).any((locale) => locale.languageCode == entry.key),
-                      )
-                      .map(
-                        (entry) => DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) run(() => widget.store.setLanguage(value));
-                  },
+                AccountLanguageField(
+                  store: widget.store,
+                  onChanged: (value) => run(() => widget.store.setLanguage(value)),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -521,36 +390,4 @@ class _AccountPageState extends State<AccountPage> {
       ),
     ),
   );
-
-  Future<void> _manageSavedCards(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Manage saved cards'),
-        content: Text(
-          widget.store.paymentLast4.isEmpty
-              ? 'No saved cards.'
-              : '${widget.store.paymentBrand} ending in ${widget.store.paymentLast4}',
-        ),
-        actions: [
-          if (widget.store.paymentLast4.isNotEmpty)
-            TextButton(
-              onPressed: () async {
-                try {
-                  await widget.store.removePaymentCard();
-                  if (dialog.mounted) Navigator.pop(dialog);
-                } catch (e) {
-                  if (dialog.mounted) message(dialog, e);
-                }
-              },
-              child: const Text('Remove card'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialog),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 }

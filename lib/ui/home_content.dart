@@ -594,10 +594,10 @@ class HomeContent extends StatelessWidget {
                         ..sort(
                           (a, b) => sectionOrder(
                             settings,
-                            a,
-                          ).compareTo(sectionOrder(settings, b)),
+                            a.key,
+                          ).compareTo(sectionOrder(settings, b.key)),
                         ))
-                        orderedSections[key]!,
+                        orderedSections[key.key]!,
                       if (!filtered) ...[
                         HomeSectionHeading(
                           title: 'Best offers',

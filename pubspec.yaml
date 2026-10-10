@@ -49,6 +49,7 @@ dependencies:
   latlong2: ^0.9.1
   firebase_messaging: ^16.6.0
   http: ^1.2.0
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'design_tokens.dart';
 
 Color colorFromHex(String value, Color fallback) {
   final normalized = value.trim().replaceFirst('#', '');
@@ -28,22 +30,87 @@ Entry sectionConfig(List<Entry> settings, String section) =>
       orElse: () => const Entry('', {}),
     );
 
+// The content section an admin picks (e.g. 'products', a Firestore
+// collection) is a different key from the layout component that actually
+// controls that section's on-page size (e.g. 'popular', what WireframeHome
+// reads via layoutFor) — resize/reorder always act on the layout key. Shared
+// by admin.dart's Page-view dashboard and the Visual Editor's on-preview
+// resize handle so both write the identical field, not two implementations.
+Future<void> adjustSectionField(Store store, String layoutKey, String field, Object value) async {
+  final saved = sectionConfig(store.entries('settings'), layoutKey);
+  await store.save(
+    'settings',
+    Entry('section_$layoutKey', {...saved.data, field: value}),
+  );
+}
+
+Future<void> adjustSectionHeight(Store store, String layoutKey, double height) =>
+    adjustSectionField(store, layoutKey, 'height', height);
+
+/// Moves a `reorderableHomeSections` entry from `oldIndex` to `newIndex`
+/// (after the move, not before — same convention as Flutter's own
+/// `ReorderableListView.onReorder`) and re-stamps every section's `order`
+/// field from its new position. Shared by admin.dart's Page-view
+/// `ReorderableListView` and the Visual Editor's drag handle so both move
+/// sections through the identical write, not two implementations.
+Future<void> reorderHomeSections(Store store, int oldIndex, int newIndex) async {
+  final settings = store.entries('settings');
+  final keys = [...reorderableHomeSections]
+    ..sort((a, b) => sectionOrder(settings, a.key).compareTo(sectionOrder(settings, b.key)));
+  final moved = keys.removeAt(oldIndex);
+  keys.insert(newIndex, moved);
+  for (final (index, descriptor) in keys.indexed) {
+    final saved = sectionConfig(settings, descriptor.key);
+    await store.save(
+      'settings',
+      Entry('section_${descriptor.key}', {...saved.data, 'order': (index + 1) * 10.0}),
+    );
+  }
+}
+
 bool sectionVisible(Entry config) =>
     config.id.isEmpty ||
     (config.data['visible'] != 'false' && config.data['visible'] != false);
 
-/// Home page sections an administrator can drag into a different top-down
-/// order from the Page view preview. These are layout-component keys (the
-/// same ones `layoutComponents`/`layoutFor` in layout_settings.dart use, and
-/// what `WireframeHome` actually renders) rather than content-collection
-/// names, so an 'order' written here is read by the real customer page.
-const reorderableHomeSections = ['notice', 'promo', 'categories', 'popular'];
+/// One admin-reorderable home page section: its layout key (what
+/// `WireframeHome`/`sectionOrder`/`sectionConfig` actually read — a
+/// layout-component key, the same ones `layoutComponents`/`layoutFor` in
+/// layout_settings.dart use, NOT a content-collection name), the generic
+/// collection that tapping it in the admin "Page view" preview should open
+/// (`targetSection`), and that preview's static title/icon. Bundling these
+/// together — instead of keeping a bare key list in this file and a
+/// separately-maintained title/icon map in admin.dart — makes it impossible
+/// to add a section here and forget its admin-preview entry: that used to be
+/// two independently-maintained lists that had to be kept in sync by hand,
+/// and forgetting the second one crashed the admin preview at runtime
+/// (a force-unwrapped lookup miss), caught only by a test, not the compiler.
+class SectionDescriptor {
+  const SectionDescriptor(this.key, this.targetSection, this.title, this.icon);
+  final String key;
+  final String targetSection;
+  final String title;
+  final IconData icon;
+}
+
+/// 'localServices' is distinct from the unrelated 'services' key (the
+/// header's nav button) — reusing that key would corrupt the button's own
+/// layout doc. 'notice' (the ticker) is deliberately NOT in this list — it
+/// now has a fixed position beside the "All Categories" button rather than
+/// being reorderable among the other sections (see wireframe_home.dart).
+/// Its own show/hide still works via Section Customization as before.
+const reorderableHomeSections = [
+  SectionDescriptor('promo', 'promotions', 'Promotions (banner carousel)', Icons.local_offer_outlined),
+  SectionDescriptor('categories', 'categories', 'Categories', Icons.grid_view_outlined),
+  SectionDescriptor('popular', 'products', 'Products & services', Icons.shopping_bag_outlined),
+  SectionDescriptor('localServices', 'products', 'Local Services', Icons.home_repair_service_outlined),
+];
 
 const _defaultSectionOrder = {
   'notice': 10.0,
   'promo': 20.0,
   'categories': 30.0,
   'popular': 40.0,
+  'localServices': 45.0,
 };
 
 double sectionOrder(List<Entry> settings, String section) {
@@ -126,15 +193,53 @@ BoxDecoration entryDecoration(
   );
 }
 
+/// A product's precomputed `avgRating`/`reviewCount` (set server-side by
+/// `submitVerifiedReview` from the real reviews subcollection — never
+/// editable directly) rendered as full/half/empty stars. Renders nothing for
+/// an unrated product rather than a row of empty stars.
+class RatingStars extends StatelessWidget {
+  const RatingStars({super.key, required this.rating, this.count = 0, this.size = 14});
+  final double rating;
+  final int count;
+  final double size;
+  @override
+  Widget build(BuildContext context) {
+    if (rating <= 0) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 1; i <= 5; i++)
+          Icon(
+            rating >= i
+                ? Icons.star
+                : rating >= i - 0.5
+                ? Icons.star_half
+                : Icons.star_border,
+            size: size,
+            color: AppTokens.accentGold,
+          ),
+        if (count > 0) ...[
+          SizedBox(width: size * .3),
+          Text(
+            '($count)',
+            style: TextStyle(fontSize: size * .85, color: AppTokens.textMuted),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 void message(BuildContext context, Object text) => ScaffoldMessenger.of(context)
     .showSnackBar(
       SnackBar(content: Text(text.toString().replaceFirst('Bad state: ', ''))),
     );
 
 class ProductArt extends StatelessWidget {
-  const ProductArt(this.entry, {super.key, this.height = 160});
+  const ProductArt(this.entry, {super.key, this.height = 160, this.width});
   final Entry entry;
   final double height;
+  final double? width;
   @override
   Widget build(BuildContext context) {
     final icons = [
@@ -150,46 +255,35 @@ class ProductArt extends StatelessWidget {
     final index = int.tryParse(entry.id.replaceAll(RegExp(r'\D'), '')) ?? 0;
     final placeholder = Container(
       height: height,
-      width: double.infinity,
+      width: width ?? double.infinity,
       decoration: BoxDecoration(
-        color: [
-          const Color(0xffe8efdc),
-          const Color(0xfff2e9dd),
-          const Color(0xffe4e9f1),
-          const Color(0xfff5e7ce),
-        ][index % 4],
-        borderRadius: BorderRadius.circular(16),
+        color: AppTokens.tintFor(index),
+        borderRadius: BorderRadius.circular(AppTokens.radiusMd),
       ),
       child: Center(
         child: Container(
           padding: EdgeInsets.all(height * .12),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .5),
+            color: Colors.white.withValues(alpha: .6),
             shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xff47624f).withValues(alpha: .08),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            boxShadow: AppTokens.shadowSoft,
           ),
           child: Icon(
             icons[index % icons.length],
             size: height * .4,
-            color: const Color(0xff47624f),
+            color: AppTokens.accentFor(index),
           ),
         ),
       ),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppTokens.radiusMd),
       child: entry.text('imageUrl').isEmpty
           ? placeholder
           : Image.network(
               entry.text('imageUrl'),
               height: height,
-              width: double.infinity,
+              width: width ?? double.infinity,
               fit: BoxFit.contain,
               errorBuilder: (_, e, s) => placeholder,
             ),

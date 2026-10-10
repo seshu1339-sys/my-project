@@ -6,6 +6,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/geocoding.dart';
 import '../services/location.dart';
+import 'design_tokens.dart';
 import 'details.dart';
 import 'location_picker.dart';
 import 'shared.dart';
@@ -191,7 +192,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 18, color: Color(0xff176b50)),
+                      const Icon(Icons.location_on_outlined, size: 18, color: AppTokens.primary),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -258,7 +259,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.location_searching, size: 48, color: Color(0xff176b50)),
+          const Icon(Icons.location_searching, size: 48, color: AppTokens.primary),
           const SizedBox(height: 16),
           if (locating) const CircularProgressIndicator(),
           if (!locating && locationError != null) ...[

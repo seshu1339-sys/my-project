@@ -18,6 +18,7 @@ const layoutComponents = <String, String>{
   'categories': 'Categories',
   'products': 'Product cards',
   'popular': 'Popular Products',
+  'localServices': 'Local Services',
   'nearby': 'Nearby shops / map',
   'ads': 'Advertisement defaults',
   'boxes': 'Promotional box defaults',
@@ -47,7 +48,16 @@ const dimensionFields = <String, (String, double, double)>{
   'voiceIconSize': ('Voice search icon size', 16, 48),
   'imageIconSize': ('Image search icon size', 16, 48),
   'imageHeight': ('Image height', 32, 400),
+  'imageWidth': ('Image width (0 = automatic/fill)', 0, 3840),
   'columns': ('Columns (0 = automatic)', 0, 12),
+  'rows': ('Rows (0 = unlimited)', 0, 12),
+  'gapX': ('Horizontal spacing (0 = same as gap)', 0, 64),
+  'mobileColumns': ('Mobile columns (0 = use Columns)', 0, 12),
+  'tabletColumns': ('Tablet columns (0 = use Columns)', 0, 12),
+  'desktopColumns': ('Desktop columns (0 = use Columns)', 0, 12),
+  'mobileRows': ('Mobile rows (0 = use Rows)', 0, 12),
+  'tabletRows': ('Tablet rows (0 = use Rows)', 0, 12),
+  'desktopRows': ('Desktop rows (0 = use Rows)', 0, 12),
   'visibleCount': ('Visible banners / items', 1, 12),
   'speed': ('Scroll speed (pixels/second)', 10, 300),
   'animationMs': ('Rotation interval (milliseconds)', 1000, 120000),
@@ -62,7 +72,16 @@ List<String> componentFields(String component) => [
           'voiceIconSize',
           'imageIconSize',
           'imageHeight',
+          'imageWidth',
           'columns',
+          'rows',
+          'gapX',
+          'mobileColumns',
+          'tabletColumns',
+          'desktopColumns',
+          'mobileRows',
+          'tabletRows',
+          'desktopRows',
           'visibleCount',
           'speed',
           'animationMs',
@@ -75,6 +94,7 @@ List<String> componentFields(String component) => [
               'user': {'gap', 'iconSize'},
               'office': {'gap', 'iconSize'},
               'popular': {'gap', 'iconSize'},
+              'localServices': {'gap', 'iconSize'},
               'nearby': {'gap'},
               'background': {'fontSize', 'iconSize'},
               'products': {'margin'},
@@ -82,8 +102,19 @@ List<String> componentFields(String component) => [
             false),
   ),
   if (component == 'search') ...['voiceIconSize', 'imageIconSize'],
-  if (['categories', 'products'].contains(component)) 'imageHeight',
-  if (['categories', 'products'].contains(component)) 'columns',
+  if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'imageHeight',
+  if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'columns',
+  if (['products', 'popular', 'localServices'].contains(component)) ...[
+    'rows',
+    'imageWidth',
+    'gapX',
+    'mobileColumns',
+    'tabletColumns',
+    'desktopColumns',
+    'mobileRows',
+    'tabletRows',
+    'desktopRows',
+  ],
   if (component == 'promo') ...['visibleCount', 'animationMs'],
   if (['notice', 'ads', 'boxes'].contains(component)) 'speed',
   if (['ads', 'boxes'].contains(component)) ...['stopAfter', 'brightness'],
@@ -104,10 +135,26 @@ class ComponentLayout {
   }
 
   double get scale => n('${breakpoint}Scale', 1, .75, 1.5);
-  double get gap => n('gap', 16, 0, 64) * scale;
+  double get gap => n('gap', 12, 0, 64) * scale;
+  double get gapX {
+    final raw = n('gapX', 0, 0, 64);
+    return raw > 0 ? raw * scale : gap;
+  }
+
   double get padding => n('padding', 12, 0, 48) * scale;
   double get margin => n('margin', 0, 0, 48);
   double get radius => n('radius', 12, 0, 80);
+  int get rows {
+    final perBreakpoint = n('${breakpoint}Rows', 0, 0, 12).round();
+    return perBreakpoint > 0 ? perBreakpoint : n('rows', 0, 0, 12).round();
+  }
+
+  WrapAlignment get alignment => switch (entry.text('alignment')) {
+    'center' => WrapAlignment.center,
+    'end' => WrapAlignment.end,
+    'spaceBetween' => WrapAlignment.spaceBetween,
+    _ => WrapAlignment.start,
+  };
   bool get visible => sectionVisible(entry) && entry.active;
   double font(double fallback) =>
       (n('fontSize', 0, 0, 40) > 0
@@ -143,7 +190,10 @@ class ComponentLayout {
     double preferred = 240,
     double minimum = 170,
   }) {
-    final desired = n('columns', 0, 0, 12).round();
+    final perBreakpointCols = n('${breakpoint}Columns', 0, 0, 12).round();
+    final desired = perBreakpointCols > 0
+        ? perBreakpointCols
+        : n('columns', 0, 0, 12).round();
     final safeCount = math.max(
       1,
       ((available + gap) / (minimum + gap)).floor(),

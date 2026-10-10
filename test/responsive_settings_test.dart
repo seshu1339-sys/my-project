@@ -83,7 +83,7 @@ void main() {
     expect(layout.columns(320), 1);
   });
 
-  testWidgets('search dimensions persist and do not resize Services', (
+  testWidgets('search dimensions persist and do not resize the header menu button', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1920, 1080);
@@ -94,8 +94,8 @@ void main() {
     final store = Store();
     await store.init();
     await tester.pumpWidget(MarketApp(store: store));
-    final services = find.widgetWithText(TextButton, 'Services');
-    final before = tester.getSize(services);
+    final menuButton = find.widgetWithIcon(IconButton, Icons.menu);
+    final before = tester.getSize(menuButton);
     await store.save(
       'settings',
       const Entry('section_search', {'desktopWidth': 520, 'height': 100}),
@@ -105,7 +105,7 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('responsive-search-box'))),
       const Size(520, 100),
     );
-    expect(tester.getSize(services), before);
+    expect(tester.getSize(menuButton), before);
     final restored = Store();
     await restored.init();
     expect(

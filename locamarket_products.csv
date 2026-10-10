@@ -1,0 +1,55 @@
+id,name,category
+cat-vegetables,Fresh & Vegetables,Fresh & Vegetables
+cat-fruits,Fruits,Fruits
+cat-dairy-bakery,Dairy & Bakery,Dairy & Bakery
+cat-grocery-staples,Grocery & Staples,Grocery & Staples
+cat-snacks-beverages,Snacks & Beverages,Snacks & Beverages
+cat-personal-care,Personal Care,Personal Care
+cat-household,Household Essentials,Household Essentials
+cat-rice-dal-grains,"Rice, Dal & Grains","Rice, Dal & Grains"
+cat-atta-flours,"Atta, Flours & Sooji","Atta, Flours & Sooji"
+cat-cooking-oils-ghee,Cooking Oils & Ghee,Cooking Oils & Ghee
+cat-masalas-spices,Masalas & Spices,Masalas & Spices
+cat-baby-kids,Baby & Kids,Baby & Kids
+prod-tomato,Fresh Tomato,Fresh & Vegetables
+prod-onion,Onion,Fresh & Vegetables
+prod-potato,Potato,Fresh & Vegetables
+prod-capsicum,Capsicum,Fresh & Vegetables
+prod-apple,Apple,Fruits
+prod-banana,Banana,Fruits
+prod-orange,Orange,Fruits
+prod-grapes,Grapes,Fruits
+prod-milk,Milk,Dairy & Bakery
+prod-bread,Fresh Bread,Dairy & Bakery
+prod-paneer,Paneer,Dairy & Bakery
+prod-curd,Curd,Dairy & Bakery
+prod-basmati-rice,India Gate Basmati Rice,Grocery & Staples
+prod-atta,Aashirvaad Atta,Grocery & Staples
+prod-sunflower-oil,Freedom Sunflower Oil,Grocery & Staples
+prod-chips,Lays Chips,Snacks & Beverages
+prod-biscuits,Glucose Biscuits,Snacks & Beverages
+prod-tea-powder,Tea Powder,Snacks & Beverages
+prod-coffee,Filter Coffee Powder,Snacks & Beverages
+prod-soap,Dove Soap,Personal Care
+prod-shampoo,Shampoo,Personal Care
+prod-toothpaste,Toothpaste,Personal Care
+prod-detergent,Surf Excel Detergent,Household Essentials
+prod-dishwash-bar,Dishwash Bar,Household Essentials
+prod-phenyl,Phenyl / Floor Cleaner,Household Essentials
+prod-toor-dal,Toor Dal,"Rice, Dal & Grains"
+prod-moong-dal,Moong Dal,"Rice, Dal & Grains"
+prod-sona-masoori,Sona Masoori Rice,"Rice, Dal & Grains"
+prod-wheat,Whole Wheat,"Rice, Dal & Grains"
+prod-maida,Maida (Refined Flour),"Atta, Flours & Sooji"
+prod-besan,Besan (Gram Flour),"Atta, Flours & Sooji"
+prod-rava,Rava / Sooji,"Atta, Flours & Sooji"
+prod-groundnut-oil,Groundnut Oil,Cooking Oils & Ghee
+prod-ghee,Pure Ghee,Cooking Oils & Ghee
+prod-coconut-oil,Coconut Oil,Cooking Oils & Ghee
+prod-turmeric,Turmeric Powder,Masalas & Spices
+prod-chilli-powder,Chilli Powder,Masalas & Spices
+prod-garam-masala,Garam Masala,Masalas & Spices
+prod-coriander-powder,Coriander Powder,Masalas & Spices
+prod-baby-wipes,Baby Wipes,Baby & Kids
+prod-diapers,Diapers,Baby & Kids
+prod-baby-soap,Baby Soap,Baby & Kids

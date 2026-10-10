@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import 'design_tokens.dart';
 import 'shared.dart';
 
 class HomeHeroSlide extends StatelessWidget {
@@ -12,9 +13,11 @@ class HomeHeroSlide extends StatelessWidget {
     builder: (context, c) {
       final wide = c.maxWidth >= 900;
       return Material(
+        borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+        clipBehavior: Clip.antiAlias,
         color: colorFromHex(
           entry.text('backgroundColor'),
-          const Color(0xffdfebd7),
+          AppTokens.primaryLight,
         ),
         child: InkWell(
           onTap: onTap,
@@ -26,9 +29,9 @@ class HomeHeroSlide extends StatelessWidget {
                 child: Container(
                   width: 420,
                   height: 420,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xffcfdfbf),
+                    color: AppTokens.primary.withValues(alpha: .10),
                   ),
                 ),
               ),
@@ -38,9 +41,9 @@ class HomeHeroSlide extends StatelessWidget {
                 child: Container(
                   width: 270,
                   height: 270,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Color(0xffe8f0e0),
+                    color: AppTokens.primary.withValues(alpha: .06),
                   ),
                 ),
               ),
@@ -62,7 +65,7 @@ class HomeHeroSlide extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: .65),
+                              color: Colors.white.withValues(alpha: .7),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Text(
@@ -73,7 +76,7 @@ class HomeHeroSlide extends StatelessWidget {
                                 fontSize: 9,
                                 letterSpacing: 1.3,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xff176b50),
+                                color: AppTokens.primaryDark,
                               ),
                             ),
                           ),
@@ -93,7 +96,7 @@ class HomeHeroSlide extends StatelessWidget {
                                     letterSpacing: -1.5,
                                     color: colorFromHex(
                                       entry.text('textColor'),
-                                      const Color(0xff163e2e),
+                                      AppTokens.textPrimary,
                                     ),
                                   ),
                             ),
@@ -106,19 +109,20 @@ class HomeHeroSlide extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 height: 1.5,
-                                color: Color(0xff46634c),
+                                color: AppTokens.textMuted,
                               ),
                             ),
                           ),
                           const SizedBox(height: 22),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+                              horizontal: 18,
+                              vertical: 13,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xff176b50),
-                              borderRadius: BorderRadius.circular(12),
+                              color: AppTokens.primary,
+                              borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                              boxShadow: AppTokens.shadowSoft,
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,

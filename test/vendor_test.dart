@@ -6,7 +6,12 @@ import 'package:ecommerce_app/ui/vendor.dart';
 class _RecordingStore extends Store {
   _RecordingStore() : super(live: true);
   int registrations = 0;
-  @override
+  // Not a real override — registerVendor is a StoreVendorActions extension
+  // method (store_vendor_actions.dart), not an instance method on Store, so
+  // there's nothing in the superclass to override. Declaring the same-named
+  // method here still works exactly as a test double: Dart always resolves
+  // instance.registerVendor(...) to an instance member over an extension
+  // method when both are in scope, so this still intercepts every call.
   Future<String> registerVendor({
     required String ownerName,
     required String phone,

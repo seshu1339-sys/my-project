@@ -23,14 +23,14 @@ Artifacts: `build/email-analysis.log`, `build/email-flutter-tests.log`, `build/e
 
 ## Exact production actions proposed (updated 2026-09-17, post admin-panel separation)
 
-Project: **e-commerce-app-a3897**. Since this doc was first written, the admin studio became a second, separate app (`lib/main_admin.dart`) needing its own Hosting site, and `placeOrder`/`quote()` gained an optional delivery/service fee, and two new notification/stock functions were added. The scope below supersedes the original six-action list.
+Project: **e-commerce-app-a3897**. Since this doc was first written, the admin studio went through two phases: briefly a second, separate app (`lib/main_admin.dart`), then (commit `d4db584`) deliberately reverted so the admin route (the hidden `/jyothi9`-style path in `lib/main.dart`) shares the exact same compiled bundle as the customer app — specifically so admin access gets the same password+email-OTP two-factor flow, which the old separate `main_admin.dart` build never had. `lib/main_admin.dart` still exists in the repo but is dead code, not part of any build command below. The admin Hosting target now gets its distinct identity (a PWA installable as "Locamarket Control" on iPhone) via `scripts/build-admin-web.ps1`, which runs *after* the one `flutter build web` and overlays only static `index.html`/`manifest.json`/icon files from `web_admin_overlay/` onto a copy of `build/web` — never a second Flutter compile, so the OTP gate stays identical either way. `placeOrder`/`quote()` also gained an optional delivery/service fee, and two new notification/stock functions were added. The scope below supersedes the original six-action list.
 
 1. One-time Hosting target setup (see **Step-by-step deploy commands** below) so `firebase.json`'s two hosting configs (`customer`, `admin`) resolve to real sites.
 2. Authentication configuration: enable email-link sign-in by setting `signIn.email.enabled=true` and `signIn.email.passwordRequired=false`. Phone stays disabled. Email/password remains available. Preserves authorized domains and all unrelated project settings.
 3. Functions in `us-central1`/`asia-south1`: **pinLogin** and **setPin** reject retired SMS/PIN authentication; **placeOrder** requires `email_verified=true` and now also applies `settings/business`'s optional delivery/service fee; **reconcileCancelledOrderStock** and **notifyOrderStatus** are new (stock restore on cancellation, one-to-one order-status push). `notifyPriceDrop`/`notifyNewOffers` are unchanged.
 4. Firestore rules: publish `firestore.rules` — verified email for authenticated private operations and admin writes, plus the widened (still validated) `users/{uid}` field set for wishlist/payment-card/language sync; public catalog browsing unchanged.
 5. Storage rules: publish `storage.rules` — verified email plus the existing admin claim for catalog uploads/deletion.
-6. Firebase Hosting: publish **build/web** to the customer site and **build/admin_web** to the new, separate admin site. The admin app is not reachable from the customer app at all (confirmed by grepping the compiled customer bundle for admin strings — zero matches).
+6. Firebase Hosting: publish **build/web** to the customer site and **build/admin_web** (the same compiled app, with `scripts/build-admin-web.ps1`'s PWA-identity overlay applied) to the admin site. The admin route is reached only via the hidden path inside the one shared bundle, gated by the password+OTP flow — not a separate, less-secure app.
 7. Web push: `FIREBASE_VAPID_KEY` is now set in the local `firebase-config-web.json` build-define file (owner-supplied), so it will be embedded in the customer build from this point on.
 8. Verify: hosted bundle hash, safe callable rejection behavior, both hosting sites serving, and the admin site's sign-in gate.
 
@@ -51,9 +51,11 @@ firebase target:apply hosting admin e-commerce-app-a3897-admin --project e-comme
 # 2. Enable email-link sign-in (email/password was already enabled earlier; this adds passwordless).
 node scripts/firebase-setup.cjs configure-email-link
 
-# 3. Build both web apps with the live Firebase config (includes the VAPID key for push).
+# 3. Build the one web app (customer + the hidden admin route share this build),
+# with the live Firebase config (includes the VAPID key for push), then overlay
+# the admin PWA identity on a copy of it — never a second Flutter compile.
 ./scripts/flutter.ps1 build web --dart-define-from-file=firebase-config-web.json
-./scripts/flutter.ps1 build web -t lib/main_admin.dart -o build/admin_web --dart-define-from-file=firebase-config-web.json
+./scripts/build-admin-web.ps1
 
 # 4. Deploy backend: all functions (including the two new ones), Firestore rules, Storage rules.
 $env:FUNCTIONS_DISCOVERY_TIMEOUT = "60"

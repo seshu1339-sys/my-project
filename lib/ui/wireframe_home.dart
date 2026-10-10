@@ -4,15 +4,30 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/search.dart';
 import '../services/strings.dart';
-import 'details.dart';
+import 'home_ad_rail.dart';
+import 'home_categories_section.dart';
+import 'home_category_product_strip.dart';
+import 'home_footer_badges.dart';
+import 'home_local_services_section.dart';
+import 'home_nearby_section.dart';
+import 'home_popular_section.dart';
 import 'home_promotions.dart';
-import 'home_widgets.dart';
+import 'home_quick_category_nav.dart';
+import 'home_ticker_section.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
+import 'services_page.dart';
 import 'shared.dart';
-import 'shop_map.dart';
 
-/// The existing homepage composition, now constrained by its actual viewport.
+/// The customer homepage composition root. Computes the shared data each
+/// section needs (catalog slices, layout configs, the admin-configurable
+/// section order), then hands each section's own widget file a small,
+/// explicit set of parameters — see home_ticker_section.dart,
+/// home_categories_section.dart, home_popular_section.dart,
+/// home_local_services_section.dart, home_nearby_section.dart and
+/// home_ad_rail.dart for each section's own logic. What stays here is
+/// specifically the composition concerns that only make sense at this
+/// level: section ordering/splicing and the wide/narrow responsive split.
 class WireframeHome extends StatelessWidget {
   const WireframeHome({
     super.key,
@@ -32,6 +47,7 @@ class WireframeHome extends StatelessWidget {
     required this.scroll,
     required this.categoriesKey,
     required this.productsKey,
+    this.wrapSection = _identitySection,
   });
   final Store store;
   final TextEditingController search;
@@ -42,6 +58,12 @@ class WireframeHome extends StatelessWidget {
   final ValueChanged<String> onCategory, onPromotion;
   final ScrollController scroll;
   final GlobalKey categoriesKey, productsKey;
+  // Lets the admin Visual Editor overlay click-to-select/dim behavior onto
+  // individual sections without this widget knowing anything about editing —
+  // every real customer render (the only caller that omits this) gets this
+  // exact no-op and therefore byte-identical output to before this existed.
+  final Widget Function(String sectionKey, Widget child) wrapSection;
+  static Widget _identitySection(String sectionKey, Widget child) => child;
 
   @override
   Widget build(BuildContext context) {
@@ -50,11 +72,14 @@ class WireframeHome extends StatelessWidget {
         .visible('categories')
         .where((e) => e.text('parentId').isEmpty)
         .toList();
-    final products = searchService.text(
-      store.visible('products'),
-      search.text,
-      store.visible('categories'),
-    );
+    // Service-kind entries now get their own dedicated Local Services
+    // section below (with the same search-box filtering), so Popular
+    // Products no longer duplicates them — searching still finds a service
+    // by name, just rendered in the Local Services section instead.
+    final products = searchService
+        .text(store.visible('products'), search.text, store.visible('categories'))
+        .where((e) => e.text('kind') != 'service')
+        .toList();
     final promotions = store
         .visible('promotions')
         .where(
@@ -73,66 +98,19 @@ class WireframeHome extends StatelessWidget {
     final boxes = promotions
         .where((e) => e.text('placement') == 'box')
         .toList();
-    final tickerSettings = store
-        .visible('settings')
-        .where((e) => e.id == 'scrollingText')
-        .firstOrNull;
-    final tickerPromo = promotions
-        .where((e) => e.text('placement') == 'ticker')
-        .firstOrNull;
-    final noticeLayout = layoutFor(context, settings, 'notice');
-    final ticker = Entry('notice', {
-      ...?tickerSettings?.data,
-      ...noticeLayout.entry.data,
-    });
-    final translations = ticker.data['translations'];
-    final notices = [
-      'importantNews',
-      'importantUpdates',
-      'customerNotices',
-      'offers',
-      'deliveryInformation',
-      'serviceAnnouncements',
-      'stateSpecificNotices',
-      'generalAlerts',
-    ].map(ticker.text).where((s) => s.isNotEmpty).join('  •  ');
-    final text = translations is Map && translations[store.language] != null
-        ? translations[store.language].toString()
-        : notices.isNotEmpty
-        ? notices
-        : ticker.text('text').isNotEmpty
-        ? ticker.text('text')
-        : tickerPromo?.text('name') ?? '';
-    final tickerSection = text.isNotEmpty && noticeLayout.visible
-        ? LayoutSection(
-            layout: noticeLayout,
-            child: TickerStrip(
-              text: text,
-              height: ComponentLayout(ticker, noticeLayout.viewport).height(40, floor: 32),
-              fontSize: ComponentLayout(ticker, noticeLayout.viewport).font(14),
-              fontFamily: ticker.text('fontFamily'),
-              fontWeight: FontWeight.values.firstWhere(
-                (w) => w.value == ticker.number('fontWeight', 400),
-                orElse: () => FontWeight.normal,
-              ),
-              speed: clampedNumber(ticker, 'speed', 70, 10, 300),
-              padding: clampedNumber(ticker, 'padding', 8, 0, 48),
-              reverse: ticker.text('direction', 'rtl') == 'ltr',
-              backgroundColor: colorFromHex(
-                ticker.text('backgroundColor'),
-                const Color(0xff174c38),
-              ),
-              textColor: colorFromHex(ticker.text('textColor'), Colors.white),
-              backgroundImage: ticker.text('backgroundImage'),
-              brightness: ticker.number('brightness', 1),
-              opacity: ticker.number('opacity', 1),
-              radius: clampedNumber(ticker, 'radius', 8, 0, 80),
-              borderColor: ticker.text('borderColor'),
-              borderWidth: clampedNumber(ticker, 'borderWidth', 0, 0, 8),
-              playback: ticker.text('playback', 'running'),
-            ),
-          )
-        : const SizedBox.shrink();
+    final localServices = localServiceEntries(store, searchService, search.text);
+    // Resolved purely from the already-loaded shops catalog (no new
+    // Firestore read) so product cards can show the selling shop's name.
+    final shopNameById = {
+      for (final shop in store.entries('shops')) shop.id: shop.text('name'),
+    };
+    final tickerSection = HomeTickerSection(
+      store: store,
+      settings: settings,
+      promotions: promotions,
+      products: products,
+      onProduct: onProduct,
+    );
     final page = layoutFor(context, settings, 'background');
     final categoryLayout = layoutFor(context, settings, 'categories');
     final productLayout = layoutFor(context, settings, 'products');
@@ -160,7 +138,7 @@ class WireframeHome extends StatelessWidget {
             page
                 .n(
                   'padding',
-                  MediaQuery.sizeOf(context).width < 700 ? 12 : 24,
+                  MediaQuery.sizeOf(context).width < 700 ? 10 : 18,
                   0,
                   48,
                 )
@@ -183,6 +161,7 @@ class WireframeHome extends StatelessWidget {
                   onAccount: onAccount,
                   onCart: onCart,
                   onAssistedSearch: onAssistedSearch,
+                  onProduct: onProduct,
                 ),
                 if (!store.live)
                   Padding(
@@ -203,86 +182,71 @@ class WireframeHome extends StatelessWidget {
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Flexible(
+                        child: AllCategoriesButton(
+                          onTap: () {
+                            final ctx = categoriesKey.currentContext;
+                            if (ctx != null) {
+                              Scrollable.ensureVisible(
+                                ctx,
+                                duration: const Duration(milliseconds: 350),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: wrapSection('notice', tickerSection)),
+                    ],
+                  ),
+                ),
                 SizedBox(height: page.gap),
                 LayoutBuilder(
                   builder: (context, c) {
+                    final boxLayout = layoutFor(context, settings, 'boxes');
                     final railWidth = adLayout.width(
                       c.maxWidth * .28,
                       fallback: (c.maxWidth * .22).clamp(230, 380),
                     );
                     final railHasContent =
                         (adLayout.visible && ads.isNotEmpty) ||
-                        (layoutFor(context, settings, 'boxes').visible &&
-                            boxes.isNotEmpty);
+                        (boxLayout.visible && boxes.isNotEmpty);
                     final wide = c.maxWidth >= 1100 && railHasContent;
-                    // Ads and feature/promo boxes share the same vertical
-                    // side rail, stacked together, rather than boxes
-                    // repeating as a separate full-width section below.
-                    final rail = Column(
-                      children: [
-                        if (adLayout.visible)
-                          LayoutSection(
-                            layout: adLayout,
-                            child: Column(
-                              children: [
-                                for (final ad in ads)
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: ad
-                                          .number('spacing', adLayout.gap)
-                                          .clamp(0, 64),
-                                    ),
-                                    child: ScheduledPromo(
-                                      entry: Entry(ad.id, {
-                                        ...adLayout.entry.data,
-                                        ...ad.data,
-                                      }),
-                                      onTap: () =>
-                                          onPromotion(ad.text('target')),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        if (boxes.isNotEmpty)
-                          LayoutSection(
-                            layout: layoutFor(context, settings, 'boxes'),
-                            child: Column(
-                              children: [
-                                for (final box in boxes)
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: clampedNumber(
-                                        box,
-                                        'spacing',
-                                        layoutFor(
-                                          context,
-                                          settings,
-                                          'boxes',
-                                        ).gap,
-                                        0,
-                                        64,
-                                      ),
-                                    ),
-                                    child: ScheduledPromo(
-                                      entry: Entry(box.id, {
-                                        ...sectionConfig(
-                                          settings,
-                                          'boxes',
-                                        ).data,
-                                        ...box.data,
-                                      }),
-                                      onTap: () =>
-                                          onPromotion(box.text('target')),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                      ],
+                    final merged = mergedPromoEntries(
+                      ads: adLayout.visible ? ads : const [],
+                      adAppearance: adLayout.entry,
+                      boxes: boxLayout.visible ? boxes : const [],
+                      boxAppearance: boxLayout.entry,
                     );
+                    final rail = HomeAdRail(
+                      adLayout: adLayout,
+                      boxLayout: boxLayout,
+                      ads: ads,
+                      boxes: boxes,
+                      onPromotion: onPromotion,
+                    );
+                    // Mobile/tablet never hide these ads — they're shown as a
+                    // compact, auto-rotating, swipeable carousel instead of
+                    // the desktop's vertical stack, reusing the exact same
+                    // merged entries and the same ScheduledPromo widget (so
+                    // every per-ad admin control keeps working identically).
+                    final carousel = !wide && railHasContent
+                        ? Padding(
+                            padding: EdgeInsets.only(bottom: page.gap),
+                            child: ScheduledPromoCarousel(
+                              entries: merged,
+                              appearance: adLayout.entry,
+                              onTap: onPromotion,
+                            ),
+                          )
+                        : null;
                     final reorderedSections = <String, Widget>{
-                      'notice': tickerSection,
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
                         child: HeroCarousel(
@@ -297,185 +261,72 @@ class WireframeHome extends StatelessWidget {
                               : offers.first.number('speed', 600),
                         ),
                       ),
-                      'categories': LayoutSection(
-                        layout: ComponentLayout(
-                          Entry(categoryLayout.entry.id, {
-                            'visible': categoryLayout.visible,
-                            'margin': categoryLayout.margin,
-                          }),
-                          categoryLayout.viewport,
-                        ),
-                        child: Column(
-                          key: categoriesKey,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            HomeSectionHeading(
-                              title: 'Categories'.tr(context),
-                              subtitle: 'Browse your everyday essentials'.tr(context),
-                              appearance: categoryLayout.entry,
-                            ),
-                            if (categories.isEmpty)
-                              Text(
-                                'Categories will appear here when available.'.tr(context),
-                              ),
-                            LayoutBuilder(
-                              builder: (context, grid) {
-                                final columns = categoryLayout.columns(
-                                  grid.maxWidth,
-                                  preferred: 170,
-                                  minimum: 125,
-                                );
-                                final tileWidth =
-                                    (grid.maxWidth -
-                                        (columns - 1) * categoryLayout.gap) /
-                                    columns;
-                                return Wrap(
-                                  spacing: categoryLayout.gap,
-                                  runSpacing: categoryLayout.gap,
-                                  children: [
-                                    for (final (i, category)
-                                        in categories.indexed)
-                                      SizedBox(
-                                        width: tileWidth,
-                                        height: categoryLayout.height(
-                                          tileWidth,
-                                          floor: tileWidth,
-                                        ),
-                                        child: HomeCategoryTile(
-                                          entry: category,
-                                          selected: false,
-                                          onTap: () =>
-                                              onCategory(category.id),
-                                          index: i,
-                                          appearance: categoryLayout.styled(
-                                            context,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                      'categories': HomeCategoriesSection(
+                        categoryLayout: categoryLayout,
+                        categories: categories,
+                        categoriesKey: categoriesKey,
+                        onCategory: onCategory,
                       ),
-                      'popular': LayoutSection(
-                        layout: layoutFor(context, settings, 'popular'),
-                        child: Column(
-                          key: productsKey,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            HomeSectionHeading(
-                              title: (search.text.isEmpty
-                                      ? 'Popular Products'
-                                      : 'Search results')
-                                  .tr(context),
-                              subtitle: search.text.isEmpty
-                                  ? 'Products and services from your neighbourhood'.tr(context)
-                                  : '{count} matching items'.tr(context, {'count': '${products.length}'}),
-                              appearance: sectionConfig(settings, 'popular'),
-                            ),
-                            if (products.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: Text(
-                                  'No matching products. Try another search.'.tr(context),
-                                ),
-                              ),
-                            if (productLayout.visible)
-                              HomeProductGrid(
-                                entries: products,
-                                appearance: productLayout.entry,
-                                itemBuilder: (entry) => HomeProductTile(
-                                  entry: entry,
-                                  price: entry.price(store.pincode),
-                                  appearance: productLayout.styled(
-                                    context,
-                                    fontSize: 16,
-                                  ),
-                                  onOpen: () => onProduct(entry),
-                                  onAdd:
-                                      entry.number('stock') >
-                                          (store.cart[entry.id] ?? 0)
-                                      ? () => onAdd(entry)
-                                      : null,
-                                ),
-                              ),
-                          ],
-                        ),
+                      'popular': HomePopularSection(
+                        store: store,
+                        settings: settings,
+                        productLayout: productLayout,
+                        products: products,
+                        categories: categories,
+                        productsKey: productsKey,
+                        searchText: search.text,
+                        shopNameById: shopNameById,
+                        onProduct: onProduct,
+                        onAdd: onAdd,
+                      ),
+                      'localServices': HomeLocalServicesSection(
+                        store: store,
+                        settings: settings,
+                        localServices: localServices,
+                        shopNameById: shopNameById,
+                        onServices: onServices,
+                        onProduct: onProduct,
                       ),
                     };
                     final orderedSectionKeys = [...reorderableHomeSections]
                       ..sort(
                         (a, b) => sectionOrder(
                           settings,
-                          a,
-                        ).compareTo(sectionOrder(settings, b)),
+                          a.key,
+                        ).compareTo(sectionOrder(settings, b.key)),
                       );
+                    // On narrow/mobile layouts the ad rail collapses into this
+                    // carousel, inserted at the very top of `main` — the
+                    // ticker itself now lives outside `main` entirely (fixed
+                    // beside the "All Categories" button), so "right after
+                    // the ticker" is simply "first".
+                    const promoInsertAt = 0;
+                    final categoriesIndex = orderedSectionKeys.indexWhere((d) => d.key == 'categories');
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (final key in orderedSectionKeys)
-                          reorderedSections[key]!,
-                        LayoutSection(
-                          layout: nearby,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              HomeSectionHeading(
-                                title: 'Nearby shops'.tr(context),
-                                subtitle: (located
-                                        ? 'Shops serving your selected location'
-                                        : 'Choose a location or browse available shops')
-                                    .tr(context),
-                                action: onLocation,
-                                actionLabel: (located
-                                        ? 'Change location'
-                                        : 'Set location')
-                                    .tr(context),
-                                appearance: nearby.entry,
-                              ),
-                              if (shops.isNotEmpty && located)
-                                ShopMap(
-                                  key: ValueKey(
-                                    '${store.pincode}-${store.latitude}-${shops.map((e) => e.id).join(',')}',
-                                  ),
-                                  shops: shops,
-                                  latitude: store.latitude,
-                                  longitude: store.longitude,
-                                  height: nearby.height(320, floor: 180),
-                                  onShop: (shop) => Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          ShopPage(store: store, shop: shop),
-                                    ),
-                                  ),
-                                ),
-                              if (shops.isEmpty)
-                                Text(
-                                  'No nearby shops found. You can change your pincode without enabling GPS.'.tr(context),
-                                ),
-                              for (final shop in shops)
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(
-                                    Icons.storefront_outlined,
-                                  ),
-                                  title: Text(shop.text('name')),
-                                  subtitle: Text(
-                                    '${shop.text('address')} • ${shop.text('phone')} ${store.latitude == null ? '' : '• ${distanceKm(store.latitude!, store.longitude!, shop.number('latitude'), shop.number('longitude')).toStringAsFixed(1)} km'}',
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          ShopPage(store: store, shop: shop),
-                                    ),
-                                  ),
-                                ),
-                            ],
+                        for (final (i, descriptor) in orderedSectionKeys.indexed) ...[
+                          wrapSection(descriptor.key, reorderedSections[descriptor.key]!),
+                          if (carousel != null && i == promoInsertAt) carousel,
+                          if (i == categoriesIndex)
+                            HomeCategoryProductStrip(
+                              title: 'Fresh Fruits & Vegetables'.tr(context),
+                              icon: Icons.eco_outlined,
+                              products: products
+                                  .where((p) => p.text('categoryId') == 'cat-vegetables' || p.text('categoryId') == 'cat-fruits')
+                                  .toList(),
+                              store: store,
+                              onProduct: onProduct,
+                            ),
+                        ],
+                        wrapSection(
+                          'nearby',
+                          HomeNearbySection(
+                            store: store,
+                            nearby: nearby,
+                            located: located,
+                            shops: shops,
+                            onLocation: onLocation,
                           ),
                         ),
                       ],
@@ -486,15 +337,14 @@ class WireframeHome extends StatelessWidget {
                             children: [
                               Expanded(child: main),
                               SizedBox(width: page.gap),
-                              SizedBox(width: railWidth, child: rail),
+                              SizedBox(width: railWidth, child: wrapSection('ads', rail)),
                             ],
                           )
-                        : Column(
-                            children: [main, if (railHasContent) rail],
-                          );
+                        : main;
                   },
                 ),
-                const SizedBox(height: 24),
+                const HomeFooterBadges(),
+                const SizedBox(height: 16),
               ],
             ),
           ),

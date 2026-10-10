@@ -16,3 +16,11 @@ const String adminRoutePath = String.fromEnvironment(
 /// page reload is the only way back to this check, so it cannot be reached by
 /// client-side navigation from the storefront.
 bool get isAdminRoute => kIsWeb && Uri.base.path == adminRoutePath;
+
+/// Optional `?open=ai-agent` query param on the admin route — lets a
+/// Home Screen shortcut (e.g. `https://.../jyothi9?open=ai-agent`, added via
+/// Safari's "Add to Home Screen") land straight on the AI Agent page after
+/// the normal password+OTP login, instead of the Business Studio view. Login
+/// itself is completely unchanged; this only decides what's shown right
+/// after it succeeds.
+bool get wantsAiAgentDirectly => kIsWeb && Uri.base.queryParameters['open'] == 'ai-agent';

@@ -125,6 +125,17 @@ service cloud.firestore {
     match /analyticsDaily/{id} { allow read: if admin(); allow write: if false; }
     match /analyticsTotals/{id} { allow read: if admin(); allow write: if false; }
     match /analyticsAds/{id} { allow read: if admin(); allow write: if false; }
+    // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js): every
+    // document here is written only by those Cloud Functions, never directly by
+    // a client. The admin UI streams these four collections live; everything
+    // else the module needs (credentials, PIN hashes, confirmation tokens, device
+    // tokens) lives under _-prefixed collections instead, covered by the default
+    // deny below, since the admin UI never needs to read those directly.
+    match /aiAgentConfig/{moduleId} { allow read: if admin(); allow write: if false; }
+    match /aiAgentMessages/{id} { allow read: if admin(); allow write: if false; }
+    match /aiAgentPendingActions/{id} { allow read: if admin(); allow write: if false; }
+    match /aiAgentAuditLog/{id} { allow read: if admin(); allow write: if false; }
+    match /aiAgentRoles/{uid} { allow read: if admin(); allow write: if false; }
     match /products/{productId}/reviews/{uid} {
       allow read: if true;
       allow delete: if admin() || (signedIn() && request.auth.uid == uid);

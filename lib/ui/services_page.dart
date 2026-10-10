@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
 import '../services/search.dart';
 import 'details.dart';
 import 'shared.dart';
+
+/// Every visible service-kind product/service entry matching [query] (a
+/// blank query matches everything). Shared by [ServicesPage] and the
+/// homepage's Local Services preview section so both read the exact same
+/// data the exact same way — one implementation, not two.
+List<Entry> localServiceEntries(
+  Store store,
+  SmartSearch searchService, [
+  String query = '',
+]) => searchService
+    .text(store.visible('products'), query, store.visible('categories'))
+    .where((entry) => entry.text('kind') == 'service')
+    .toList();
 
 class ServicesPage extends StatefulWidget {
   const ServicesPage({super.key, required this.store});
@@ -24,10 +38,7 @@ class _ServicesPageState extends State<ServicesPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.store,
     builder: (context, _) {
-      final services = const SmartSearch()
-          .text(widget.store.visible('products'), search.text, widget.store.visible('categories'))
-          .where((entry) => entry.text('kind') == 'service')
-          .toList();
+      final services = localServiceEntries(widget.store, const SmartSearch(), search.text);
       return Scaffold(
         appBar: AppBar(title: const Text('Services')),
         body: ListView(

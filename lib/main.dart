@@ -19,7 +19,7 @@ import 'services/analytics.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
 import 'services/location.dart';
-import 'ui/shared.dart';
+import 'services/app_theme.dart';
 import 'services/localization.dart';
 
 final _navigator = GlobalKey<NavigatorState>();
@@ -171,94 +171,12 @@ class MarketApp extends StatelessWidget {
             : TextDirection.ltr,
         child: child ?? const SizedBox.shrink(),
       ),
-      theme: _theme(store, dark: false),
-      darkTheme: _theme(store, dark: true),
-      themeMode: _themeMode(store),
+      theme: buildAppTheme(store, dark: false),
+      darkTheme: buildAppTheme(store, dark: true),
+      themeMode: resolveThemeMode(store),
       home: store.pendingEmailLink != null
           ? EmailLinkPage(store: store)
           : Storefront(store: store),
     ),
   );
-
-  ThemeMode _themeMode(Store store) {
-    final mode = store
-        .entries('settings')
-        .firstWhere(
-          (entry) => entry.id == 'theme',
-          orElse: () => const Entry('theme', {}),
-        )
-        .text('mode', 'light');
-    return mode == 'dark' ? ThemeMode.dark : ThemeMode.light;
-  }
-
-  ThemeData _theme(Store store, {required bool dark}) {
-    final settings = store
-        .entries('settings')
-        .firstWhere(
-          (entry) => entry.id == 'theme',
-          orElse: () => const Entry('theme', {}),
-        );
-    final primary = colorFromHex(
-      settings.text(dark ? 'darkPrimary' : 'primary'),
-      const Color(0xff176b50),
-    );
-    final background = colorFromHex(
-      settings.text(dark ? 'darkBackground' : 'background'),
-      dark ? const Color(0xff101512) : const Color(0xfff7f8f4),
-    );
-    final surface = colorFromHex(
-      settings.text(dark ? 'darkSurface' : 'surface'),
-      dark ? const Color(0xff1a211d) : Colors.white,
-    );
-    final text = colorFromHex(
-      settings.text(dark ? 'darkText' : 'text'),
-      dark ? Colors.white : Colors.black87,
-    );
-    final appBar = colorFromHex(
-      settings.text(dark ? 'darkAppBar' : 'appBar'),
-      background,
-    );
-    final secondary = colorFromHex(
-      settings.text(dark ? 'darkSecondary' : 'secondary'),
-      primary,
-    );
-    final fontFamily = settings.text('fontFamily').trim();
-    final fontSize = settings.number('fontSize', 14).clamp(10, 30).toDouble();
-    final fontWeight = FontWeight.values.firstWhere(
-      (weight) => weight.value == settings.number('fontWeight', 400).round(),
-      orElse: () => FontWeight.normal,
-    );
-    final textTheme =
-        ThemeData(brightness: dark ? Brightness.dark : Brightness.light)
-            .textTheme
-            .apply(
-              fontFamily: fontFamily.isEmpty ? 'Arial' : fontFamily,
-              bodyColor: text,
-              displayColor: text,
-              fontSizeFactor: fontSize / 14,
-            );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
-        brightness: dark ? Brightness.dark : Brightness.light,
-      ).copyWith(secondary: secondary),
-      scaffoldBackgroundColor: background,
-      fontFamily: fontFamily.isEmpty ? 'Arial' : fontFamily,
-      textTheme: textTheme.copyWith(
-        bodyMedium: textTheme.bodyMedium?.copyWith(fontWeight: fontWeight),
-        bodyLarge: textTheme.bodyLarge?.copyWith(fontWeight: fontWeight),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-      cardTheme: CardThemeData(elevation: 0, color: surface),
-      appBarTheme: AppBarTheme(
-        backgroundColor: appBar,
-        surfaceTintColor: Colors.transparent,
-      ),
-    );
-  }
 }

@@ -1,4 +1,4 @@
-package com.example.ecommerce_app
+package `in`.locamarket.locamark
 
 import io.flutter.embedding.android.FlutterActivity
 

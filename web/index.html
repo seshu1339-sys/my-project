@@ -41,6 +41,14 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!--
+    AI Admin Agent (optional admin-only module, see lib/ui/ai_agent_*.dart):
+    the browser-side half of WebAuthn/Face ID registration and verification.
+    Pinned to match functions/package.json's @simplewebauthn/server major
+    version so the JSON shapes they exchange always agree. Used only inside
+    the AI Agent's protected-access gate; unrelated to every other screen.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@14.0.0/dist/bundle/index.umd.min.js" defer></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

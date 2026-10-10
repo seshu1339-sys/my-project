@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/catalog.dart';
+import 'design_tokens.dart';
 
 /// A small OpenStreetMap view with a pin per shop in [shops], and an optional
 /// second "my location" pin at [latitude]/[longitude]. Shared by the customer
@@ -44,8 +45,13 @@ class ShopMap extends StatelessWidget {
         : const LatLng(20.5937, 78.9629);
     return SizedBox(
       height: height,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+          border: Border.all(color: AppTokens.border),
+          boxShadow: AppTokens.shadowSoft,
+        ),
+        clipBehavior: Clip.antiAlias,
         child: FlutterMap(
           options: MapOptions(initialCenter: center, initialZoom: 12),
           children: [
@@ -60,8 +66,8 @@ class ShopMap extends StatelessWidget {
                     point: LatLng(latitude!, longitude!),
                     radius: radiusKm! * 1000,
                     useRadiusInMeter: true,
-                    color: const Color(0x22176b50),
-                    borderColor: const Color(0xff176b50),
+                    color: AppTokens.primary.withValues(alpha: .13),
+                    borderColor: AppTokens.primary,
                     borderStrokeWidth: 2,
                   ),
                 ],
@@ -83,7 +89,7 @@ class ShopMap extends StatelessWidget {
                         icon: const Icon(
                           Icons.location_on,
                           size: 36,
-                          color: Color(0xff176b50),
+                          color: AppTokens.primary,
                         ),
                       ),
                     ),
@@ -91,7 +97,7 @@ class ShopMap extends StatelessWidget {
                 if (latitude != null && longitude != null)
                   Marker(
                     point: LatLng(latitude!, longitude!),
-                    child: Icon(myLocationIcon, color: Colors.blue),
+                    child: Icon(myLocationIcon, color: AppTokens.accentGold),
                   ),
               ],
             ),

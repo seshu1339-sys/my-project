@@ -94,6 +94,71 @@ const mode = process.argv[2] || 'inspect';
     const verified = await findUser(project, undefined, undefined, owner.uid);
     console.log(JSON.stringify({ownerAccountExists: true, emailVerified: verified.emailVerified, admin: JSON.parse(verified.customAttributes || '{}').admin === true}));
     return;
+  } else if (mode === 'configure-agent-apis' || mode === 'inspect-agent-apis') {
+    // Prerequisite GCP-side setup for the Master AI Agent's Play Console /
+    // Firebase Hosting / Cloud Functions integrations (functions/ai-agent-
+    // {playconsole,firebase-ops}.js). The runtime service account already
+    // has roles/editor on this project (verified via inspect-runtime), which
+    // already covers Hosting/Functions read access — no new IAM grant is
+    // needed for those two. Play Console access is NOT a GCP IAM concept at
+    // all; it is granted only through the Play Console web UI (Setup -> API
+    // access -> grant access to a service account) and there is no API for
+    // that step, so this mode only enables the Android Publisher API itself,
+    // the one prerequisite this script CAN do, and reports what still needs
+    // the Play Console UI.
+    const services = new Client({urlPrefix: 'https://serviceusage.googleapis.com', auth: true});
+    const apis = ['androidpublisher.googleapis.com', 'firebasehosting.googleapis.com', 'cloudfunctions.googleapis.com'];
+    const before = {};
+    for (const api of apis) before[api] = (await services.get(`/v1/projects/${project}/services/${api}`)).body.state;
+    if (mode === 'configure-agent-apis' && before['androidpublisher.googleapis.com'] !== 'ENABLED') {
+      await services.post(`/v1/projects/${project}/services/androidpublisher.googleapis.com:enable`, {});
+    }
+    const after = {};
+    for (const api of apis) after[api] = (await services.get(`/v1/projects/${project}/services/${api}`)).body.state;
+    console.log(JSON.stringify({
+      apis: after,
+      hostingAndFunctionsReadAccess: 'already covered by the runtime service account\'s existing roles/editor — no new IAM grant needed',
+      playConsoleManualStepRequired: 'Play Console -> Setup -> API access -> grant access to 462582150390-compute@developer.gserviceaccount.com (Release management, at minimum). No API exists for this step.',
+    }, null, 2));
+    return;
+  } else if (mode === 'set-github-app-config') {
+    // Non-secret GitHub App identifiers for functions/ai-agent-github.js
+    // (aiAgentConfig/global.integrations.github.{appId,installationId}).
+    // The private key itself is NEVER handled here — see
+    // `firebase functions:secrets:set AI_AGENT_GITHUB_APP_PRIVATE_KEY`.
+    const appId = process.argv[3];
+    const installationId = process.argv[4];
+    if (!appId || !installationId) throw Error('Provide appId and installationId.');
+    const firestore = new Client({urlPrefix: 'https://firestore.googleapis.com', auth: true});
+    const githubFields = {
+      appId: {stringValue: appId},
+      installationId: {stringValue: installationId},
+    };
+    const body = {fields: {integrations: {mapValue: {fields: {github: {mapValue: {fields: githubFields}}}}}}};
+    await firestore.patch(
+      `/v1/projects/${project}/databases/(default)/documents/aiAgentConfig/global?updateMask.fieldPaths=integrations.github.appId&updateMask.fieldPaths=integrations.github.installationId`,
+      body,
+    );
+    console.log(JSON.stringify({appId, installationId}));
+    return;
+  } else if (mode === 'grant-agent-role') {
+    // Bootstraps functions/ai-agent-rbac.js's aiAgentRoles/{uid} doc. While that
+    // collection is completely empty, every admin is treated as 'owner' (see
+    // ai-agent-rbac.js's getRole) so the existing admin account isn't locked
+    // out on day one; writing the first real doc here ends that carve-out for
+    // everyone else from then on — fail-closed, same as every other agent gate.
+    const email = process.argv[3];
+    const role = process.argv[4];
+    if (!email || !email.includes('@')) throw Error('Provide the admin email.');
+    if (!['owner', 'operator', 'viewer'].includes(role)) throw Error("Role must be 'owner', 'operator', or 'viewer'.");
+    const user = await findUser(project, email, undefined, undefined);
+    const firestore = new Client({urlPrefix: 'https://firestore.googleapis.com', auth: true});
+    await firestore.patch(
+      `/v1/projects/${project}/databases/(default)/documents/aiAgentRoles/${user.uid}?updateMask.fieldPaths=role&updateMask.fieldPaths=updatedAt`,
+      {fields: {role: {stringValue: role}, updatedAt: {timestampValue: new Date().toISOString()}}},
+    );
+    console.log(JSON.stringify({uid: user.uid, email, role}));
+    return;
   } else if (mode === 'configure-email' || mode === 'configure-email-link') {
     await identity.patch(configPath + '?updateMask=signIn.email.enabled,signIn.email.passwordRequired,signIn.phoneNumber.enabled', {
       signIn: {email: {enabled: true, passwordRequired: mode !== 'configure-email-link'}, phoneNumber: {enabled: false}},

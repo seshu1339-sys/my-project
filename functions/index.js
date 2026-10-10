@@ -16,6 +16,33 @@ Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
 Object.assign(exports, require('./ids'));
+// AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
+// file is independently removable: deleting its require/Object.assign line
+// here removes exactly that module's callables, nothing else. ai-agent-config.js
+// and ai-agent-confirmation.js each also export a plain helper function for the
+// other ai-agent-*.js modules to import directly (not a callable) — those two
+// are destructured instead of Object.assign'd so that helper is never
+// mistakenly offered to Firebase as a function to deploy.
+const {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting} = require('./ai-agent-config');
+Object.assign(exports, {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting});
+const {setAgentPin} = require('./ai-agent-confirmation');
+Object.assign(exports, {setAgentPin});
+// ai-agent-actions.js exports only the whitelist data (no callables), so it's
+// never required here directly — only by the other ai-agent-*.js modules below.
+Object.assign(exports, require('./ai-agent-executor'));
+Object.assign(exports, require('./ai-agent-interpreter'));
+Object.assign(exports, require('./ai-agent-image-check'));
+Object.assign(exports, require('./ai-agent-trusted-device'));
+Object.assign(exports, require('./ai-agent-webauthn'));
+Object.assign(exports, require('./ai-agent-voice'));
+Object.assign(exports, require('./ai-agent-monitoring'));
+Object.assign(exports, require('./ai-agent-backup'));
+// ai-agent-query.js is the read-only sibling of ai-agent-executor.js (see
+// its header comment); ai-agent-{github,playconsole,firebase-ops,rbac,
+// read-queries}.js export only plain functions/data, never onCall, so they
+// are required directly by ai-agent-executor.js/ai-agent-query.js and never
+// appear in this Object.assign list.
+Object.assign(exports, require('./ai-agent-query'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

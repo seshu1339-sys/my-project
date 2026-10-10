@@ -320,12 +320,12 @@ void main() {
 
     final settings = store.entries('settings');
     expect(
-      sectionOrder(settings, 'popular') > sectionOrder(settings, 'categories'),
+      sectionOrder(settings, 'localServices') > sectionOrder(settings, 'categories'),
       isTrue,
-      reason: 'Products starts below Categories by default',
+      reason: 'Local Services starts below Categories by default',
     );
 
-    // Drag the last handle (Products) up above the first one (Scrolling notice).
+    // Drag the last handle (Local Services) up above the first one (Scrolling notice).
     final handles = find.byIcon(Icons.drag_indicator);
     await tester.ensureVisible(handles.last);
     await tester.pump();
@@ -334,14 +334,14 @@ void main() {
 
     final reordered = store.entries('settings');
     expect(
-      sectionOrder(reordered, 'popular') < sectionOrder(settings, 'popular'),
+      sectionOrder(reordered, 'localServices') < sectionOrder(settings, 'localServices'),
       isTrue,
-      reason: 'Dragging the Products handle upward should move it earlier than its original last place',
+      reason: 'Dragging the Local Services handle upward should move it earlier than its original last place',
     );
     expect(
-      sectionOrder(reordered, 'popular') < sectionOrder(reordered, 'categories'),
+      sectionOrder(reordered, 'localServices') < sectionOrder(reordered, 'categories'),
       isTrue,
-      reason: 'Products should now sit above Categories',
+      reason: 'Local Services should now sit above Categories',
     );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
@@ -523,6 +523,8 @@ void main() {
     // brought into view further down the same lazily-built list).
     await tester.enterText(find.widgetWithText(TextFormField, emailLabel), 'not-an-email');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.pump();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     expect(store.business.text('supportEmail'), '', reason: 'invalid email must not save');
@@ -534,6 +536,8 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, emailLabel), 'support@locamarket.in');
     await tester.enterText(find.widgetWithText(TextFormField, websiteLabel), 'http://locamarket.in');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.pump();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     expect(store.business.text('websiteUrl'), '', reason: 'a non-HTTPS website must not save');
@@ -542,6 +546,8 @@ void main() {
     await tester.pump();
     await tester.enterText(find.widgetWithText(TextFormField, websiteLabel), 'https://locamarket.in');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.ensureVisible(find.text('Save changes'));
+    await tester.pump();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

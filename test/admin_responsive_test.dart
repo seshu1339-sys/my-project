@@ -8,7 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 
 void main() {
-  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1440.0]) {
+  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0]) {
     testWidgets('admin studio has no overflow at width $width', (
       tester,
     ) async {
@@ -23,17 +23,23 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
-      final narrow = width < 1100;
+      final narrow = width < 1300;
       // Below the breakpoint the navigation buttons collapse into one menu; above it
       // they stay a plain row of labelled buttons. Either way nothing may overflow.
       expect(find.byTooltip('More'), narrow ? findsOneWidget : findsNothing);
       expect(find.text('Vendors'), narrow ? findsNothing : findsOneWidget);
       expect(find.text('Field Assistants'), narrow ? findsNothing : findsOneWidget);
+      // Regression check: AI Agent is the newest (7th) nav button — it must
+      // never silently fall off the row at a width the "wide" layout claims
+      // to support (the production build clips RenderFlex overflow with no
+      // visible warning, unlike debug builds, so this has to be asserted).
+      expect(find.text('AI Agent'), narrow ? findsNothing : findsOneWidget);
       if (narrow) {
         await tester.tap(find.byTooltip('More'));
         await tester.pump();
         expect(find.text('Vendors'), findsOneWidget);
         expect(find.text('Field Assistants'), findsOneWidget);
+        expect(find.text('AI Agent'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tapAt(const Offset(10, 10)); // dismiss the menu
         await tester.pump();
