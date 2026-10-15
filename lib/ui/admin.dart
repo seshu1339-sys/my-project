@@ -291,17 +291,11 @@ class _AdminPageState extends State<AdminPage> {
       }
       final entries = widget.store
           .entries(
-            section == 'scrollingText' ||
-                    section == 'theme' ||
-                    section == 'sectionSettings'
-                ? 'settings'
-                : section,
+            section == 'scrollingText' || section == 'theme' ? 'settings' : section,
           )
           .where(
             (entry) => section == 'settings'
                 ? entry.id == 'business'
-                : section == 'sectionSettings'
-                ? entry.id.startsWith('section_')
                 : section != 'scrollingText' && section != 'theme' ||
                       entry.id == section,
           )
@@ -529,11 +523,7 @@ class _AdminPageState extends State<AdminPage> {
         }
       }
       await widget.store.delete(
-        section == 'scrollingText' ||
-                section == 'theme' ||
-                section == 'sectionSettings'
-            ? 'settings'
-            : section,
+        section == 'scrollingText' || section == 'theme' ? 'settings' : section,
         entry.id,
       );
       if (mounted) message(context, 'Deleted');

@@ -209,17 +209,13 @@ class _EntryEditorState extends State<EntryEditor> {
           widget.entry?.id ??
           (widget.collection == 'settings'
               ? 'business'
-              : widget.collection == 'sectionSettings'
-              ? 'section_${controllers['section']!.text.trim().toLowerCase()}'
               : widget.collection == 'scrollingText'
               ? 'scrollingText'
               : widget.collection == 'theme'
               ? 'theme'
               : '${widget.collection.substring(0, 1)}${DateTime.now().microsecondsSinceEpoch}');
       final collection =
-          widget.collection == 'scrollingText' ||
-              widget.collection == 'theme' ||
-              widget.collection == 'sectionSettings'
+          widget.collection == 'scrollingText' || widget.collection == 'theme'
           ? 'settings'
           : widget.collection;
       await widget.store.save(collection, Entry(id, data));
