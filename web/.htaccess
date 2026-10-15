@@ -1,0 +1,38 @@
+RewriteEngine On
+
+# Block public access to the stray dev-repo files/directories that were
+# sitting in public_html before this deploy (source code, Firestore rules,
+# internal docs) — safety net while their removal is confirmed separately.
+RewriteRule ^(docs|\.github|test|android|lib|macos|linux|ios|scripts|functions|windows|web_admin_overlay|config|web)(/|$) - [F,L]
+RewriteRule ^(\.metadata|firebase\.json|pubspec\.lock|BUILD_STATUS\.md|pubspec\.yaml|storage\.rules|README\.md|firestore\.indexes\.json|firestore\.rules|\.firebaserc|\.gitignore|locamarket_products\.csv|devtools_options\.yaml|AI_HANDOFF\.md|analysis_options\.yaml)$ - [F,L]
+
+# SPA fallback for the real deployed Flutter web app. Excludes /staging/ so
+# that subtree's own .htaccess handles its fallback independently (it has its
+# own base-href-correct index.html, never the root's).
+RewriteCond %{REQUEST_URI} !^/staging/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Every deploy regenerates main.dart.js/flutter_bootstrap.js/index.html with
+# new content at the SAME filename, but without these rules Apache's default
+# (and this host's own prior behavior — confirmed via a live `curl`: 7-day
+# max-age) let browsers cache them for up to a week. A returning visitor's
+# browser would keep running the OLD app logic for up to 7 days after every
+# deploy, with no visible error — just silently stale features, which caused
+# real confusion more than once ("I deployed the fix, why doesn't it show?").
+# These are intentionally the opposite of the long-cache rule below: the
+# entry point and the compiled app itself must always be revalidated, while
+# large, content-stable assets (fonts, canvaskit, images) keep caching long
+# so repeat visits still load fast.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|js)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "^version\.json$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(woff2?|ttf|otf|png|jpg|jpeg|svg|wasm)$">
+    Header set Cache-Control "public, max-age=2592000, immutable"
+  </FilesMatch>
+</IfModule>
