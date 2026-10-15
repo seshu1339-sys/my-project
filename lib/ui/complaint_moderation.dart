@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
+import 'moderation_dialogs.dart';
 
 /// Customer complaint review — fully self-contained, independent of the
 /// generic EntryEditor/admin shell and the other moderation pages.
@@ -16,11 +16,12 @@ class ComplaintModerationPage extends StatelessWidget {
       content: TextField(controller: resolution, maxLines: 4, decoration: const InputDecoration(labelText: 'Resolution or review note')),
       actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Save'))],
     ));
-    if (submit != true) return;
-    try {
-      await FirebaseFunctions.instance.httpsCallable('reviewComplaint').call({'complaintId': id, 'status': status, 'resolution': resolution.text.trim()});
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint updated')));
-    } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
+    if (submit != true || !context.mounted) return;
+    await runModerationAction(
+      context,
+      () => store.call('reviewComplaint', {'complaintId': id, 'status': status, 'resolution': resolution.text.trim()}),
+      onSuccess: (_) => 'Complaint updated',
+    );
     resolution.dispose();
   }
   @override

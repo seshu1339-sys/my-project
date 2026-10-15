@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
 import 'moderation_dialogs.dart';
@@ -17,14 +16,8 @@ class StaffDetailPage extends StatelessWidget {
   final Store store;
   final String staffUid;
 
-  Future<void> _decide(BuildContext context, String function, Map<String, dynamic> data) async {
-    try {
-      await FirebaseFunctions.instance.httpsCallable(function).call(data);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
+  Future<void> _decide(BuildContext context, String function, Map<String, dynamic> data) =>
+      runModerationAction(context, () => store.call(function, data));
 
   Future<void> _review(BuildContext context, {required bool approved}) =>
       _decide(context, 'reviewFieldStaff', {'staffUid': staffUid, 'approved': approved, 'reason': ''});

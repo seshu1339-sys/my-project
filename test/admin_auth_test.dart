@@ -22,6 +22,10 @@ class AdminTestStore extends Store {
   String? lastCallName;
   Map<String, dynamic>? lastCallData;
   bool failLogin = false, failVerify = false, loggedOut = false;
+  // Defaults to an invalid/expired session so every existing test (which
+  // expects to land on the OTP page right after logging in) keeps working
+  // unchanged — set true to simulate a still-valid 12-hour OTP session.
+  bool sessionValid = false;
   Map<String, dynamic> requestOtpResult = const {'ok': true, 'cooldownSeconds': 45, 'expiresInSeconds': 300};
 
   @override
@@ -66,6 +70,10 @@ class AdminTestStore extends Store {
     if (name == 'verifyAdminOtp') {
       if (failVerify) throw Exception('Incorrect code. 4 attempt(s) left.');
       return {'ok': true};
+    }
+    if (name == 'checkAdminSession') {
+      if (sessionValid) return {'ok': true};
+      throw Exception('Admin verification expired. Sign in and verify your code again.');
     }
     throw StateError('Unexpected call: $name');
   }
@@ -192,5 +200,30 @@ void main() {
     expect(store.loggedOut, true);
     expect(field('Password'), findsOneWidget);
     expect(field('Verification code'), findsNothing);
+  });
+
+  testWidgets('a still-valid OTP session skips straight to the dashboard on reload, without a fresh OTP', (tester) async {
+    final store = AdminTestStore()
+      ..admin = true
+      ..current = AdminTestUser()
+      ..sessionValid = true;
+    await tester.pumpWidget(MaterialApp(home: AdminGate(store: store)));
+    await tester.pump(); // let the cached session-check Future resolve
+    await tester.pump();
+    expect(store.lastCallName, 'checkAdminSession');
+    expect(field('Verification code'), findsNothing);
+    expect(field('Password'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('an expired OTP session still requires a fresh code on reload, never bypassed', (tester) async {
+    final store = AdminTestStore()
+      ..admin = true
+      ..current = AdminTestUser()
+      ..sessionValid = false;
+    await tester.pumpWidget(MaterialApp(home: AdminGate(store: store)));
+    await tester.pumpAndSettle();
+    expect(store.lastCallName, 'requestAdminOtp'); // checkAdminSession ran first, then fell through
+    expect(field('Verification code'), findsOneWidget);
   });
 }

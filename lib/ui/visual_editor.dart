@@ -9,9 +9,19 @@ import '../services/search.dart';
 import 'entry_editor.dart';
 import 'layout_editor.dart';
 import 'layout_settings.dart';
+import 'home_ad_rail.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
 import 'visual_editor_overlay.dart';
 import 'wireframe_home.dart';
+
+// Keys for individually-selectable ad/box promotions are namespaced with
+// this prefix (e.g. 'promo-<firestoreId>') so they can share EditorSelection
+// and ResizeController with the 7 layout-component keys without colliding —
+// no promotion id is ever itself a bare layout-component key.
+const _promoKeyPrefix = 'promo-';
+bool _isPromoKey(String key) => key.startsWith(_promoKeyPrefix);
+String _promoId(String key) => key.substring(_promoKeyPrefix.length);
 
 enum _PreviewWidth { desktop, tablet, mobile }
 
@@ -50,50 +60,70 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   final List<Map<String, dynamic>> _history = [];
   int _historyIndex = 0;
 
-  // Real drag-to-resize state: the handle reports raw local dy on every
-  // pointer-move event (can fire 60+ times/sec), so writes are throttled to
-  // avoid hammering Firestore while the drag is live, with one final,
-  // un-throttled write on release so the committed value always matches
-  // exactly where the pointer was let go.
-  String? _resizingKey;
-  double _resizeBaseHeight = 0;
-  double _resizeStartDy = 0;
-  bool _resizeOriginSet = false;
-  double _resizeLiveHeight = 0;
-  DateTime _lastResizeWrite = DateTime.fromMillisecondsSinceEpoch(0);
+  // Real drag-to-resize state, held purely locally (never Firestore) while a
+  // drag is live — only the dragged section's own SectionTapRegion rebuilds
+  // per pointer-move, never the whole page/preview. Persisted exactly once,
+  // at drag-end — see _endResize. Extracted into its own class (rather than
+  // inline ValueNotifier + methods here) so the drag/commit logic is
+  // directly unit-testable without mounting the real WireframeHome preview.
+  final ResizeController _resize = ResizeController();
+
+  bool _closing = false;
 
   @override
   void dispose() {
     selection.dispose();
     search.dispose();
     scroll.dispose();
+    _resize.dispose();
     super.dispose();
   }
 
   void _previewOnly(String what) => message(context, '$what — open the live site to try this for real.');
 
+  // A selected key is either one of the 7 layout-component sections (backed
+  // by settings/section_<key>) or one individually-selected ad/box promotion
+  // (backed by its own promotions/<id> doc, key 'promo-<id>') — these two
+  // helpers are the ONE place that distinction is resolved, so selection,
+  // undo/redo, cancel and the percent fields all agree on where a key's data
+  // actually lives without duplicating this branch everywhere.
+  Entry _currentEntryFor(String key) => _isPromoKey(key)
+      ? widget.store.entries('promotions').firstWhere((e) => e.id == _promoId(key), orElse: () => Entry(_promoId(key), const {}))
+      : sectionConfig(widget.store.entries('settings'), key);
+
+  Future<void> _saveEntryFor(String key, Map<String, dynamic> data) => _isPromoKey(key)
+      ? widget.store.save('promotions', Entry(_promoId(key), data))
+      : widget.store.save('settings', Entry('section_$key', data));
+
   void _select(String key) {
     _history
       ..clear()
-      ..add(Map<String, dynamic>.from(sectionConfig(widget.store.entries('settings'), key).data));
+      ..add(Map<String, dynamic>.from(_currentEntryFor(key).data));
     _historyIndex = 0;
     selection.value = key;
   }
 
   Future<void> _closeSelection({required bool restoreSnapshot}) async {
     final key = selection.value;
-    if (key != null && restoreSnapshot && _history.isNotEmpty) {
-      await widget.store.save('settings', Entry('section_$key', _history.first));
+    setState(() => _closing = true);
+    try {
+      if (key != null && restoreSnapshot && _history.isNotEmpty) {
+        await _saveEntryFor(key, _history.first);
+      }
+      selection.value = null;
+      _history.clear();
+      _historyIndex = 0;
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => _closing = false);
     }
-    selection.value = null;
-    _history.clear();
-    _historyIndex = 0;
   }
 
   void _onAutoSaved() {
     final key = selection.value;
     if (key == null) return;
-    final current = Map<String, dynamic>.from(sectionConfig(widget.store.entries('settings'), key).data);
+    final current = Map<String, dynamic>.from(_currentEntryFor(key).data);
     // Drop any "future" redo states once a new edit happens after an undo.
     _history.removeRange(_historyIndex + 1, _history.length);
     _history.add(current);
@@ -105,7 +135,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     final key = selection.value;
     if (key == null || _historyIndex <= 0) return;
     _historyIndex--;
-    await widget.store.save('settings', Entry('section_$key', _history[_historyIndex]));
+    await _saveEntryFor(key, _history[_historyIndex]);
     setState(() {});
   }
 
@@ -113,7 +143,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     final key = selection.value;
     if (key == null || _historyIndex >= _history.length - 1) return;
     _historyIndex++;
-    await widget.store.save('settings', Entry('section_$key', _history[_historyIndex]));
+    await _saveEntryFor(key, _history[_historyIndex]);
     setState(() {});
   }
 
@@ -141,57 +171,67 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     onSelect: _select,
     reorderable: reorderableHomeSections.any((d) => d.key == key),
     onReorderDrop: (draggedKey) => _dropReorder(draggedKey, ontoKey: key),
-    liveHeightLabel: _resizingKey == key ? '${_resizeLiveHeight.round()}px' : null,
-    onResizeDragStart: () => _startResize(key),
-    onResizeDragUpdate: (dy) => _updateResize(key, dy),
-    onResizeDragEnd: () => _endResize(key),
+    liveResize: _resize.live,
+    onHeightDragStart: () => _startResize(key),
+    onHeightDragUpdate: (dy) => _resize.updateHeight(key, dy),
+    onHeightDragEnd: () => _endResize(key),
+    onWidthDragStart: () => _startResize(key),
+    onWidthDragUpdate: (dx) => _resize.updateWidth(key, dx),
+    onWidthDragEnd: () => _endResize(key),
+    onCornerDragStart: () => _startResize(key),
+    onCornerDragUpdate: (d) => _resize.updateCorner(key, d),
+    onCornerDragEnd: () => _endResize(key),
     child: child,
   );
 
   void _startResize(String key) {
-    final saved = sectionConfig(widget.store.entries('settings'), key);
-    final current = saved.number('height', 0);
-    setState(() {
-      _resizingKey = key;
-      // 0/automatic starts from a sensible on-screen size rather than
-      // jumping the section to 0px the instant the drag begins.
-      _resizeBaseHeight = current > 0 ? current : 240;
-      _resizeOriginSet = false;
-      _resizeLiveHeight = _resizeBaseHeight;
-    });
+    final saved = _currentEntryFor(key);
+    final h = saved.number('height', 0);
+    final w = saved.number('width', 0);
+    // 0/automatic starts from a sensible on-screen size rather than jumping
+    // the section to 0px/full-bleed the instant the drag begins.
+    _resize.start(key, baseHeight: h > 0 ? h : 240, baseWidth: w > 0 ? w : 600);
   }
 
-  void _updateResize(String key, double dy) {
-    if (_resizingKey != key) return;
-    // First callback of the drag establishes the local-coordinate origin;
-    // every later one reports dy relative to the SAME fixed handle origin
-    // (GestureDetector's localPosition is relative to the handle itself,
-    // which doesn't move during the drag), so the raw delta from the first
-    // sample is exactly the total drag distance.
-    if (!_resizeOriginSet) {
-      _resizeOriginSet = true;
-      _resizeStartDy = dy;
-    }
-    final next = (_resizeBaseHeight + (dy - _resizeStartDy)).clamp(40.0, 1200.0);
-    setState(() => _resizeLiveHeight = next);
-    final now = DateTime.now();
-    if (now.difference(_lastResizeWrite) > const Duration(milliseconds: 120)) {
-      _lastResizeWrite = now;
-      adjustSectionHeight(widget.store, key, next);
-    }
-  }
+  Future<void> _saveHeight(String key, double h) => _isPromoKey(key)
+      ? adjustPromoDimension(widget.store, _promoId(key), 'height', h)
+      : adjustSectionHeight(widget.store, key, h);
 
-  Future<void> _endResize(String key) async {
-    if (_resizingKey != key) return;
-    final finalHeight = _resizeLiveHeight;
-    setState(() {
-      _resizingKey = null;
-      _resizeStartDy = 0;
-    });
-    // Un-throttled final write so the committed value always matches
-    // exactly where the pointer was released, even if the last live write
-    // was skipped by the throttle window.
-    await adjustSectionHeight(widget.store, key, finalHeight);
+  Future<void> _saveWidth(String key, double w) => _isPromoKey(key)
+      ? adjustPromoDimension(widget.store, _promoId(key), 'width', w)
+      : adjustSectionWidth(widget.store, key, w);
+
+  Future<void> _endResize(String key) => _resize.end(
+    key,
+    saveHeight: (h) => _saveHeight(key, h),
+    saveWidth: (w) => _saveWidth(key, w),
+  );
+
+  // Wraps one individual ad/box promotion (not the whole rail — see
+  // home_ad_rail.dart's wrapItem doc comment) in the exact same
+  // SectionTapRegion/ResizeController machinery the 7 layout sections use,
+  // just keyed by its own Firestore id so each one is selected, resized and
+  // saved completely independently of its neighbors. Not reorderable here —
+  // ad/box order isn't part of this bug fix's scope.
+  Widget _wrapPromoItem(Entry entry, String kind, Widget child) {
+    final key = '$_promoKeyPrefix${entry.id}';
+    return SectionTapRegion(
+      sectionKey: key,
+      label: kind == 'ad' ? 'Ad' : 'Box',
+      selection: selection,
+      onSelect: _select,
+      liveResize: _resize.live,
+      onHeightDragStart: () => _startResize(key),
+      onHeightDragUpdate: (dy) => _resize.updateHeight(key, dy),
+      onHeightDragEnd: () => _endResize(key),
+      onWidthDragStart: () => _startResize(key),
+      onWidthDragUpdate: (dx) => _resize.updateWidth(key, dx),
+      onWidthDragEnd: () => _endResize(key),
+      onCornerDragStart: () => _startResize(key),
+      onCornerDragUpdate: (d) => _resize.updateCorner(key, d),
+      onCornerDragEnd: () => _endResize(key),
+      child: child,
+    );
   }
 
   Future<void> _dropReorder(String draggedKey, {required String ontoKey}) async {
@@ -256,26 +296,33 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                           : MediaQuery.of(context).copyWith(
                               size: Size(_simulatedWidth!, MediaQuery.sizeOf(context).height),
                             ),
-                      child: SingleChildScrollView(
-                        child: WireframeHome(
-                          store: widget.store,
-                          search: search,
-                          searchService: const SmartSearch(),
-                          onSearch: () => setState(() {}),
-                          onLocation: () => _previewOnly('Location picker'),
-                          onAssistedSearch: (_) => _previewOnly('Voice/image search'),
-                          onServices: () => _previewOnly('Services page'),
-                          onAccount: () => _previewOnly('Account page'),
-                          onCart: () => _previewOnly('Cart page'),
-                          onProduct: (_) => _previewOnly('Product page'),
-                          onAdd: (_) => _previewOnly('Add to cart'),
-                          onCategory: (_) => _previewOnly('Category page'),
-                          onPromotion: (_) => _previewOnly('Promotion target'),
-                          scroll: scroll,
-                          categoriesKey: categoriesKey,
-                          productsKey: productsKey,
-                          wrapSection: _wrapSection,
-                        ),
+                      // WireframeHome already scrolls itself internally
+                      // (bound to `scroll` below) — wrapping it in a second,
+                      // outer SingleChildScrollView here nests two unbounded
+                      // vertical scrollables, which Flutter cannot lay out
+                      // (the inner viewport is handed an unbounded height)
+                      // and throws a layout error that crashed/froze this
+                      // page. WireframeHome just needs the bounded height
+                      // its ancestors (Expanded/Scaffold) already give it.
+                      child: WireframeHome(
+                        store: widget.store,
+                        search: search,
+                        searchService: const SmartSearch(),
+                        onSearch: () => setState(() {}),
+                        onLocation: () => _previewOnly('Location picker'),
+                        onAssistedSearch: (_) => _previewOnly('Voice/image search'),
+                        onServices: () => _previewOnly('Services page'),
+                        onAccount: () => _previewOnly('Account page'),
+                        onCart: () => _previewOnly('Cart page'),
+                        onProduct: (_) => _previewOnly('Product page'),
+                        onAdd: (_) => _previewOnly('Add to cart'),
+                        onCategory: (_) => _previewOnly('Category page'),
+                        onPromotion: (_) => _previewOnly('Promotion target'),
+                        scroll: scroll,
+                        categoriesKey: categoriesKey,
+                        productsKey: productsKey,
+                        wrapSection: _wrapSection,
+                        wrapPromoItem: _wrapPromoItem,
                       ),
                     ),
                   ),
@@ -301,6 +348,19 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     ),
   );
 
+  // Matches _startResize's own "0/automatic" fallback, so the pixel value
+  // shown here is the same number a drag would start from, not a
+  // momentarily-misleading 0px.
+  double _displayHeight(String key) {
+    final h = _currentEntryFor(key).number('height', 0);
+    return h > 0 ? h : 240;
+  }
+
+  double _displayWidth(String key) {
+    final w = _currentEntryFor(key).number('width', 0);
+    return w > 0 ? w : 600;
+  }
+
   Widget _inlinePanel(String key) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -310,7 +370,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           children: [
             Expanded(
               child: Text(
-                layoutComponents[key] ?? key,
+                _isPromoKey(key) ? 'Advertisement / promo box' : layoutComponents[key] ?? key,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -325,29 +385,74 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
               onPressed: _historyIndex < _history.length - 1 ? _redo : null,
             ),
             OutlinedButton(
-              onPressed: () => _closeSelection(restoreSnapshot: true),
+              onPressed: _closing ? null : () => _closeSelection(restoreSnapshot: true),
               child: const Text('Cancel'),
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: () => _closeSelection(restoreSnapshot: false),
-              child: const Text('Done'),
+              onPressed: _closing ? null : () => _closeSelection(restoreSnapshot: false),
+              child: _closing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Done'),
             ),
           ],
         ),
       ),
-      const Divider(),
-      Expanded(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: LayoutFieldsForm(
-            key: ValueKey(key),
-            store: widget.store,
-            component: key,
-            autoSave: true,
-            onSaved: _onAutoSaved,
+      // Promo items (ad/box) aren't part of the layoutComponents/
+      // LayoutFieldsForm system below (they're individual promotions/<id>
+      // docs, not settings/section_<key> docs) — so they get their own
+      // pixel width/height row here. The 7 layout sections don't: their
+      // Width/Height fields now live in LayoutFieldsForm itself (below,
+      // with a "px" suffix), so showing them twice in two different places
+      // would be confusing — one spot per field, not two.
+      if (_isPromoKey(key))
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              PixelField(
+                label: 'Width',
+                valuePx: _displayWidth(key),
+                minPx: 80,
+                maxPx: 3840,
+                onChangedPx: (px) => _saveWidth(key, px),
+              ),
+              PixelField(
+                label: 'Height',
+                valuePx: _displayHeight(key),
+                minPx: 40,
+                maxPx: 1200,
+                onChangedPx: (px) => _saveHeight(key, px),
+              ),
+            ],
           ),
         ),
+      const Divider(),
+      Expanded(
+        child: _isPromoKey(key)
+            ? Center(
+                child: TextButton.icon(
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Edit target, schedule, image & more'),
+                  onPressed: () => _openFullEditor('promotions', entryId: _promoId(key)),
+                ),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: LayoutFieldsForm(
+                  key: ValueKey(key),
+                  store: widget.store,
+                  component: key,
+                  autoSave: true,
+                  onSaved: _onAutoSaved,
+                ),
+              ),
       ),
     ],
   );

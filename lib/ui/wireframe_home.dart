@@ -17,6 +17,7 @@ import 'home_ticker_section.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
 import 'services_page.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
 
 /// The customer homepage composition root. Computes the shared data each
@@ -48,6 +49,7 @@ class WireframeHome extends StatelessWidget {
     required this.categoriesKey,
     required this.productsKey,
     this.wrapSection = _identitySection,
+    this.wrapPromoItem = _identityPromoItem,
   });
   final Store store;
   final TextEditingController search;
@@ -64,6 +66,11 @@ class WireframeHome extends StatelessWidget {
   // exact no-op and therefore byte-identical output to before this existed.
   final Widget Function(String sectionKey, Widget child) wrapSection;
   static Widget _identitySection(String sectionKey, Widget child) => child;
+  // Same hook as wrapSection, but per individual ad/box promotion rather
+  // than per whole section — see HomeAdRail's own wrapItem doc comment for
+  // why a single section-level wrap isn't enough for the ad/box rail.
+  final Widget Function(Entry entry, String kind, Widget child) wrapPromoItem;
+  static Widget _identityPromoItem(Entry entry, String kind, Widget child) => child;
 
   @override
   Widget build(BuildContext context) {
@@ -230,6 +237,7 @@ class WireframeHome extends StatelessWidget {
                       ads: ads,
                       boxes: boxes,
                       onPromotion: onPromotion,
+                      wrapItem: wrapPromoItem,
                     );
                     // Mobile/tablet never hide these ads — they're shown as a
                     // compact, auto-rotating, swipeable carousel instead of
@@ -337,7 +345,14 @@ class WireframeHome extends StatelessWidget {
                             children: [
                               Expanded(child: main),
                               SizedBox(width: page.gap),
-                              SizedBox(width: railWidth, child: wrapSection('ads', rail)),
+                              // Individual ads/boxes are wrapped (wrapPromoItem,
+                              // threaded through HomeAdRail above), not the
+                              // whole rail — wrapping the whole rail in one
+                              // SectionTapRegion made one shared selection
+                              // box/resize handles span every stacked ad/box
+                              // at once, which read as them overlapping and
+                              // made it impossible to resize just one.
+                              SizedBox(width: railWidth, child: rail),
                             ],
                           )
                         : main;

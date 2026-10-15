@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
-import 'admin.dart';
+import 'entry_editor.dart';
+import 'moderation_dialogs.dart';
 import 'staff_detail_page.dart';
 import 'vendor_detail_page.dart';
 
@@ -52,17 +52,12 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
 
   Future<void> _backfill() async {
     setState(() => backfilling = true);
-    try {
-      final result = await FirebaseFunctions.instance.httpsCallable('backfillSequentialIds').call();
-      final counts = result.data as Map;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+    await runModerationAction(
+      context,
+      () => store.call('backfillSequentialIds', {}),
+      onSuccess: (counts) =>
           'Assigned IDs — vendors: ${counts['vendors']}, staff: ${counts['fieldStaff']}, shops: ${counts['shops']}',
-        )));
-      }
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+    );
     if (mounted) setState(() => backfilling = false);
   }
 

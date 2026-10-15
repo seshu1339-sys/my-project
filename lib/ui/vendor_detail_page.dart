@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
@@ -21,14 +20,8 @@ class VendorDetailPage extends StatelessWidget {
   final Store store;
   final String vendorUid;
 
-  Future<void> _decide(BuildContext context, String function, Map<String, dynamic> data) async {
-    try {
-      await FirebaseFunctions.instance.httpsCallable(function).call(data);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
+  Future<void> _decide(BuildContext context, String function, Map<String, dynamic> data) =>
+      runModerationAction(context, () => store.call(function, data));
 
   Future<void> _setSuspension(BuildContext context, String name, {required bool suspend}) async {
     final reason = await showSuspensionDialog(

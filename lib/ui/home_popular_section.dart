@@ -5,7 +5,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'home_widgets.dart';
 import 'layout_settings.dart';
-import 'shared.dart';
+import 'home_section_config.dart';
 
 /// The "Popular Products" / "Featured Products" homepage section (also
 /// doubles as search results when the customer has typed into the header

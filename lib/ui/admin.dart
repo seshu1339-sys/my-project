@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/admin_route.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
 import 'layout_editor.dart';
 import 'visual_editor.dart';

@@ -108,7 +108,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       'spacing': '16',
                       'animationMs': '6000',
                       'stopAfter': '0',
-                      'scrollEnabled': 'true',
+                      'scrollEnabled': 'false',
                       'position': 'start',
                       'animationSpeed': '600',
                       'displayDuration': '6000',

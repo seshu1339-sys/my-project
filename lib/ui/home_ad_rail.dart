@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'home_promotions.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
+
+/// Commits one dimension (`width`/`height`) onto a single ad/box promotion
+/// doc, preserving every other field — the exact same read-merge-save
+/// pattern as `adjustSectionField` in `home_section_config.dart`, just
+/// targeting one `promotions` entry instead of a shared `settings/section_*`
+/// doc. This is what lets each ad/box be resized independently in the
+/// Visual Editor: dragging one never touches the shared `ads`/`boxes`
+/// appearance defaults, only this one entry's own `width`/`height`.
+Future<void> adjustPromoDimension(Store store, String id, String field, double value) async {
+  final current = store.entries('promotions').firstWhere(
+    (e) => e.id == id,
+    orElse: () => Entry(id, const {}),
+  );
+  await store.save('promotions', Entry(id, {...current.data, field: value}));
+}
 
 /// Merges each ad/box promotion with its section's shared appearance config
 /// (exactly as the desktop rail has always done), so the desktop rail and
@@ -32,12 +48,22 @@ class HomeAdRail extends StatelessWidget {
     required this.ads,
     required this.boxes,
     required this.onPromotion,
+    this.wrapItem,
   });
   final ComponentLayout adLayout;
   final ComponentLayout boxLayout;
   final List<Entry> ads;
   final List<Entry> boxes;
   final ValueChanged<String> onPromotion;
+  // Admin Visual Editor hook: when provided, wraps each INDIVIDUAL ad/box
+  // (not the rail as a whole) so each one gets its own selection border,
+  // ghost outline and 8 resize handles, independent of its neighbors. Null
+  // on the real customer site — this widget's own rendering is otherwise
+  // completely unchanged either way.
+  final Widget Function(Entry entry, String kind, Widget child)? wrapItem;
+
+  Widget _item(Entry entry, String kind, Widget child) =>
+      wrapItem == null ? child : wrapItem!(entry, kind, child);
 
   @override
   Widget build(BuildContext context) => Column(
@@ -55,9 +81,13 @@ class HomeAdRail extends StatelessWidget {
                   padding: EdgeInsets.only(
                     bottom: ad.number('spacing', adLayout.gap).clamp(0, 64),
                   ),
-                  child: ScheduledPromo(
-                    entry: Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
-                    onTap: () => onPromotion(ad.text('target')),
+                  child: _item(
+                    ad,
+                    'ad',
+                    ScheduledPromo(
+                      entry: Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
+                      onTap: () => onPromotion(ad.text('target')),
+                    ),
                   ),
                 ),
             ],
@@ -73,9 +103,13 @@ class HomeAdRail extends StatelessWidget {
                   padding: EdgeInsets.only(
                     bottom: clampedNumber(box, 'spacing', boxLayout.gap, 0, 64),
                   ),
-                  child: ScheduledPromo(
-                    entry: Entry(box.id, {...boxLayout.entry.data, ...box.data}),
-                    onTap: () => onPromotion(box.text('target')),
+                  child: _item(
+                    box,
+                    'box',
+                    ScheduledPromo(
+                      entry: Entry(box.id, {...boxLayout.entry.data, ...box.data}),
+                      onTap: () => onPromotion(box.text('target')),
+                    ),
                   ),
                 ),
             ],

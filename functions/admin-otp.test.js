@@ -37,6 +37,16 @@ test('admin OTP: request/verify success, wrong code, reuse, expiry, resend coold
   const audience = await fns.offerAudienceSize.run({...admin, data: {}});
   assert.equal(typeof audience.subscribers, 'number');
 
+  // ---- checkAdminSession mirrors requireAdmin()'s own session check exactly:
+  // succeeds immediately after a fresh OTP verification (the client's own way
+  // to ask "is my session still valid?" without being able to forge a yes),
+  // then fails again once the session is force-expired, same as any other
+  // privileged callable would at that point.
+  const checked = await fns.checkAdminSession.run({...admin, data: {}});
+  assert.equal(checked.ok, true);
+  await db.collection('_adminSessions').doc(admin.auth.uid).update({expiresAt: Timestamp.fromMillis(Date.now() - 1000)});
+  await assert.rejects(() => fns.checkAdminSession.run({...admin, data: {}}), /verification expired/);
+
   // ---- resend cooldown: requesting again immediately is refused
   await assert.rejects(() => fns.requestAdminOtp.run({...admin, data: {}}), /wait/);
 

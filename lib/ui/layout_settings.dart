@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
 
 /// Shared by the editor and renderer. Zero dimensions mean automatic sizing.
@@ -90,7 +91,17 @@ List<String> componentFields(String component) => [
         }.contains(key) &&
         !({
               'header': {'fontSize'},
-              'logo': {'fontSize', 'gap'},
+              // width/padding/margin/radius/borderWidth excluded here, not
+              // just unset: the logo icon is a deliberately square box sized
+              // from `height` alone (see responsive_header_bar.dart), with
+              // no padding/margin/decoration wrapper at all — showing these
+              // fields would let an admin "set" them and see nothing happen.
+              // Height (and minHeight/maxHeight/*Scale, which feed it) and
+              // iconSize are the only ones that actually do anything here.
+              'logo': {
+                'fontSize', 'gap', 'padding', 'radius', 'borderWidth',
+                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+              },
               'user': {'gap', 'iconSize'},
               'office': {'gap', 'iconSize'},
               'popular': {'gap', 'iconSize'},
@@ -119,6 +130,66 @@ List<String> componentFields(String component) => [
   if (['notice', 'ads', 'boxes'].contains(component)) 'speed',
   if (['ads', 'boxes'].contains(component)) ...['stopAfter', 'brightness'],
 ];
+
+/// Which `dimensionFields` keys are real pixel quantities (get a "px"
+/// suffix in the admin form) versus unitless multipliers/counts/other units
+/// that would be misleading with one — the *Scale fields are 0.75-1.5
+/// multipliers, columns/rows-family are plain counts, speed is px/second,
+/// animationMs/stopAfter are milliseconds/seconds, brightness is a
+/// 0.2-2 multiplier.
+const pixelFields = <String>{
+  'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
+  'mobileWidth', 'tabletWidth', 'desktopWidth', 'padding', 'margin', 'gap',
+  'gapX', 'radius', 'borderWidth', 'fontSize', 'iconSize', 'voiceIconSize',
+  'imageIconSize', 'imageHeight', 'imageWidth',
+};
+
+/// Google Fonts offered in the admin's Font family picker — five general
+/// e-commerce-friendly latin faces plus five that render Telugu well, since
+/// this site's ticker/UI strings are bilingual. Passed straight to
+/// `GoogleFonts.getFont` in shared.dart's `sectionTextStyle`, so these must
+/// be the exact canonical Google Fonts family names.
+const fontFamilyOptions = <String>[
+  'Poppins', 'Roboto', 'Lato', 'Montserrat', 'Open Sans',
+  'Inter', 'Nunito', 'Noto Sans Telugu', 'Ramabhadra', 'Mallanna',
+];
+
+// Components whose section container is wrapped in `LayoutSection`
+// (layout_settings.dart below) — they get entryDecoration's
+// background/border/gradient AND the one-time entrance animation
+// LayoutSection applies, plus cascaded text styling via its
+// DefaultTextStyle.merge. See wireframe_home.dart/home_ad_rail.dart/
+// responsive_header_bar.dart for where each is actually wrapped.
+const _animatedSections = {
+  'header', 'notice', 'promo', 'categories', 'popular', 'localServices', 'nearby', 'ads', 'boxes', 'background',
+};
+// Has its own entryDecoration/sectionTextStyle call but isn't wrapped in its
+// own LayoutSection (no entrance animation of its own).
+const _decoratedOnly = {'search'};
+
+/// The full, ordered field list the admin form builds for one component —
+/// `componentFields` (the numeric dimension fields) plus visibility, colors,
+/// typography and the other non-numeric controls, included only where
+/// they're genuinely wired to something real for that specific component.
+/// Centralizing this (rather than each caller re-deriving which extras
+/// apply) is what makes layout_editor.dart's form and this file's own
+/// render-time checks impossible to drift apart.
+List<String> allFieldsFor(String component) {
+  final animated = _animatedSections.contains(component);
+  final decorated = animated || _decoratedOnly.contains(component);
+  final textStyled = decorated || component == 'products';
+  return [
+    'visible',
+    ...componentFields(component),
+    if (decorated) ...['backgroundColor', 'gradientStart', 'gradientEnd', 'borderColor']
+    else if (component == 'products') ...['backgroundColor', 'borderColor'],
+    if (textStyled) ...['textColor', 'fontFamily', 'fontStyle'],
+    if (animated) 'animation',
+    if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
+    if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
+    if (['products', 'popular', 'localServices'].contains(component)) 'alignment',
+  ];
+}
 
 class ComponentLayout {
   ComponentLayout(this.entry, this.viewport);
@@ -246,7 +317,7 @@ class LayoutSection extends StatelessWidget {
             .n('padding', 0, 0, 48)
             .clamp(0, insetBudget)
             .toDouble();
-        return Padding(
+        final content = Padding(
           padding: EdgeInsets.all(margin),
           child: Align(
             alignment: Alignment.topLeft,
@@ -275,7 +346,32 @@ class LayoutSection extends StatelessWidget {
             ),
           ),
         );
+        return applyEntranceAnimation(layout.entry, content);
       },
     );
   }
+}
+
+/// Wraps [child] in a one-time entrance animation (fade in, or fade+slide up)
+/// driven by the component's own `animation` field (none/fade/slide,
+/// default none — fully backward compatible with every section that's never
+/// set it). Plays once per mount, not on every rebuild: `TweenAnimationBuilder`
+/// only re-animates when its tween's begin/end values actually move the
+/// displayed value, and once this reaches 1.0 a fresh 0→1 tween on a later
+/// rebuild has nothing left to animate. Exposed as a top-level helper (not
+/// buried in `LayoutSection`'s build method) so the same effect can be
+/// reused for the admin form's own "Preview" button on a tiny demo box.
+Widget applyEntranceAnimation(Entry entry, Widget child) {
+  final animation = entry.text('animation', 'none');
+  if (animation != 'fade' && animation != 'slide') return child;
+  return TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: const Duration(milliseconds: 450),
+    curve: Curves.easeOut,
+    builder: (context, t, builtChild) {
+      final faded = Opacity(opacity: t, child: builtChild);
+      return animation == 'slide' ? Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded) : faded;
+    },
+    child: child,
+  );
 }

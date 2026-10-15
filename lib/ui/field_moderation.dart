@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'moderation_dialogs.dart';
 import 'shop_map.dart';
 
 /// Field Assistant approvals — a separate admin tool from Vendor moderation,
@@ -15,14 +14,8 @@ class FieldModerationPage extends StatelessWidget {
   const FieldModerationPage({super.key, required this.store});
   final Store store;
 
-  Future<void> decide(BuildContext context, String function, Map<String, dynamic> data) async {
-    try {
-      await FirebaseFunctions.instance.httpsCallable(function).call(data);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Decision saved')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
+  Future<void> decide(BuildContext context, String function, Map<String, dynamic> data) =>
+      runModerationAction(context, () => store.call(function, data), onSuccess: (_) => 'Decision saved');
 
   Future<void> _reviewStaff(BuildContext context, String staffUid, {required bool approved}) async {
     var reason = '';
@@ -42,24 +35,15 @@ class FieldModerationPage extends StatelessWidget {
   }
 
   Future<void> _setSuspension(BuildContext context, String staffUid, String name, {required bool suspend}) async {
-    final reason = TextEditingController();
-    final go = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
-      title: Text(suspend ? 'Suspend $name?' : 'Reinstate $name?'),
-      content: suspend
-          ? Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('They will not be able to submit new entries until reinstated.'),
-              TextField(controller: reason, maxLines: 3, maxLength: 500, onChanged: (_) => setDialogState(() {}), decoration: const InputDecoration(labelText: 'Reason for suspension (required)')),
-            ])
-          : const Text('They will be able to submit entries again.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
-        FilledButton(onPressed: suspend && reason.text.trim().length < 3 ? null : () => Navigator.pop(dialog, true), child: Text(suspend ? 'Suspend' : 'Reinstate')),
-      ],
-    )));
-    final note = reason.text.trim();
-    reason.dispose();
-    if (go != true || !context.mounted) return;
-    await decide(context, 'setFieldStaffSuspension', {'staffUid': staffUid, 'suspended': suspend, 'reason': note});
+    final reason = await showSuspensionDialog(
+      context,
+      name: name,
+      suspend: suspend,
+      suspendBody: 'They will not be able to submit new entries until reinstated.',
+      reinstateBody: 'They will be able to submit entries again.',
+    );
+    if (reason == null || !context.mounted) return;
+    await decide(context, 'setFieldStaffSuspension', {'staffUid': staffUid, 'suspended': suspend, 'reason': reason});
   }
 
   Future<void> _reviewEntry(BuildContext context, String entryId, {required bool approved}) async {
@@ -154,7 +138,7 @@ class FieldModerationPage extends StatelessWidget {
       subtitle: Text('${data['staffName'] ?? data['staffUid']} • ₹${item['price']} • Stock ${item['stock']}'),
       children: [
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 12, runSpacing: 12, children: [
-          for (final p in (item['photoPaths'] as List? ?? const [])) _FieldPhoto(path: p?.toString()),
+          for (final p in (item['photoPaths'] as List? ?? const [])) ApplicationPhoto(path: p?.toString(), height: 150, width: 200),
         ])),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(
           shopId.isNotEmpty ? 'Existing shop: $shopId' : 'New shop: ${shop?['name']} • ${shop?['address']} • ${shop?['pincode']}',
@@ -174,31 +158,5 @@ class FieldModerationPage extends StatelessWidget {
         ]),
       ],
     ));
-  }
-}
-
-/// One private field-submission photo, fetched with the admin's own Storage
-/// access. Mirrors admin.dart's _ApplicationPhoto exactly but stays local to
-/// this file so Field Assistant moderation never depends on vendor code.
-class _FieldPhoto extends StatelessWidget {
-  const _FieldPhoto({required this.path});
-  final String? path;
-  @override
-  Widget build(BuildContext context) {
-    if (path == null) {
-      return Container(height: 150, width: 200, alignment: Alignment.center, color: Colors.black12, child: const Text('Photo missing'));
-    }
-    return FutureBuilder<String>(
-      future: FirebaseStorage.instance.ref(path!).getDownloadURL(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Container(height: 150, width: 200, alignment: Alignment.center, color: Colors.black12, child: const Text('Photo could not load'));
-        if (!snapshot.hasData) return const SizedBox(height: 150, width: 200, child: Center(child: CircularProgressIndicator()));
-        final url = snapshot.data!;
-        return Semantics(button: true, label: 'View item photo full size', child: InkWell(
-          onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(child: InteractiveViewer(child: Image.network(url)))),
-          child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(url, height: 150, width: 200, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(height: 150, width: 200, alignment: Alignment.center, color: Colors.black12, child: const Text('Photo could not load')))),
-        ));
-      },
-    );
   }
 }

@@ -5,7 +5,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'home_widgets.dart';
 import 'layout_settings.dart';
-import 'shared.dart';
+import 'home_section_config.dart';
 
 /// The "Local Services" homepage section — a preview grid over the exact
 /// same service-kind entries `ServicesPage` lists (see

@@ -6,6 +6,7 @@ import '../services/analytics.dart';
 import '../services/search.dart';
 import 'home_promotions.dart';
 import 'home_widgets.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
 
 class HomeContent extends StatelessWidget {
@@ -95,14 +96,23 @@ class HomeContent extends StatelessWidget {
   );
 
   /// An admin-set height (0 = automatic) clips a section to that height and
-  /// makes it independently scrollable, instead of resizing its content.
+  /// makes it independently scrollable, instead of resizing its content. An
+  /// admin-set width (0 = automatic) narrows the section to that width,
+  /// left-aligned like every other section in this column.
   Widget clamped(Entry config, Widget child) {
     final height = config.number('height', 0);
-    if (height <= 0) return child;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: height),
-      child: SingleChildScrollView(child: child),
-    );
+    final width = config.number('width', 0);
+    var result = child;
+    if (height > 0) {
+      result = ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height),
+        child: SingleChildScrollView(child: result),
+      );
+    }
+    if (width > 0) {
+      result = ConstrainedBox(constraints: BoxConstraints(maxWidth: width), child: result);
+    }
+    return result;
   }
 
   Widget promotion(Entry entry) => ImpressionOnce(

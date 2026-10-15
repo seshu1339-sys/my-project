@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -41,12 +40,6 @@ Future<void> main() async {
           firebaseMessagingBackgroundHandler,
         );
       }
-      // The hidden admin route always starts at the password step: any
-      // session already persisted in this browser (from an earlier visit, or
-      // from the customer site sharing the same Firebase project) is signed
-      // out before the admin UI is ever built, so a direct reload can never
-      // skip straight past the password check.
-      if (kIsWeb && isAdminRoute) await FirebaseAuth.instance.signOut();
       live = true;
     } catch (e) {
       startupError = 'Firebase could not start. Check the supplied project configuration and restart.';

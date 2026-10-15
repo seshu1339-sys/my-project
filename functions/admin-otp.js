@@ -13,6 +13,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {defineSecret} = require('firebase-functions/params');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {createHmac, randomInt, timingSafeEqual} = require('node:crypto');
+const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 
 const otpPepper = defineSecret('ADMIN_OTP_PEPPER');
@@ -119,5 +120,17 @@ exports.verifyAdminOtp = onCall({...options, secrets: [otpPepper]}, async reques
     throw new HttpsError('invalid-argument', result.attemptsLeft > 0 ? `Incorrect code. ${result.attemptsLeft} attempt(s) left.` : 'Incorrect code. Request a new one.');
   }
   await db.collection('_adminSessions').doc(uid).set({verifiedAt: FieldValue.serverTimestamp(), expiresAt: Timestamp.fromMillis(Date.now() + SESSION_TTL_MS)});
+  return {ok: true};
+});
+
+// Lets the client ask "is my OTP session still valid?" without being able to
+// forge the answer itself — reuses the exact same server-side check
+// (requireAdminSession) every other privileged admin callable already
+// depends on. A read-and-answer only: no new write capability, no secret.
+// Exists so a page reload can skip straight to AdminPage within the existing
+// 12-hour session window instead of always re-asking for a fresh OTP code.
+exports.checkAdminSession = onCall(options, async request => {
+  const uid = requireAdminClaim(request);
+  await requireAdminSession(uid);
   return {ok: true};
 });

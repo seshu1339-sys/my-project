@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
@@ -91,8 +90,8 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
     if (productId == null) return;
     setState(() { loading = true; error = null; });
     try {
-      final result = await FirebaseFunctions.instance.httpsCallable('priceAlertAudience').call({'productId': productId});
-      final rows = ((result.data as Map)['rows'] as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
+      final result = await store.call('priceAlertAudience', {'productId': productId});
+      final rows = (result['rows'] as List).map((r) => Map<String, dynamic>.from(r as Map)).toList();
       if (mounted) setState(() { audience = rows; loading = false; });
     } catch (e) {
       if (mounted) setState(() { loading = false; error = 'Customers could not load. $e'; });
@@ -109,8 +108,7 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
     if (ok != true) return;
     setState(() => sending = true);
     try {
-      final result = await FirebaseFunctions.instance.httpsCallable('sendPriceDropAlerts').call({'productId': productId});
-      final r = Map<String, dynamic>.from(result.data as Map);
+      final r = await store.call('sendPriceDropAlerts', {'productId': productId});
       if (mounted) setState(() => notice = 'Alert sent to ${r['sent']} customer(s). Already notified: ${r['duplicate']}. Not eligible: ${r['ineligible']}.');
       await loadAudience();
     } catch (e) {
@@ -223,8 +221,8 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
 
   Future<void> loadSubscribers() async {
     try {
-      final result = await FirebaseFunctions.instance.httpsCallable('offerAudienceSize').call();
-      if (mounted) setState(() => subscribers = (result.data as Map)['subscribers'] as int?);
+      final result = await store.call('offerAudienceSize', {});
+      if (mounted) setState(() => subscribers = result['subscribers'] as int?);
     } catch (_) {
       // The count is informational; the section still works without it.
     }
@@ -248,8 +246,7 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
     if (ok != true) return;
     setState(() => sendingOffer = offer.id);
     try {
-      final result = await FirebaseFunctions.instance.httpsCallable('sendOfferNotification').call({'promotionId': offer.id});
-      final r = Map<String, dynamic>.from(result.data as Map);
+      final r = await store.call('sendOfferNotification', {'promotionId': offer.id});
       if (mounted) setState(() => notice = 'Offer sent to ${r['sent']} subscriber(s). Already notified: ${r['duplicate']}. No device or alerts off: ${r['noDevice']}.');
     } catch (e) {
       if (mounted) setState(() => notice = 'Offer could not be sent: $e');

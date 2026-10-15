@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'moderation_dialogs.dart';
 import 'shop_map.dart';
 
 /// Vendor applications, fee payments, active/suspended vendors, pending shop
@@ -14,14 +13,8 @@ import 'shop_map.dart';
 class VendorModerationPage extends StatelessWidget {
   const VendorModerationPage({super.key, required this.store});
   final Store store;
-  Future<void> decide(BuildContext context, String function, Map<String, dynamic> data) async {
-    try {
-      await FirebaseFunctions.instance.httpsCallable(function).call(data);
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Decision saved')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
+  Future<void> decide(BuildContext context, String function, Map<String, dynamic> data) =>
+      runModerationAction(context, () => store.call(function, data), onSuccess: (_) => 'Decision saved');
   Future<void> reviewApplication(BuildContext context, String vendorId, {required bool approved}) async {
     var feeRequired = false;
     final amount = TextEditingController(text: '500');
@@ -128,11 +121,12 @@ class VendorModerationPage extends StatelessWidget {
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Verify'))],
     ));
-    if (submit != true) return;
-    try {
-      await FirebaseFunctions.instance.httpsCallable('verifyVendorShop').call({'vendorId': vendor.text.trim(), 'shopId': shop.text.trim(), 'latitude': double.parse(latitude.text), 'longitude': double.parse(longitude.text), 'radiusKm': double.parse(radius.text)});
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shop verified')));
-    } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
+    if (submit != true || !context.mounted) return;
+    await runModerationAction(
+      context,
+      () => store.call('verifyVendorShop', {'vendorId': vendor.text.trim(), 'shopId': shop.text.trim(), 'latitude': double.parse(latitude.text), 'longitude': double.parse(longitude.text), 'radiusKm': double.parse(radius.text)}),
+      onSuccess: (_) => 'Shop verified',
+    );
   }
   Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
@@ -142,8 +136,8 @@ class VendorModerationPage extends StatelessWidget {
       children: [
         // The two mandatory photos are stored separately; both are shown for review.
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 16, runSpacing: 12, children: [
-          _ApplicationPhoto(label: 'Vendor photo', path: data['vendorPhotoPath']?.toString()),
-          _ApplicationPhoto(label: 'Shop photo', path: data['shopPhotoPath']?.toString()),
+          ApplicationPhoto(label: 'Vendor photo', path: data['vendorPhotoPath']?.toString(), height: 150, width: 200),
+          ApplicationPhoto(label: 'Shop photo', path: data['shopPhotoPath']?.toString(), height: 150, width: 200),
         ])),
         if (data['latitude'] is num && data['longitude'] is num)
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -163,30 +157,21 @@ class VendorModerationPage extends StatelessWidget {
     ));
   }
   Future<void> _setSuspension(BuildContext context, String vendorId, String name, {required bool suspend}) async {
-    final reason = TextEditingController();
-    final go = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
-      title: Text(suspend ? 'Suspend $name?' : 'Reinstate $name?'),
-      content: suspend
-          ? Column(mainAxisSize: MainAxisSize.min, children: [
-              const Text('The vendor is locked out immediately and its shop and products are hidden from customers. The vendor sees the reason below.'),
-              TextField(controller: reason, maxLines: 3, maxLength: 500, onChanged: (_) => setDialogState(() {}), decoration: const InputDecoration(labelText: 'Reason for suspension (required)')),
-            ])
-          : const Text('The vendor can trade again and the shop and products hidden by the suspension are shown to customers again.'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
-        FilledButton(onPressed: suspend && reason.text.trim().length < 3 ? null : () => Navigator.pop(dialog, true), child: Text(suspend ? 'Suspend vendor' : 'Reinstate vendor')),
-      ],
-    )));
-    final note = reason.text.trim();
-    reason.dispose();
-    if (go != true || !context.mounted) return;
-    try {
-      final result = await FirebaseFunctions.instance.httpsCallable('setVendorSuspension').call({'vendorId': vendorId, 'suspended': suspend, 'reason': note});
-      final count = (result.data as Map)['itemsChanged'];
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(suspend ? '$name suspended. $count item(s) hidden from customers.' : '$name reinstated. $count item(s) shown again.')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+    final reason = await showSuspensionDialog(
+      context,
+      name: name,
+      suspend: suspend,
+      suspendBody: 'The vendor is locked out immediately and its shop and products are hidden from customers. The vendor sees the reason below.',
+      reinstateBody: 'The vendor can trade again and the shop and products hidden by the suspension are shown to customers again.',
+    );
+    if (reason == null || !context.mounted) return;
+    await runModerationAction(
+      context,
+      () => store.call('setVendorSuspension', {'vendorId': vendorId, 'suspended': suspend, 'reason': reason}),
+      onSuccess: (result) => suspend
+          ? '$name suspended. ${result['itemsChanged']} item(s) hidden from customers.'
+          : '$name reinstated. ${result['itemsChanged']} item(s) shown again.',
+    );
   }
   Widget _vendorTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
@@ -214,35 +199,18 @@ class VendorModerationPage extends StatelessWidget {
     ));
   }
   Future<void> _setExclusivesPermission(BuildContext context, String vendorId, String name, {required bool currentlyEnabled, int? currentMaxDays}) async {
-    var enabled = currentlyEnabled;
-    final maxDays = TextEditingController(text: '${currentMaxDays ?? 30}');
-    final go = await showDialog<bool>(context: context, builder: (dialog) => StatefulBuilder(builder: (context, setDialogState) => AlertDialog(
-      title: Text('Special Category Exclusives — $name'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('When enabled, this vendor can publish its own one-off design/product entries immediately, with no separate review per item.'),
-        SwitchListTile(title: const Text('Enabled for this vendor'), value: enabled, onChanged: (value) => setDialogState(() => enabled = value)),
-        if (enabled) TextField(controller: maxDays, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Maximum active duration per item (days)')),
-      ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Save'))],
-    )));
-    final days = int.tryParse(maxDays.text.trim());
-    maxDays.dispose();
-    if (go != true || !context.mounted) return;
-    if (enabled && (days == null || days < 1)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a maximum duration of 1 day or more.')));
-      return;
-    }
-    try {
-      await FirebaseFunctions.instance.httpsCallable('setVendorExclusivesPermission').call({'vendorId': vendorId, 'enabled': enabled, if (enabled) 'maxDurationDays': days});
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(enabled ? 'Exclusives enabled for $name (up to $days day(s))' : 'Exclusives disabled for $name')));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
+    final result = await showExclusivesDialog(context, name: name, currentlyEnabled: currentlyEnabled, currentMaxDays: currentMaxDays);
+    if (result == null || !context.mounted) return;
+    await runModerationAction(
+      context,
+      () => store.call('setVendorExclusivesPermission', {'vendorId': vendorId, 'enabled': result.enabled, if (result.enabled) 'maxDurationDays': result.maxDurationDays}),
+      onSuccess: (_) => result.enabled ? 'Exclusives enabled for $name (up to ${result.maxDurationDays} day(s))' : 'Exclusives disabled for $name',
+    );
   }
   Widget _shopPhotoTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
     return Card(child: ListTile(
-      leading: _ApplicationPhoto(label: 'Slot ${data['slot']}', path: data['path']?.toString()),
+      leading: ApplicationPhoto(label: 'Slot ${data['slot']}', path: data['path']?.toString(), height: 150, width: 200),
       title: Text('${data['vendorName'] ?? data['vendorId']}'),
       subtitle: Text('Shop photo, slot ${data['slot']}'),
       trailing: Wrap(children: [
@@ -279,29 +247,4 @@ class VendorModerationPage extends StatelessWidget {
       ]),
     ));
   }
-}
-
-/// One private application photo, fetched with the admin's own Storage access.
-class _ApplicationPhoto extends StatelessWidget {
-  const _ApplicationPhoto({required this.label, required this.path});
-  final String label;
-  final String? path;
-  @override
-  Widget build(BuildContext context) => SizedBox(width: 200, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-    const SizedBox(height: 4),
-    if (path == null) Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label missing'))
-    else FutureBuilder<String>(
-      future: FirebaseStorage.instance.ref(path!).getDownloadURL(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label could not load'));
-        if (!snapshot.hasData) return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
-        final url = snapshot.data!;
-        return Semantics(button: true, label: 'View $label full size', child: InkWell(
-          onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(child: InteractiveViewer(child: Image.network(url)))),
-          child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(url, height: 150, width: 200, fit: BoxFit.cover, errorBuilder: (_, _, _) => Container(height: 150, alignment: Alignment.center, color: Colors.black12, child: Text('$label could not load')))),
-        ));
-      },
-    ),
-  ]));
 }

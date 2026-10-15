@@ -47,7 +47,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
     onScreen = visible;
     if (!visible) {
       animation.stop();
-    } else if (!paused && widget.entry.text('scrollEnabled', 'true') == 'true') {
+    } else if (!paused && widget.entry.text('scrollEnabled', 'false') == 'true') {
       animation.repeat();
     }
   }
@@ -67,7 +67,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
     cycle = extent;
     stop?.cancel();
     animation.stop();
-    final enabled = widget.entry.text('scrollEnabled', 'true') == 'true';
+    final enabled = widget.entry.text('scrollEnabled', 'false') == 'true';
     paused = !enabled || widget.entry.text('playback', 'running') != 'running';
     animation.duration = Duration(
       milliseconds: (extent / layout.n('speed', 25, 10, 300) * 1000)
@@ -103,7 +103,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
       // copy at the midpoint of every cycle — a visible gap flashing through
       // the middle of the box while it scrolled.
       configure(height, layout);
-      final moving = widget.entry.text('scrollEnabled', 'true') == 'true';
+      final moving = widget.entry.text('scrollEnabled', 'false') == 'true';
       final width = layout.width(c.maxWidth, fallback: c.maxWidth, floor: 140);
       final position = widget.entry.text('position', 'start');
       // 'up' (default, unchanged from before) reveals new content from the

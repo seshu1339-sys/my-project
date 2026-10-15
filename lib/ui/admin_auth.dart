@@ -8,10 +8,11 @@ import 'shared.dart';
 /// The admin panel's real entry point (see services/admin_route.dart for the
 /// hidden URL that reaches it). Two mandatory steps gate access: password
 /// sign-in to an account holding the admin claim, then a one-time email code
-/// (functions/admin-otp.js). Neither step's success is remembered across a
-/// reload — main.dart signs out any persisted session before this widget is
-/// ever built, and the OTP flag below lives only in this State, so a fresh
-/// visit to the URL always starts at the password step again.
+/// (functions/admin-otp.js). Firebase Auth's own session persists across a
+/// reload as normal; the OTP step's validity is re-checked against the
+/// server's existing 12-hour `_adminSessions` window (functions/admin-otp.js's
+/// `checkAdminSession`) rather than blindly re-asked every time — a genuinely
+/// expired or absent session of either kind still shows its real step.
 class AdminEntryApp extends StatelessWidget {
   const AdminEntryApp({super.key, required this.store});
   final Store store;
@@ -39,23 +40,48 @@ class AdminGate extends StatefulWidget {
 
 class _AdminGateState extends State<AdminGate> {
   bool _otpVerified = false;
+  Future<bool>? _sessionCheck;
+
+  Future<bool> _checkSession() async {
+    try {
+      await widget.store.call('checkAdminSession', const {});
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
     if (store.user == null || !store.admin) {
-      // Mutating a field during build (never calling setState here) only
+      // Mutating fields during build (never calling setState here) only
       // affects what the *next* rebuild sees; it never causes one itself.
       _otpVerified = false;
+      _sessionCheck = null;
       return AdminPasswordPage(store: store);
     }
-    if (!_otpVerified) {
-      return AdminOtpPage(
-        store: store,
-        onVerified: () => setState(() => _otpVerified = true),
-      );
-    }
-    return AdminPage(store: store);
+    if (_otpVerified) return AdminPage(store: store);
+    // Kick off exactly one session-validity check per qualifying session,
+    // cached so unrelated rebuilds (e.g. store.notifyListeners()) never
+    // re-fire it.
+    _sessionCheck ??= _checkSession();
+    return FutureBuilder<bool>(
+      future: _sessionCheck,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.data!) {
+          _otpVerified = true;
+          return AdminPage(store: store);
+        }
+        return AdminOtpPage(
+          store: store,
+          onVerified: () => setState(() => _otpVerified = true),
+        );
+      },
+    );
   }
 }
 

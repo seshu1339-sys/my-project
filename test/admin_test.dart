@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/admin.dart';
-import 'package:ecommerce_app/ui/shared.dart';
+import 'package:ecommerce_app/ui/home_section_config.dart';
 
 void main() {
   testWidgets('admin can add and persist a category through the form', (
