@@ -16,6 +16,23 @@ Entry _withAdBorderDefault(Entry entry) => entry.text('borderColor').isEmpty
     ? Entry(entry.id, {...entry.data, 'borderColor': '#D32F2F', 'borderWidth': 2.0})
     : entry;
 
+/// The wireframe draws every ADS box the exact same size. Per-ad
+/// `width`/`height` overrides (used to let each ad be individually resized
+/// in the Visual Editor) are dropped here so every ad in the rail falls
+/// back to the one shared size from `adLayout` -- every other per-ad field
+/// (name, description, image, target, colors, ...) still applies as-is.
+Entry _withUniformAdSize(Entry merged, ComponentLayout adLayout) {
+  final data = {...merged.data};
+  for (final key in ['width', 'height']) {
+    if (adLayout.entry.data.containsKey(key)) {
+      data[key] = adLayout.entry.data[key];
+    } else {
+      data.remove(key);
+    }
+  }
+  return Entry(merged.id, data);
+}
+
 /// Commits one dimension (`width`/`height`) onto a single ad/box promotion
 /// doc, preserving every other field — the exact same read-merge-save
 /// pattern as `adjustSectionField` in `home_section_config.dart`, just
@@ -109,7 +126,9 @@ class HomeAdRail extends StatelessWidget {
                     ad,
                     'ad',
                     ScheduledPromo(
-                      entry: _withAdBorderDefault(Entry(ad.id, {...adLayout.entry.data, ...ad.data})),
+                      entry: _withAdBorderDefault(
+                        _withUniformAdSize(Entry(ad.id, {...adLayout.entry.data, ...ad.data}), adLayout),
+                      ),
                       onTap: () => onPromotion(ad.text('target')),
                     ),
                   ),
