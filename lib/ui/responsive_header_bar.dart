@@ -199,54 +199,52 @@ class ResponsiveHeader extends StatelessWidget {
                 ),
                 // User greeting + compact location pill (matches the
                 // reference design's "📍 Narsipatnam ▾" style) — same
-                // onLocation callback. Grouped together, right after the
-                // logo, to match the wireframe's "user name + location"
-                // block.
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      store.profileName.isEmpty
-                          ? 'Welcome'.tr(context)
-                          : 'Hello {name}'.tr(context, {'name': store.profileName}),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(width: 8),
-                    Material(
-                      color: AppTokens.primaryLight,
-                      borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                        onTap: onLocation,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 200),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    store.address.isEmpty
-                                        ? (store.pincode.isEmpty
-                                              ? 'Choose your location'.tr(context)
-                                              : store.pincode)
-                                        : store.address,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                  ),
-                                ),
-                                const Icon(Icons.keyboard_arrow_down, size: 16),
-                              ],
+                // onLocation callback. Two separate Wrap children (not one
+                // nested Row) right after the logo, to match the
+                // wireframe's "user name + location" block — a Row here
+                // would measure both at their natural width ignoring the
+                // Wrap's own bound and can overflow at narrow widths; as
+                // separate Wrap children, the pill simply flows to its own
+                // line when there's no room instead.
+                Text(
+                  store.profileName.isEmpty
+                      ? 'Welcome'.tr(context)
+                      : 'Hello {name}'.tr(context, {'name': store.profileName}),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Material(
+                  color: AppTokens.primaryLight,
+                  borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+                    onTap: onLocation,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 200),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                store.address.isEmpty
+                                    ? (store.pincode.isEmpty
+                                          ? 'Choose your location'.tr(context)
+                                          : store.pincode)
+                                    : store.address,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
                             ),
-                          ),
+                            const Icon(Icons.keyboard_arrow_down, size: 16),
+                          ],
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
                 SizedBox(
                   width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),

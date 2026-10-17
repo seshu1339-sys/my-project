@@ -8,9 +8,14 @@ import 'design_tokens.dart';
 import 'shared.dart';
 
 class PromoCard extends StatelessWidget {
-  const PromoCard({super.key, required this.entry, required this.onTap});
+  const PromoCard({super.key, required this.entry, required this.onTap, this.exactHeight});
   final Entry entry;
   final VoidCallback onTap;
+  // When set, pins the card body to exactly this height (clipping any
+  // content that doesn't fit) instead of the usual "grow to fit content,
+  // floored at a minimum" sizing -- used by the ad rail so every ad is
+  // visually the same size no matter how much its own text wraps.
+  final double? exactHeight;
   @override
   Widget build(BuildContext context) {
     final decoration = entryDecoration(entry, fallback: AppTokens.tintFor(entry.id.hashCode));
@@ -29,7 +34,7 @@ class PromoCard extends StatelessWidget {
         onTap: onTap,
         child: Stack(
           children: [
-            _CardBody(entry: entry, decoration: decoration, showEyebrow: !isAd),
+            _CardBody(entry: entry, decoration: decoration, showEyebrow: !isAd, exactHeight: exactHeight),
             if (countdownSeconds > 0)
               Positioned(
                 top: 8,
@@ -95,20 +100,28 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
 }
 
 class _CardBody extends StatelessWidget {
-  const _CardBody({required this.entry, required this.decoration, this.showEyebrow = true});
+  const _CardBody({
+    required this.entry,
+    required this.decoration,
+    this.showEyebrow = true,
+    this.exactHeight,
+  });
   final Entry entry;
   final BoxDecoration decoration;
   final bool showEyebrow;
+  final double? exactHeight;
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final container = Container(
           decoration: decoration.boxShadow == null
               ? decoration.copyWith(boxShadow: AppTokens.shadowSoft)
               : decoration,
           child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: clampedNumber(entry, 'height', 200, 100, 1200),
-            ),
+            constraints: exactHeight != null
+                ? BoxConstraints.tightFor(height: exactHeight)
+                : BoxConstraints(
+                    minHeight: clampedNumber(entry, 'height', 200, 100, 1200),
+                  ),
             child: LayoutBuilder(
               builder: (context, c) => Padding(
                 padding: EdgeInsets.all(
@@ -146,6 +159,8 @@ class _CardBody extends StatelessWidget {
                     ],
                     Text(
                       entry.text('name'),
+                      maxLines: exactHeight == null ? null : 2,
+                      overflow: exactHeight == null ? null : TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: clampedNumber(entry, 'fontSize', 25, 10, 40),
                         fontWeight: FontWeight.values.firstWhere(
@@ -163,6 +178,12 @@ class _CardBody extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       entry.text('description'),
+                      // A fixed-height card (the ad rail's uniform boxes)
+                      // can't let the description grow with its own text --
+                      // one line, truncated, keeps every box the same size
+                      // regardless of how long the admin's copy is.
+                      maxLines: exactHeight == null ? null : 1,
+                      overflow: exactHeight == null ? null : TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colorFromHex(
                           entry.text('textColor'),
@@ -178,6 +199,11 @@ class _CardBody extends StatelessWidget {
             ),
           ),
         );
+    // Content that doesn't fit within exactHeight is clipped rather than
+    // bleeding past the box's own bounds or growing the box -- this is
+    // what actually guarantees uniform visible size; a bare BoxConstraints
+    // tight height alone doesn't stop a Column from painting past it.
+    return exactHeight == null ? container : ClipRect(child: container);
   }
 }
 

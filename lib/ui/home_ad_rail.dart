@@ -16,19 +16,22 @@ Entry _withAdBorderDefault(Entry entry) => entry.text('borderColor').isEmpty
     ? Entry(entry.id, {...entry.data, 'borderColor': '#D32F2F', 'borderWidth': 2.0})
     : entry;
 
-/// The wireframe draws every ADS box the exact same size. Per-ad
-/// `width`/`height` overrides (used to let each ad be individually resized
-/// in the Visual Editor) are dropped here so every ad in the rail falls
-/// back to the one shared size from `adLayout` -- every other per-ad field
-/// (name, description, image, target, colors, ...) still applies as-is.
-Entry _withUniformAdSize(Entry merged, ComponentLayout adLayout) {
+/// The wireframe draws every ADS box the exact same size. The per-ad
+/// `width` override (used to let each ad be individually resized in the
+/// Visual Editor) is dropped here so every ad falls back to the one shared
+/// width from `adLayout` -- every other per-ad field (name, description,
+/// image, target, colors, ...) still applies as-is. Height is handled
+/// separately (see `heightOverride` on `ScheduledPromo`), not through this
+/// data merge, since `ComponentLayout.height()` and `PromoCard`'s own
+/// minimum-height fallback don't agree on whether the field is pre- or
+/// post-scale -- passing one pre-computed pixel value straight through
+/// both layers avoids relying on them agreeing.
+Entry _withUniformAdWidth(Entry merged, ComponentLayout adLayout) {
   final data = {...merged.data};
-  for (final key in ['width', 'height']) {
-    if (adLayout.entry.data.containsKey(key)) {
-      data[key] = adLayout.entry.data[key];
-    } else {
-      data.remove(key);
-    }
+  if (adLayout.entry.data.containsKey('width')) {
+    data['width'] = adLayout.entry.data['width'];
+  } else {
+    data.remove('width');
   }
   return Entry(merged.id, data);
 }
@@ -126,8 +129,13 @@ class HomeAdRail extends StatelessWidget {
                     ad,
                     'ad',
                     ScheduledPromo(
+                      // One shared height computed ONCE from adLayout (not
+                      // per-ad) and passed straight through, so every ad box
+                      // is visually identical regardless of how much its
+                      // own title/description text wraps.
+                      heightOverride: adLayout.height(240, floor: 120),
                       entry: _withAdBorderDefault(
-                        _withUniformAdSize(Entry(ad.id, {...adLayout.entry.data, ...ad.data}), adLayout),
+                        _withUniformAdWidth(Entry(ad.id, {...adLayout.entry.data, ...ad.data}), adLayout),
                       ),
                       onTap: () => onPromotion(ad.text('target')),
                     ),

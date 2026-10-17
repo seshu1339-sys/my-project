@@ -12,9 +12,16 @@ import 'layout_settings.dart';
 
 /// Each promotion owns its playback clock, dimensions and stop timer.
 class ScheduledPromo extends StatefulWidget {
-  const ScheduledPromo({super.key, required this.entry, required this.onTap});
+  const ScheduledPromo({super.key, required this.entry, required this.onTap, this.heightOverride});
   final Entry entry;
   final VoidCallback onTap;
+  // When set, replaces the usual admin-configured/responsive height
+  // computation outright (used by the ad rail to force every ad to the
+  // exact same pixel height, bypassing the per-entry 'height' field and
+  // the component-layout scale factor entirely, so there's a single
+  // source of truth for the number instead of two formulas that can
+  // disagree).
+  final double? heightOverride;
   @override
   State<ScheduledPromo> createState() => _ScheduledPromoState();
 }
@@ -95,7 +102,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
         widget.entry,
         MediaQuery.sizeOf(context).width,
       );
-      final height = layout.height(240, floor: 120);
+      final height = widget.heightOverride ?? layout.height(240, floor: 120);
       // The loop distance must equal exactly one card's height: the visible
       // window is also `height` tall, so the two stacked copies always tile
       // it with no seam. Baking `gap` into this distance (as before) made the
@@ -115,6 +122,7 @@ class _ScheduledPromoState extends State<ScheduledPromo>
         child: SingleChildScrollView(
           child: PromoCard(
             entry: widget.entry,
+            exactHeight: widget.heightOverride,
             onTap: () {
               Analytics.click(widget.entry);
               widget.onTap();
