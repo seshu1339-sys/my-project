@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../services/strings.dart';
+import 'design_tokens.dart';
 import 'home_promotions.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
+
+/// The wireframe's "ADS" rail specifically wants a red border on every ad
+/// box by default. Per-ad or per-section (adLayout) `borderColor` still
+/// overrides this exactly as before — this only fills in when neither has
+/// set one.
+Entry _withAdBorderDefault(Entry entry) => entry.text('borderColor').isEmpty
+    ? Entry(entry.id, {...entry.data, 'borderColor': '#D32F2F', 'borderWidth': 2.0})
+    : entry;
 
 /// Commits one dimension (`width`/`height`) onto a single ad/box promotion
 /// doc, preserving every other field — the exact same read-merge-save
@@ -75,7 +85,21 @@ class HomeAdRail extends StatelessWidget {
         LayoutSection(
           layout: adLayout,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (ads.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'ADS'.tr(context),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      letterSpacing: 1.2,
+                      color: AppTokens.textMuted,
+                    ),
+                  ),
+                ),
               for (final ad in ads)
                 Padding(
                   padding: EdgeInsets.only(
@@ -85,7 +109,7 @@ class HomeAdRail extends StatelessWidget {
                     ad,
                     'ad',
                     ScheduledPromo(
-                      entry: Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
+                      entry: _withAdBorderDefault(Entry(ad.id, {...adLayout.entry.data, ...ad.data})),
                       onTap: () => onPromotion(ad.text('target')),
                     ),
                   ),
