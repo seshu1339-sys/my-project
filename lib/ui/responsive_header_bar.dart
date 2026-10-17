@@ -135,6 +135,15 @@ class ResponsiveHeader extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, c) {
           final narrow = c.maxWidth < 900;
+          // Thin vertical separators between header sections, matching the
+          // wireframe's divider lines (APP LOGO | USER NAME/LOCATION |
+          // SEARCH | SERVICES | OFFICE ADDRESS). Hidden once the Wrap
+          // starts stacking items onto their own lines at narrow widths,
+          // where a floating divider line would look broken rather than
+          // separating anything.
+          Widget divider() => narrow
+              ? const SizedBox.shrink()
+              : Container(width: 1.5, height: 32, color: AppTokens.textMuted.withValues(alpha: .25));
           return Directionality(
             // Keep the logo at the physical top-left in every language.
             textDirection: TextDirection.ltr,
@@ -197,6 +206,7 @@ class ResponsiveHeader extends StatelessWidget {
                     ),
                   ],
                 ),
+                divider(),
                 // User greeting + compact location pill (matches the
                 // reference design's "📍 Narsipatnam ▾" style) — same
                 // onLocation callback. Two separate Wrap children (not one
@@ -246,6 +256,7 @@ class ResponsiveHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+                divider(),
                 SizedBox(
                   width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
                   child: ResponsiveSearchBox(
@@ -255,6 +266,7 @@ class ResponsiveHeader extends StatelessWidget {
                     onAssistedSearch: onAssistedSearch,
                   ),
                 ),
+                divider(),
                 // Visible "Services" shortcut (was hamburger-menu-only) —
                 // plain text, matching the wireframe's unadorned header
                 // label style (no button chrome/icon, same as the other
@@ -273,6 +285,7 @@ class ResponsiveHeader extends StatelessWidget {
                     ),
                   ),
                 ),
+                divider(),
                 // Visible office address + phone (was hamburger-menu-only,
                 // behind "Office / Head Office") — matches the wireframe
                 // showing it directly in the header.
