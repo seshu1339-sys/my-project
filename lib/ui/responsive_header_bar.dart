@@ -269,53 +269,36 @@ class ResponsiveHeader extends StatelessWidget {
                 ),
                 divider(),
                 // Visible "Services" shortcut (was hamburger-menu-only) —
-                // plain text, matching the wireframe's unadorned header
-                // label style (no button chrome/icon, same as the other
-                // header items) — plus an admin-changeable icon image
-                // (Layout Settings → Services → "Icon image URL"), falling
-                // back to a generic services icon when none is set.
-                InkWell(
-                  borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-                  onTap: onServices,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
+                // the whole slot IS an admin-changeable image (Layout
+                // Settings → Services → "Icon image URL"), no separate text
+                // label beside it, falling back to a generic services icon
+                // when none is set.
+                Semantics(
+                  label: 'Services'.tr(context),
+                  button: true,
+                  child: Tooltip(
+                    message: 'Services'.tr(context),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                      onTap: onServices,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
                           child: servicesIconUrl.isEmpty
-                              ? const Icon(Icons.home_repair_service_outlined, size: 20, color: AppTokens.textPrimary)
+                              ? const Icon(Icons.home_repair_service_outlined, size: 28, color: AppTokens.textPrimary)
                               : Image.network(
                                   servicesIconUrl,
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, error, stack) => const Icon(
                                     Icons.home_repair_service_outlined,
-                                    size: 20,
+                                    size: 28,
                                     color: AppTokens.textPrimary,
                                   ),
                                 ),
                         ),
-                        const SizedBox(width: 6),
-                        // Flexible (not a bare Text) so this can shrink
-                        // instead of forcing the Row to its full natural
-                        // width -- a Row with no flexible child can hard
-                        // RenderFlex-overflow when available header space
-                        // is squeezed (narrow viewport, or an admin-set
-                        // extreme margin/padding elsewhere in the header).
-                        Flexible(
-                          child: Text(
-                            'Services'.tr(context),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppTokens.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
