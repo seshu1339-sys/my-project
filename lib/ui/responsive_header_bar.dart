@@ -268,7 +268,10 @@ class ResponsiveHeader extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                     child: Text(
                       'Services'.tr(context),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppTokens.textPrimary,
+                      ),
                     ),
                   ),
                 ),
