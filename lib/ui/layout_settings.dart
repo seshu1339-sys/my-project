@@ -188,6 +188,7 @@ List<String> allFieldsFor(String component) {
     if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
     if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
     if (['products', 'popular', 'localServices'].contains(component)) 'alignment',
+    if (component == 'services') 'iconUrl',
   ];
 }
 

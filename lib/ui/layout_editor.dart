@@ -428,7 +428,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           controller: controllers[key],
           decoration: InputDecoration(
             labelText: dimensionFields[key]?.$1 ??
-                {'fontFamily': 'Font family'}[key],
+                {'fontFamily': 'Font family', 'iconUrl': 'Icon image URL (optional)'}[key],
             suffixText: isPixel ? 'px' : null,
             helperText: dimensionFields.containsKey(key)
                 ? '${dimensionFields[key]!.$2} – ${dimensionFields[key]!.$3}'
