@@ -258,11 +258,19 @@ class ResponsiveHeader extends StatelessWidget {
                   ),
                 ),
                 // Visible "Services" shortcut (was hamburger-menu-only) —
-                // matches the wireframe showing it directly in the header.
-                OutlinedButton.icon(
-                  onPressed: onServices,
-                  icon: const Icon(Icons.home_repair_service_outlined, size: 18),
-                  label: Text('Services'.tr(context)),
+                // plain text, matching the wireframe's unadorned header
+                // label style (no button chrome/icon, same as the other
+                // header items).
+                InkWell(
+                  borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                  onTap: onServices,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: Text(
+                      'Services'.tr(context),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ),
                 // Visible office address + phone (was hamburger-menu-only,
                 // behind "Office / Head Office") — matches the wireframe

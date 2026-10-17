@@ -226,3 +226,27 @@ class ProductArt extends StatelessWidget {
 
 String money(num value) =>
     '₹${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2)}';
+
+/// Builds the scrolling-notice marquee's text from a `settings/scrollingText`
+/// entry: a translation for the current language if set, else every
+/// non-empty notice field joined together, else the plain `text` field.
+String noticeTickerText(Entry entry, String language) {
+  final translations = entry.data['translations'];
+  if (translations is Map && translations[language] != null) {
+    return translations[language].toString();
+  }
+  final fallback = translations is Map ? translations['en']?.toString() : null;
+  if (fallback != null && fallback.isNotEmpty) return fallback;
+  final fields = [
+    'importantNews',
+    'importantUpdates',
+    'customerNotices',
+    'offers',
+    'deliveryInformation',
+    'serviceAnnouncements',
+    'stateSpecificNotices',
+    'generalAlerts',
+  ];
+  final messages = fields.map(entry.text).where((value) => value.isNotEmpty).toList();
+  return messages.isEmpty ? entry.text('text') : messages.join('  •  ');
+}

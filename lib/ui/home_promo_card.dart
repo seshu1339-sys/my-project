@@ -14,7 +14,11 @@ class PromoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final decoration = entryDecoration(entry, fallback: AppTokens.tintFor(entry.id.hashCode));
-    final countdownSeconds = entry.number('countdownSeconds', 0).round();
+    // The wireframe's "ADS" rail wants plain, uniform boxes -- no eyebrow
+    // label, no countdown badge -- unlike other promo placements (boxes,
+    // offers), which keep their full card treatment unchanged.
+    final isAd = entry.text('placement') == 'ad';
+    final countdownSeconds = isAd ? 0 : entry.number('countdownSeconds', 0).round();
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(
@@ -25,7 +29,7 @@ class PromoCard extends StatelessWidget {
         onTap: onTap,
         child: Stack(
           children: [
-            _CardBody(entry: entry, decoration: decoration),
+            _CardBody(entry: entry, decoration: decoration, showEyebrow: !isAd),
             if (countdownSeconds > 0)
               Positioned(
                 top: 8,
@@ -91,9 +95,10 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
 }
 
 class _CardBody extends StatelessWidget {
-  const _CardBody({required this.entry, required this.decoration});
+  const _CardBody({required this.entry, required this.decoration, this.showEyebrow = true});
   final Entry entry;
   final BoxDecoration decoration;
+  final bool showEyebrow;
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -115,28 +120,30 @@ class _CardBody extends StatelessWidget {
                   children: [
                     if (entry.text('imageUrl').isNotEmpty)
                       ProductArt(entry, height: 100),
-                    Text(
-                      (entry.text('placement') == 'ad'
-                              ? 'NEIGHBOURHOOD SPOTLIGHT'
-                              : 'CURATED FOR YOU')
-                          .tr(context),
-                      style: TextStyle(
-                        fontSize: clampedNumber(
-                          entry,
-                          'labelFontSize',
-                          10,
-                          10,
-                          24,
+                    if (showEyebrow) ...[
+                      Text(
+                        (entry.text('placement') == 'ad'
+                                ? 'NEIGHBOURHOOD SPOTLIGHT'
+                                : 'CURATED FOR YOU')
+                            .tr(context),
+                        style: TextStyle(
+                          fontSize: clampedNumber(
+                            entry,
+                            'labelFontSize',
+                            10,
+                            10,
+                            24,
+                          ),
+                          color: colorFromHex(
+                            entry.text('textColor'),
+                            AppTokens.primaryDark,
+                          ),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.6,
                         ),
-                        color: colorFromHex(
-                          entry.text('textColor'),
-                          AppTokens.primaryDark,
-                        ),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.6,
                       ),
-                    ),
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
+                    ],
                     Text(
                       entry.text('name'),
                       style: TextStyle(

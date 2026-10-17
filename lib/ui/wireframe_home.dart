@@ -118,6 +118,41 @@ class WireframeHome extends StatelessWidget {
       products: products,
       onProduct: onProduct,
     );
+    // The scrolling-notice marquee (wireframe's thin "6" bar above the
+    // offers row) -- driven by the admin's Scrolling Text Settings
+    // (settings/scrollingText), independent of the "Today's Best Offers"
+    // product-chip strip above.
+    final scrolling = store
+        .visible('settings')
+        .firstWhere((e) => e.id == 'scrollingText', orElse: () => const Entry('scrollingText', {}));
+    final tickerTextValue = noticeTickerText(scrolling, store.language);
+    final notice = scrolling.active && tickerTextValue.isNotEmpty
+        ? Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TickerStrip(
+              text: tickerTextValue,
+              textColor: colorFromHex(scrolling.text('textColor'), Colors.white),
+              backgroundColor: colorFromHex(scrolling.text('backgroundColor'), const Color(0xff174c38)),
+              fontFamily: scrolling.text('fontFamily'),
+              fontSize: scrolling.number('fontSize', 12),
+              fontWeight: FontWeight.values.firstWhere(
+                (weight) => weight.value == scrolling.number('fontWeight', 400).round(),
+                orElse: () => FontWeight.normal,
+              ),
+              speed: scrolling.number('speed', 70).clamp(10, 300),
+              height: scrolling.number('height', 36).clamp(24, 120),
+              padding: scrolling.number('padding', 9).clamp(0, 40),
+              reverse: scrolling.text('direction', 'rtl') == 'ltr',
+              backgroundImage: scrolling.text('backgroundImage'),
+              brightness: scrolling.number('brightness', 1),
+              opacity: scrolling.number('opacity', 1),
+              borderColor: scrolling.text('borderColor'),
+              borderWidth: scrolling.number('borderWidth'),
+              radius: scrolling.number('radius'),
+              playback: scrolling.text('playback', 'running'),
+            ),
+          )
+        : const SizedBox.shrink();
     final page = layoutFor(context, settings, 'background');
     final categoryLayout = layoutFor(context, settings, 'categories');
     final productLayout = layoutFor(context, settings, 'products');
@@ -189,6 +224,7 @@ class WireframeHome extends StatelessWidget {
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
+                notice,
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
