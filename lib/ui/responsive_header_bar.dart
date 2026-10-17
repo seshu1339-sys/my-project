@@ -197,6 +197,57 @@ class ResponsiveHeader extends StatelessWidget {
                     ),
                   ],
                 ),
+                // User greeting + compact location pill (matches the
+                // reference design's "📍 Narsipatnam ▾" style) — same
+                // onLocation callback. Grouped together, right after the
+                // logo, to match the wireframe's "user name + location"
+                // block.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      store.profileName.isEmpty
+                          ? 'Welcome'.tr(context)
+                          : 'Hello {name}'.tr(context, {'name': store.profileName}),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: AppTokens.primaryLight,
+                      borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+                        onTap: onLocation,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 200),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    store.address.isEmpty
+                                        ? (store.pincode.isEmpty
+                                              ? 'Choose your location'.tr(context)
+                                              : store.pincode)
+                                        : store.address,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  ),
+                                ),
+                                const Icon(Icons.keyboard_arrow_down, size: 16),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(
                   width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
                   child: ResponsiveSearchBox(
@@ -206,47 +257,45 @@ class ResponsiveHeader extends StatelessWidget {
                     onAssistedSearch: onAssistedSearch,
                   ),
                 ),
-                // Compact location pill (matches the reference design's
-                // "📍 Narsipatnam ▾" style) — same onLocation callback.
-                Material(
-                  color: AppTokens.primaryLight,
+                // Visible "Services" shortcut (was hamburger-menu-only) —
+                // matches the wireframe showing it directly in the header.
+                OutlinedButton.icon(
+                  onPressed: onServices,
+                  icon: const Icon(Icons.home_repair_service_outlined, size: 18),
+                  label: Text('Services'.tr(context)),
+                ),
+                // Visible office address + phone (was hamburger-menu-only,
+                // behind "Office / Head Office") — matches the wireframe
+                // showing it directly in the header.
+                InkWell(
                   borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                    onTap: onLocation,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 200),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                store.address.isEmpty
-                                    ? (store.pincode.isEmpty
-                                          ? 'Choose your location'.tr(context)
-                                          : store.pincode)
-                                    : store.address,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                              ),
+                  onTap: () => office(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (store.business.text('address').isNotEmpty)
+                            Text(
+                              store.business.text('address'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: AppTokens.textMuted),
                             ),
-                            const Icon(Icons.keyboard_arrow_down, size: 16),
-                          ],
-                        ),
+                          if (store.business.text('phone').isNotEmpty)
+                            Text(
+                              store.business.text('phone'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                Text(
-                  store.profileName.isEmpty
-                      ? 'Welcome'.tr(context)
-                      : 'Hello {name}'.tr(context, {'name': store.profileName}),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 IconButton(
                   tooltip: 'Notifications'.tr(context),
@@ -278,10 +327,6 @@ class ResponsiveHeader extends StatelessWidget {
                     switch (value) {
                       case 'account':
                         onAccount();
-                      case 'services':
-                        onServices();
-                      case 'office':
-                        await office(context);
                       case 'seller':
                         await becomeASeller(context);
                       default:
@@ -295,22 +340,6 @@ class ResponsiveHeader extends StatelessWidget {
                         const Icon(Icons.person_outline, size: 18),
                         const SizedBox(width: 10),
                         Text('Your account'.tr(context)),
-                      ]),
-                    ),
-                    PopupMenuItem(
-                      value: 'services',
-                      child: Row(children: [
-                        const Icon(Icons.home_repair_service_outlined, size: 18),
-                        const SizedBox(width: 10),
-                        Text('Services'.tr(context)),
-                      ]),
-                    ),
-                    PopupMenuItem(
-                      value: 'office',
-                      child: Row(children: [
-                        const Icon(Icons.apartment_outlined, size: 18),
-                        const SizedBox(width: 10),
-                        Text('Office / Head Office'.tr(context)),
                       ]),
                     ),
                     PopupMenuItem(
