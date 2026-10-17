@@ -302,40 +302,6 @@ class ResponsiveHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                divider(),
-                // Visible office address + phone (was hamburger-menu-only,
-                // behind "Office / Head Office") — matches the wireframe
-                // showing it directly in the header.
-                InkWell(
-                  borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                  onTap: () => office(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (store.business.text('address').isNotEmpty)
-                            Text(
-                              store.business.text('address'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: AppTokens.textMuted),
-                            ),
-                          if (store.business.text('phone').isNotEmpty)
-                            Text(
-                              store.business.text('phone'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 IconButton(
                   tooltip: 'Notifications'.tr(context),
                   onPressed: onAccount,
@@ -396,6 +362,40 @@ class ResponsiveHeader extends StatelessWidget {
                         child: Text(AppLocale.names[locale.languageCode]!),
                       ),
                   ],
+                ),
+                divider(),
+                // Visible office address + phone (was hamburger-menu-only,
+                // behind "Office / Head Office") — placed last so it sits
+                // at the header's top-right corner, matching the wireframe.
+                InkWell(
+                  borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+                  onTap: () => office(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 220),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (store.business.text('address').isNotEmpty)
+                            Text(
+                              store.business.text('address'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11, color: AppTokens.textMuted),
+                            ),
+                          if (store.business.text('phone').isNotEmpty)
+                            Text(
+                              store.business.text('phone'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
