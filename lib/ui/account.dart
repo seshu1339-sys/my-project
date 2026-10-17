@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'shared.dart';
+import 'account_auth_form.dart';
+import 'account_complaint_dialog.dart' as complaint_dialog;
 import 'account_complaints_section.dart';
 import 'account_language_field.dart';
 import 'account_orders_section.dart';
 import 'account_payment_card_section.dart';
-import 'email_link.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key, required this.store});
@@ -18,11 +18,8 @@ class AccountPage extends StatefulWidget {
 }
 
 class _AccountPageState extends State<AccountPage> {
-  final email = TextEditingController(),
-      password = TextEditingController(),
-      confirmPassword = TextEditingController(),
-      name = TextEditingController();
-  bool registering = false, busy = false;
+  final name = TextEditingController();
+  bool busy = false;
   final cardBrand = TextEditingController(),
       cardLast4 = TextEditingController();
   Future<void> run(Future<void> Function() action) async {
@@ -47,66 +44,6 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
-  Future<void> showComplaintDialog() async {
-    // The server requires a complaint to reference an order, so the customer picks one.
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> orderDocs;
-    try {
-      orderDocs = (await FirebaseFirestore.instance.collection('orders').where('userId', isEqualTo: widget.store.user!.uid).limit(30).get()).docs;
-    } catch (_) {
-      if (mounted) message(context, 'Your orders could not load. Please try again.');
-      return;
-    }
-    if (orderDocs.isEmpty) {
-      if (mounted) message(context, 'Place an order first, then you can open a complaint about it.');
-      return;
-    }
-    var orderId = orderDocs.first.id;
-    if (!mounted) return;
-    final subject = TextEditingController(), description = TextEditingController();
-    final submit = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Open a complaint'),
-        content: SingleChildScrollView(child: Column(children: [
-          DropdownButtonFormField<String>(
-            initialValue: orderId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Order'),
-            items: [for (final order in orderDocs) DropdownMenuItem(value: order.id, child: Text('Order ${order.id.substring(0, 8)} • ${order.data()['status'] ?? ''}', overflow: TextOverflow.ellipsis))],
-            onChanged: (value) { if (value != null) orderId = value; },
-          ),
-          TextField(controller: subject, decoration: const InputDecoration(labelText: 'Subject')),
-          TextField(controller: description, maxLines: 5, decoration: const InputDecoration(labelText: 'What happened?')),
-        ])),
-        actions: [TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Submit'))],
-      ),
-    );
-    if (submit != true) { subject.dispose(); description.dispose(); return; }
-    await run(() async {
-      await widget.store.createComplaint(orderId: orderId, subject: subject.text, description: description.text);
-      if (mounted) message(context, 'Complaint submitted. You can follow its full history here.');
-    });
-    subject.dispose(); description.dispose();
-  }
-
-  void validateEmail() {
-    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
-      throw StateError('Enter a valid email address.');
-    }
-  }
-
-  Future<void> resetPassword() async {
-    final address = widget.store.user?.email ?? email.text.trim();
-    if (widget.store.user == null) validateEmail();
-    await widget.store.resetPassword(address);
-    if (mounted) {
-      message(
-        context,
-        'If an account exists, a password reset email has been sent.',
-      );
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -117,9 +54,6 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   void dispose() {
-    email.dispose();
-    password.dispose();
-    confirmPassword.dispose();
     name.dispose();
     cardBrand.dispose();
     cardLast4.dispose();
@@ -208,7 +142,8 @@ class _AccountPageState extends State<AccountPage> {
                 const SizedBox(height: 20),
                 AccountLanguageField(
                   store: widget.store,
-                  onChanged: (value) => run(() => widget.store.setLanguage(value)),
+                  onChanged: (value) =>
+                      run(() => widget.store.setLanguage(value)),
                 ),
                 const SizedBox(height: 14),
                 AccountPaymentCardSection(
@@ -219,7 +154,21 @@ class _AccountPageState extends State<AccountPage> {
                   cardLast4: cardLast4,
                 ),
                 OutlinedButton(
-                  onPressed: busy ? null : () => run(resetPassword),
+                  onPressed: busy
+                      ? null
+                      : () => run(() async {
+                          await sendPasswordReset(
+                            widget.store,
+                            currentUserEmail: widget.store.user?.email,
+                            typedEmail: '',
+                          );
+                          if (context.mounted) {
+                            message(
+                              context,
+                              'If an account exists, a password reset email has been sent.',
+                            );
+                          }
+                        }),
                   child: const Text('Reset password by email'),
                 ),
                 TextButton(
@@ -261,128 +210,21 @@ class _AccountPageState extends State<AccountPage> {
                   child: const Text('Disable alerts for my account'),
                 ),
                 const Text('Your orders', style: TextStyle(fontSize: 22)),
-                OutlinedButton.icon(onPressed: busy ? null : showComplaintDialog, icon: const Icon(Icons.report_problem_outlined), label: const Text('Open a complaint')),
+                OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => complaint_dialog.showComplaintDialog(
+                          context,
+                          widget.store,
+                          run,
+                        ),
+                  icon: const Icon(Icons.report_problem_outlined),
+                  label: const Text('Open a complaint'),
+                ),
                 AccountComplaintsSection(store: widget.store),
                 AccountOrdersSection(store: widget.store, run: run),
-              ] else ...[
-                Text(
-                  registering
-                      ? 'Create your account'
-                      : 'Welcome to your neighbourhood',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  registering
-                      ? 'Register with email and password, then verify your email.'
-                      : 'Sign in with your email and password.',
-                ),
-                const SizedBox(height: 24),
-                AccountLanguageField(
-                  store: widget.store,
-                  onChanged: (value) => run(() => widget.store.setLanguage(value)),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: email,
-                  enabled: !busy,
-                  keyboardType: TextInputType.emailAddress,
-                  autofillHints: const [AutofillHints.email],
-                  autocorrect: false,
-                  decoration: const InputDecoration(labelText: 'Email address'),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: password,
-                  enabled: !busy,
-                  obscureText: true,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  autofillHints: [
-                    registering
-                        ? AutofillHints.newPassword
-                        : AutofillHints.password,
-                  ],
-                  decoration: const InputDecoration(labelText: 'Password'),
-                ),
-                OutlinedButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                            builder: (_) => EmailLinkPage(store: widget.store),
-                          ),
-                        ),
-                  child: const Text('Sign in with an email link'),
-                ),
-                if (registering) ...[
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: confirmPassword,
-                    enabled: !busy,
-                    obscureText: true,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm password',
-                    ),
-                  ),
-                ],
-                FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () => run(() async {
-                          validateEmail();
-                          if (password.text.isEmpty) {
-                            throw StateError('Enter your password.');
-                          }
-                          if (registering) {
-                            if (password.text.length < 6) {
-                              throw StateError(
-                                'Use at least six characters for your password.',
-                              );
-                            }
-                            if (password.text != confirmPassword.text) {
-                              throw StateError('Passwords do not match.');
-                            }
-                            await widget.store.registerEmail(
-                              email.text.trim(),
-                              password.text,
-                            );
-                            // Registration is done; the sign-in form must be what shows after a later logout.
-                            if (mounted) setState(() => registering = false);
-                          } else {
-                            await widget.store.login(
-                              email.text.trim(),
-                              password.text,
-                            );
-                          }
-                          password.clear();
-                          confirmPassword.clear();
-                        }),
-                  child: Text(registering ? 'Create account' : 'Sign in'),
-                ),
-                TextButton(
-                  onPressed: busy
-                      ? null
-                      : () => setState(() {
-                          registering = !registering;
-                          password.clear();
-                          confirmPassword.clear();
-                        }),
-                  child: Text(
-                    registering ? 'Back to sign in' : 'Create an account',
-                  ),
-                ),
-                TextButton(
-                  onPressed: busy ? null : () => run(resetPassword),
-                  child: const Text('Forgot password?'),
-                ),
-              ],
+              ] else
+                AccountAuthForm(store: widget.store),
               if (busy) const LinearProgressIndicator(),
             ],
           ),
