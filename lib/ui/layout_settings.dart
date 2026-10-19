@@ -193,19 +193,28 @@ List<String> componentFields(String component) => [
               // 'title'/'user' are plain inline text (business name+tagline,
               // the greeting) with no box/decoration of their own -- same
               // "only show fields that do something" rule as 'logo' above.
+              // Also excludes height/minHeight/maxHeight/*Scale/iconSize --
+              // title is a plain inline Text with no box or icon of its own,
+              // so those never did anything (shown-but-dead fields).
               'title': {
-                'gap', 'padding', 'margin', 'radius', 'borderWidth',
+                'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
               },
               // 'tagline' is the small muted line under the title — same
               // shape as 'title' above.
               'tagline': {
-                'gap', 'padding', 'margin', 'radius', 'borderWidth',
+                'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
               },
+              // Also excludes height/minHeight/maxHeight/*Scale -- same
+              // "shown-but-dead" fix as 'title' above (iconSize was already
+              // excluded here).
               'user': {
                 'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
               },
               // 'location' is a small pill (background + radius), no
               // width/padding/margin controls (it already sizes to its own
@@ -255,6 +264,14 @@ List<String> componentFields(String component) => [
   if (component == 'search') ...['voiceIconSize', 'imageIconSize'],
   if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'imageHeight',
   if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'columns',
+  // Adjusts the brightness/contrast of the category tile and product card
+  // photos themselves (see home_category_tile.dart/home_product_tile.dart)
+  // -- not just a decorative section background like 'ads'/'boxes' below.
+  // NOT 'popular': its own key only drives the Popular Products heading --
+  // the grid/card images there read 'products' (see wireframe_home.dart),
+  // so a brightness field under 'popular' itself would be shown but dead,
+  // exactly the mistake this round is fixing elsewhere.
+  if (['categories', 'products', 'localServices'].contains(component)) 'brightness',
   if (['products', 'popular', 'localServices'].contains(component)) ...[
     'rows',
     'imageWidth',
@@ -343,6 +360,12 @@ final _textOverridable = {
 // Has a swappable icon image (iconUrl) alongside its own text/box -- unlike
 // the plain icon-only header buttons, these also show a text label.
 const _iconReplaceableWithText = {'moreCategoriesTile', 'nearbyShopCard', ..._footerBadgeKeys};
+// Elements whose fallback icon (shown when no image is set) can be
+// recolored, without the rest of the full icon-button treatment
+// (background/replace-image) -- 'logo''s image already comes from
+// Business Profile, and 'services' already gets its own 'iconUrl' field
+// below, so neither needs the full _iconOnlyComponents shape, just a color.
+const _iconTintable = {'logo', 'services'};
 
 List<String> allFieldsFor(String component) {
   final animated = _animatedSections.contains(component);
@@ -361,9 +384,14 @@ List<String> allFieldsFor(String component) {
     if (decorated) ...['backgroundColor', 'gradientStart', 'gradientEnd', 'borderColor']
     else if (pillLike || iconOnly) ...['backgroundColor', 'borderColor'],
     if (textStyled) ...['textColor', 'fontFamily', 'fontStyle', 'fontWeight']
-    else if (iconOnly) 'textColor',
+    else if (iconOnly || _iconTintable.contains(component)) 'textColor',
     if (_textOverridable.contains(component)) 'text',
     if (animated) 'animation',
+    // Lets an admin set a real photo behind the "Today's Best Offers"
+    // strip, turning it into an actual banner instead of a plain-colored
+    // bar -- scoped to just 'notice' for now, the one place this was asked
+    // for, rather than every decorated section at once.
+    if (component == 'notice') 'backgroundImage',
     if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
     if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
     if (['products', 'popular', 'localServices'].contains(component)) 'alignment',

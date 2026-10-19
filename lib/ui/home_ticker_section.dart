@@ -59,9 +59,16 @@ class HomeTickerSection extends StatelessWidget {
       layout: noticeLayout,
       child: Container(
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: colorFromHex(ticker.text('backgroundColor'), const Color(0xffe8f3fb)),
-          borderRadius: BorderRadius.circular(clampedNumber(ticker, 'radius', 8, 0, 80)),
+        // entryDecoration (not a hand-rolled BoxDecoration) so this strip
+        // can be a real photo banner -- background image, brightness,
+        // gradient, border -- same mechanism every other decorated
+        // section already uses, not something new just for this one. At
+        // its defaults (no backgroundImage/gradient/border ever set) this
+        // produces the exact same look as before.
+        decoration: entryDecoration(
+          ticker,
+          fallback: const Color(0xffe8f3fb),
+          defaultRadius: 8,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         // The whole strip (label + chips) scrolls together as one row rather

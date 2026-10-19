@@ -139,19 +139,23 @@ void main() {
       );
     });
 
-    testWidgets('logo excludes fields that genuinely do nothing for it (width, colors, animation)', (tester) async {
+    testWidgets('logo excludes fields that genuinely do nothing for it (width, animation), but keeps its icon color', (tester) async {
       final store = await openStore();
       setRealisticSize(tester);
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'logo'),
       ))));
       expect(find.byKey(const ValueKey('logo-width')), findsNothing);
-      expect(find.byType(ColorPickerField), findsNothing);
       expect(find.widgetWithText(DropdownButtonFormField<String>, 'Entrance animation'), findsNothing);
       // Height remains — it's the one dimension that's actually wired.
       expect(find.byKey(const ValueKey('logo-height')), findsOneWidget);
       // logo still gets Visible, same as every other component.
       expect(find.byKey(const ValueKey('logo-visible')), findsOneWidget);
+      // The fallback icon's own color IS real and wired (responsive_header_bar.dart) --
+      // exactly one ColorPickerField (textColor), not the full
+      // background/border treatment a pill-shaped component would get.
+      expect(find.byType(ColorPickerField), findsOneWidget);
+      expect(find.byKey(const ValueKey('logo-backgroundColor')), findsNothing);
     });
   });
 }

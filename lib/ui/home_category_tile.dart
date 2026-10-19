@@ -74,6 +74,8 @@ class HomeCategoryTile extends StatelessWidget {
                                   width: badgeSize,
                                   height: badgeSize,
                                   fit: BoxFit.cover,
+                                  color: imageBrightnessTint(appearance ?? const Entry('', {}))?.$1,
+                                  colorBlendMode: imageBrightnessTint(appearance ?? const Entry('', {}))?.$2,
                                   errorBuilder: (_, e, s) => Icon(
                                     icons[index % icons.length],
                                     color: accent,

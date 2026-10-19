@@ -84,6 +84,7 @@ class HomeProductTile extends StatelessWidget {
                     width: layout.n('imageWidth', 0, 0, 3840) > 0
                         ? layout.n('imageWidth', 0, 0, 3840) * layout.scale
                         : null,
+                    appearance: appearance,
                   ),
                   if (discount > 0 || preview)
                     Positioned(

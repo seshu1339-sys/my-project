@@ -142,7 +142,11 @@ class ResponsiveHeader extends StatelessWidget {
     final settings = store.entries('settings');
     final header = layoutFor(context, settings, 'header');
     final logo = layoutFor(context, settings, 'logo');
-    final servicesIconUrl = layoutFor(context, settings, 'services').entry.text('iconUrl');
+    final servicesLayout = layoutFor(context, settings, 'services');
+    final servicesIconUrl = servicesLayout.entry.text('iconUrl');
+    final servicesIconColor = servicesLayout.entry.text('textColor').isEmpty
+        ? AppTokens.textPrimary
+        : colorFromHex(servicesLayout.entry.text('textColor'), AppTokens.textPrimary);
     // Three previously-hardcoded header pieces, each now independently
     // admin-editable (text/color/font/size/visibility) — see layout_settings.dart's
     // 'title'/'user'/'location' entries. Every field below falls back to
@@ -195,7 +199,9 @@ class ResponsiveHeader extends StatelessWidget {
                               ? Icon(
                                   Icons.storefront_rounded,
                                   size: logo.n('iconSize', 32, 20, 96),
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: logo.entry.text('textColor').isEmpty
+                                      ? Theme.of(context).colorScheme.primary
+                                      : colorFromHex(logo.entry.text('textColor'), Theme.of(context).colorScheme.primary),
                                 )
                               : Image.network(
                                   store.business.text('imageUrl'),
@@ -399,14 +405,14 @@ class ResponsiveHeader extends StatelessWidget {
                             width: 28,
                             height: 28,
                             child: servicesIconUrl.isEmpty
-                                ? const Icon(Icons.home_repair_service_outlined, size: 28, color: AppTokens.textPrimary)
+                                ? Icon(Icons.home_repair_service_outlined, size: 28, color: servicesIconColor)
                                 : Image.network(
                                     servicesIconUrl,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (_, error, stack) => const Icon(
+                                    errorBuilder: (_, error, stack) => Icon(
                                       Icons.home_repair_service_outlined,
                                       size: 28,
-                                      color: AppTokens.textPrimary,
+                                      color: servicesIconColor,
                                     ),
                                   ),
                           ),

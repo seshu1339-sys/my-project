@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
@@ -10,6 +11,12 @@ import 'layout_settings.dart';
 import 'home_section_config.dart';
 import 'page_elements.dart';
 import 'shared.dart';
+
+// Fields that hold an image URL and so get a real Upload/Remove image pair
+// next to their plain URL text field (same ImagePicker + Store.upload path
+// entry_editor.dart's collection forms already use) -- not just a box to
+// paste a URL into.
+const _imageUrlFields = {'iconUrl', 'backgroundImage'};
 
 class LayoutSettingsPage extends StatefulWidget {
   const LayoutSettingsPage({super.key, required this.store});
@@ -215,6 +222,33 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
 
   void _setValue(String key, dynamic value) {
     setState(() => values[key] = value);
+    _onFieldChanged();
+  }
+
+  // Same ImagePicker + Store.upload path entry_editor.dart's own "Upload
+  // image" button already uses for collection entries (products,
+  // categories, promotions, ...) -- reused here so a layout-component
+  // image field (icon replace, or the ticker's new background photo) gets
+  // a real upload, not just a box to paste a URL into.
+  Future<void> _uploadImage(String key) async {
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      setState(() => busy = true);
+      final url = await widget.store.upload(file);
+      if (mounted) {
+        setState(() => controllers[key]!.text = url);
+        _onFieldChanged();
+      }
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  void _clearImage(String key) {
+    setState(() => controllers[key]!.clear());
     _onFieldChanged();
   }
 
@@ -449,7 +483,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
       case _FieldKind.number:
       case _FieldKind.text:
         final isPixel = pixelFields.contains(key);
-        return TextFormField(
+        final field = TextFormField(
           key: ValueKey('${widget.component}-$key'),
           controller: controllers[key],
           decoration: InputDecoration(
@@ -457,6 +491,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
                 {
                   'fontFamily': 'Font family',
                   'iconUrl': 'Icon image URL (optional)',
+                  'backgroundImage': 'Background photo URL (optional — or use Upload below)',
                   'text': 'Text content (optional — leave blank for the default)',
                 }[key],
             suffixText: isPixel ? 'px' : null,
@@ -469,6 +504,32 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               : TextInputType.text,
           onChanged: (_) => _onFieldChanged(),
           validator: dimensionFields.containsKey(key) ? (v) => _numberValidator(key, v) : null,
+        );
+        if (!_imageUrlFields.contains(key)) return field;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            field,
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: busy ? null : () => _uploadImage(key),
+                  icon: const Icon(Icons.upload, size: 18),
+                  label: const Text('Upload image'),
+                ),
+                if (controllers[key]!.text.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : () => _clearImage(key),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Remove image'),
+                  ),
+              ],
+            ),
+          ],
         );
     }
   }

@@ -62,6 +62,18 @@ TextStyle sectionTextStyle(
   }
 }
 
+/// A `(color, blendMode)` pair usable as `Image`'s own `color`/
+/// `colorBlendMode` params to darken/brighten a photo based on the entry's
+/// `brightness` field (0.2-2, default 1 = unchanged) -- same formula
+/// `entryDecoration` below already uses for section background images,
+/// reused here for individual product/category photos. Returns null at
+/// the default so a never-touched entry renders byte-identical to before.
+(Color, BlendMode)? imageBrightnessTint(Entry entry) {
+  final brightness = clampedNumber(entry, 'brightness', 1, 0.2, 2);
+  if (brightness == 1) return null;
+  return (Colors.black.withValues(alpha: 1 - brightness.clamp(0.2, 2) / 2), BlendMode.darken);
+}
+
 BoxShadow? shadowFromEntry(Entry entry) {
   final strength = clampedNumber(entry, 'shadow', 0, 0, 1);
   if (strength == 0) return null;
@@ -247,10 +259,15 @@ void message(BuildContext context, Object text) => ScaffoldMessenger.of(context)
     );
 
 class ProductArt extends StatelessWidget {
-  const ProductArt(this.entry, {super.key, this.height = 160, this.width});
+  const ProductArt(this.entry, {super.key, this.height = 160, this.width, this.appearance});
   final Entry entry;
   final double height;
   final double? width;
+  // The section's own layout entry (e.g. 'products'/'categories'), used
+  // only for its 'brightness' field -- null everywhere ProductArt is used
+  // outside the home-page grids (product/category/shop/services pages),
+  // so every one of those keeps rendering exactly as before.
+  final Entry? appearance;
   @override
   Widget build(BuildContext context) {
     final icons = [
@@ -287,6 +304,7 @@ class ProductArt extends StatelessWidget {
         ),
       ),
     );
+    final tint = appearance == null ? null : imageBrightnessTint(appearance!);
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppTokens.radiusMd),
       child: entry.text('imageUrl').isEmpty
@@ -296,6 +314,8 @@ class ProductArt extends StatelessWidget {
               height: height,
               width: width ?? double.infinity,
               fit: BoxFit.contain,
+              color: tint?.$1,
+              colorBlendMode: tint?.$2,
               errorBuilder: (_, e, s) => placeholder,
             ),
     );

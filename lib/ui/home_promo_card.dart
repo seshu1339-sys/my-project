@@ -132,7 +132,7 @@ class _CardBody extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (entry.text('imageUrl').isNotEmpty)
-                      ProductArt(entry, height: 100),
+                      ProductArt(entry, height: 100, appearance: entry),
                     if (showEyebrow) ...[
                       Text(
                         (entry.text('placement') == 'ad'
@@ -225,7 +225,7 @@ class CompactBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (entry.text('imageUrl').isNotEmpty)
-                  ProductArt(entry, height: 120),
+                  ProductArt(entry, height: 120, appearance: entry),
                 Text(
                   entry.text('name'),
                   style: sectionTextStyle(
