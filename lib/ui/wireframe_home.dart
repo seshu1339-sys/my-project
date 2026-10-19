@@ -225,31 +225,6 @@ class WireframeHome extends StatelessWidget {
                     ),
                   ),
                 notice,
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Flexible(
-                        child: AllCategoriesButton(
-                          onTap: () {
-                            final ctx = categoriesKey.currentContext;
-                            if (ctx != null) {
-                              Scrollable.ensureVisible(
-                                ctx,
-                                duration: const Duration(milliseconds: 350),
-                                curve: Curves.easeOut,
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: wrapSection('notice', tickerSection)),
-                    ],
-                  ),
-                ),
-                SizedBox(height: page.gap),
                 LayoutBuilder(
                   builder: (context, c) {
                     final boxLayout = layoutFor(context, settings, 'boxes');
@@ -349,6 +324,48 @@ class WireframeHome extends StatelessWidget {
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // The "All Categories" button + chip-strip ticker
+                        // lives inside `main` (not as a separate full-width
+                        // row above the main/ads split) specifically so its
+                        // right edge always matches the offer cards/
+                        // categories/products below it, not the ad rail's --
+                        // keeping every section in this column visually
+                        // aligned to the same left/right edges regardless of
+                        // the ad rail's own width.
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Deliberately NOT Flexible/Expanded: a flex
+                              // widget here (even Flexible, which defaults to
+                              // flex:1) would compete equally with the
+                              // ticker's Expanded for the row's width,
+                              // splitting it 50/50 regardless of this
+                              // button's actual content size -- that was
+                              // exactly why the ticker used to stop partway
+                              // across instead of filling the rest of the
+                              // row. Sized to its own natural content width
+                              // instead, so shrinking or growing this button
+                              // automatically gives the ticker's Expanded
+                              // whatever space is left over.
+                              AllCategoriesButton(
+                                onTap: () {
+                                  final ctx = categoriesKey.currentContext;
+                                  if (ctx != null) {
+                                    Scrollable.ensureVisible(
+                                      ctx,
+                                      duration: const Duration(milliseconds: 350),
+                                      curve: Curves.easeOut,
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(child: wrapSection('notice', tickerSection)),
+                            ],
+                          ),
+                        ),
                         for (final (i, descriptor) in orderedSectionKeys.indexed) ...[
                           wrapSection(descriptor.key, reorderedSections[descriptor.key]!),
                           if (carousel != null && i == promoInsertAt) carousel,
