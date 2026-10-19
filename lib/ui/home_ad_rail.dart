@@ -5,6 +5,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'home_promotions.dart';
+import 'home_section_config.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 
@@ -114,7 +115,7 @@ class HomeAdRail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (ads.isNotEmpty && adsLabelLayout.visible)
+              if (ads.isNotEmpty && componentVisible(adsLabelLayout.entry, 'adsLabel'))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: wrapSection(

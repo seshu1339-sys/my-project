@@ -63,6 +63,24 @@ bool sectionVisible(Entry config) =>
     config.id.isEmpty ||
     (config.data['visible'] != 'false' && config.data['visible'] != false);
 
+// Elements that should start OFF until an admin explicitly turns them on,
+// unlike every other component (which defaults to visible -- see
+// sectionVisible above). Kept to a named, deliberately short list rather
+// than a per-component field, since "hidden by default" is the unusual
+// case.
+const _defaultHiddenComponents = {'adsLabel'};
+
+/// Like [sectionVisible], but respects a component's own default (most
+/// default to shown; [_defaultHiddenComponents] default to hidden) when the
+/// admin hasn't explicitly set 'visible' either way. Both the renderer and
+/// the admin form's own toggle call this (never [sectionVisible] directly
+/// for one of these components), so what the toggle shows and what
+/// actually renders can never disagree.
+bool componentVisible(Entry config, String component) =>
+    _defaultHiddenComponents.contains(component)
+    ? (config.data['visible'] == 'true' || config.data['visible'] == true)
+    : sectionVisible(config);
+
 /// One admin-reorderable home page section: its layout key (what
 /// `WireframeHome`/`sectionOrder`/`sectionConfig` actually read — a
 /// layout-component key, the same ones `layoutComponents`/`layoutFor` in

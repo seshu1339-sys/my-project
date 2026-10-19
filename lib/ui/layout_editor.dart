@@ -170,12 +170,15 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     for (final key in fields) {
       switch (_kindOf(key)) {
         case _FieldKind.toggle:
-          // 'visible' defaults to true when unset (sectionVisible's own
-          // rule); 'scrollEnabled' defaults to false (see
-          // home_scheduled_promo.dart's own default — flipped from true
-          // after the ad/box overlap fix). Entry.text() normalizes a
-          // legacy string 'true'/'false' the same as a real stored bool.
-          values[key] = key == 'visible' ? sectionVisible(saved) : saved.text(key, 'false') == 'true';
+          // 'visible' defaults to true when unset for most components
+          // (componentVisible delegates to sectionVisible's own rule for
+          // them), false for the few that default to hidden (e.g.
+          // 'adsLabel' -- see home_section_config.dart); 'scrollEnabled'
+          // defaults to false (see home_scheduled_promo.dart's own default
+          // — flipped from true after the ad/box overlap fix). Entry.text()
+          // normalizes a legacy string 'true'/'false' the same as a real
+          // stored bool.
+          values[key] = key == 'visible' ? componentVisible(saved, widget.component) : saved.text(key, 'false') == 'true';
         case _FieldKind.color:
         case _FieldKind.fontFamily:
         case _FieldKind.fontStyle:
