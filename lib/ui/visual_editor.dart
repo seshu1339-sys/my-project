@@ -25,6 +25,16 @@ const _promoKeyPrefix = 'promo-';
 bool _isPromoKey(String key) => key.startsWith(_promoKeyPrefix);
 String _promoId(String key) => key.substring(_promoKeyPrefix.length);
 
+// Numbered elements whose settings already live in their OWN dedicated
+// Firestore doc with their own full admin editor, rather than the generic
+// settings/section_<key> + LayoutFieldsForm pair every other numbered
+// element uses. Selecting one of these opens that existing editor instead
+// of the inline panel -- same "point at the real editor" pattern already
+// used below for Theme/Business Profile/Promotions.
+const _externalEditorKeys = {
+  'tickerMarquee': ('settings', 'scrollingText'),
+};
+
 enum _PreviewWidth { desktop, tablet, mobile }
 
 /// The admin "Visual Editor": the real, live `WireframeHome` rendered inside
@@ -95,13 +105,23 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   // helpers are the ONE place that distinction is resolved, so selection,
   // undo/redo, cancel and the percent fields all agree on where a key's data
   // actually lives without duplicating this branch everywhere.
-  Entry _currentEntryFor(String key) => _isPromoKey(key)
-      ? widget.store.entries('promotions').firstWhere((e) => e.id == _promoId(key), orElse: () => Entry(_promoId(key), const {}))
-      : sectionConfig(widget.store.entries('settings'), key);
+  Entry _currentEntryFor(String key) {
+    if (_isPromoKey(key)) {
+      return widget.store.entries('promotions').firstWhere((e) => e.id == _promoId(key), orElse: () => Entry(_promoId(key), const {}));
+    }
+    final external = _externalEditorKeys[key];
+    if (external != null) {
+      return widget.store.entries(external.$1).firstWhere((e) => e.id == external.$2, orElse: () => Entry(external.$2, const {}));
+    }
+    return sectionConfig(widget.store.entries('settings'), key);
+  }
 
-  Future<void> _saveEntryFor(String key, Map<String, dynamic> data) => _isPromoKey(key)
-      ? widget.store.save('promotions', Entry(_promoId(key), data))
-      : widget.store.save('settings', Entry('section_$key', data));
+  Future<void> _saveEntryFor(String key, Map<String, dynamic> data) {
+    if (_isPromoKey(key)) return widget.store.save('promotions', Entry(_promoId(key), data));
+    final external = _externalEditorKeys[key];
+    if (external != null) return widget.store.save(external.$1, Entry(external.$2, data));
+    return widget.store.save('settings', Entry('section_$key', data));
+  }
 
   void _select(String key) {
     _history
@@ -459,6 +479,38 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     return w > 0 ? w : 600;
   }
 
+  Widget _panelBody(String key) {
+    if (_isPromoKey(key)) {
+      return Center(
+        child: TextButton.icon(
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Edit target, schedule, image & more'),
+          onPressed: () => _openFullEditor('promotions', entryId: _promoId(key)),
+        ),
+      );
+    }
+    final external = _externalEditorKeys[key];
+    if (external != null) {
+      return Center(
+        child: TextButton.icon(
+          icon: const Icon(Icons.open_in_new),
+          label: const Text('Open its full settings editor'),
+          onPressed: () => _openFullEditor(external.$1, entryId: external.$2),
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: LayoutFieldsForm(
+        key: ValueKey(key),
+        store: widget.store,
+        component: key,
+        autoSave: true,
+        onSaved: _onAutoSaved,
+      ),
+    );
+  }
+
   Widget _inlinePanel(String key) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -468,7 +520,9 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           children: [
             Expanded(
               child: Text(
-                _isPromoKey(key) ? 'Advertisement / promo box' : numberedLabel(key, layoutComponents[key] ?? key),
+                _isPromoKey(key)
+                    ? 'Advertisement / promo box'
+                    : numberedLabel(key, layoutComponents[key] ?? pageElementByKey(key)?.label ?? key),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -532,26 +586,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           ),
         ),
       const Divider(),
-      Expanded(
-        child: _isPromoKey(key)
-            ? Center(
-                child: TextButton.icon(
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Edit target, schedule, image & more'),
-                  onPressed: () => _openFullEditor('promotions', entryId: _promoId(key)),
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: LayoutFieldsForm(
-                  key: ValueKey(key),
-                  store: widget.store,
-                  component: key,
-                  autoSave: true,
-                  onSaved: _onAutoSaved,
-                ),
-              ),
-      ),
+      Expanded(child: _panelBody(key)),
     ],
   );
 }

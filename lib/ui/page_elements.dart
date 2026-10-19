@@ -32,6 +32,27 @@ const pageElements = <PageElement>[
   PageElement(10, 'cartIcon', 'Shopping bag icon'),
   PageElement(11, 'menuIcon', 'Menu icon'),
   PageElement(12, 'office', 'Office address & phone'),
+  // --- Home page, remaining sections (round 2) ---
+  PageElement(13, 'notice', "Today's Best Offers strip"),
+  PageElement(14, 'tickerMarquee', 'Ticker marquee banner'),
+  PageElement(15, 'promo', 'Offers banner carousel'),
+  PageElement(16, 'categories', 'Categories section'),
+  PageElement(17, 'moreCategoriesTile', '"More Categories" tile'),
+  PageElement(18, 'popular', 'Popular Products section'),
+  PageElement(19, 'popularFilterChips', 'Popular Products filter chips'),
+  PageElement(20, 'products', 'Product card template'),
+  PageElement(21, 'localServices', 'Local Services section'),
+  PageElement(22, 'adsLabel', '"ADS" label'),
+  PageElement(23, 'ads', 'Advertisement box template'),
+  PageElement(24, 'boxes', 'Promotional box template'),
+  PageElement(25, 'nearby', 'Nearby shops section'),
+  PageElement(26, 'nearbyShopCard', 'Nearby shop card'),
+  PageElement(27, 'footerBadge1', 'Footer badge 1 — Fresh & Premium Quality'),
+  PageElement(28, 'footerBadge2', 'Footer badge 2 — Fast & Safe Delivery'),
+  PageElement(29, 'footerBadge3', 'Footer badge 3 — Best Prices Always'),
+  PageElement(30, 'footerBadge4', 'Footer badge 4 — Easy Returns & Support'),
+  PageElement(31, 'footerBadge5', 'Footer badge 5 — Local Shops & Trusted Sellers'),
+  PageElement(32, 'footerBadge6', 'Footer badge 6 — Pay on Delivery'),
 ];
 
 PageElement? pageElementByNumber(int number) => pageElements.where((e) => e.number == number).firstOrNull;

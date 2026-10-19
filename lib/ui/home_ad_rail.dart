@@ -78,19 +78,26 @@ class HomeAdRail extends StatelessWidget {
     required this.ads,
     required this.boxes,
     required this.onPromotion,
+    required this.adsLabelLayout,
     this.wrapItem,
+    this.wrapSection = _identitySection,
   });
   final ComponentLayout adLayout;
   final ComponentLayout boxLayout;
   final List<Entry> ads;
   final List<Entry> boxes;
   final ValueChanged<String> onPromotion;
+  final ComponentLayout adsLabelLayout;
   // Admin Visual Editor hook: when provided, wraps each INDIVIDUAL ad/box
   // (not the rail as a whole) so each one gets its own selection border,
   // ghost outline and 8 resize handles, independent of its neighbors. Null
   // on the real customer site — this widget's own rendering is otherwise
   // completely unchanged either way.
   final Widget Function(Entry entry, String kind, Widget child)? wrapItem;
+  // Same hook as HomeAdRail's sibling sections -- just for the fixed "ADS"
+  // label, not the per-ad items above (those use wrapItem instead).
+  final Widget Function(String sectionKey, Widget child) wrapSection;
+  static Widget _identitySection(String sectionKey, Widget child) => child;
 
   Widget _item(Entry entry, String kind, Widget child) =>
       wrapItem == null ? child : wrapItem!(entry, kind, child);
@@ -107,16 +114,23 @@ class HomeAdRail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (ads.isNotEmpty)
+              if (ads.isNotEmpty && adsLabelLayout.visible)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    'ADS'.tr(context),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      letterSpacing: 1.2,
-                      color: AppTokens.textMuted,
+                  child: wrapSection(
+                    'adsLabel',
+                    Text(
+                      adsLabelLayout.entry.text('text', 'ADS').tr(context),
+                      style: sectionTextStyle(
+                        adsLabelLayout.entry,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ).copyWith(
+                        letterSpacing: 1.2,
+                        color: adsLabelLayout.entry.text('textColor').isEmpty
+                            ? AppTokens.textMuted
+                            : colorFromHex(adsLabelLayout.entry.text('textColor'), AppTokens.textMuted),
+                      ),
                     ),
                   ),
                 ),

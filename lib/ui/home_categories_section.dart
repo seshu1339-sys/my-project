@@ -5,6 +5,7 @@ import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'home_widgets.dart';
 import 'layout_settings.dart';
+import 'shared.dart';
 
 /// The Categories homepage section: heading + a responsive icon-tile grid
 /// whose column count/tile size come from the admin-configured layout.
@@ -15,11 +16,16 @@ class HomeCategoriesSection extends StatelessWidget {
     required this.categories,
     required this.categoriesKey,
     required this.onCategory,
+    required this.moreTileLayout,
+    this.wrapSection = _identitySection,
   });
   final ComponentLayout categoryLayout;
   final List<Entry> categories;
   final GlobalKey categoriesKey;
   final ValueChanged<String> onCategory;
+  final ComponentLayout moreTileLayout;
+  final Widget Function(String sectionKey, Widget child) wrapSection;
+  static Widget _identitySection(String sectionKey, Widget child) => child;
 
   @override
   Widget build(BuildContext context) => LayoutSection(
@@ -38,7 +44,7 @@ class HomeCategoriesSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             HomeSectionHeading(
-              title: 'Categories'.tr(context),
+              title: categoryLayout.entry.text('text', 'Categories').tr(context),
               subtitle: 'Browse your everyday essentials'.tr(context),
               appearance: categoryLayout.entry,
             ),
@@ -70,11 +76,15 @@ class HomeCategoriesSection extends StatelessWidget {
                         ),
                       ),
                     ),
-                  SizedBox(
-                    width: tileWidth,
-                    height: categoryLayout.height(125, floor: 125),
-                    child: _MoreCategoriesTile(onTap: () => onCategory('')),
-                  ),
+                  if (moreTileLayout.visible)
+                    SizedBox(
+                      width: tileWidth,
+                      height: categoryLayout.height(125, floor: 125),
+                      child: wrapSection(
+                        'moreCategoriesTile',
+                        _MoreCategoriesTile(onTap: () => onCategory(''), layout: moreTileLayout),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -86,44 +96,61 @@ class HomeCategoriesSection extends StatelessWidget {
 }
 
 class _MoreCategoriesTile extends StatelessWidget {
-  const _MoreCategoriesTile({required this.onTap});
+  const _MoreCategoriesTile({required this.onTap, required this.layout});
   final VoidCallback onTap;
+  final ComponentLayout layout;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.transparent,
-    child: InkWell(
-      borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppTokens.tintFor(0),
-                    shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final entry = layout.entry;
+    final badgeSize = entry.number('iconSize') > 0 ? clampedNumber(entry, 'iconSize', 56, 16, 120) : 56.0;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppTokens.radiusLg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: badgeSize,
+                    height: badgeSize,
+                    decoration: BoxDecoration(
+                      color: entry.text('backgroundColor').isEmpty
+                          ? AppTokens.tintFor(0)
+                          : colorFromHex(entry.text('backgroundColor'), AppTokens.tintFor(0)),
+                      shape: BoxShape.circle,
+                    ),
+                    child: entry.text('iconUrl').isEmpty
+                        ? const Icon(Icons.grid_view_rounded)
+                        : ClipOval(
+                            child: Image.network(
+                              entry.text('iconUrl'),
+                              width: badgeSize,
+                              height: badgeSize,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, error, stack) => const Icon(Icons.grid_view_rounded),
+                            ),
+                          ),
                   ),
-                  child: const Icon(Icons.grid_view_rounded),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'More Categories'.tr(context),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Text(
+                    entry.text('text', 'More Categories').tr(context),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: sectionTextStyle(entry, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

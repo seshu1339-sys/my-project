@@ -9,6 +9,7 @@ import 'package:ecommerce_app/ui/layout_settings.dart';
 void main() {
   final adLayout = ComponentLayout(const Entry('section_ads', {}), 1200);
   final boxLayout = ComponentLayout(const Entry('section_boxes', {}), 1200);
+  final adsLabelLayout = ComponentLayout(const Entry('section_adsLabel', {}), 1200);
 
   group('HomeAdRail.wrapItem', () {
     testWidgets('the real customer site (wrapItem omitted) renders ads/boxes unwrapped, unchanged', (tester) async {
@@ -18,6 +19,7 @@ void main() {
         ads: [const Entry('ad1', {'target': 'x'})],
         boxes: const [],
         onPromotion: (_) {},
+        adsLabelLayout: adsLabelLayout,
       ))));
       expect(tester.takeException(), isNull);
     });
@@ -30,6 +32,7 @@ void main() {
         ads: [const Entry('ad1', {'target': 'x'}), const Entry('ad2', {'target': 'y'})],
         boxes: [const Entry('box1', {'target': 'z'})],
         onPromotion: (_) {},
+        adsLabelLayout: adsLabelLayout,
         wrapItem: (entry, kind, child) {
           wrapped.add('$kind:${entry.id}');
           return KeyedSubtree(key: ValueKey('wrapped-${entry.id}'), child: child);
@@ -48,6 +51,7 @@ void main() {
         ads: [const Entry('ad1', {'target': 'x'}), const Entry('ad2', {'target': 'y'})],
         boxes: const [],
         onPromotion: (_) {},
+        adsLabelLayout: adsLabelLayout,
         wrapItem: (entry, kind, child) => Container(key: ValueKey('wrap-${entry.id}'), child: child),
       )))));
       final wrap1 = find.byKey(const ValueKey('wrap-ad1'));

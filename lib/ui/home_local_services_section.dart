@@ -37,7 +37,7 @@ class HomeLocalServicesSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HomeSectionHeading(
-            title: 'Local Services'.tr(context),
+            title: layout.entry.text('text', 'Local Services').tr(context),
             subtitle: 'Book trusted help near you'.tr(context),
             action: onServices,
             appearance: sectionConfig(settings, 'localServices'),

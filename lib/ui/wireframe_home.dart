@@ -225,7 +225,7 @@ class WireframeHome extends StatelessWidget {
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
-                notice,
+                wrapSection('tickerMarquee', notice),
                 LayoutBuilder(
                   builder: (context, c) {
                     final boxLayout = layoutFor(context, settings, 'boxes');
@@ -249,7 +249,9 @@ class WireframeHome extends StatelessWidget {
                       ads: ads,
                       boxes: boxes,
                       onPromotion: onPromotion,
+                      adsLabelLayout: layoutFor(context, settings, 'adsLabel'),
                       wrapItem: wrapPromoItem,
+                      wrapSection: wrapSection,
                     );
                     // Mobile/tablet never hide these ads — they're shown as a
                     // compact, auto-rotating, swipeable carousel instead of
@@ -286,6 +288,8 @@ class WireframeHome extends StatelessWidget {
                         categories: categories,
                         categoriesKey: categoriesKey,
                         onCategory: onCategory,
+                        moreTileLayout: layoutFor(context, settings, 'moreCategoriesTile'),
+                        wrapSection: wrapSection,
                       ),
                       'popular': HomePopularSection(
                         store: store,
@@ -298,6 +302,7 @@ class WireframeHome extends StatelessWidget {
                         shopNameById: shopNameById,
                         onProduct: onProduct,
                         onAdd: onAdd,
+                        wrapSection: wrapSection,
                       ),
                       'localServices': HomeLocalServicesSection(
                         store: store,
@@ -389,6 +394,8 @@ class WireframeHome extends StatelessWidget {
                             located: located,
                             shops: shops,
                             onLocation: onLocation,
+                            shopCardLayout: layoutFor(context, settings, 'nearbyShopCard'),
+                            wrapSection: wrapSection,
                           ),
                         ),
                       ],
@@ -412,7 +419,7 @@ class WireframeHome extends StatelessWidget {
                         : main;
                   },
                 ),
-                const HomeFooterBadges(),
+                HomeFooterBadges(settings: settings, wrapSection: wrapSection),
                 const SizedBox(height: 16),
               ],
             ),

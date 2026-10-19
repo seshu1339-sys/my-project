@@ -6,6 +6,7 @@ import '../services/strings.dart';
 import 'home_widgets.dart';
 import 'layout_settings.dart';
 import 'home_section_config.dart';
+import 'shared.dart';
 
 /// The "Popular Products" / "Featured Products" homepage section (also
 /// doubles as search results when the customer has typed into the header
@@ -25,6 +26,7 @@ class HomePopularSection extends StatefulWidget {
     required this.shopNameById,
     required this.onProduct,
     required this.onAdd,
+    this.wrapSection = _identitySection,
   });
   final Store store;
   final List<Entry> settings;
@@ -35,6 +37,8 @@ class HomePopularSection extends StatefulWidget {
   final String searchText;
   final Map<String, String> shopNameById;
   final ValueChanged<Entry> onProduct, onAdd;
+  final Widget Function(String sectionKey, Widget child) wrapSection;
+  static Widget _identitySection(String sectionKey, Widget child) => child;
 
   @override
   State<HomePopularSection> createState() => _HomePopularSectionState();
@@ -58,34 +62,57 @@ class _HomePopularSectionState extends State<HomePopularSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HomeSectionHeading(
-            title: (widget.searchText.isEmpty ? 'Popular Products' : 'Search results').tr(context),
+            title: widget.searchText.isEmpty
+                ? sectionConfig(widget.settings, 'popular').text('text', 'Popular Products').tr(context)
+                : 'Search results'.tr(context),
             subtitle: widget.searchText.isEmpty
                 ? 'Products and services from your neighbourhood'.tr(context)
                 : '{count} matching items'.tr(context, {'count': '${widget.products.length}'}),
             appearance: sectionConfig(widget.settings, 'popular'),
           ),
           if (widget.searchText.isEmpty && tabCategories.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    ChoiceChip(
-                      label: Text('All'.tr(context)),
-                      selected: filter.isEmpty,
-                      onSelected: (_) => setState(() => filter = ''),
-                    ),
-                    for (final category in tabCategories) ...[
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: Text(category.text('name')),
-                        selected: filter == category.id,
-                        onSelected: (_) => setState(() => filter = category.id),
+            widget.wrapSection(
+              'popularFilterChips',
+              Builder(
+                builder: (context) {
+                  final chips = layoutFor(context, widget.settings, 'popularFilterChips');
+                  if (!chips.visible) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ChoiceChip(
+                            label: Text('All'.tr(context)),
+                            selected: filter.isEmpty,
+                            selectedColor: chips.entry.text('backgroundColor').isEmpty
+                                ? null
+                                : colorFromHex(chips.entry.text('backgroundColor'), Colors.transparent),
+                            labelStyle: chips.entry.text('textColor').isEmpty
+                                ? null
+                                : TextStyle(color: colorFromHex(chips.entry.text('textColor'), Colors.black87)),
+                            onSelected: (_) => setState(() => filter = ''),
+                          ),
+                          for (final category in tabCategories) ...[
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: Text(category.text('name')),
+                              selected: filter == category.id,
+                              selectedColor: chips.entry.text('backgroundColor').isEmpty
+                                  ? null
+                                  : colorFromHex(chips.entry.text('backgroundColor'), Colors.transparent),
+                              labelStyle: chips.entry.text('textColor').isEmpty
+                                  ? null
+                                  : TextStyle(color: colorFromHex(chips.entry.text('textColor'), Colors.black87)),
+                              onSelected: (_) => setState(() => filter = category.id),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
             ),
           if (filtered.isEmpty)

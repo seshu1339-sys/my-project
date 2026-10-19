@@ -24,13 +24,28 @@ const layoutComponents = <String, String>{
   'notice': 'Ticker / notice bar',
   'promo': 'Banner carousel',
   'categories': 'Categories',
+  'moreCategoriesTile': '"More Categories" tile',
   'products': 'Product cards',
   'popular': 'Popular Products',
+  'popularFilterChips': 'Popular Products filter chips',
   'localServices': 'Local Services',
-  'nearby': 'Nearby shops / map',
+  'adsLabel': '"ADS" label',
   'ads': 'Advertisement defaults',
   'boxes': 'Promotional box defaults',
+  'nearby': 'Nearby shops / map',
+  'nearbyShopCard': 'Nearby shop card',
+  'footerBadge1': 'Footer badge 1',
+  'footerBadge2': 'Footer badge 2',
+  'footerBadge3': 'Footer badge 3',
+  'footerBadge4': 'Footer badge 4',
+  'footerBadge5': 'Footer badge 5',
+  'footerBadge6': 'Footer badge 6',
   'background': 'Page layout',
+};
+
+const _footerBadgeKeys = {
+  'footerBadge1', 'footerBadge2', 'footerBadge3',
+  'footerBadge4', 'footerBadge5', 'footerBadge6',
 };
 
 const dimensionFields = <String, (String, double, double)>{
@@ -80,6 +95,16 @@ const dimensionFields = <String, (String, double, double)>{
 // an image, with its own color/size/padding/background/visibility).
 const _iconExclusions = {
   'fontSize', 'gap', 'margin', 'radius', 'borderWidth',
+  'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+};
+
+// Small fixed icon+text pieces (the "More Categories" tile, "ADS" label,
+// filter chips, footer badges) that size to their own content -- same
+// "only show fields that do something" rule as above, just keeping
+// fontSize/iconSize/padding since (unlike the plain icon buttons) these
+// have both an icon AND a text label.
+const _smallBadgeExclusions = {
+  'gap', 'margin', 'radius', 'borderWidth',
   'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
 };
 
@@ -160,6 +185,22 @@ List<String> componentFields(String component) => [
               'nearby': {'gap'},
               'background': {'fontSize', 'iconSize'},
               'products': {'margin'},
+              'moreCategoriesTile': _smallBadgeExclusions,
+              'popularFilterChips': _smallBadgeExclusions,
+              'adsLabel': _smallBadgeExclusions,
+              // 'nearbyShopCard' is a real card -- keeps radius/borderWidth/
+              // padding (unlike the other small badges above) since those
+              // all apply visibly to its own box.
+              'nearbyShopCard': {
+                'gap', 'margin',
+                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+              },
+              'footerBadge1': _smallBadgeExclusions,
+              'footerBadge2': _smallBadgeExclusions,
+              'footerBadge3': _smallBadgeExclusions,
+              'footerBadge4': _smallBadgeExclusions,
+              'footerBadge5': _smallBadgeExclusions,
+              'footerBadge6': _smallBadgeExclusions,
             }[component]?.contains(key) ??
             false),
   ),
@@ -230,11 +271,25 @@ const _iconOnlyComponents = {'notificationIcon', 'wishlistIcon', 'cartIcon', 'me
 // gradient/entrance-animation of a full LayoutSection) -- 'tagline' and
 // 'office' joined this set so every header element gets a background
 // color option, matching 'products'/'location' which already had one.
-const _pillLikeComponents = {'products', 'location', 'tagline', 'office'};
+// The small home-page badges joined for the same reason.
+const _pillLikeComponents = {
+  'products', 'location', 'tagline', 'office',
+  'moreCategoriesTile', 'popularFilterChips', 'adsLabel', 'nearbyShopCard',
+  ..._footerBadgeKeys,
+};
 // Elements with their own text content that can be overridden from the
-// admin (as opposed to 'office', whose two lines come from Business
-// Profile and have no single sensible one-field override).
-const _textOverridable = {'title', 'user', 'location', 'tagline'};
+// admin (as opposed to 'office'/'nearbyShopCard', whose text comes from
+// Business Profile/the shops catalog per-entry and has no single sensible
+// one-field override).
+const _textOverridable = {
+  'title', 'user', 'location', 'tagline',
+  'notice', 'categories', 'popular', 'localServices', 'nearby',
+  'moreCategoriesTile', 'adsLabel',
+  ..._footerBadgeKeys,
+};
+// Has a swappable icon image (iconUrl) alongside its own text/box -- unlike
+// the plain icon-only header buttons, these also show a text label.
+const _iconReplaceableWithText = {'moreCategoriesTile', 'nearbyShopCard', ..._footerBadgeKeys};
 
 List<String> allFieldsFor(String component) {
   final animated = _animatedSections.contains(component);
@@ -259,7 +314,7 @@ List<String> allFieldsFor(String component) {
     if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
     if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
     if (['products', 'popular', 'localServices'].contains(component)) 'alignment',
-    if (component == 'services' || iconOnly) 'iconUrl',
+    if (component == 'services' || iconOnly || _iconReplaceableWithText.contains(component)) 'iconUrl',
   ];
 }
 
