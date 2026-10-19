@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../services/strings.dart';
 import 'cart_page.dart';
 import 'design_tokens.dart';
+import 'layout_settings.dart';
 import 'responsive_header.dart';
 import 'reviews.dart';
 import 'shared.dart';
@@ -58,19 +60,29 @@ class _ProductPageState extends State<ProductPage> {
         appBar: AppBar(
           title: Text(p.text('name')),
           actions: [
-            IconButton(
+            pageIconButton(
+              context,
+              layout: layoutFor(
+                context,
+                store.entries('settings'),
+                'productPageShareIcon',
+              ),
+              icon: Icons.share_outlined,
               tooltip: 'Share product',
               onPressed: () => _share(context, p),
-              icon: const Icon(Icons.share_outlined),
             ),
-            IconButton(
+            pageIconButton(
+              context,
+              layout: layoutFor(
+                context,
+                store.entries('settings'),
+                'productPageWishlistIcon',
+              ),
+              icon: store.wishlist.contains(p.id)
+                  ? Icons.favorite
+                  : Icons.favorite_border,
               tooltip: 'Wishlist',
               onPressed: () => _toggleWishlist(context, p),
-              icon: Icon(
-                store.wishlist.contains(p.id)
-                    ? Icons.favorite
-                    : Icons.favorite_border,
-              ),
             ),
           ],
         ),
@@ -161,42 +173,104 @@ class _ProductPageState extends State<ProductPage> {
                   style: const TextStyle(fontSize: 17, height: 1.6),
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _canAdd(p)
-                            ? () {
-                                store.add(p);
-                                message(context, 'Added to bag');
-                              }
-                            : null,
-                        icon: const Icon(Icons.shopping_bag_outlined),
-                        label: Text(
-                          p.number('stock') <= 0
-                              ? 'Currently unavailable'
-                              : 'Add to bag',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _canAdd(p)
-                            ? () {
-                                store.add(p);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => CartPage(store: store),
-                                  ),
-                                );
-                              }
-                            : null,
-                        child: const Text('Buy now'),
-                      ),
-                    ),
-                  ],
+                Builder(
+                  builder: (context) {
+                    final addLayout = layoutFor(
+                      context,
+                      store.entries('settings'),
+                      'productPageAddButton',
+                    );
+                    final buyLayout = layoutFor(
+                      context,
+                      store.entries('settings'),
+                      'productPageBuyButton',
+                    );
+                    final addColor = addLayout.entry.text('backgroundColor');
+                    final addTextColor = addLayout.entry.text('textColor');
+                    final buyColor = buyLayout.entry.text('borderColor');
+                    final buyTextColor = buyLayout.entry.text('textColor');
+                    return Row(
+                      children: [
+                        if (addLayout.visible)
+                          Expanded(
+                            child: FilledButton.icon(
+                              style: addColor.isEmpty && addTextColor.isEmpty
+                                  ? null
+                                  : FilledButton.styleFrom(
+                                      backgroundColor: addColor.isEmpty
+                                          ? null
+                                          : colorFromHex(
+                                              addColor,
+                                              AppTokens.primary,
+                                            ),
+                                      foregroundColor: addTextColor.isEmpty
+                                          ? null
+                                          : colorFromHex(
+                                              addTextColor,
+                                              Colors.white,
+                                            ),
+                                    ),
+                              onPressed: _canAdd(p)
+                                  ? () {
+                                      store.add(p);
+                                      message(context, 'Added to bag');
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.shopping_bag_outlined),
+                              label: Text(
+                                p.number('stock') <= 0
+                                    ? 'Currently unavailable'
+                                    : addLayout.entry
+                                          .text('text', 'Add to bag')
+                                          .tr(context),
+                              ),
+                            ),
+                          ),
+                        if (addLayout.visible && buyLayout.visible)
+                          const SizedBox(width: 12),
+                        if (buyLayout.visible)
+                          Expanded(
+                            child: OutlinedButton(
+                              style: buyColor.isEmpty && buyTextColor.isEmpty
+                                  ? null
+                                  : OutlinedButton.styleFrom(
+                                      side: buyColor.isEmpty
+                                          ? null
+                                          : BorderSide(
+                                              color: colorFromHex(
+                                                buyColor,
+                                                AppTokens.primary,
+                                              ),
+                                            ),
+                                      foregroundColor: buyTextColor.isEmpty
+                                          ? null
+                                          : colorFromHex(
+                                              buyTextColor,
+                                              AppTokens.primary,
+                                            ),
+                                    ),
+                              onPressed: _canAdd(p)
+                                  ? () {
+                                      store.add(p);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute<void>(
+                                          builder: (_) =>
+                                              CartPage(store: store),
+                                        ),
+                                      );
+                                    }
+                                  : null,
+                              child: Text(
+                                buyLayout.entry
+                                    .text('text', 'Buy now')
+                                    .tr(context),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 if (shop != null)
                   ListTile(
@@ -222,9 +296,14 @@ class _ProductPageState extends State<ProductPage> {
                 ],
                 const Divider(height: 40),
                 if (related.isNotEmpty) ...[
-                  const Text(
-                    'Related products',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  pageHeadingText(
+                    context,
+                    layout: layoutFor(
+                      context,
+                      store.entries('settings'),
+                      'productPageRelatedHeading',
+                    ),
+                    defaultText: 'Related products',
                   ),
                   for (final item in related)
                     ListTile(

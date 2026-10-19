@@ -53,6 +53,31 @@ const pageElements = <PageElement>[
   PageElement(30, 'footerBadge4', 'Footer badge 4 — Easy Returns & Support'),
   PageElement(31, 'footerBadge5', 'Footer badge 5 — Local Shops & Trusted Sellers'),
   PageElement(32, 'footerBadge6', 'Footer badge 6 — Pay on Delivery'),
+  // --- Other screens (round 3) -- no live preview exists for these (the
+  // admin Visual Editor only ever renders the home page), so these are
+  // reachable only via "Go to number" and the Layout Settings dropdown,
+  // not by clicking in a live preview, and the "Show numbers" overlay has
+  // nothing to draw a badge on for them. ---
+  PageElement(33, 'productPageAddButton', 'Product page: "Add to bag" button'),
+  PageElement(34, 'productPageBuyButton', 'Product page: "Buy now" button'),
+  PageElement(35, 'productPageShareIcon', 'Product page: share icon'),
+  PageElement(36, 'productPageWishlistIcon', 'Product page: wishlist icon'),
+  PageElement(37, 'productPageRelatedHeading', 'Product page: "Related products" heading'),
+  PageElement(38, 'productPageReviewsHeading', 'Product page: "Community reviews" heading'),
+  PageElement(39, 'categoryPageHeading', 'Category page: section headings'),
+  PageElement(40, 'cartEmptyMessage', 'Cart: empty-bag message'),
+  PageElement(41, 'cartEmptyIcon', 'Cart: empty-bag icon'),
+  PageElement(42, 'cartSubmitButton', 'Cart: submit order button'),
+  PageElement(43, 'servicesPageAppBarTitle', 'Services page: title'),
+  PageElement(44, 'shopsPageAppBarTitle', 'Shops page: title'),
+  PageElement(45, 'shopsPageHeading', 'Shops page: heading'),
+  PageElement(46, 'shopPageDirectionsButton', 'Shop page: "Get directions" button'),
+  PageElement(47, 'shopPageRelatedHeading', 'Shop page: "From this shop" heading'),
+  PageElement(48, 'accountPageAppBarTitle', 'Account page: title'),
+  PageElement(49, 'accountDemoHeading', 'Account page: demo-mode heading'),
+  PageElement(50, 'accountOrdersHeading', 'Account page: "Your orders" heading'),
+  PageElement(51, 'authFormHeading', 'Sign-in form: heading'),
+  PageElement(52, 'wishlistDialogTitle', 'Wishlist dialog: title'),
 ];
 
 PageElement? pageElementByNumber(int number) => pageElements.where((e) => e.number == number).firstOrNull;

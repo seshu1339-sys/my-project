@@ -41,12 +41,58 @@ const layoutComponents = <String, String>{
   'footerBadge5': 'Footer badge 5',
   'footerBadge6': 'Footer badge 6',
   'background': 'Page layout',
+  // --- Other screens (no live preview exists for these yet -- see
+  // page_elements.dart's doc comment) ---
+  'productPageAddButton': 'Product page: "Add to bag" button',
+  'productPageBuyButton': 'Product page: "Buy now" button',
+  'productPageShareIcon': 'Product page: share icon',
+  'productPageWishlistIcon': 'Product page: wishlist icon',
+  'productPageRelatedHeading': 'Product page: "Related products" heading',
+  'productPageReviewsHeading': 'Product page: "Community reviews" heading',
+  'categoryPageHeading': 'Category page: section headings',
+  'cartEmptyMessage': 'Cart: empty-bag message',
+  'cartEmptyIcon': 'Cart: empty-bag icon',
+  'cartSubmitButton': 'Cart: submit order button',
+  'servicesPageAppBarTitle': 'Services page: title',
+  'shopsPageAppBarTitle': 'Shops page: title',
+  'shopsPageHeading': 'Shops page: heading',
+  'shopPageDirectionsButton': 'Shop page: "Get directions" button',
+  'shopPageRelatedHeading': 'Shop page: "From this shop" heading',
+  'accountPageAppBarTitle': 'Account page: title',
+  'accountDemoHeading': 'Account page: demo-mode heading',
+  'accountOrdersHeading': 'Account page: "Your orders" heading',
+  'authFormHeading': 'Sign-in form: heading',
+  'wishlistDialogTitle': 'Wishlist dialog: title',
 };
 
 const _footerBadgeKeys = {
   'footerBadge1', 'footerBadge2', 'footerBadge3',
   'footerBadge4', 'footerBadge5', 'footerBadge6',
 };
+
+// Plain heading/label/button text on the non-homepage screens -- these
+// screens have no live Visual Editor preview at all (see
+// page_elements.dart), so unlike the homepage elements above there is no
+// wrapSection/click-to-select for any of these; they're reachable only via
+// "Go to number" and the Layout Settings dropdown. Treated uniformly as
+// one shape (text/color/font family/style/weight + optional background,
+// no box sizing) rather than hand-distinguishing headings from buttons --
+// a deliberately broader brush than the homepage got, given how many of
+// these there are.
+const _otherScreenTextKeys = {
+  'productPageAddButton', 'productPageBuyButton',
+  'productPageRelatedHeading', 'productPageReviewsHeading',
+  'categoryPageHeading', 'cartEmptyMessage', 'cartSubmitButton',
+  'servicesPageAppBarTitle', 'shopsPageAppBarTitle', 'shopsPageHeading',
+  'shopPageDirectionsButton', 'shopPageRelatedHeading',
+  'accountPageAppBarTitle', 'accountDemoHeading', 'accountOrdersHeading',
+  'authFormHeading', 'wishlistDialogTitle',
+};
+// A handful of these (the two-states-share-one-label case, like
+// 'categoryPageHeading' covering both "Subcategories" and "{n} products")
+// get styling only, no single sensible text override.
+const _otherScreenStyleOnly = {'categoryPageHeading'};
+const _otherScreenIconKeys = {'productPageShareIcon', 'productPageWishlistIcon', 'cartEmptyIcon'};
 
 const dimensionFields = <String, (String, double, double)>{
   'width': ('Width (0 = automatic)', 0, 3840),
@@ -201,6 +247,8 @@ List<String> componentFields(String component) => [
               'footerBadge4': _smallBadgeExclusions,
               'footerBadge5': _smallBadgeExclusions,
               'footerBadge6': _smallBadgeExclusions,
+              for (final key in _otherScreenTextKeys) key: _smallBadgeExclusions,
+              for (final key in _otherScreenIconKeys) key: _iconExclusions,
             }[component]?.contains(key) ??
             false),
   ),
@@ -266,7 +314,10 @@ const _decoratedOnly = {'search'};
 /// Centralizing this (rather than each caller re-deriving which extras
 /// apply) is what makes layout_editor.dart's form and this file's own
 /// render-time checks impossible to drift apart.
-const _iconOnlyComponents = {'notificationIcon', 'wishlistIcon', 'cartIcon', 'menuIcon'};
+const _iconOnlyComponents = {
+  'notificationIcon', 'wishlistIcon', 'cartIcon', 'menuIcon',
+  ..._otherScreenIconKeys,
+};
 // Elements that read like a small pill/block (background + border, but no
 // gradient/entrance-animation of a full LayoutSection) -- 'tagline' and
 // 'office' joined this set so every header element gets a background
@@ -276,17 +327,19 @@ const _pillLikeComponents = {
   'products', 'location', 'tagline', 'office',
   'moreCategoriesTile', 'popularFilterChips', 'adsLabel', 'nearbyShopCard',
   ..._footerBadgeKeys,
+  ..._otherScreenTextKeys,
 };
 // Elements with their own text content that can be overridden from the
 // admin (as opposed to 'office'/'nearbyShopCard', whose text comes from
 // Business Profile/the shops catalog per-entry and has no single sensible
 // one-field override).
-const _textOverridable = {
+final _textOverridable = {
   'title', 'user', 'location', 'tagline',
   'notice', 'categories', 'popular', 'localServices', 'nearby',
   'moreCategoriesTile', 'adsLabel',
   ..._footerBadgeKeys,
-};
+  ..._otherScreenTextKeys,
+}..removeAll(_otherScreenStyleOnly);
 // Has a swappable icon image (iconUrl) alongside its own text/box -- unlike
 // the plain icon-only header buttons, these also show a text label.
 const _iconReplaceableWithText = {'moreCategoriesTile', 'nearbyShopCard', ..._footerBadgeKeys};

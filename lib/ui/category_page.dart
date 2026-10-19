@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import 'layout_settings.dart';
 import 'product_page.dart';
 import 'shared.dart';
 
@@ -35,9 +36,15 @@ class CategoryPage extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           if (children.isNotEmpty) ...[
-            const Text(
-              'Subcategories',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            pageHeadingText(
+              context,
+              layout: layoutFor(
+                context,
+                store.entries('settings'),
+                'categoryPageHeading',
+              ),
+              defaultText: 'Subcategories',
+              overridable: false,
             ),
             for (final child in children)
               ListTile(
@@ -53,9 +60,16 @@ class CategoryPage extends StatelessWidget {
               ),
           ],
           const SizedBox(height: 20),
-          Text(
-            '${products.length} products',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          pageHeadingText(
+            context,
+            layout: layoutFor(
+              context,
+              store.entries('settings'),
+              'categoryPageHeading',
+            ),
+            defaultText: '${products.length} products',
+            overridable: false,
+            translate: false,
           ),
           if (products.isEmpty)
             const Padding(

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../data/store.dart';
 import 'account_language_field.dart';
 import 'email_link.dart';
+import 'layout_settings.dart';
 import 'shared.dart';
 
 /// Throws if [value] isn't a plausible email address. Shared by this form
@@ -85,10 +86,17 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      Text(
-        registering ? 'Create your account' : 'Welcome to your neighbourhood',
-        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-      ),
+      registering
+          ? const Text(
+              'Create your account',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            )
+          : pageHeadingText(
+              context,
+              layout: layoutFor(context, widget.store.entries('settings'), 'authFormHeading'),
+              defaultText: 'Welcome to your neighbourhood',
+              fontSize: 28,
+            ),
       const SizedBox(height: 12),
       Text(
         registering

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../services/strings.dart';
+import 'layout_settings.dart';
 import 'product_search.dart';
+import 'shared.dart';
 import 'shop_map.dart';
 import 'shop_page.dart';
 
@@ -12,14 +15,17 @@ class ShopsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shops = store.nearby();
+    final titleLayout = layoutFor(context, store.entries('settings'), 'shopsPageAppBarTitle');
     return Scaffold(
-      appBar: AppBar(title: const Text('Around your neighbourhood')),
+      appBar: AppBar(title: Text(titleLayout.entry.text('text', 'Around your neighbourhood').tr(context))),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text(
-            'Good shops, close by.',
-            style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+          pageHeadingText(
+            context,
+            layout: layoutFor(context, store.entries('settings'), 'shopsPageHeading'),
+            defaultText: 'Good shops, close by.',
+            fontSize: 30,
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(

@@ -48,7 +48,9 @@ class ResponsiveHeader extends StatelessWidget {
   Future<void> wishlist(BuildContext context) => showDialog<void>(
     context: context,
     builder: (dialog) => AlertDialog(
-      title: Text('Wishlist'.tr(dialog)),
+      title: Text(
+        layoutFor(dialog, store.entries('settings'), 'wishlistDialogTitle').entry.text('text', 'Wishlist').tr(dialog),
+      ),
       content: SizedBox(
         width: 320,
         child: store.wishlist.isEmpty

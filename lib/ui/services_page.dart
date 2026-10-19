@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/search.dart';
+import '../services/strings.dart';
 import 'details.dart';
+import 'layout_settings.dart';
 import 'shared.dart';
 
 /// Every visible service-kind product/service entry matching [query] (a
@@ -39,8 +41,9 @@ class _ServicesPageState extends State<ServicesPage> {
     listenable: widget.store,
     builder: (context, _) {
       final services = localServiceEntries(widget.store, const SmartSearch(), search.text);
+      final titleLayout = layoutFor(context, widget.store.entries('settings'), 'servicesPageAppBarTitle');
       return Scaffold(
-        appBar: AppBar(title: const Text('Services')),
+        appBar: AppBar(title: Text(titleLayout.entry.text('text', 'Services').tr(context))),
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../data/store.dart';
+import '../services/strings.dart';
+import 'layout_settings.dart';
 import 'shared.dart';
 import 'account_auth_form.dart';
 import 'account_complaint_dialog.dart' as complaint_dialog;
@@ -62,7 +64,11 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Your account')),
+    appBar: AppBar(
+      title: Text(
+        layoutFor(context, widget.store.entries('settings'), 'accountPageAppBarTitle').entry.text('text', 'Your account').tr(context),
+      ),
+    ),
     body: ListenableBuilder(
       listenable: widget.store,
       builder: (context, _) => Center(
@@ -74,9 +80,12 @@ class _AccountPageState extends State<AccountPage> {
               if (!widget.store.live) ...[
                 const Icon(Icons.person_outline, size: 64),
                 const SizedBox(height: 20),
-                const Text(
-                  'You’re exploring the demo',
-                  style: TextStyle(fontSize: 26),
+                pageHeadingText(
+                  context,
+                  layout: layoutFor(context, widget.store.entries('settings'), 'accountDemoHeading'),
+                  defaultText: 'You’re exploring the demo',
+                  fontSize: 26,
+                  fontWeight: FontWeight.normal,
                 ),
                 const Text(
                   'Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.',
@@ -209,7 +218,13 @@ class _AccountPageState extends State<AccountPage> {
                         }),
                   child: const Text('Disable alerts for my account'),
                 ),
-                const Text('Your orders', style: TextStyle(fontSize: 22)),
+                pageHeadingText(
+                  context,
+                  layout: layoutFor(context, widget.store.entries('settings'), 'accountOrdersHeading'),
+                  defaultText: 'Your orders',
+                  fontSize: 22,
+                  fontWeight: FontWeight.normal,
+                ),
                 OutlinedButton.icon(
                   onPressed: busy
                       ? null

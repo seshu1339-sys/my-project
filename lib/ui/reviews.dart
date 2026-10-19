@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'account.dart';
+import 'layout_settings.dart';
 import 'shared.dart';
 
 class Reviews extends StatefulWidget {
@@ -27,9 +28,14 @@ class _ReviewsState extends State<Reviews> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text(
-        'Community reviews',
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      pageHeadingText(
+        context,
+        layout: layoutFor(
+          context,
+          widget.store.entries('settings'),
+          'productPageReviewsHeading',
+        ),
+        defaultText: 'Community reviews',
       ),
       const SizedBox(height: 12),
       if (!widget.store.live)

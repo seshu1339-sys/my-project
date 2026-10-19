@@ -4,6 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../services/strings.dart';
+import 'design_tokens.dart';
+import 'layout_settings.dart';
 import 'product_page.dart';
 import 'responsive_header.dart';
 import 'shared.dart';
@@ -44,36 +47,45 @@ class ShopPage extends StatelessWidget {
             const SizedBox(height: 16),
             _ShopPhotos(store: store, shopId: shop.id),
             const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: () async {
-                final uri = Uri.https('www.google.com', '/maps/dir/', {
-                  'api': '1',
-                  'destination':
-                      '${shop.number('latitude')},${shop.number('longitude')}',
-                  if (store.latitude != null)
-                    'origin': '${store.latitude},${store.longitude}',
-                });
-                try {
-                  if (!await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      ) &&
-                      context.mounted) {
-                    message(context, 'Could not open directions');
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    message(context, 'Could not open directions');
-                  }
-                }
+            Builder(
+              builder: (context) {
+                final layout = layoutFor(context, store.entries('settings'), 'shopPageDirectionsButton');
+                if (!layout.visible) return const SizedBox.shrink();
+                final backgroundColor = layout.entry.text('backgroundColor');
+                final textColor = layout.entry.text('textColor');
+                return FilledButton.icon(
+                  style: backgroundColor.isEmpty && textColor.isEmpty
+                      ? null
+                      : FilledButton.styleFrom(
+                          backgroundColor: backgroundColor.isEmpty ? null : colorFromHex(backgroundColor, AppTokens.primary),
+                          foregroundColor: textColor.isEmpty ? null : colorFromHex(textColor, Colors.white),
+                        ),
+                  onPressed: () async {
+                    final uri = Uri.https('www.google.com', '/maps/dir/', {
+                      'api': '1',
+                      'destination': '${shop.number('latitude')},${shop.number('longitude')}',
+                      if (store.latitude != null) 'origin': '${store.latitude},${store.longitude}',
+                    });
+                    try {
+                      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+                        message(context, 'Could not open directions');
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        message(context, 'Could not open directions');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.directions),
+                  label: Text(layout.entry.text('text', 'Get directions').tr(context)),
+                );
               },
-              icon: const Icon(Icons.directions),
-              label: const Text('Get directions'),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'From this shop',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            pageHeadingText(
+              context,
+              layout: layoutFor(context, store.entries('settings'), 'shopPageRelatedHeading'),
+              defaultText: 'From this shop',
             ),
             for (final p
                 in store
