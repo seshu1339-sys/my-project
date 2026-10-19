@@ -204,6 +204,7 @@ class WireframeHome extends StatelessWidget {
                   onCart: onCart,
                   onAssistedSearch: onAssistedSearch,
                   onProduct: onProduct,
+                  wrapSection: wrapSection,
                 ),
                 if (!store.live)
                   Padding(

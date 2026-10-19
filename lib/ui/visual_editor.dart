@@ -12,6 +12,7 @@ import 'layout_editor.dart';
 import 'layout_settings.dart';
 import 'home_ad_rail.dart';
 import 'home_section_config.dart';
+import 'page_elements.dart';
 import 'shared.dart';
 import 'visual_editor_overlay.dart';
 import 'wireframe_home.dart';
@@ -54,7 +55,12 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   final scroll = ScrollController();
   final categoriesKey = GlobalKey();
   final productsKey = GlobalKey();
+  final goToNumber = TextEditingController();
   _PreviewWidth previewWidth = _PreviewWidth.desktop;
+  // Off by default -- customers never see this (it's purely an admin aid
+  // inside this editor) and it must never affect anything until an admin
+  // actually turns it on. See SectionTapRegion's `showNumber`/`number`.
+  bool _showNumbers = false;
 
   // Undo/redo + cancel are scoped to the current edit session only (one
   // selected section at a time) — not a global, app-wide history.
@@ -76,6 +82,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     selection.dispose();
     search.dispose();
     scroll.dispose();
+    goToNumber.dispose();
     _resize.dispose();
     super.dispose();
   }
@@ -102,6 +109,22 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
       ..add(Map<String, dynamic>.from(_currentEntryFor(key).data));
     _historyIndex = 0;
     selection.value = key;
+  }
+
+  // "Go to number": typing a number and pressing Enter jumps straight to
+  // that element's edit panel exactly as if its live-preview region had
+  // been clicked -- it reuses `_select`, so undo/redo/cancel all work
+  // identically either way. Only numbered elements (currently the Header's
+  // 12 -- see page_elements.dart) can be reached this way yet.
+  void _goToNumber(String text) {
+    final number = int.tryParse(text.trim());
+    final element = number == null ? null : pageElementByNumber(number);
+    if (element == null) {
+      message(context, 'No numbered element #$text yet.');
+      return;
+    }
+    _select(element.key);
+    goToNumber.clear();
   }
 
   Future<void> _closeSelection({required bool restoreSnapshot}) async {
@@ -208,6 +231,8 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     label: layoutComponents[key] ?? key,
     selection: selection,
     onSelect: _select,
+    number: pageElementByKey(key)?.number,
+    showNumber: _showNumbers,
     reorderable: reorderableHomeSections.any((d) => d.key == key),
     onReorderDrop: (draggedKey) => _dropReorder(draggedKey, ontoKey: key),
     liveResize: _resize.live,
@@ -290,6 +315,28 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
       appBar: AppBar(
         title: const Text('Visual Editor'),
         actions: [
+          SizedBox(
+            width: 150,
+            child: TextField(
+              controller: goToNumber,
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: 'Go to number',
+                prefixIcon: Icon(Icons.pin_outlined, size: 18),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              onSubmitted: _goToNumber,
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            avatar: const Icon(Icons.numbers, size: 18),
+            label: const Text('Show numbers'),
+            selected: _showNumbers,
+            onSelected: (v) => setState(() => _showNumbers = v),
+          ),
+          const SizedBox(width: 12),
           SegmentedButton<_PreviewWidth>(
             segments: const [
               ButtonSegment(value: _PreviewWidth.desktop, icon: Icon(Icons.desktop_windows_outlined)),
@@ -421,7 +468,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           children: [
             Expanded(
               child: Text(
-                _isPromoKey(key) ? 'Advertisement / promo box' : layoutComponents[key] ?? key,
+                _isPromoKey(key) ? 'Advertisement / promo box' : numberedLabel(key, layoutComponents[key] ?? key),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),

@@ -8,6 +8,7 @@ import 'color_picker_field.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'home_section_config.dart';
+import 'page_elements.dart';
 import 'shared.dart';
 
 class LayoutSettingsPage extends StatefulWidget {
@@ -67,7 +68,7 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
             decoration: const InputDecoration(labelText: 'Component'),
             items: [
               for (final item in layoutComponents.entries)
-                DropdownMenuItem(value: item.key, child: Text(item.value)),
+                DropdownMenuItem(value: item.key, child: Text(numberedLabel(item.key, item.value))),
             ],
             onChanged: (value) async {
               if (value == null || value == component) return;
@@ -89,7 +90,7 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
 
 // How one field's value is edited — picked once per key by _kindOf below,
 // not per component, so every component's form stays consistent.
-enum _FieldKind { toggle, color, fontFamily, fontStyle, animation, alignment, direction, number, text }
+enum _FieldKind { toggle, color, fontFamily, fontStyle, fontWeight, animation, alignment, direction, number, text }
 
 const _toggleLabels = {'visible': 'Visible on the site', 'scrollEnabled': 'Scroll enabled'};
 
@@ -98,6 +99,7 @@ _FieldKind _kindOf(String key) {
   if (key.endsWith('Color') || key == 'gradientStart' || key == 'gradientEnd') return _FieldKind.color;
   if (key == 'fontFamily') return _FieldKind.fontFamily;
   if (key == 'fontStyle') return _FieldKind.fontStyle;
+  if (key == 'fontWeight') return _FieldKind.fontWeight;
   if (key == 'animation') return _FieldKind.animation;
   if (key == 'alignment') return _FieldKind.alignment;
   if (key == 'direction') return _FieldKind.direction;
@@ -177,6 +179,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
         case _FieldKind.color:
         case _FieldKind.fontFamily:
         case _FieldKind.fontStyle:
+        case _FieldKind.fontWeight:
         case _FieldKind.animation:
         case _FieldKind.alignment:
         case _FieldKind.direction:
@@ -309,15 +312,20 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           onChanged: (v) => _setValue(key, v),
         );
       case _FieldKind.color:
+        final isIconOnly = {
+          'notificationIcon', 'wishlistIcon', 'cartIcon', 'menuIcon',
+        }.contains(widget.component);
         return ColorPickerField(
           key: ValueKey('${widget.component}-$key'),
-          label: const {
-            'backgroundColor': 'Background color',
-            'textColor': 'Text color',
-            'borderColor': 'Border color',
-            'gradientStart': 'Gradient start',
-            'gradientEnd': 'Gradient end',
-          }[key]!,
+          label: key == 'textColor' && isIconOnly
+              ? 'Icon color'
+              : const {
+                  'backgroundColor': 'Background color',
+                  'textColor': 'Text color',
+                  'borderColor': 'Border color',
+                  'gradientStart': 'Gradient start',
+                  'gradientEnd': 'Gradient end',
+                }[key]!,
           value: values[key] as String,
           onChanged: (v) => _setValue(key, v),
         );
@@ -340,6 +348,21 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
             DropdownMenuItem(value: 'italic', child: Text('Italic')),
           ],
           onChanged: (v) => _setValue(key, v ?? 'normal'),
+        );
+      case _FieldKind.fontWeight:
+        return DropdownButtonFormField<String>(
+          key: ValueKey('${widget.component}-$key'),
+          initialValue: (values[key] as String).isEmpty ? null : values[key] as String,
+          decoration: const InputDecoration(labelText: 'Font weight'),
+          hint: const Text('Default'),
+          items: const [
+            DropdownMenuItem(value: '400', child: Text('Normal')),
+            DropdownMenuItem(value: '500', child: Text('Medium')),
+            DropdownMenuItem(value: '600', child: Text('Semi-bold')),
+            DropdownMenuItem(value: '700', child: Text('Bold')),
+            DropdownMenuItem(value: '800', child: Text('Extra bold')),
+          ],
+          onChanged: (v) => _setValue(key, v ?? ''),
         );
       case _FieldKind.direction:
         final isNotice = widget.component == 'notice';

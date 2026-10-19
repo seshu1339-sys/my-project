@@ -242,6 +242,8 @@ class SectionTapRegion extends StatelessWidget {
     this.onCornerDragStart,
     this.onCornerDragUpdate,
     this.onCornerDragEnd,
+    this.number,
+    this.showNumber = false,
     required this.child,
   });
   final String sectionKey;
@@ -249,6 +251,15 @@ class SectionTapRegion extends StatelessWidget {
   final EditorSelection selection;
   final ValueChanged<String> onSelect;
   final bool reorderable;
+  // The element's permanent admin-facing number (lib/ui/page_elements.dart),
+  // or null while this section hasn't been numbered yet. Shown as a small
+  // badge whenever [showNumber] is true, regardless of selection state --
+  // unlike the [label] chip above (which only appears on the currently
+  // selected section), this is meant to be visible on every numbered
+  // element at once, so an admin can see "which part is which" while
+  // toggled on. Default off: it must never affect an unrelated render.
+  final int? number;
+  final bool showNumber;
   // Called with the dragged section's key when it's dropped onto this one.
   final ValueChanged<String>? onReorderDrop;
   // Drives the ghost-outline overlay and the live dimension badges while a
@@ -305,6 +316,28 @@ class SectionTapRegion extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               content,
+              if (showNumber && number != null)
+                Positioned(
+                  key: ValueKey('number-badge-$sectionKey'),
+                  top: 4,
+                  left: 4,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Colors.black87,
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 4)],
+                      ),
+                      child: Text(
+                        '$number',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ),
               if (isSelected) ...[
                 Positioned(
                   top: 4,

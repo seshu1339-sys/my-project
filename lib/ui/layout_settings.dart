@@ -10,12 +10,17 @@ import 'shared.dart';
 const layoutComponents = <String, String>{
   'header': 'Header',
   'logo': 'Logo',
-  'title': 'Business name & tagline',
+  'title': 'Business name',
+  'tagline': 'Tagline',
   'user': 'Greeting / Welcome text',
   'location': 'Location pill',
   'search': 'Search Box',
-  'services': 'Services',
-  'office': 'Office / Head Office',
+  'services': 'Services icon',
+  'notificationIcon': 'Notifications icon',
+  'wishlistIcon': 'Wishlist icon',
+  'cartIcon': 'Shopping bag icon',
+  'menuIcon': 'Menu icon',
+  'office': 'Office address & phone',
   'notice': 'Ticker / notice bar',
   'promo': 'Banner carousel',
   'categories': 'Categories',
@@ -68,6 +73,16 @@ const dimensionFields = <String, (String, double, double)>{
   'brightness': ('Brightness / highlight', .2, 2),
 };
 
+// The 4 header icon buttons (notifications/wishlist/cart/menu) are plain
+// Icon widgets with no font/box of their own — same "only show fields that
+// do something" rule as logo/title/user/location above, just shared across
+// all 4 since they're identical in shape (an icon, optionally swapped for
+// an image, with its own color/size/padding/background/visibility).
+const _iconExclusions = {
+  'fontSize', 'gap', 'margin', 'radius', 'borderWidth',
+  'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+};
+
 List<String> componentFields(String component) => [
   ...dimensionFields.keys.where(
     (key) =>
@@ -111,6 +126,12 @@ List<String> componentFields(String component) => [
                 'gap', 'padding', 'margin', 'radius', 'borderWidth',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
               },
+              // 'tagline' is the small muted line under the title — same
+              // shape as 'title' above.
+              'tagline': {
+                'gap', 'padding', 'margin', 'radius', 'borderWidth',
+                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+              },
               'user': {
                 'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
@@ -122,7 +143,18 @@ List<String> componentFields(String component) => [
                 'gap', 'padding', 'margin', 'borderWidth', 'iconSize',
                 'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
               },
-              'office': {'gap', 'iconSize'},
+              'notificationIcon': _iconExclusions,
+              'wishlistIcon': _iconExclusions,
+              'cartIcon': _iconExclusions,
+              'menuIcon': _iconExclusions,
+              // 'office' shows two lines of plain text (address + phone) in
+              // a tappable block — background/radius/padding apply to that
+              // block, but it has no gap/icon of its own and sizes to its
+              // own content like the other inline header items.
+              'office': {
+                'gap', 'iconSize', 'margin',
+                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+              },
               'popular': {'gap', 'iconSize'},
               'localServices': {'gap', 'iconSize'},
               'nearby': {'gap'},
@@ -193,28 +225,41 @@ const _decoratedOnly = {'search'};
 /// Centralizing this (rather than each caller re-deriving which extras
 /// apply) is what makes layout_editor.dart's form and this file's own
 /// render-time checks impossible to drift apart.
+const _iconOnlyComponents = {'notificationIcon', 'wishlistIcon', 'cartIcon', 'menuIcon'};
+// Elements that read like a small pill/block (background + border, but no
+// gradient/entrance-animation of a full LayoutSection) -- 'tagline' and
+// 'office' joined this set so every header element gets a background
+// color option, matching 'products'/'location' which already had one.
+const _pillLikeComponents = {'products', 'location', 'tagline', 'office'};
+// Elements with their own text content that can be overridden from the
+// admin (as opposed to 'office', whose two lines come from Business
+// Profile and have no single sensible one-field override).
+const _textOverridable = {'title', 'user', 'location', 'tagline'};
+
 List<String> allFieldsFor(String component) {
   final animated = _animatedSections.contains(component);
   final decorated = animated || _decoratedOnly.contains(component);
-  // 'title'/'user' are plain text with no box of their own -- they get
-  // text styling without ever qualifying for background/border fields.
-  // 'location' is a small pill -- gets a reduced background+border set,
-  // the same shape 'products' already uses, without the full
-  // gradient/animation treatment a whole LayoutSection gets.
+  // 'title'/'user'/'tagline' are plain text with no box of their own --
+  // they get text styling without ever qualifying for background/border
+  // fields on their own (tagline/location/office instead get the reduced
+  // pill-like set below).
   final plainText = {'title', 'user'}.contains(component);
-  final textStyled = decorated || plainText || ['products', 'location'].contains(component);
+  final pillLike = _pillLikeComponents.contains(component);
+  final iconOnly = _iconOnlyComponents.contains(component);
+  final textStyled = decorated || plainText || pillLike;
   return [
     'visible',
     ...componentFields(component),
     if (decorated) ...['backgroundColor', 'gradientStart', 'gradientEnd', 'borderColor']
-    else if (['products', 'location'].contains(component)) ...['backgroundColor', 'borderColor'],
-    if (textStyled) ...['textColor', 'fontFamily', 'fontStyle'],
-    if (['title', 'user', 'location'].contains(component)) 'text',
+    else if (pillLike || iconOnly) ...['backgroundColor', 'borderColor'],
+    if (textStyled) ...['textColor', 'fontFamily', 'fontStyle', 'fontWeight']
+    else if (iconOnly) 'textColor',
+    if (_textOverridable.contains(component)) 'text',
     if (animated) 'animation',
     if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
     if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
     if (['products', 'popular', 'localServices'].contains(component)) 'alignment',
-    if (component == 'services') 'iconUrl',
+    if (component == 'services' || iconOnly) 'iconUrl',
   ];
 }
 

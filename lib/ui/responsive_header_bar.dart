@@ -13,6 +13,8 @@ import 'layout_settings.dart';
 import 'responsive_search_box.dart';
 import 'shared.dart';
 
+Widget _identityHeaderSection(String key, Widget child) => child;
+
 /// Single-row header (logo+tagline, search, location, greeting, wishlist,
 /// cart, menu) matching the reference design — wraps onto additional lines
 /// at narrow widths via the outer Wrap rather than a fixed two-row split.
@@ -28,12 +30,20 @@ class ResponsiveHeader extends StatelessWidget {
     required this.onCart,
     required this.onAssistedSearch,
     required this.onProduct,
+    this.wrapSection = _identityHeaderSection,
   });
   final Store store;
   final TextEditingController search;
   final VoidCallback onSearch, onLocation, onServices, onAccount, onCart;
   final ValueChanged<bool> onAssistedSearch;
   final ValueChanged<Entry> onProduct;
+  // Lets the admin Visual Editor overlay click-to-select/number-badge
+  // behavior onto each individual header element (logo, title, tagline,
+  // greeting, location pill, search box, services icon, the 4 header
+  // icons, office) without this widget knowing anything about editing --
+  // every real customer render (the only caller that omits this) gets this
+  // exact no-op and therefore byte-identical output to before this existed.
+  final Widget Function(String sectionKey, Widget child) wrapSection;
 
   Future<void> wishlist(BuildContext context) => showDialog<void>(
     context: context,
@@ -137,8 +147,14 @@ class ResponsiveHeader extends StatelessWidget {
     // exactly the prior hardcoded value when unset, so the header's default
     // appearance is unchanged until an admin actually sets something.
     final title = layoutFor(context, settings, 'title');
+    final tagline = layoutFor(context, settings, 'tagline');
     final greeting = layoutFor(context, settings, 'user');
     final locationLayout = layoutFor(context, settings, 'location');
+    final notificationLayout = layoutFor(context, settings, 'notificationIcon');
+    final wishlistLayout = layoutFor(context, settings, 'wishlistIcon');
+    final cartLayout = layoutFor(context, settings, 'cartIcon');
+    final menuLayout = layoutFor(context, settings, 'menuIcon');
+    final officeLayout = layoutFor(context, settings, 'office');
     return LayoutSection(
       layout: header,
       child: LayoutBuilder(
@@ -166,25 +182,28 @@ class ResponsiveHeader extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Semantics(
-                      label: 'App logo',
-                      child: SizedBox(
-                        height: logo.height(36, floor: 28),
-                        width: logo.height(36, floor: 28),
-                        child: store.business.text('imageUrl').isEmpty
-                            ? Icon(
-                                Icons.storefront_rounded,
-                                size: logo.n('iconSize', 32, 20, 96),
-                                color: Theme.of(context).colorScheme.primary,
-                              )
-                            : Image.network(
-                                store.business.text('imageUrl'),
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, error, stack) => const Icon(
+                    wrapSection(
+                      'logo',
+                      Semantics(
+                        label: 'App logo',
+                        child: SizedBox(
+                          height: logo.height(36, floor: 28),
+                          width: logo.height(36, floor: 28),
+                          child: store.business.text('imageUrl').isEmpty
+                              ? Icon(
                                   Icons.storefront_rounded,
-                                  size: 32,
+                                  size: logo.n('iconSize', 32, 20, 96),
+                                  color: Theme.of(context).colorScheme.primary,
+                                )
+                              : Image.network(
+                                  store.business.text('imageUrl'),
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, error, stack) => const Icon(
+                                    Icons.storefront_rounded,
+                                    size: 32,
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -195,33 +214,51 @@ class ResponsiveHeader extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (title.visible)
-                            Text(
-                              title.entry.text(
-                                'text',
-                                store.business.text('name', 'Locamarket'),
+                            wrapSection(
+                              'title',
+                              Text(
+                                title.entry.text(
+                                  'text',
+                                  store.business.text('name', 'Locamarket'),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    sectionTextStyle(
+                                      title.entry,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                    ).copyWith(
+                                      color: title.entry.text('textColor').isEmpty
+                                          ? Theme.of(context).colorScheme.primary
+                                          : colorFromHex(
+                                              title.entry.text('textColor'),
+                                              Theme.of(context).colorScheme.primary,
+                                            ),
+                                    ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style:
-                                  sectionTextStyle(
-                                    title.entry,
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w800,
-                                  ).copyWith(
-                                    color: title.entry.text('textColor').isEmpty
-                                        ? Theme.of(context).colorScheme.primary
-                                        : colorFromHex(
-                                            title.entry.text('textColor'),
-                                            Theme.of(context).colorScheme.primary,
-                                          ),
-                                  ),
                             ),
-                          Text(
-                            store.business.text('tagline', 'Local Shops • Local People • Better Prices'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10, color: AppTokens.textMuted),
-                          ),
+                          if (tagline.visible)
+                            wrapSection(
+                              'tagline',
+                              Text(
+                                tagline.entry.text(
+                                  'text',
+                                  store.business.text('tagline', 'Local Shops • Local People • Better Prices'),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sectionTextStyle(
+                                  tagline.entry,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.normal,
+                                ).copyWith(
+                                  color: tagline.entry.text('textColor').isEmpty
+                                      ? AppTokens.textMuted
+                                      : colorFromHex(tagline.entry.text('textColor'), AppTokens.textMuted),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -238,90 +275,104 @@ class ResponsiveHeader extends StatelessWidget {
                 // separate Wrap children, the pill simply flows to its own
                 // line when there's no room instead.
                 if (greeting.visible)
-                  Text(
-                    store.profileName.isEmpty
-                        ? greeting.entry.text('text', 'Welcome').tr(context)
-                        : 'Hello {name}'.tr(context, {'name': store.profileName}),
-                    style: TextStyle(
-                      fontWeight: FontWeight.values.firstWhere(
-                        (w) => w.value == greeting.entry.number('fontWeight', 700),
-                        orElse: () => FontWeight.w700,
+                  wrapSection(
+                    'user',
+                    Text(
+                      store.profileName.isEmpty
+                          ? greeting.entry.text('text', 'Welcome').tr(context)
+                          : 'Hello {name}'.tr(context, {'name': store.profileName}),
+                      style: TextStyle(
+                        fontWeight: FontWeight.values.firstWhere(
+                          (w) => w.value == greeting.entry.number('fontWeight', 700),
+                          orElse: () => FontWeight.w700,
+                        ),
+                        fontSize: greeting.entry.number('fontSize') > 0
+                            ? clampedNumber(greeting.entry, 'fontSize', 14, 10, 40)
+                            : null,
+                        color: greeting.entry.text('textColor').isEmpty
+                            ? null
+                            : colorFromHex(greeting.entry.text('textColor'), Colors.black87),
+                        fontStyle: greeting.entry.text('fontStyle') == 'italic'
+                            ? FontStyle.italic
+                            : FontStyle.normal,
                       ),
-                      fontSize: greeting.entry.number('fontSize') > 0
-                          ? clampedNumber(greeting.entry, 'fontSize', 14, 10, 40)
-                          : null,
-                      color: greeting.entry.text('textColor').isEmpty
-                          ? null
-                          : colorFromHex(greeting.entry.text('textColor'), Colors.black87),
-                      fontStyle: greeting.entry.text('fontStyle') == 'italic'
-                          ? FontStyle.italic
-                          : FontStyle.normal,
                     ),
                   ),
                 if (locationLayout.visible)
-                  Material(
-                    color: locationLayout.entry.text('backgroundColor').isEmpty
-                        ? AppTokens.primaryLight
-                        : colorFromHex(locationLayout.entry.text('backgroundColor'), AppTokens.primaryLight),
-                    borderRadius: BorderRadius.circular(
-                      locationLayout.entry.number('radius') > 0
-                          ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
-                          : AppTokens.radiusLg,
-                    ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(
-                        locationLayout.entry.number('radius') > 0
-                            ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
-                            : AppTokens.radiusLg,
+                  wrapSection(
+                    'location',
+                    Material(
+                      color: locationLayout.entry.text('backgroundColor').isEmpty
+                          ? AppTokens.primaryLight
+                          : colorFromHex(locationLayout.entry.text('backgroundColor'), AppTokens.primaryLight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          locationLayout.entry.number('radius') > 0
+                              ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              : AppTokens.radiusLg,
+                        ),
+                        side: locationLayout.entry.text('borderColor').isEmpty
+                            ? BorderSide.none
+                            : BorderSide(color: colorFromHex(locationLayout.entry.text('borderColor'), AppTokens.primary), width: 1.5),
                       ),
-                      onTap: onLocation,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 200),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  store.address.isEmpty
-                                      ? (store.pincode.isEmpty
-                                            ? locationLayout.entry.text('text', 'Choose your location').tr(context)
-                                            : store.pincode)
-                                      : store.address,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.values.firstWhere(
-                                      (w) => w.value == locationLayout.entry.number('fontWeight', 600),
-                                      orElse: () => FontWeight.w600,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(
+                          locationLayout.entry.number('radius') > 0
+                              ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              : AppTokens.radiusLg,
+                        ),
+                        onTap: onLocation,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 200),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    store.address.isEmpty
+                                        ? (store.pincode.isEmpty
+                                              ? locationLayout.entry.text('text', 'Choose your location').tr(context)
+                                              : store.pincode)
+                                        : store.address,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.values.firstWhere(
+                                        (w) => w.value == locationLayout.entry.number('fontWeight', 600),
+                                        orElse: () => FontWeight.w600,
+                                      ),
+                                      fontSize: locationLayout.entry.number('fontSize') > 0
+                                          ? clampedNumber(locationLayout.entry, 'fontSize', 13, 10, 40)
+                                          : 13,
+                                      color: locationLayout.entry.text('textColor').isEmpty
+                                          ? null
+                                          : colorFromHex(locationLayout.entry.text('textColor'), Colors.black87),
                                     ),
-                                    fontSize: locationLayout.entry.number('fontSize') > 0
-                                        ? clampedNumber(locationLayout.entry, 'fontSize', 13, 10, 40)
-                                        : 13,
-                                    color: locationLayout.entry.text('textColor').isEmpty
-                                        ? null
-                                        : colorFromHex(locationLayout.entry.text('textColor'), Colors.black87),
                                   ),
                                 ),
-                              ),
-                              const Icon(Icons.keyboard_arrow_down, size: 16),
-                            ],
+                                const Icon(Icons.keyboard_arrow_down, size: 16),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 divider(),
-                SizedBox(
-                  width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
-                  child: ResponsiveSearchBox(
-                    layout: layoutFor(context, settings, 'search'),
-                    controller: search,
-                    onChanged: onSearch,
-                    onAssistedSearch: onAssistedSearch,
+                wrapSection(
+                  'search',
+                  SizedBox(
+                    width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
+                    child: ResponsiveSearchBox(
+                      layout: layoutFor(context, settings, 'search'),
+                      controller: search,
+                      onChanged: onSearch,
+                      onAssistedSearch: onAssistedSearch,
+                    ),
                   ),
                 ),
                 divider(),
@@ -330,61 +381,102 @@ class ResponsiveHeader extends StatelessWidget {
                 // Settings → Services → "Icon image URL"), no separate text
                 // label beside it, falling back to a generic services icon
                 // when none is set.
-                Semantics(
-                  label: 'Services'.tr(context),
-                  button: true,
-                  child: Tooltip(
-                    message: 'Services'.tr(context),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-                      onTap: onServices,
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: SizedBox(
-                          width: 28,
-                          height: 28,
-                          child: servicesIconUrl.isEmpty
-                              ? const Icon(Icons.home_repair_service_outlined, size: 28, color: AppTokens.textPrimary)
-                              : Image.network(
-                                  servicesIconUrl,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, error, stack) => const Icon(
-                                    Icons.home_repair_service_outlined,
-                                    size: 28,
-                                    color: AppTokens.textPrimary,
+                wrapSection(
+                  'services',
+                  Semantics(
+                    label: 'Services'.tr(context),
+                    button: true,
+                    child: Tooltip(
+                      message: 'Services'.tr(context),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+                        onTap: onServices,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: servicesIconUrl.isEmpty
+                                ? const Icon(Icons.home_repair_service_outlined, size: 28, color: AppTokens.textPrimary)
+                                : Image.network(
+                                    servicesIconUrl,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, error, stack) => const Icon(
+                                      Icons.home_repair_service_outlined,
+                                      size: 28,
+                                      color: AppTokens.textPrimary,
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Notifications'.tr(context),
-                  onPressed: onAccount,
-                  icon: const Icon(Icons.notifications_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Wishlist'.tr(context),
-                  onPressed: () => wishlist(context),
-                  icon: const Icon(Icons.favorite_border),
-                ),
-                IconButton(
-                  tooltip: 'Shopping bag'.tr(context),
-                  onPressed: onCart,
-                  icon: Badge(
-                    isLabelVisible: store.count > 0,
-                    label: Text('${store.count}'),
-                    child: const Icon(Icons.shopping_bag_outlined),
+                if (notificationLayout.visible)
+                  wrapSection(
+                    'notificationIcon',
+                    _headerIconButton(
+                      context,
+                      layout: notificationLayout,
+                      icon: Icons.notifications_outlined,
+                      tooltip: 'Notifications'.tr(context),
+                      onPressed: onAccount,
+                    ),
                   ),
-                ),
+                if (wishlistLayout.visible)
+                  wrapSection(
+                    'wishlistIcon',
+                    _headerIconButton(
+                      context,
+                      layout: wishlistLayout,
+                      icon: Icons.favorite_border,
+                      tooltip: 'Wishlist'.tr(context),
+                      onPressed: () => wishlist(context),
+                    ),
+                  ),
+                if (cartLayout.visible)
+                  wrapSection(
+                    'cartIcon',
+                    _headerIconButton(
+                      context,
+                      layout: cartLayout,
+                      icon: Icons.shopping_bag_outlined,
+                      tooltip: 'Shopping bag'.tr(context),
+                      onPressed: onCart,
+                      badge: store.count > 0 ? '${store.count}' : null,
+                    ),
+                  ),
                 // Everything lower-frequency lives behind one menu icon
                 // (matches the reference design's single hamburger icon)
                 // instead of each having its own permanently-visible button
                 // or box — nothing is removed, just consolidated here.
-                PopupMenuButton<String>(
+                if (menuLayout.visible)
+                  wrapSection(
+                    'menuIcon',
+                    PopupMenuButton<String>(
                   tooltip: 'Menu'.tr(context),
-                  icon: const Icon(Icons.menu),
+                  icon: menuLayout.entry.text('iconUrl').isEmpty
+                      ? Icon(
+                          Icons.menu,
+                          size: menuLayout.entry.number('iconSize') > 0
+                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
+                              : 24,
+                          color: menuLayout.entry.text('textColor').isEmpty
+                              ? null
+                              : colorFromHex(menuLayout.entry.text('textColor'), AppTokens.textPrimary),
+                        )
+                      : Image.network(
+                          menuLayout.entry.text('iconUrl'),
+                          width: menuLayout.entry.number('iconSize') > 0
+                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
+                              : 24,
+                          height: menuLayout.entry.number('iconSize') > 0
+                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
+                              : 24,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, error, stack) => const Icon(Icons.menu),
+                        ),
                   onSelected: (value) async {
                     switch (value) {
                       case 'account':
@@ -420,40 +512,82 @@ class ResponsiveHeader extends StatelessWidget {
                       ),
                   ],
                 ),
+                  ),
                 divider(),
                 // Visible office address + phone (was hamburger-menu-only,
                 // behind "Office / Head Office") — placed last so it sits
                 // at the header's top-right corner, matching the wireframe.
-                InkWell(
-                  borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                  onTap: () => office(context),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (store.business.text('address').isNotEmpty)
-                            Text(
-                              store.business.text('address'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: AppTokens.textMuted),
+                if (officeLayout.visible)
+                  wrapSection(
+                    'office',
+                    Material(
+                      color: officeLayout.entry.text('backgroundColor').isEmpty
+                          ? Colors.transparent
+                          : colorFromHex(officeLayout.entry.text('backgroundColor'), Colors.transparent),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          officeLayout.entry.number('radius') > 0
+                              ? clampedNumber(officeLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              : AppTokens.radiusLg,
+                        ),
+                        side: officeLayout.entry.text('borderColor').isEmpty
+                            ? BorderSide.none
+                            : BorderSide(color: colorFromHex(officeLayout.entry.text('borderColor'), AppTokens.primary), width: 1.5),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(
+                          officeLayout.entry.number('radius') > 0
+                              ? clampedNumber(officeLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              : AppTokens.radiusLg,
+                        ),
+                        onTap: () => office(context),
+                        child: Padding(
+                          padding: officeLayout.entry.number('padding') > 0
+                              ? EdgeInsets.all(clampedNumber(officeLayout.entry, 'padding', 4, 0, 48))
+                              : const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 220),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (store.business.text('address').isNotEmpty)
+                                  Text(
+                                    store.business.text('address'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sectionTextStyle(
+                                      officeLayout.entry,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.normal,
+                                    ).copyWith(
+                                      color: officeLayout.entry.text('textColor').isEmpty
+                                          ? AppTokens.textMuted
+                                          : colorFromHex(officeLayout.entry.text('textColor'), AppTokens.textMuted),
+                                    ),
+                                  ),
+                                if (store.business.text('phone').isNotEmpty)
+                                  Text(
+                                    store.business.text('phone'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sectionTextStyle(
+                                      officeLayout.entry,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ).copyWith(
+                                      color: officeLayout.entry.text('textColor').isEmpty
+                                          ? null
+                                          : colorFromHex(officeLayout.entry.text('textColor'), Colors.black87),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          if (store.business.text('phone').isNotEmpty)
-                            Text(
-                              store.business.text('phone'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                        ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           );
@@ -461,4 +595,49 @@ class ResponsiveHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Shared rendering for the 4 plain header icon buttons (notifications,
+/// wishlist, cart, menu is built separately since PopupMenuButton has no
+/// `icon:` widget replacement path that fits this helper's shape) — each
+/// gets its own icon color/size/replace-image/background, falling back to
+/// exactly its prior hardcoded look (default IconButton size, no
+/// background, theme icon color) when nothing is set.
+Widget _headerIconButton(
+  BuildContext context, {
+  required ComponentLayout layout,
+  required IconData icon,
+  required String tooltip,
+  required VoidCallback onPressed,
+  String? badge,
+}) {
+  final size = layout.entry.number('iconSize') > 0 ? clampedNumber(layout.entry, 'iconSize', 24, 16, 48) : 24.0;
+  final color = layout.entry.text('textColor').isEmpty ? null : colorFromHex(layout.entry.text('textColor'), AppTokens.textPrimary);
+  final iconUrl = layout.entry.text('iconUrl');
+  Widget iconWidget = iconUrl.isEmpty
+      ? Icon(icon, size: size, color: color)
+      : Image.network(
+          iconUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          errorBuilder: (_, error, stack) => Icon(icon, size: size, color: color),
+        );
+  if (badge != null) {
+    iconWidget = Badge(label: Text(badge), child: iconWidget);
+  }
+  final button = IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    padding: EdgeInsets.all(layout.entry.number('padding') > 0 ? clampedNumber(layout.entry, 'padding', 8, 0, 48) : 8),
+    icon: iconWidget,
+  );
+  final backgroundColor = layout.entry.text('backgroundColor');
+  return backgroundColor.isEmpty
+      ? button
+      : Material(
+          color: colorFromHex(backgroundColor, Colors.transparent),
+          shape: const CircleBorder(),
+          child: button,
+        );
 }
