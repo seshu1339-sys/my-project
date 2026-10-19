@@ -203,8 +203,12 @@ void main() {
     }
     tester.view.physicalSize = const Size(390, 844);
     await tester.pump();
+    // The minimum per-card width when fitting `visibleCount` cards is 150px
+    // (not 200px) -- see home_hero_carousel.dart -- so at 390px two cards
+    // now fit per page instead of one; a third still doesn't.
     expect(find.text('Banner 0').hitTestable(), findsOneWidget);
-    expect(find.text('Banner 1').hitTestable(), findsNothing);
+    expect(find.text('Banner 1').hitTestable(), findsOneWidget);
+    expect(find.text('Banner 2').hitTestable(), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

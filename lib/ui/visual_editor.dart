@@ -7,6 +7,7 @@ import '../domain/catalog.dart';
 import '../services/app_theme.dart';
 import '../services/search.dart';
 import 'entry_editor.dart';
+import 'layout_defaults.dart';
 import 'layout_editor.dart';
 import 'layout_settings.dart';
 import 'home_ad_rail.dart';
@@ -158,6 +159,44 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     );
   }
 
+  Future<void> _saveDefault() async {
+    try {
+      await saveAsDefault(widget.store);
+      if (mounted) message(context, 'Saved as My Default');
+    } catch (e) {
+      if (mounted) message(context, e);
+    }
+  }
+
+  Future<void> _resetDefault() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Reset to My Default?'),
+        content: const Text(
+          'This replaces every current layout/colour/size setting with whatever you last saved as "My Default". This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await resetToDefault(widget.store);
+      if (mounted) message(context, 'Restored to My Default');
+    } catch (e) {
+      if (mounted) message(context, e);
+    }
+  }
+
   double? get _simulatedWidth => switch (previewWidth) {
     _PreviewWidth.desktop => null,
     _PreviewWidth.tablet => 900,
@@ -277,6 +316,18 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
             avatar: const Icon(Icons.local_offer_outlined, size: 18),
             label: const Text('Promotions'),
             onPressed: () => _openFullEditor('promotions'),
+          ),
+          const SizedBox(width: 8),
+          ActionChip(
+            avatar: const Icon(Icons.bookmark_add_outlined, size: 18),
+            label: const Text('Save as My Default'),
+            onPressed: _saveDefault,
+          ),
+          const SizedBox(width: 8),
+          ActionChip(
+            avatar: const Icon(Icons.restore_outlined, size: 18),
+            label: const Text('Reset to My Default'),
+            onPressed: _resetDefault,
           ),
           const SizedBox(width: 16),
         ],

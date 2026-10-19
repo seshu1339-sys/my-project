@@ -58,6 +58,7 @@ class HomeTickerSection extends StatelessWidget {
     return LayoutSection(
       layout: noticeLayout,
       child: Container(
+        width: double.infinity,
         decoration: BoxDecoration(
           color: colorFromHex(ticker.text('backgroundColor'), const Color(0xffe8f3fb)),
           borderRadius: BorderRadius.circular(clampedNumber(ticker, 'radius', 8, 0, 80)),

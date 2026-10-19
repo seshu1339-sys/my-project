@@ -161,12 +161,12 @@ class ResponsiveHeader extends StatelessWidget {
                     Semantics(
                       label: 'App logo',
                       child: SizedBox(
-                        height: logo.height(44, floor: 32),
-                        width: logo.height(44, floor: 32),
+                        height: logo.height(36, floor: 28),
+                        width: logo.height(36, floor: 28),
                         child: store.business.text('imageUrl').isEmpty
                             ? Icon(
                                 Icons.storefront_rounded,
-                                size: logo.n('iconSize', 40, 24, 96),
+                                size: logo.n('iconSize', 32, 20, 96),
                                 color: Theme.of(context).colorScheme.primary,
                               )
                             : Image.network(
@@ -174,14 +174,14 @@ class ResponsiveHeader extends StatelessWidget {
                                 fit: BoxFit.contain,
                                 errorBuilder: (_, error, stack) => const Icon(
                                   Icons.storefront_rounded,
-                                  size: 40,
+                                  size: 32,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 220),
+                      constraints: const BoxConstraints(maxWidth: 180),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -191,7 +191,7 @@ class ResponsiveHeader extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 22,
+                              fontSize: 17,
                               fontWeight: FontWeight.w800,
                               color: Theme.of(context).colorScheme.primary,
                             ),
@@ -200,7 +200,7 @@ class ResponsiveHeader extends StatelessWidget {
                             store.business.text('tagline', 'Local Shops • Local People • Better Prices'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11, color: AppTokens.textMuted),
+                            style: const TextStyle(fontSize: 10, color: AppTokens.textMuted),
                           ),
                         ],
                       ),

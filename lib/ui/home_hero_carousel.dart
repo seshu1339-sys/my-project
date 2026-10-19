@@ -100,9 +100,14 @@ class _HeroCarouselState extends State<HeroCarousel> {
           MediaQuery.sizeOf(context).width,
         );
         final requested = layout.n('visibleCount', 1, 1, 12).round();
+        // 150px (not 200px) is the minimum width a single offer card is
+        // allowed to shrink to when fitting `requested` cards into the
+        // available width -- lets an admin-requested visibleCount of 6
+        // actually show 6 at once on a typical desktop width instead of
+        // being silently clamped down to however many fit at 200px each.
         final count = requested.clamp(
           1,
-          ((c.maxWidth + layout.gap) / (200 + layout.gap)).floor().clamp(1, 12),
+          ((c.maxWidth + layout.gap) / (150 + layout.gap)).floor().clamp(1, 12),
         );
         pageCount = (widget.entries.length / count).ceil();
         if (page >= pageCount) {
