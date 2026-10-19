@@ -62,6 +62,46 @@ TextStyle sectionTextStyle(
   }
 }
 
+/// Like [sectionTextStyle], but for a widget (a button's own label, mainly)
+/// that must keep inheriting its surrounding theme/button style completely
+/// when nothing is set -- sectionTextStyle always resolves a *concrete*
+/// fontSize/fontWeight even when the admin never touched them, which would
+/// visibly change a button's label away from its theme default the moment
+/// this was applied at all. Returns null when every one of
+/// color/fontFamily/fontStyle/fontWeight/fontSize is unset (so applying it
+/// is a true no-op); otherwise returns a style with ONLY the fields that
+/// are actually set, which `Text`'s own style-merge then layers onto the
+/// ambient default -- every untouched field still inherits normally.
+TextStyle? overrideTextStyle(Entry config) {
+  final hasColor = config.text('textColor').isNotEmpty;
+  final hasWeight = config.number('fontWeight') > 0;
+  final hasStyle = config.text('fontStyle').isNotEmpty;
+  final hasSize = config.number('fontSize') > 0;
+  final family = config.text('fontFamily').trim();
+  if (!hasColor && !hasWeight && !hasStyle && !hasSize && family.isEmpty) {
+    return null;
+  }
+  final base = TextStyle(
+    color: hasColor
+        ? colorFromHex(config.text('textColor'), Colors.black87)
+        : null,
+    fontWeight: hasWeight
+        ? FontWeight.values.firstWhere(
+            (weight) => weight.value == config.number('fontWeight').round(),
+            orElse: () => FontWeight.normal,
+          )
+        : null,
+    fontStyle: config.text('fontStyle') == 'italic' ? FontStyle.italic : null,
+    fontSize: hasSize ? clampedNumber(config, 'fontSize', 14, 10, 72) : null,
+  );
+  if (family.isEmpty) return base;
+  try {
+    return GoogleFonts.getFont(family, textStyle: base);
+  } catch (_) {
+    return base;
+  }
+}
+
 /// A `(color, blendMode)` pair usable as `Image`'s own `color`/
 /// `colorBlendMode` params to darken/brighten a photo based on the entry's
 /// `brightness` field (0.2-2, default 1 = unchanged) -- same formula
@@ -71,7 +111,27 @@ TextStyle sectionTextStyle(
 (Color, BlendMode)? imageBrightnessTint(Entry entry) {
   final brightness = clampedNumber(entry, 'brightness', 1, 0.2, 2);
   if (brightness == 1) return null;
-  return (Colors.black.withValues(alpha: 1 - brightness.clamp(0.2, 2) / 2), BlendMode.darken);
+  return (
+    Colors.black.withValues(alpha: 1 - brightness.clamp(0.2, 2) / 2),
+    BlendMode.darken,
+  );
+}
+
+/// Merges a Google Font (by name, from fontFamilyOptions) onto an already-
+/// built [base] style, failing safe back to [base] for a blank or
+/// unrecognized family -- the same tail `sectionTextStyle` above runs,
+/// factored out so a hand-rolled style (one that needs its own concrete
+/// defaults for fontSize/fontWeight, like the header's greeting/location
+/// pill, rather than sectionTextStyle's defaults) can still pick up the
+/// admin's chosen font family without duplicating the try/catch.
+TextStyle applyFontFamily(TextStyle base, String family) {
+  final trimmed = family.trim();
+  if (trimmed.isEmpty) return base;
+  try {
+    return GoogleFonts.getFont(trimmed, textStyle: base);
+  } catch (_) {
+    return base;
+  }
 }
 
 BoxShadow? shadowFromEntry(Entry entry) {
@@ -259,7 +319,13 @@ void message(BuildContext context, Object text) => ScaffoldMessenger.of(context)
     );
 
 class ProductArt extends StatelessWidget {
-  const ProductArt(this.entry, {super.key, this.height = 160, this.width, this.appearance});
+  const ProductArt(
+    this.entry, {
+    super.key,
+    this.height = 160,
+    this.width,
+    this.appearance,
+  });
   final Entry entry;
   final double height;
   final double? width;

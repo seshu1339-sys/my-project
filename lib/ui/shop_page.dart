@@ -29,7 +29,8 @@ class ShopPage extends StatelessWidget {
               shop.text('name'),
               style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
-            if (shop.text('shopCode').isNotEmpty) Text('Shop ID: ${shop.text('shopCode')}'),
+            if (shop.text('shopCode').isNotEmpty)
+              Text('Shop ID: ${shop.text('shopCode')}'),
             const SizedBox(height: 12),
             Text(shop.text('description')),
             Text('${shop.text('address')} • ${shop.text('pincode')}'),
@@ -49,7 +50,11 @@ class ShopPage extends StatelessWidget {
             const SizedBox(height: 8),
             Builder(
               builder: (context) {
-                final layout = layoutFor(context, store.entries('settings'), 'shopPageDirectionsButton');
+                final layout = layoutFor(
+                  context,
+                  store.entries('settings'),
+                  'shopPageDirectionsButton',
+                );
                 if (!layout.visible) return const SizedBox.shrink();
                 final backgroundColor = layout.entry.text('backgroundColor');
                 final textColor = layout.entry.text('textColor');
@@ -57,17 +62,30 @@ class ShopPage extends StatelessWidget {
                   style: backgroundColor.isEmpty && textColor.isEmpty
                       ? null
                       : FilledButton.styleFrom(
-                          backgroundColor: backgroundColor.isEmpty ? null : colorFromHex(backgroundColor, AppTokens.primary),
-                          foregroundColor: textColor.isEmpty ? null : colorFromHex(textColor, Colors.white),
+                          backgroundColor: backgroundColor.isEmpty
+                              ? null
+                              : colorFromHex(
+                                  backgroundColor,
+                                  AppTokens.primary,
+                                ),
+                          foregroundColor: textColor.isEmpty
+                              ? null
+                              : colorFromHex(textColor, Colors.white),
                         ),
                   onPressed: () async {
                     final uri = Uri.https('www.google.com', '/maps/dir/', {
                       'api': '1',
-                      'destination': '${shop.number('latitude')},${shop.number('longitude')}',
-                      if (store.latitude != null) 'origin': '${store.latitude},${store.longitude}',
+                      'destination':
+                          '${shop.number('latitude')},${shop.number('longitude')}',
+                      if (store.latitude != null)
+                        'origin': '${store.latitude},${store.longitude}',
                     });
                     try {
-                      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+                      if (!await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          ) &&
+                          context.mounted) {
                         message(context, 'Could not open directions');
                       }
                     } catch (e) {
@@ -77,14 +95,21 @@ class ShopPage extends StatelessWidget {
                     }
                   },
                   icon: const Icon(Icons.directions),
-                  label: Text(layout.entry.text('text', 'Get directions').tr(context)),
+                  label: Text(
+                    layout.entry.text('text', 'Get directions').tr(context),
+                    style: overrideTextStyle(layout.entry),
+                  ),
                 );
               },
             ),
             const SizedBox(height: 24),
             pageHeadingText(
               context,
-              layout: layoutFor(context, store.entries('settings'), 'shopPageRelatedHeading'),
+              layout: layoutFor(
+                context,
+                store.entries('settings'),
+                'shopPageRelatedHeading',
+              ),
               defaultText: 'From this shop',
             ),
             for (final p
@@ -119,20 +144,34 @@ class _ShopPhotos extends StatelessWidget {
   Widget build(BuildContext context) {
     final approved = store
         .entries('vendorShopPhotos')
-        .where((e) => e.text('shopId') == shopId && e.text('status') == 'approved')
+        .where(
+          (e) => e.text('shopId') == shopId && e.text('status') == 'approved',
+        )
         .toList();
     if (approved.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 8, children: [
-      for (final photo in approved)
-        FutureBuilder<String>(
-          future: FirebaseStorage.instance.ref(photo.text('path')).getDownloadURL(),
-          builder: (context, snapshot) => snapshot.hasData
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(snapshot.data!, width: 140, height: 100, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink()),
-                )
-              : const SizedBox(width: 140, height: 100),
-        ),
-    ]);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final photo in approved)
+          FutureBuilder<String>(
+            future: FirebaseStorage.instance
+                .ref(photo.text('path'))
+                .getDownloadURL(),
+            builder: (context, snapshot) => snapshot.hasData
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      snapshot.data!,
+                      width: 140,
+                      height: 100,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  )
+                : const SizedBox(width: 140, height: 100),
+          ),
+      ],
+    );
   }
 }

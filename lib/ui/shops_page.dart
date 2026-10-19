@@ -15,15 +15,30 @@ class ShopsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shops = store.nearby();
-    final titleLayout = layoutFor(context, store.entries('settings'), 'shopsPageAppBarTitle');
+    final titleLayout = layoutFor(
+      context,
+      store.entries('settings'),
+      'shopsPageAppBarTitle',
+    );
     return Scaffold(
-      appBar: AppBar(title: Text(titleLayout.entry.text('text', 'Around your neighbourhood').tr(context))),
+      appBar: AppBar(
+        title: Text(
+          titleLayout.entry
+              .text('text', 'Around your neighbourhood')
+              .tr(context),
+          style: overrideTextStyle(titleLayout.entry),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           pageHeadingText(
             context,
-            layout: layoutFor(context, store.entries('settings'), 'shopsPageHeading'),
+            layout: layoutFor(
+              context,
+              store.entries('settings'),
+              'shopsPageHeading',
+            ),
             defaultText: 'Good shops, close by.',
             fontSize: 30,
           ),
@@ -31,7 +46,9 @@ class ShopsPage extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute<void>(builder: (_) => ProductSearchPage(store: store)),
+              MaterialPageRoute<void>(
+                builder: (_) => ProductSearchPage(store: store),
+              ),
             ),
             icon: const Icon(Icons.travel_explore_outlined),
             label: const Text('Search products near me'),

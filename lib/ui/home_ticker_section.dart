@@ -49,11 +49,15 @@ class HomeTickerSection extends StatelessWidget {
         ? translations[store.language].toString()
         : ticker.text('text').isNotEmpty
         ? ticker.text('text')
-        : 'Today\'s Best Offers in {location}'.tr(context, {'location': location});
+        : 'Today\'s Best Offers in {location}'.tr(context, {
+            'location': location,
+          });
     final discounted = products
         .where((p) => p.number('compareAtPrice', 0) > p.number('price', 0))
         .toList();
-    final chips = (discounted.isNotEmpty ? discounted : products).take(8).toList();
+    final chips = (discounted.isNotEmpty ? discounted : products)
+        .take(8)
+        .toList();
     if (chips.isEmpty || !noticeLayout.visible) return const SizedBox.shrink();
     return LayoutSection(
       layout: noticeLayout,
@@ -81,16 +85,31 @@ class HomeTickerSection extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              Icon(Icons.campaign, size: 18, color: colorFromHex(ticker.text('textColor'), AppTokens.primaryDark)),
+              Icon(
+                Icons.campaign,
+                size: 18,
+                color: colorFromHex(
+                  ticker.text('textColor'),
+                  AppTokens.primaryDark,
+                ),
+              ),
               const SizedBox(width: 8),
               Text(
                 label,
                 maxLines: 1,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: colorFromHex(ticker.text('textColor'), AppTokens.primaryDark),
-                ),
+                style:
+                    sectionTextStyle(
+                      ticker,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ).copyWith(
+                      color: ticker.text('textColor').isEmpty
+                          ? AppTokens.primaryDark
+                          : colorFromHex(
+                              ticker.text('textColor'),
+                              AppTokens.primaryDark,
+                            ),
+                    ),
               ),
               const SizedBox(width: 12),
               for (final product in chips) ...[
@@ -125,13 +144,21 @@ class _OfferChip extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: product.text('imageUrl').isEmpty
-                  ? Icon(Icons.local_offer_outlined, size: 16, color: AppTokens.primary)
+                  ? Icon(
+                      Icons.local_offer_outlined,
+                      size: 16,
+                      color: AppTokens.primary,
+                    )
                   : Image.network(
                       product.text('imageUrl'),
                       width: 20,
                       height: 20,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, e, s) => Icon(Icons.local_offer_outlined, size: 16, color: AppTokens.primary),
+                      errorBuilder: (_, e, s) => Icon(
+                        Icons.local_offer_outlined,
+                        size: 16,
+                        color: AppTokens.primary,
+                      ),
                     ),
             ),
             const SizedBox(width: 6),
@@ -142,7 +169,11 @@ class _OfferChip extends StatelessWidget {
             const SizedBox(width: 4),
             Text(
               '${money(product.number('price', 0))}/${product.text('unit').isEmpty ? 'unit' : product.text('unit')}',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTokens.primary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTokens.primary,
+              ),
             ),
           ],
         ),

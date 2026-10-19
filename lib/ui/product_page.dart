@@ -223,6 +223,7 @@ class _ProductPageState extends State<ProductPage> {
                                     : addLayout.entry
                                           .text('text', 'Add to bag')
                                           .tr(context),
+                                style: overrideTextStyle(addLayout.entry),
                               ),
                             ),
                           ),
@@ -265,6 +266,7 @@ class _ProductPageState extends State<ProductPage> {
                                 buyLayout.entry
                                     .text('text', 'Buy now')
                                     .tr(context),
+                                style: overrideTextStyle(buyLayout.entry),
                               ),
                             ),
                           ),

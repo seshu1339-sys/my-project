@@ -335,6 +335,7 @@ class _CartPageState extends State<CartPage> {
             : widget.store.live
             ? layout.entry.text('text', 'Submit order request').tr(context)
             : 'Preview checkout',
+        style: overrideTextStyle(layout.entry),
       ),
     );
   }

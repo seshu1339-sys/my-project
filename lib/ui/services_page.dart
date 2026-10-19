@@ -40,10 +40,23 @@ class _ServicesPageState extends State<ServicesPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.store,
     builder: (context, _) {
-      final services = localServiceEntries(widget.store, const SmartSearch(), search.text);
-      final titleLayout = layoutFor(context, widget.store.entries('settings'), 'servicesPageAppBarTitle');
+      final services = localServiceEntries(
+        widget.store,
+        const SmartSearch(),
+        search.text,
+      );
+      final titleLayout = layoutFor(
+        context,
+        widget.store.entries('settings'),
+        'servicesPageAppBarTitle',
+      );
       return Scaffold(
-        appBar: AppBar(title: Text(titleLayout.entry.text('text', 'Services').tr(context))),
+        appBar: AppBar(
+          title: Text(
+            titleLayout.entry.text('text', 'Services').tr(context),
+            style: overrideTextStyle(titleLayout.entry),
+          ),
+        ),
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [

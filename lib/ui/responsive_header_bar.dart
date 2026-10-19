@@ -47,37 +47,45 @@ class ResponsiveHeader extends StatelessWidget {
 
   Future<void> wishlist(BuildContext context) => showDialog<void>(
     context: context,
-    builder: (dialog) => AlertDialog(
-      title: Text(
-        layoutFor(dialog, store.entries('settings'), 'wishlistDialogTitle').entry.text('text', 'Wishlist').tr(dialog),
-      ),
-      content: SizedBox(
-        width: 320,
-        child: store.wishlist.isEmpty
-            ? Text('Nothing saved yet.'.tr(dialog))
-            : ListView(
-                shrinkWrap: true,
-                children: [
-                  for (final id in store.wishlist)
-                    if (store.product(id) case final entry?)
-                      ListTile(
-                        title: Text(entry.text('name')),
-                        subtitle: Text(money(entry.price(store.pincode))),
-                        onTap: () {
-                          Navigator.pop(dialog);
-                          onProduct(entry);
-                        },
-                      ),
-                ],
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialog),
-          child: Text('Close'.tr(dialog)),
+    builder: (dialog) {
+      final titleLayout = layoutFor(
+        dialog,
+        store.entries('settings'),
+        'wishlistDialogTitle',
+      );
+      return AlertDialog(
+        title: Text(
+          titleLayout.entry.text('text', 'Wishlist').tr(dialog),
+          style: overrideTextStyle(titleLayout.entry),
         ),
-      ],
-    ),
+        content: SizedBox(
+          width: 320,
+          child: store.wishlist.isEmpty
+              ? Text('Nothing saved yet.'.tr(dialog))
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final id in store.wishlist)
+                      if (store.product(id) case final entry?)
+                        ListTile(
+                          title: Text(entry.text('name')),
+                          subtitle: Text(money(entry.price(store.pincode))),
+                          onTap: () {
+                            Navigator.pop(dialog);
+                            onProduct(entry);
+                          },
+                        ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: Text('Close'.tr(dialog)),
+          ),
+        ],
+      );
+    },
   );
 
   Future<void> office(BuildContext context) => showDialog<void>(
@@ -128,12 +136,16 @@ class ResponsiveHeader extends StatelessWidget {
       'https://e-commerce-app-a3897-vendor.web.app',
     );
     try {
-      if (!await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication) &&
+      if (!await launchUrl(
+            Uri.parse(url),
+            mode: LaunchMode.externalApplication,
+          ) &&
           context.mounted) {
         message(context, 'Could not open the seller signup page');
       }
     } catch (e) {
-      if (context.mounted) message(context, 'Could not open the seller signup page');
+      if (context.mounted)
+        message(context, 'Could not open the seller signup page');
     }
   }
 
@@ -146,7 +158,10 @@ class ResponsiveHeader extends StatelessWidget {
     final servicesIconUrl = servicesLayout.entry.text('iconUrl');
     final servicesIconColor = servicesLayout.entry.text('textColor').isEmpty
         ? AppTokens.textPrimary
-        : colorFromHex(servicesLayout.entry.text('textColor'), AppTokens.textPrimary);
+        : colorFromHex(
+            servicesLayout.entry.text('textColor'),
+            AppTokens.textPrimary,
+          );
     // Three previously-hardcoded header pieces, each now independently
     // admin-editable (text/color/font/size/visibility) — see layout_settings.dart's
     // 'title'/'user'/'location' entries. Every field below falls back to
@@ -174,7 +189,11 @@ class ResponsiveHeader extends StatelessWidget {
           // separating anything.
           Widget divider() => narrow
               ? const SizedBox.shrink()
-              : Container(width: 1.5, height: 32, color: AppTokens.textMuted.withValues(alpha: .25));
+              : Container(
+                  width: 1.5,
+                  height: 32,
+                  color: AppTokens.textMuted.withValues(alpha: .25),
+                );
           return Directionality(
             // Keep the logo at the physical top-left in every language.
             textDirection: TextDirection.ltr,
@@ -201,7 +220,10 @@ class ResponsiveHeader extends StatelessWidget {
                                   size: logo.n('iconSize', 32, 20, 96),
                                   color: logo.entry.text('textColor').isEmpty
                                       ? Theme.of(context).colorScheme.primary
-                                      : colorFromHex(logo.entry.text('textColor'), Theme.of(context).colorScheme.primary),
+                                      : colorFromHex(
+                                          logo.entry.text('textColor'),
+                                          Theme.of(context).colorScheme.primary,
+                                        ),
                                 )
                               : Image.network(
                                   store.business.text('imageUrl'),
@@ -237,11 +259,16 @@ class ResponsiveHeader extends StatelessWidget {
                                       fontSize: 17,
                                       fontWeight: FontWeight.w800,
                                     ).copyWith(
-                                      color: title.entry.text('textColor').isEmpty
-                                          ? Theme.of(context).colorScheme.primary
+                                      color:
+                                          title.entry.text('textColor').isEmpty
+                                          ? Theme.of(context)
+                                                .colorScheme
+                                                .primary
                                           : colorFromHex(
                                               title.entry.text('textColor'),
-                                              Theme.of(context).colorScheme.primary,
+                                              Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
                                             ),
                                     ),
                               ),
@@ -252,19 +279,29 @@ class ResponsiveHeader extends StatelessWidget {
                               Text(
                                 tagline.entry.text(
                                   'text',
-                                  store.business.text('tagline', 'Local Shops • Local People • Better Prices'),
+                                  store.business.text(
+                                    'tagline',
+                                    'Local Shops • Local People • Better Prices',
+                                  ),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: sectionTextStyle(
-                                  tagline.entry,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.normal,
-                                ).copyWith(
-                                  color: tagline.entry.text('textColor').isEmpty
-                                      ? AppTokens.textMuted
-                                      : colorFromHex(tagline.entry.text('textColor'), AppTokens.textMuted),
-                                ),
+                                style:
+                                    sectionTextStyle(
+                                      tagline.entry,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.normal,
+                                    ).copyWith(
+                                      color:
+                                          tagline.entry
+                                              .text('textColor')
+                                              .isEmpty
+                                          ? AppTokens.textMuted
+                                          : colorFromHex(
+                                              tagline.entry.text('textColor'),
+                                              AppTokens.textMuted,
+                                            ),
+                                    ),
                               ),
                             ),
                         ],
@@ -288,21 +325,38 @@ class ResponsiveHeader extends StatelessWidget {
                     Text(
                       store.profileName.isEmpty
                           ? greeting.entry.text('text', 'Welcome').tr(context)
-                          : 'Hello {name}'.tr(context, {'name': store.profileName}),
-                      style: TextStyle(
-                        fontWeight: FontWeight.values.firstWhere(
-                          (w) => w.value == greeting.entry.number('fontWeight', 700),
-                          orElse: () => FontWeight.w700,
+                          : 'Hello {name}'.tr(context, {
+                              'name': store.profileName,
+                            }),
+                      style: applyFontFamily(
+                        TextStyle(
+                          fontWeight: FontWeight.values.firstWhere(
+                            (w) =>
+                                w.value ==
+                                greeting.entry.number('fontWeight', 700),
+                            orElse: () => FontWeight.w700,
+                          ),
+                          fontSize: greeting.entry.number('fontSize') > 0
+                              ? clampedNumber(
+                                  greeting.entry,
+                                  'fontSize',
+                                  14,
+                                  10,
+                                  40,
+                                )
+                              : null,
+                          color: greeting.entry.text('textColor').isEmpty
+                              ? null
+                              : colorFromHex(
+                                  greeting.entry.text('textColor'),
+                                  Colors.black87,
+                                ),
+                          fontStyle:
+                              greeting.entry.text('fontStyle') == 'italic'
+                              ? FontStyle.italic
+                              : FontStyle.normal,
                         ),
-                        fontSize: greeting.entry.number('fontSize') > 0
-                            ? clampedNumber(greeting.entry, 'fontSize', 14, 10, 40)
-                            : null,
-                        color: greeting.entry.text('textColor').isEmpty
-                            ? null
-                            : colorFromHex(greeting.entry.text('textColor'), Colors.black87),
-                        fontStyle: greeting.entry.text('fontStyle') == 'italic'
-                            ? FontStyle.italic
-                            : FontStyle.normal,
+                        greeting.entry.text('fontFamily'),
                       ),
                     ),
                   ),
@@ -310,55 +364,123 @@ class ResponsiveHeader extends StatelessWidget {
                   wrapSection(
                     'location',
                     Material(
-                      color: locationLayout.entry.text('backgroundColor').isEmpty
+                      color:
+                          locationLayout.entry.text('backgroundColor').isEmpty
                           ? AppTokens.primaryLight
-                          : colorFromHex(locationLayout.entry.text('backgroundColor'), AppTokens.primaryLight),
+                          : colorFromHex(
+                              locationLayout.entry.text('backgroundColor'),
+                              AppTokens.primaryLight,
+                            ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                           locationLayout.entry.number('radius') > 0
-                              ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              ? clampedNumber(
+                                  locationLayout.entry,
+                                  'radius',
+                                  AppTokens.radiusLg,
+                                  0,
+                                  80,
+                                )
                               : AppTokens.radiusLg,
                         ),
                         side: locationLayout.entry.text('borderColor').isEmpty
                             ? BorderSide.none
-                            : BorderSide(color: colorFromHex(locationLayout.entry.text('borderColor'), AppTokens.primary), width: 1.5),
+                            : BorderSide(
+                                color: colorFromHex(
+                                  locationLayout.entry.text('borderColor'),
+                                  AppTokens.primary,
+                                ),
+                                width: 1.5,
+                              ),
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(
                           locationLayout.entry.number('radius') > 0
-                              ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              ? clampedNumber(
+                                  locationLayout.entry,
+                                  'radius',
+                                  AppTokens.radiusLg,
+                                  0,
+                                  80,
+                                )
                               : AppTokens.radiusLg,
                         ),
                         onTap: onLocation,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 200),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: AppTokens.primary,
+                                ),
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
                                     store.address.isEmpty
                                         ? (store.pincode.isEmpty
-                                              ? locationLayout.entry.text('text', 'Choose your location').tr(context)
+                                              ? locationLayout.entry
+                                                    .text(
+                                                      'text',
+                                                      'Choose your location',
+                                                    )
+                                                    .tr(context)
                                               : store.pincode)
                                         : store.address,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.values.firstWhere(
-                                        (w) => w.value == locationLayout.entry.number('fontWeight', 600),
-                                        orElse: () => FontWeight.w600,
+                                    style: applyFontFamily(
+                                      TextStyle(
+                                        fontWeight: FontWeight.values
+                                            .firstWhere(
+                                              (w) =>
+                                                  w.value ==
+                                                  locationLayout.entry.number(
+                                                    'fontWeight',
+                                                    600,
+                                                  ),
+                                              orElse: () => FontWeight.w600,
+                                            ),
+                                        fontSize:
+                                            locationLayout.entry.number(
+                                                  'fontSize',
+                                                ) >
+                                                0
+                                            ? clampedNumber(
+                                                locationLayout.entry,
+                                                'fontSize',
+                                                13,
+                                                10,
+                                                40,
+                                              )
+                                            : 13,
+                                        color:
+                                            locationLayout.entry
+                                                .text('textColor')
+                                                .isEmpty
+                                            ? null
+                                            : colorFromHex(
+                                                locationLayout.entry.text(
+                                                  'textColor',
+                                                ),
+                                                Colors.black87,
+                                              ),
+                                        fontStyle:
+                                            locationLayout.entry.text(
+                                                  'fontStyle',
+                                                ) ==
+                                                'italic'
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
                                       ),
-                                      fontSize: locationLayout.entry.number('fontSize') > 0
-                                          ? clampedNumber(locationLayout.entry, 'fontSize', 13, 10, 40)
-                                          : 13,
-                                      color: locationLayout.entry.text('textColor').isEmpty
-                                          ? null
-                                          : colorFromHex(locationLayout.entry.text('textColor'), Colors.black87),
+                                      locationLayout.entry.text('fontFamily'),
                                     ),
                                   ),
                                 ),
@@ -374,7 +496,9 @@ class ResponsiveHeader extends StatelessWidget {
                 wrapSection(
                   'search',
                   SizedBox(
-                    width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
+                    width: narrow
+                        ? c.maxWidth
+                        : math.max(260, c.maxWidth * .35),
                     child: ResponsiveSearchBox(
                       layout: layoutFor(context, settings, 'search'),
                       controller: search,
@@ -405,7 +529,11 @@ class ResponsiveHeader extends StatelessWidget {
                             width: 28,
                             height: 28,
                             child: servicesIconUrl.isEmpty
-                                ? Icon(Icons.home_repair_service_outlined, size: 28, color: servicesIconColor)
+                                ? Icon(
+                                    Icons.home_repair_service_outlined,
+                                    size: 28,
+                                    color: servicesIconColor,
+                                  )
                                 : Image.network(
                                     servicesIconUrl,
                                     fit: BoxFit.contain,
@@ -463,63 +591,91 @@ class ResponsiveHeader extends StatelessWidget {
                   wrapSection(
                     'menuIcon',
                     PopupMenuButton<String>(
-                  tooltip: 'Menu'.tr(context),
-                  icon: menuLayout.entry.text('iconUrl').isEmpty
-                      ? Icon(
-                          Icons.menu,
-                          size: menuLayout.entry.number('iconSize') > 0
-                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
-                              : 24,
-                          color: menuLayout.entry.text('textColor').isEmpty
-                              ? null
-                              : colorFromHex(menuLayout.entry.text('textColor'), AppTokens.textPrimary),
-                        )
-                      : Image.network(
-                          menuLayout.entry.text('iconUrl'),
-                          width: menuLayout.entry.number('iconSize') > 0
-                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
-                              : 24,
-                          height: menuLayout.entry.number('iconSize') > 0
-                              ? clampedNumber(menuLayout.entry, 'iconSize', 24, 16, 48)
-                              : 24,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, error, stack) => const Icon(Icons.menu),
+                      tooltip: 'Menu'.tr(context),
+                      icon: menuLayout.entry.text('iconUrl').isEmpty
+                          ? Icon(
+                              Icons.menu,
+                              size: menuLayout.entry.number('iconSize') > 0
+                                  ? clampedNumber(
+                                      menuLayout.entry,
+                                      'iconSize',
+                                      24,
+                                      16,
+                                      48,
+                                    )
+                                  : 24,
+                              color: menuLayout.entry.text('textColor').isEmpty
+                                  ? null
+                                  : colorFromHex(
+                                      menuLayout.entry.text('textColor'),
+                                      AppTokens.textPrimary,
+                                    ),
+                            )
+                          : Image.network(
+                              menuLayout.entry.text('iconUrl'),
+                              width: menuLayout.entry.number('iconSize') > 0
+                                  ? clampedNumber(
+                                      menuLayout.entry,
+                                      'iconSize',
+                                      24,
+                                      16,
+                                      48,
+                                    )
+                                  : 24,
+                              height: menuLayout.entry.number('iconSize') > 0
+                                  ? clampedNumber(
+                                      menuLayout.entry,
+                                      'iconSize',
+                                      24,
+                                      16,
+                                      48,
+                                    )
+                                  : 24,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, error, stack) =>
+                                  const Icon(Icons.menu),
+                            ),
+                      onSelected: (value) async {
+                        switch (value) {
+                          case 'account':
+                            onAccount();
+                          case 'seller':
+                            await becomeASeller(context);
+                          default:
+                            if (context.mounted) await store.setLanguage(value);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        PopupMenuItem(
+                          value: 'account',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_outline, size: 18),
+                              const SizedBox(width: 10),
+                              Text('Your account'.tr(context)),
+                            ],
+                          ),
                         ),
-                  onSelected: (value) async {
-                    switch (value) {
-                      case 'account':
-                        onAccount();
-                      case 'seller':
-                        await becomeASeller(context);
-                      default:
-                        if (context.mounted) await store.setLanguage(value);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'account',
-                      child: Row(children: [
-                        const Icon(Icons.person_outline, size: 18),
-                        const SizedBox(width: 10),
-                        Text('Your account'.tr(context)),
-                      ]),
+                        PopupMenuItem(
+                          value: 'seller',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.add_business_outlined, size: 18),
+                              const SizedBox(width: 10),
+                              Text('Become a Seller'.tr(context)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        for (final locale in AppLocale.enabled(
+                          store.business.text('enabledLanguages'),
+                        ))
+                          PopupMenuItem(
+                            value: locale.languageCode,
+                            child: Text(AppLocale.names[locale.languageCode]!),
+                          ),
+                      ],
                     ),
-                    PopupMenuItem(
-                      value: 'seller',
-                      child: Row(children: [
-                        const Icon(Icons.add_business_outlined, size: 18),
-                        const SizedBox(width: 10),
-                        Text('Become a Seller'.tr(context)),
-                      ]),
-                    ),
-                    const PopupMenuDivider(),
-                    for (final locale in AppLocale.enabled(store.business.text('enabledLanguages')))
-                      PopupMenuItem(
-                        value: locale.languageCode,
-                        child: Text(AppLocale.names[locale.languageCode]!),
-                      ),
-                  ],
-                ),
                   ),
                 divider(),
                 // Visible office address + phone (was hamburger-menu-only,
@@ -531,28 +687,60 @@ class ResponsiveHeader extends StatelessWidget {
                     Material(
                       color: officeLayout.entry.text('backgroundColor').isEmpty
                           ? Colors.transparent
-                          : colorFromHex(officeLayout.entry.text('backgroundColor'), Colors.transparent),
+                          : colorFromHex(
+                              officeLayout.entry.text('backgroundColor'),
+                              Colors.transparent,
+                            ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                           officeLayout.entry.number('radius') > 0
-                              ? clampedNumber(officeLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              ? clampedNumber(
+                                  officeLayout.entry,
+                                  'radius',
+                                  AppTokens.radiusLg,
+                                  0,
+                                  80,
+                                )
                               : AppTokens.radiusLg,
                         ),
                         side: officeLayout.entry.text('borderColor').isEmpty
                             ? BorderSide.none
-                            : BorderSide(color: colorFromHex(officeLayout.entry.text('borderColor'), AppTokens.primary), width: 1.5),
+                            : BorderSide(
+                                color: colorFromHex(
+                                  officeLayout.entry.text('borderColor'),
+                                  AppTokens.primary,
+                                ),
+                                width: 1.5,
+                              ),
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(
                           officeLayout.entry.number('radius') > 0
-                              ? clampedNumber(officeLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                              ? clampedNumber(
+                                  officeLayout.entry,
+                                  'radius',
+                                  AppTokens.radiusLg,
+                                  0,
+                                  80,
+                                )
                               : AppTokens.radiusLg,
                         ),
                         onTap: () => office(context),
                         child: Padding(
                           padding: officeLayout.entry.number('padding') > 0
-                              ? EdgeInsets.all(clampedNumber(officeLayout.entry, 'padding', 4, 0, 48))
-                              : const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              ? EdgeInsets.all(
+                                  clampedNumber(
+                                    officeLayout.entry,
+                                    'padding',
+                                    4,
+                                    0,
+                                    48,
+                                  ),
+                                )
+                              : const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
                           child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 220),
                             child: Column(
@@ -564,30 +752,48 @@ class ResponsiveHeader extends StatelessWidget {
                                     store.business.text('address'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: sectionTextStyle(
-                                      officeLayout.entry,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.normal,
-                                    ).copyWith(
-                                      color: officeLayout.entry.text('textColor').isEmpty
-                                          ? AppTokens.textMuted
-                                          : colorFromHex(officeLayout.entry.text('textColor'), AppTokens.textMuted),
-                                    ),
+                                    style:
+                                        sectionTextStyle(
+                                          officeLayout.entry,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.normal,
+                                        ).copyWith(
+                                          color:
+                                              officeLayout.entry
+                                                  .text('textColor')
+                                                  .isEmpty
+                                              ? AppTokens.textMuted
+                                              : colorFromHex(
+                                                  officeLayout.entry.text(
+                                                    'textColor',
+                                                  ),
+                                                  AppTokens.textMuted,
+                                                ),
+                                        ),
                                   ),
                                 if (store.business.text('phone').isNotEmpty)
                                   Text(
                                     store.business.text('phone'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: sectionTextStyle(
-                                      officeLayout.entry,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ).copyWith(
-                                      color: officeLayout.entry.text('textColor').isEmpty
-                                          ? null
-                                          : colorFromHex(officeLayout.entry.text('textColor'), Colors.black87),
-                                    ),
+                                    style:
+                                        sectionTextStyle(
+                                          officeLayout.entry,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ).copyWith(
+                                          color:
+                                              officeLayout.entry
+                                                  .text('textColor')
+                                                  .isEmpty
+                                              ? null
+                                              : colorFromHex(
+                                                  officeLayout.entry.text(
+                                                    'textColor',
+                                                  ),
+                                                  Colors.black87,
+                                                ),
+                                        ),
                                   ),
                               ],
                             ),
@@ -619,8 +825,12 @@ Widget _headerIconButton(
   required VoidCallback onPressed,
   String? badge,
 }) {
-  final size = layout.entry.number('iconSize') > 0 ? clampedNumber(layout.entry, 'iconSize', 24, 16, 48) : 24.0;
-  final color = layout.entry.text('textColor').isEmpty ? null : colorFromHex(layout.entry.text('textColor'), AppTokens.textPrimary);
+  final size = layout.entry.number('iconSize') > 0
+      ? clampedNumber(layout.entry, 'iconSize', 24, 16, 48)
+      : 24.0;
+  final color = layout.entry.text('textColor').isEmpty
+      ? null
+      : colorFromHex(layout.entry.text('textColor'), AppTokens.textPrimary);
   final iconUrl = layout.entry.text('iconUrl');
   Widget iconWidget = iconUrl.isEmpty
       ? Icon(icon, size: size, color: color)
@@ -629,7 +839,8 @@ Widget _headerIconButton(
           width: size,
           height: size,
           fit: BoxFit.contain,
-          errorBuilder: (_, error, stack) => Icon(icon, size: size, color: color),
+          errorBuilder: (_, error, stack) =>
+              Icon(icon, size: size, color: color),
         );
   if (badge != null) {
     iconWidget = Badge(label: Text(badge), child: iconWidget);
@@ -637,7 +848,11 @@ Widget _headerIconButton(
   final button = IconButton(
     tooltip: tooltip,
     onPressed: onPressed,
-    padding: EdgeInsets.all(layout.entry.number('padding') > 0 ? clampedNumber(layout.entry, 'padding', 8, 0, 48) : 8),
+    padding: EdgeInsets.all(
+      layout.entry.number('padding') > 0
+          ? clampedNumber(layout.entry, 'padding', 8, 0, 48)
+          : 8,
+    ),
     icon: iconWidget,
   );
   final backgroundColor = layout.entry.text('backgroundColor');
