@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
@@ -71,6 +72,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   // inside this editor) and it must never affect anything until an admin
   // actually turns it on. See SectionTapRegion's `showNumber`/`number`.
   bool _showNumbers = false;
+  bool _logoBusy = false;
 
   // Undo/redo + cancel are scoped to the current edit session only (one
   // selected section at a time) — not a global, app-wide history.
@@ -200,6 +202,41 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
         builder: (_) => EntryEditor(store: widget.store, collection: collection, entry: entry),
       ),
     );
+  }
+
+  // Writes ONLY the business profile's 'imageUrl' field -- merging onto a
+  // fresh read of the current data, never a full replace -- so uploading
+  // or removing the logo photo can never touch the shop name, tagline, or
+  // any other Business Profile field, even though they all live in the
+  // same settings/business doc. Same read-merge-save shape as
+  // adjustSectionField/adjustPromoDimension elsewhere in this app for
+  // exactly this "touch one field only" need.
+  Future<void> _uploadLogo() async {
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      setState(() => _logoBusy = true);
+      final url = await widget.store.upload(file);
+      await widget.store.save('settings', Entry('business', {...widget.store.business.data, 'imageUrl': url}));
+      if (mounted) message(context, 'Logo photo updated');
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
+  }
+
+  Future<void> _removeLogo() async {
+    setState(() => _logoBusy = true);
+    try {
+      final data = {...widget.store.business.data}..remove('imageUrl');
+      await widget.store.save('settings', Entry('business', data));
+      if (mounted) message(context, 'Logo photo removed — showing the fallback icon');
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => _logoBusy = false);
+    }
   }
 
   Future<void> _saveDefault() async {
@@ -501,12 +538,70 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: LayoutFieldsForm(
-        key: ValueKey(key),
-        store: widget.store,
-        component: key,
-        autoSave: true,
-        onSaved: _onAutoSaved,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (key == 'logo') _logoPhotoRow(),
+          LayoutFieldsForm(
+            key: ValueKey(key),
+            store: widget.store,
+            component: key,
+            autoSave: true,
+            onSaved: _onAutoSaved,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // The logo's actual photo lives in Business Profile (settings/business's
+  // 'imageUrl'), not in its own settings/section_logo doc -- LayoutFieldsForm
+  // below only ever edits section_logo (size/color/visibility). This row
+  // gives the logo number its own upload/remove control without touching
+  // Business Profile's page, and _uploadLogo/_removeLogo above write only
+  // the 'imageUrl' field, so the shop name and tagline (separate fields on
+  // that same document) are never affected.
+  Widget _logoPhotoRow() {
+    final imageUrl = widget.store.business.text('imageUrl');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (imageUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  imageUrl,
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, error, stack) => const SizedBox(width: 48, height: 48),
+                ),
+              ),
+            ),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _logoBusy ? null : _uploadLogo,
+                  icon: const Icon(Icons.upload, size: 18),
+                  label: const Text('Upload logo photo'),
+                ),
+                if (imageUrl.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: _logoBusy ? null : _removeLogo,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Remove logo photo'),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
