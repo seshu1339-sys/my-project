@@ -4,8 +4,23 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'admin_fields.dart';
+import 'color_picker_field.dart';
 import 'geo_target_picker.dart';
 import 'shared.dart';
+
+// Matches layout_editor.dart's own _kindOf rule for the numbered elements'
+// forms -- any key ending in "Color" gets the same visual swatch picker
+// there, not a raw "#RRGGBB" text box. Applied here too so promotions'
+// and the Scrolling Text Settings' color fields (textColor/backgroundColor/
+// borderColor) get it as well, instead of just the numbered elements.
+bool _isColorField(String key) => key.endsWith('Color');
+const _fontWeightOptions = <String, String>{
+  '400': 'Normal',
+  '500': 'Medium',
+  '600': 'Semi-bold',
+  '700': 'Bold',
+  '800': 'Extra bold',
+};
 
 class EntryEditor extends StatefulWidget {
   const EntryEditor({
@@ -312,6 +327,26 @@ class _EntryEditorState extends State<EntryEditor> {
   }
 
   Widget field(String key, String label) {
+    if (_isColorField(key)) {
+      return ColorPickerField(
+        label: label,
+        value: controllers[key]!.text,
+        onChanged: (v) => setState(() => controllers[key]!.text = v),
+      );
+    }
+    if (key == 'fontWeight') {
+      final current = controllers[key]!.text.trim();
+      return DropdownButtonFormField<String>(
+        initialValue: _fontWeightOptions.containsKey(current) ? current : null,
+        decoration: InputDecoration(labelText: label),
+        hint: const Text('Theme default'),
+        items: [
+          for (final entry in _fontWeightOptions.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: (v) => setState(() => controllers[key]!.text = v ?? ''),
+      );
+    }
     List<DropdownMenuItem<String>>? options;
     if (['position', 'scrollEnabled'].contains(key)) {
       options =
@@ -320,15 +355,33 @@ class _EntryEditorState extends State<EntryEditor> {
               .toList();
     } else if (key == 'notifySubscribers') {
       options = const [
-        DropdownMenuItem(value: '', child: Text('Automatic (all offers except the ticker)')),
-        DropdownMenuItem(value: 'true', child: Text('Always notify subscribers')),
-        DropdownMenuItem(value: 'false', child: Text('Never notify subscribers')),
+        DropdownMenuItem(
+          value: '',
+          child: Text('Automatic (all offers except the ticker)'),
+        ),
+        DropdownMenuItem(
+          value: 'true',
+          child: Text('Always notify subscribers'),
+        ),
+        DropdownMenuItem(
+          value: 'false',
+          child: Text('Never notify subscribers'),
+        ),
       ];
     } else if (key == 'defaultPaymentMethod') {
       options = const [
-        DropdownMenuItem(value: 'direct_vendor', child: Text('Customer pays vendor directly')),
-        DropdownMenuItem(value: 'cash_on_delivery', child: Text('Cash on delivery')),
-        DropdownMenuItem(value: 'platform_collected', child: Text('Platform collected (future)')),
+        DropdownMenuItem(
+          value: 'direct_vendor',
+          child: Text('Customer pays vendor directly'),
+        ),
+        DropdownMenuItem(
+          value: 'cash_on_delivery',
+          child: Text('Cash on delivery'),
+        ),
+        DropdownMenuItem(
+          value: 'platform_collected',
+          child: Text('Platform collected (future)'),
+        ),
       ];
     } else if (['categoryId', 'parentId', 'shopId'].contains(key)) {
       options = [
@@ -418,18 +471,30 @@ class _EntryEditorState extends State<EntryEditor> {
     }
     if (key == 'geoTargetArea') {
       final entryData = widget.entry?.data;
-      final effectiveShape = pickedShape ?? entryData?['geoShape']?.toString() ?? 'circle';
-      final rectangle = pickedShape != null ? pickedRectangle : parseRectangleField(entryData?['targetRectangle']);
+      final effectiveShape =
+          pickedShape ?? entryData?['geoShape']?.toString() ?? 'circle';
+      final rectangle = pickedShape != null
+          ? pickedRectangle
+          : parseRectangleField(entryData?['targetRectangle']);
       final polygon = pickedShape != null
           ? pickedPolygon
-          : parsePolygonField(entryData?['targetPolygon'])?.map((p) => {'lat': p.$1, 'lng': p.$2}).toList();
-      final lat = double.tryParse(controllers['targetLatitude']?.text ?? '') ?? 0;
-      final lng = double.tryParse(controllers['targetLongitude']?.text ?? '') ?? 0;
-      final radius = double.tryParse(controllers['targetRadiusKm']?.text ?? '') ?? 0;
+          : parsePolygonField(entryData?['targetPolygon'])
+                ?.map((p) => {'lat': p.$1, 'lng': p.$2})
+                .toList();
+      final lat =
+          double.tryParse(controllers['targetLatitude']?.text ?? '') ?? 0;
+      final lng =
+          double.tryParse(controllers['targetLongitude']?.text ?? '') ?? 0;
+      final radius =
+          double.tryParse(controllers['targetRadiusKm']?.text ?? '') ?? 0;
       final summary = effectiveShape == 'rectangle'
-          ? (rectangle == null ? 'No rectangle drawn yet.' : 'Rectangle area set.')
+          ? (rectangle == null
+                ? 'No rectangle drawn yet.'
+                : 'Rectangle area set.')
           : effectiveShape == 'polygon'
-          ? (polygon == null ? 'No polygon drawn yet.' : 'Polygon area set (${polygon.length} points).')
+          ? (polygon == null
+                ? 'No polygon drawn yet.'
+                : 'Polygon area set (${polygon.length} points).')
           : (lat == 0 && lng == 0)
           ? 'No location targeting yet (shows everywhere, or by pincode).'
           : 'Circle: ${(radius > 0 ? radius : 10).round()} km around ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}.';
@@ -442,7 +507,9 @@ class _EntryEditorState extends State<EntryEditor> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () async {
-              final start = DateTime.tryParse(controllers['startsAt']?.text ?? '');
+              final start = DateTime.tryParse(
+                controllers['startsAt']?.text ?? '',
+              );
               final end = DateTime.tryParse(controllers['endsAt']?.text ?? '');
               final result = await Navigator.push<GeoTargetResult>(
                 context,
@@ -457,7 +524,9 @@ class _EntryEditorState extends State<EntryEditor> {
                     initialLongitude: lng,
                     initialRadiusKm: radius,
                     initialRectangle: rectangle,
-                    initialPolygon: polygon?.map((p) => (p['lat']!, p['lng']!)).toList(),
+                    initialPolygon: polygon
+                        ?.map((p) => (p['lat']!, p['lng']!))
+                        .toList(),
                   ),
                 ),
               );
@@ -467,9 +536,12 @@ class _EntryEditorState extends State<EntryEditor> {
                 pickedRectangle = result.rectangle;
                 pickedPolygon = result.polygon;
                 if (result.shape == 'circle') {
-                  controllers['targetLatitude']!.text = result.latitude.toString();
-                  controllers['targetLongitude']!.text = result.longitude.toString();
-                  controllers['targetRadiusKm']!.text = result.radiusKm.toString();
+                  controllers['targetLatitude']!.text = result.latitude
+                      .toString();
+                  controllers['targetLongitude']!.text = result.longitude
+                      .toString();
+                  controllers['targetRadiusKm']!.text = result.radiusKm
+                      .toString();
                 } else {
                   controllers['targetLatitude']!.text = '0';
                   controllers['targetLongitude']!.text = '0';
@@ -551,7 +623,13 @@ class _EntryEditorState extends State<EntryEditor> {
           if (n == null || !n.isFinite) {
             return 'Enter a valid number';
           }
-          if (!['latitude', 'longitude', 'targetLatitude', 'targetLongitude'].contains(key) && n < 0) {
+          if (![
+                'latitude',
+                'longitude',
+                'targetLatitude',
+                'targetLongitude',
+              ].contains(key) &&
+              n < 0) {
             return 'Use zero or more';
           }
           if (key == 'latitude' && n.abs() > 90 ||
@@ -565,7 +643,9 @@ class _EntryEditorState extends State<EntryEditor> {
           if (key == 'stock' && n != n.round()) {
             return 'Use a whole number';
           }
-          if (['vendorPhotoLimit', 'fieldPhotoLimit'].contains(key) && v.isNotEmpty && (n < 1 || n > 9)) {
+          if (['vendorPhotoLimit', 'fieldPhotoLimit'].contains(key) &&
+              v.isNotEmpty &&
+              (n < 1 || n > 9)) {
             return 'Enter a number from 1 to 9';
           }
         }
@@ -577,7 +657,9 @@ class _EntryEditorState extends State<EntryEditor> {
         if (key == 'pincode' && !RegExp(r'^\d{6}$').hasMatch(v)) {
           return 'Enter six digits';
         }
-        if (key == 'targetPincode' && v.isNotEmpty && !RegExp(r'^\d{6}$').hasMatch(v)) {
+        if (key == 'targetPincode' &&
+            v.isNotEmpty &&
+            !RegExp(r'^\d{6}$').hasMatch(v)) {
           return 'Enter six digits';
         }
         if (key == 'imageUrl' &&
@@ -585,13 +667,19 @@ class _EntryEditorState extends State<EntryEditor> {
             Uri.tryParse(v)?.scheme != 'https') {
           return 'Use an HTTPS image URL';
         }
-        if (key == 'websiteUrl' && v.isNotEmpty && Uri.tryParse(v)?.scheme != 'https') {
+        if (key == 'websiteUrl' &&
+            v.isNotEmpty &&
+            Uri.tryParse(v)?.scheme != 'https') {
           return 'Use an HTTPS website URL';
         }
-        if (key == 'vendorSignupUrl' && v.isNotEmpty && Uri.tryParse(v)?.scheme != 'https') {
+        if (key == 'vendorSignupUrl' &&
+            v.isNotEmpty &&
+            Uri.tryParse(v)?.scheme != 'https') {
           return 'Use an HTTPS vendor signup URL';
         }
-        if (key == 'supportEmail' && v.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
+        if (key == 'supportEmail' &&
+            v.isNotEmpty &&
+            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
           return 'Enter a valid email address';
         }
         return null;
