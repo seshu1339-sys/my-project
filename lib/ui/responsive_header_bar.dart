@@ -131,6 +131,14 @@ class ResponsiveHeader extends StatelessWidget {
     final header = layoutFor(context, settings, 'header');
     final logo = layoutFor(context, settings, 'logo');
     final servicesIconUrl = layoutFor(context, settings, 'services').entry.text('iconUrl');
+    // Three previously-hardcoded header pieces, each now independently
+    // admin-editable (text/color/font/size/visibility) — see layout_settings.dart's
+    // 'title'/'user'/'location' entries. Every field below falls back to
+    // exactly the prior hardcoded value when unset, so the header's default
+    // appearance is unchanged until an admin actually sets something.
+    final title = layoutFor(context, settings, 'title');
+    final greeting = layoutFor(context, settings, 'user');
+    final locationLayout = layoutFor(context, settings, 'location');
     return LayoutSection(
       layout: header,
       child: LayoutBuilder(
@@ -186,16 +194,28 @@ class ResponsiveHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            store.business.text('name', 'Locamarket'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: Theme.of(context).colorScheme.primary,
+                          if (title.visible)
+                            Text(
+                              title.entry.text(
+                                'text',
+                                store.business.text('name', 'Locamarket'),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style:
+                                  sectionTextStyle(
+                                    title.entry,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                  ).copyWith(
+                                    color: title.entry.text('textColor').isEmpty
+                                        ? Theme.of(context).colorScheme.primary
+                                        : colorFromHex(
+                                            title.entry.text('textColor'),
+                                            Theme.of(context).colorScheme.primary,
+                                          ),
+                                  ),
                             ),
-                          ),
                           Text(
                             store.business.text('tagline', 'Local Shops • Local People • Better Prices'),
                             maxLines: 1,
@@ -217,46 +237,83 @@ class ResponsiveHeader extends StatelessWidget {
                 // Wrap's own bound and can overflow at narrow widths; as
                 // separate Wrap children, the pill simply flows to its own
                 // line when there's no room instead.
-                Text(
-                  store.profileName.isEmpty
-                      ? 'Welcome'.tr(context)
-                      : 'Hello {name}'.tr(context, {'name': store.profileName}),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                Material(
-                  color: AppTokens.primaryLight,
-                  borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-                    onTap: onLocation,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 200),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                store.address.isEmpty
-                                    ? (store.pincode.isEmpty
-                                          ? 'Choose your location'.tr(context)
-                                          : store.pincode)
-                                    : store.address,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                if (greeting.visible)
+                  Text(
+                    store.profileName.isEmpty
+                        ? greeting.entry.text('text', 'Welcome').tr(context)
+                        : 'Hello {name}'.tr(context, {'name': store.profileName}),
+                    style: TextStyle(
+                      fontWeight: FontWeight.values.firstWhere(
+                        (w) => w.value == greeting.entry.number('fontWeight', 700),
+                        orElse: () => FontWeight.w700,
+                      ),
+                      fontSize: greeting.entry.number('fontSize') > 0
+                          ? clampedNumber(greeting.entry, 'fontSize', 14, 10, 40)
+                          : null,
+                      color: greeting.entry.text('textColor').isEmpty
+                          ? null
+                          : colorFromHex(greeting.entry.text('textColor'), Colors.black87),
+                      fontStyle: greeting.entry.text('fontStyle') == 'italic'
+                          ? FontStyle.italic
+                          : FontStyle.normal,
+                    ),
+                  ),
+                if (locationLayout.visible)
+                  Material(
+                    color: locationLayout.entry.text('backgroundColor').isEmpty
+                        ? AppTokens.primaryLight
+                        : colorFromHex(locationLayout.entry.text('backgroundColor'), AppTokens.primaryLight),
+                    borderRadius: BorderRadius.circular(
+                      locationLayout.entry.number('radius') > 0
+                          ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                          : AppTokens.radiusLg,
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(
+                        locationLayout.entry.number('radius') > 0
+                            ? clampedNumber(locationLayout.entry, 'radius', AppTokens.radiusLg, 0, 80)
+                            : AppTokens.radiusLg,
+                      ),
+                      onTap: onLocation,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.location_on, size: 16, color: AppTokens.primary),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  store.address.isEmpty
+                                      ? (store.pincode.isEmpty
+                                            ? locationLayout.entry.text('text', 'Choose your location').tr(context)
+                                            : store.pincode)
+                                      : store.address,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.values.firstWhere(
+                                      (w) => w.value == locationLayout.entry.number('fontWeight', 600),
+                                      orElse: () => FontWeight.w600,
+                                    ),
+                                    fontSize: locationLayout.entry.number('fontSize') > 0
+                                        ? clampedNumber(locationLayout.entry, 'fontSize', 13, 10, 40)
+                                        : 13,
+                                    color: locationLayout.entry.text('textColor').isEmpty
+                                        ? null
+                                        : colorFromHex(locationLayout.entry.text('textColor'), Colors.black87),
+                                  ),
+                                ),
                               ),
-                            ),
-                            const Icon(Icons.keyboard_arrow_down, size: 16),
-                          ],
+                              const Icon(Icons.keyboard_arrow_down, size: 16),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 divider(),
                 SizedBox(
                   width: narrow ? c.maxWidth : math.max(260, c.maxWidth * .35),
