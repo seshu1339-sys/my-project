@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import 'shared.dart';
 
@@ -28,16 +30,13 @@ Future<void> showComplaintDialog(
             .docs;
   } catch (_) {
     if (context.mounted) {
-      message(context, 'Your orders could not load. Please try again.');
+      message(context, 'Your orders could not load. Please try again.'.tr(context));
     }
     return;
   }
   if (orderDocs.isEmpty) {
     if (context.mounted) {
-      message(
-        context,
-        'Place an order first, then you can open a complaint about it.',
-      );
+      message(context, 'Place an order first, then you can open a complaint about it.'.tr(context));
     }
     return;
   }
@@ -48,20 +47,23 @@ Future<void> showComplaintDialog(
   final submit = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Open a complaint'),
+      title: Text('Open a complaint'.tr(context)),
       content: SingleChildScrollView(
         child: Column(
           children: [
             DropdownButtonFormField<String>(
               initialValue: orderId,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Order'),
+              decoration: InputDecoration(labelText: 'Order'.tr(context)),
               items: [
                 for (final order in orderDocs)
                   DropdownMenuItem(
                     value: order.id,
                     child: Text(
-                      'Order ${order.id.substring(0, 8)} • ${order.data()['status'] ?? ''}',
+                      'Order {id} • {status}'.tr(dialogContext, {
+                        'id': order.id.substring(0, 8),
+                        'status': '${order.data()['status'] ?? ''}',
+                      }),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -72,12 +74,12 @@ Future<void> showComplaintDialog(
             ),
             TextField(
               controller: subject,
-              decoration: const InputDecoration(labelText: 'Subject'),
+              decoration: InputDecoration(labelText: 'Subject'.tr(context)),
             ),
             TextField(
               controller: description,
               maxLines: 5,
-              decoration: const InputDecoration(labelText: 'What happened?'),
+              decoration: InputDecoration(labelText: 'What happened?'.tr(context)),
             ),
           ],
         ),
@@ -85,11 +87,11 @@ Future<void> showComplaintDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Cancel'),
+          child: Text('Cancel'.tr(context)),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Submit'),
+          child: Text('Submit'.tr(context)),
         ),
       ],
     ),
@@ -106,10 +108,7 @@ Future<void> showComplaintDialog(
       description: description.text,
     );
     if (context.mounted) {
-      message(
-        context,
-        'Complaint submitted. You can follow its full history here.',
-      );
+      message(context, 'Complaint submitted. You can follow its full history here.'.tr(context));
     }
   });
   subject.dispose();

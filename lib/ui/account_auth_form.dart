@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import 'account_language_field.dart';
 import 'email_link.dart';
@@ -87,9 +89,9 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
     mainAxisSize: MainAxisSize.min,
     children: [
       registering
-          ? const Text(
-              'Create your account',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          ? Text(
+              'Create your account'.tr(context),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             )
           : pageHeadingText(
               context,
@@ -100,8 +102,8 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
       const SizedBox(height: 12),
       Text(
         registering
-            ? 'Register with email and password, then verify your email.'
-            : 'Sign in with your email and password.',
+            ? 'Register with email and password, then verify your email.'.tr(context)
+            : 'Sign in with your email and password.'.tr(context),
       ),
       const SizedBox(height: 24),
       AccountLanguageField(
@@ -115,7 +117,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
         autocorrect: false,
-        decoration: const InputDecoration(labelText: 'Email address'),
+        decoration: InputDecoration(labelText: 'Email address'.tr(context)),
       ),
       const SizedBox(height: 14),
       TextField(
@@ -127,7 +129,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
         autofillHints: [
           registering ? AutofillHints.newPassword : AutofillHints.password,
         ],
-        decoration: const InputDecoration(labelText: 'Password'),
+        decoration: InputDecoration(labelText: 'Password'.tr(context)),
       ),
       OutlinedButton(
         onPressed: busy
@@ -138,7 +140,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
                   builder: (_) => EmailLinkPage(store: widget.store),
                 ),
               ),
-        child: const Text('Sign in with an email link'),
+        child: Text('Sign in with an email link'.tr(context)),
       ),
       if (registering) ...[
         const SizedBox(height: 14),
@@ -148,7 +150,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
           obscureText: true,
           autocorrect: false,
           enableSuggestions: false,
-          decoration: const InputDecoration(labelText: 'Confirm password'),
+          decoration: InputDecoration(labelText: 'Confirm password'.tr(context)),
         ),
       ],
       FilledButton(
@@ -157,16 +159,16 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
             : () => run(() async {
                 validateEmailAddress(email.text);
                 if (password.text.isEmpty) {
-                  throw StateError('Enter your password.');
+                  throw StateError('Enter your password.'.tr(context));
                 }
                 if (registering) {
                   if (password.text.length < 6) {
                     throw StateError(
-                      'Use at least six characters for your password.',
+                      'Use at least six characters for your password.'.tr(context),
                     );
                   }
                   if (password.text != confirmPassword.text) {
-                    throw StateError('Passwords do not match.');
+                    throw StateError('Passwords do not match.'.tr(context));
                   }
                   await widget.store.registerEmail(
                     email.text.trim(),
@@ -180,7 +182,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
                 password.clear();
                 confirmPassword.clear();
               }),
-        child: Text(registering ? 'Create account' : 'Sign in'),
+        child: Text(registering ? 'Create account'.tr(context) : 'Sign in'.tr(context)),
       ),
       TextButton(
         onPressed: busy
@@ -190,7 +192,7 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
                 password.clear();
                 confirmPassword.clear();
               }),
-        child: Text(registering ? 'Back to sign in' : 'Create an account'),
+        child: Text(registering ? 'Back to sign in'.tr(context) : 'Create an account'.tr(context)),
       ),
       TextButton(
         onPressed: busy
@@ -202,13 +204,10 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
                   typedEmail: email.text,
                 );
                 if (context.mounted) {
-                  message(
-                    context,
-                    'If an account exists, a password reset email has been sent.',
-                  );
+                  message(context, 'If an account exists, a password reset email has been sent.'.tr(context));
                 }
               }),
-        child: const Text('Forgot password?'),
+        child: Text('Forgot password?'.tr(context)),
       ),
       if (busy) const LinearProgressIndicator(),
     ],

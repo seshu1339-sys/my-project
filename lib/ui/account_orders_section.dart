@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import '../services/location.dart';
 import 'shared.dart';
@@ -26,19 +28,19 @@ class AccountOrdersSection extends StatelessWidget {
         .snapshots(),
     builder: (context, snap) {
       if (snap.hasError) {
-        return const Text('Orders could not load. Please try again.');
+        return Text('Orders could not load. Please try again.'.tr(context));
       }
       if (!snap.hasData) {
         return const LinearProgressIndicator();
       }
       if (snap.data!.docs.isEmpty) {
-        return const Text('Your first local find is waiting for you.');
+        return Text('Your first local find is waiting for you.'.tr(context));
       }
       return Column(
         children: snap.data!.docs
             .map(
               (d) => ListTile(
-                title: Text('Order ${d.id}'),
+                title: Text('Order {id}'.tr(context, {'id': d.id})),
                 subtitle: Text(d.data()['status'].toString()),
                 trailing: d.data()['status'] == 'fulfilled'
                     ? TextButton(
@@ -54,18 +56,18 @@ class AccountOrdersSection extends StatelessWidget {
                           await showDialog<void>(
                             context: pageContext,
                             builder: (dialogContext) => AlertDialog(
-                              title: const Text('Your one-time purchase code'),
+                              title: Text('Your one-time purchase code'.tr(context)),
                               content: Text(code),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(dialogContext),
-                                  child: const Text('Close'),
+                                  child: Text('Close'.tr(context)),
                                 ),
                               ],
                             ),
                           );
                         }),
-                        child: const Text('Get code'),
+                        child: Text('Get code'.tr(context)),
                       )
                     : Text(money(d.data()['total'] as num)),
               ),

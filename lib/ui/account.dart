@@ -98,18 +98,19 @@ class _AccountPageState extends State<AccountPage> {
                     fontSize: 26,
                     fontWeight: FontWeight.normal,
                   ),
-                  const Text(
-                    'Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.',
-                  ),
+                  Text('Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.'.tr(context)),
                 ] else if (widget.store.user != null &&
                     !widget.store.user!.emailVerified) ...[
-                  const Text(
-                    'Verify your email',
-                    style: TextStyle(fontSize: 24),
+                  Text(
+                    'Verify your email'.tr(context),
+                    style: const TextStyle(fontSize: 24),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Open the verification link sent to ${widget.store.user!.email ?? 'your email'}, then return here. Check your spam folder too.',
+                    'Open the verification link sent to {email}, then return here. Check your spam folder too.'.tr(
+                      context,
+                      {'email': widget.store.user!.email ?? 'your email'.tr(context)},
+                    ),
                   ),
                   FilledButton(
                     onPressed: busy
@@ -118,13 +119,10 @@ class _AccountPageState extends State<AccountPage> {
                             final verified = await widget.store
                                 .refreshEmailVerification();
                             if (context.mounted && !verified) {
-                              message(
-                                context,
-                                'Your email is not verified yet. Open the email link first.',
-                              );
+                              message(context, 'Your email is not verified yet. Open the email link first.'.tr(context));
                             }
                           }),
-                    child: const Text('I have verified my email'),
+                    child: Text('I have verified my email'.tr(context)),
                   ),
                   OutlinedButton(
                     onPressed: busy
@@ -132,24 +130,24 @@ class _AccountPageState extends State<AccountPage> {
                         : () => run(() async {
                             await widget.store.sendVerificationEmail();
                             if (context.mounted) {
-                              message(context, 'Verification email sent');
+                              message(context, 'Verification email sent'.tr(context));
                             }
                           }),
-                    child: const Text('Resend verification email'),
+                    child: Text('Resend verification email'.tr(context)),
                   ),
                   TextButton(
                     onPressed: busy ? null : () => run(widget.store.logout),
-                    child: const Text('Log out / Use another email'),
+                    child: Text('Log out / Use another email'.tr(context)),
                   ),
                 ] else if (widget.store.user != null) ...[
                   Text(
-                    widget.store.user!.email ?? 'Your profile',
+                    widget.store.user!.email ?? 'Your profile'.tr(context),
                     style: const TextStyle(fontSize: 24),
                   ),
                   const SizedBox(height: 20),
                   TextField(
                     controller: name,
-                    decoration: const InputDecoration(labelText: 'Your name'),
+                    decoration: InputDecoration(labelText: 'Your name'.tr(context)),
                   ),
                   FilledButton(
                     onPressed: busy
@@ -157,10 +155,10 @@ class _AccountPageState extends State<AccountPage> {
                         : () => run(() async {
                             await widget.store.updateProfile(name.text.trim());
                             if (context.mounted) {
-                              message(context, 'Profile saved');
+                              message(context, 'Profile saved'.tr(context));
                             }
                           }),
-                    child: const Text('Save profile'),
+                    child: Text('Save profile'.tr(context)),
                   ),
                   const SizedBox(height: 20),
                   AccountLanguageField(
@@ -186,22 +184,17 @@ class _AccountPageState extends State<AccountPage> {
                               typedEmail: '',
                             );
                             if (context.mounted) {
-                              message(
-                                context,
-                                'If an account exists, a password reset email has been sent.',
-                              );
+                              message(context, 'If an account exists, a password reset email has been sent.'.tr(context));
                             }
                           }),
-                    child: const Text('Reset password by email'),
+                    child: Text('Reset password by email'.tr(context)),
                   ),
                   TextButton(
                     onPressed: () => run(widget.store.logout),
-                    child: const Text('Log out'),
+                    child: Text('Log out'.tr(context)),
                   ),
                   const Divider(),
-                  const Text(
-                    'Get price-drop alerts for items you view and new offer notifications. Your signed-in item views are saved privately to personalize these alerts.',
-                  ),
+                  Text('Get price-drop alerts for items you view and new offer notifications. Your signed-in item views are saved privately to personalize these alerts.'.tr(context)),
                   OutlinedButton.icon(
                     onPressed: busy
                         ? null
@@ -212,14 +205,11 @@ class _AccountPageState extends State<AccountPage> {
                               longitude: widget.store.longitude,
                             );
                             if (context.mounted) {
-                              message(
-                                context,
-                                'Price-drop and offer alerts enabled',
-                              );
+                              message(context, 'Price-drop and offer alerts enabled'.tr(context));
                             }
                           }),
                     icon: const Icon(Icons.notifications_active_outlined),
-                    label: const Text('Enable alerts on this device'),
+                    label: Text('Enable alerts on this device'.tr(context)),
                   ),
                   TextButton(
                     onPressed: busy
@@ -227,10 +217,10 @@ class _AccountPageState extends State<AccountPage> {
                         : () => run(() async {
                             await widget.store.notifications.disable();
                             if (context.mounted) {
-                              message(context, 'Alerts disabled');
+                              message(context, 'Alerts disabled'.tr(context));
                             }
                           }),
-                    child: const Text('Disable alerts for my account'),
+                    child: Text('Disable alerts for my account'.tr(context)),
                   ),
                   pageHeadingText(
                     context,
@@ -252,7 +242,7 @@ class _AccountPageState extends State<AccountPage> {
                             run,
                           ),
                     icon: const Icon(Icons.report_problem_outlined),
-                    label: const Text('Open a complaint'),
+                    label: Text('Open a complaint'.tr(context)),
                   ),
                   AccountComplaintsSection(store: widget.store),
                   AccountOrdersSection(store: widget.store, run: run),

@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import 'shared.dart';
 
@@ -33,7 +35,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
       final address = email.text.trim();
       if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(address)) {
         throw StateError(
-          'Enter the email address that should receive the link.',
+          'Enter the email address that should receive the link.'.tr(context),
         );
       }
       if (completing) {
@@ -43,7 +45,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
           replace: true,
         );
         if (mounted) {
-          message(context, 'Signed in with your verified email');
+          message(context, 'Signed in with your verified email'.tr(context));
           if (Navigator.canPop(context)) Navigator.pop(context);
         }
       } else {
@@ -59,7 +61,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
                 'expired-action-code',
                 'invalid-credential',
               ].contains(e.code)
-              ? 'This link is invalid, expired, or already used. Request a new sign-in link.'
+              ? 'This link is invalid, expired, or already used. Request a new sign-in link.'.tr(context)
               : e.message ?? 'Sign-in could not finish. Please try again.',
         );
       }
@@ -79,7 +81,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Email link sign-in')),
+    appBar: AppBar(title: Text('Email link sign-in'.tr(context))),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 500),
@@ -88,15 +90,15 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
           children: [
             Text(
               completing
-                  ? 'Confirm your email to sign in'
-                  : 'Sign in without a password',
+                  ? 'Confirm your email to sign in'.tr(context)
+                  : 'Sign in without a password'.tr(context),
               style: const TextStyle(fontSize: 26),
             ),
             const SizedBox(height: 12),
             Text(
               completing
-                  ? 'Use the same email address that received this link. On another device, enter it again.'
-                  : 'We will email you a secure sign-in link. Opening it also verifies your email.',
+                  ? 'Use the same email address that received this link. On another device, enter it again.'.tr(context)
+                  : 'We will email you a secure sign-in link. Opening it also verifies your email.'.tr(context),
             ),
             const SizedBox(height: 24),
             TextField(
@@ -105,7 +107,7 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               autofillHints: const [AutofillHints.email],
-              decoration: const InputDecoration(labelText: 'Email address'),
+              decoration: InputDecoration(labelText: 'Email address'.tr(context)),
             ),
             if (completing) ...[
               const SizedBox(height: 14),
@@ -114,18 +116,18 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
                 enabled: !busy,
                 autocorrect: false,
                 enableSuggestions: false,
-                decoration: const InputDecoration(
-                  labelText: 'Sign-in link',
+                decoration: InputDecoration(
+                  labelText: 'Sign-in link'.tr(context),
                   helperText:
-                      'Paste the full link if you opened it on another device.',
+                      'Paste the full link if you opened it on another device.'.tr(context),
                 ),
               ),
             ],
             if (sent)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
-                  'Sign-in link sent. Check your inbox and spam folder.',
+                  'Sign-in link sent. Check your inbox and spam folder.'.tr(context),
                 ),
               ),
             if (error != null)
@@ -140,10 +142,10 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
               onPressed: busy ? null : submit,
               child: Text(
                 completing
-                    ? 'Complete sign-in'
+                    ? 'Complete sign-in'.tr(context)
                     : sent
-                    ? 'Send another sign-in link'
-                    : 'Send sign-in link',
+                    ? 'Send another sign-in link'.tr(context)
+                    : 'Send sign-in link'.tr(context),
               ),
             ),
             TextButton(
@@ -156,8 +158,8 @@ class _EmailLinkPageState extends State<EmailLinkPage> {
                     }),
               child: Text(
                 completing
-                    ? 'Request a new link'
-                    : 'I already have a sign-in link',
+                    ? 'Request a new link'.tr(context)
+                    : 'I already have a sign-in link'.tr(context),
               ),
             ),
             if (busy) const LinearProgressIndicator(),

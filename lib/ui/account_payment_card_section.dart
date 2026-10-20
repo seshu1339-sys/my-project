@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import 'shared.dart';
 
@@ -26,11 +28,14 @@ class AccountPaymentCardSection extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialog) => AlertDialog(
-        title: const Text('Manage saved cards'),
+        title: Text('Manage saved cards'.tr(context)),
         content: Text(
           store.paymentLast4.isEmpty
-              ? 'No saved cards.'
-              : '${store.paymentBrand} ending in ${store.paymentLast4}',
+              ? 'No saved cards.'.tr(context)
+              : '{brand} ending in {last4}'.tr(context, {
+                  'brand': store.paymentBrand,
+                  'last4': store.paymentLast4,
+                }),
         ),
         actions: [
           if (store.paymentLast4.isNotEmpty)
@@ -43,11 +48,11 @@ class AccountPaymentCardSection extends StatelessWidget {
                   if (dialog.mounted) message(dialog, e);
                 }
               },
-              child: const Text('Remove card'),
+              child: Text('Remove card'.tr(context)),
             ),
           TextButton(
             onPressed: () => Navigator.pop(dialog),
-            child: const Text('Close'),
+            child: Text('Close'.tr(context)),
           ),
         ],
       ),
@@ -58,14 +63,14 @@ class AccountPaymentCardSection extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text('Payment card', style: TextStyle(fontSize: 20)),
-      const Text('Only the card brand and last four digits are stored.'),
+      Text('Payment card'.tr(context), style: const TextStyle(fontSize: 20)),
+      Text('Only the card brand and last four digits are stored.'.tr(context)),
       Row(
         children: [
           Expanded(
             child: TextField(
               controller: cardBrand,
-              decoration: const InputDecoration(labelText: 'Brand'),
+              decoration: InputDecoration(labelText: 'Brand'.tr(context)),
             ),
           ),
           const SizedBox(width: 12),
@@ -75,7 +80,7 @@ class AccountPaymentCardSection extends StatelessWidget {
               controller: cardLast4,
               maxLength: 4,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Last 4'),
+              decoration: InputDecoration(labelText: 'Last 4'.tr(context)),
             ),
           ),
         ],
@@ -92,15 +97,15 @@ class AccountPaymentCardSection extends StatelessWidget {
                   cardLast4.text.trim(),
                 );
                 if (context.mounted) {
-                  message(context, 'Payment card saved');
+                  message(context, 'Payment card saved'.tr(context));
                 }
               }),
-        child: const Text('Save payment card'),
+        child: Text('Save payment card'.tr(context)),
       ),
       OutlinedButton.icon(
         onPressed: () => _manageSavedCards(context),
         icon: const Icon(Icons.credit_card_outlined),
-        label: const Text('Manage saved cards'),
+        label: Text('Manage saved cards'.tr(context)),
       ),
     ],
   );

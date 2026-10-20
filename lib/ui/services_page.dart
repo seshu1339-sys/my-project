@@ -134,13 +134,13 @@ class _ServicesPageState extends State<ServicesPage> {
           controller: search,
           autofocus: false,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            labelText: 'Search services',
-            prefixIcon: Icon(Icons.search),
+          decoration: InputDecoration(
+            labelText: 'Search services'.tr(context),
+            prefixIcon: const Icon(Icons.search),
           ),
         ),
         const SizedBox(height: 16),
-        if (filtered.isEmpty) const Text('No matching services available.'),
+        if (filtered.isEmpty) Text('No matching services available.'.tr(context)),
         for (final category in filtered)
           Card(
             child: ListTile(
@@ -188,7 +188,7 @@ class _ServicesPageState extends State<ServicesPage> {
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back),
-              tooltip: 'All services',
+              tooltip: 'All services'.tr(context),
               onPressed: () => setState(() => _selected = null),
             ),
             Expanded(
@@ -201,7 +201,7 @@ class _ServicesPageState extends State<ServicesPage> {
         ),
         const SizedBox(height: 8),
         if (listings.isEmpty)
-          const Text('No matching services available.'),
+          Text('No matching services available.'.tr(context)),
         for (final service in listings)
           Card(
             child: ListTile(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../services/strings.dart';
+
 import '../data/store.dart';
 import 'account.dart';
 import 'layout_settings.dart';
@@ -39,7 +41,7 @@ class _ReviewsState extends State<Reviews> {
       ),
       const SizedBox(height: 12),
       if (!widget.store.live)
-        const Text('Reviews are available when Firebase is connected.')
+        Text('Reviews are available when Firebase is connected.'.tr(context))
       else ...[
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
@@ -49,13 +51,13 @@ class _ReviewsState extends State<Reviews> {
               .snapshots(),
           builder: (context, snap) {
             if (snap.hasError) {
-              return const Text('Reviews could not load. Please retry later.');
+              return Text('Reviews could not load. Please retry later.'.tr(context));
             }
             if (!snap.hasData) {
               return const LinearProgressIndicator();
             }
             if (snap.data!.docs.isEmpty) {
-              return const Text('No reviews yet. Share your experience.');
+              return Text('No reviews yet. Share your experience.'.tr(context));
             }
             return Column(
               children: snap.data!.docs
@@ -63,7 +65,7 @@ class _ReviewsState extends State<Reviews> {
                     (d) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(
-                        '${'★' * (d.data()['rating'] as num).toInt()} • ${(d.data()['name'] as String?)?.isNotEmpty == true ? d.data()['name'] : 'Neighbour'}',
+                        '${'★' * (d.data()['rating'] as num).toInt()} • ${(d.data()['name'] as String?)?.isNotEmpty == true ? d.data()['name'] : 'Neighbour'.tr(context)}',
                       ),
                       subtitle: Text(d.data()['text'] as String),
                     ),
@@ -78,7 +80,7 @@ class _ReviewsState extends State<Reviews> {
             children: [
               for (var i = 1; i <= 5; i++)
                 IconButton(
-                  tooltip: '$i stars',
+                  tooltip: '{n} stars'.tr(context, {'n': '$i'}),
                   onPressed: () => setState(() => rating = i),
                   icon: Icon(
                     i <= rating ? Icons.star : Icons.star_border,
@@ -91,14 +93,14 @@ class _ReviewsState extends State<Reviews> {
             controller: review,
             maxLength: 1000,
             maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Your review'),
+            decoration: InputDecoration(labelText: 'Your review'.tr(context)),
           ),
           FilledButton(
             onPressed: busy
                 ? null
                 : () async {
                     if (review.text.trim().isEmpty) {
-                      message(context, 'Write a review first');
+                      message(context, 'Write a review first'.tr(context));
                       return;
                     }
                     setState(() => busy = true);
@@ -112,7 +114,7 @@ class _ReviewsState extends State<Reviews> {
                         'text': review.text.trim(),
                       });
                       if (context.mounted) {
-                        message(context, 'Verified review saved');
+                        message(context, 'Verified review saved'.tr(context));
                         review.clear();
                       }
                     } catch (e) {
@@ -125,7 +127,7 @@ class _ReviewsState extends State<Reviews> {
                       }
                     }
                   },
-            child: const Text('Publish review'),
+            child: Text('Publish review'.tr(context)),
           ),
         ] else
           TextButton(
@@ -135,7 +137,7 @@ class _ReviewsState extends State<Reviews> {
                 builder: (_) => AccountPage(store: widget.store),
               ),
             ),
-            child: const Text('Sign in to write a review'),
+            child: Text('Sign in to write a review'.tr(context)),
           ),
       ],
     ],

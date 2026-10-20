@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'product_page.dart';
 import 'shared.dart';
@@ -30,7 +31,10 @@ class CategoryPage extends StatelessWidget {
         .toList();
     return Scaffold(
       appBar: AppBar(
-        title: Text(category?.text('name', 'Category') ?? 'Category'),
+        title: Text(
+          category?.text('name', 'Category'.tr(context)) ??
+              'Category'.tr(context),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
@@ -67,14 +71,18 @@ class CategoryPage extends StatelessWidget {
               store.entries('settings'),
               'categoryPageHeading',
             ),
-            defaultText: '${products.length} products',
+            defaultText: '{count} products'.tr(context, {
+              'count': '${products.length}',
+            }),
             overridable: false,
             translate: false,
           ),
           if (products.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: Text('No products are available in this category yet.'),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                'No products are available in this category yet.'.tr(context),
+              ),
             ),
           for (final product in products)
             ListTile(

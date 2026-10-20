@@ -30,7 +30,7 @@ class ShopPage extends StatelessWidget {
               style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
             if (shop.text('shopCode').isNotEmpty)
-              Text('Shop ID: ${shop.text('shopCode')}'),
+              Text('Shop ID: {id}'.tr(context, {'id': shop.text('shopCode')})),
             const SizedBox(height: 12),
             Text(shop.text('description')),
             Text('${shop.text('address')} • ${shop.text('pincode')}'),
@@ -86,11 +86,11 @@ class ShopPage extends StatelessWidget {
                             mode: LaunchMode.externalApplication,
                           ) &&
                           context.mounted) {
-                        message(context, 'Could not open directions');
+                        message(context, 'Could not open directions'.tr(context));
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        message(context, 'Could not open directions');
+                        message(context, 'Could not open directions'.tr(context));
                       }
                     }
                   },

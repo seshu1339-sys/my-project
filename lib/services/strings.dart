@@ -1,5 +1,8 @@
 import 'package:flutter/widgets.dart';
 
+import 'strings_account.dart';
+import 'strings_details.dart';
+
 /// Translates a literal English UI label into the site's current language.
 /// Falls back to the English original when the current language has no
 /// translation yet (see AppLocale.supported for languages not covered below),
@@ -9,7 +12,9 @@ extension Translate on String {
     final code = Localizations.maybeLocaleOf(context)?.languageCode;
     var value = (code == null || code == 'en')
         ? this
-        : (_translations[this]?[code] ?? this);
+        : (_translations[this]?[code] ??
+              _extraTranslations[this]?[code] ??
+              this);
     if (args != null) {
       for (final entry in args.entries) {
         value = value.replaceAll('{${entry.key}}', entry.value);
@@ -18,6 +23,13 @@ extension Translate on String {
     return value;
   }
 }
+
+/// Account/sign-in/services and product/cart screens live in their own files
+/// (strings_account.dart, strings_details.dart) to keep this one readable.
+final _extraTranslations = <String, Map<String, String>>{
+  ...accountTranslations,
+  ...detailsTranslations,
+};
 
 /// English text -> {language code: translation}. Only the languages listed
 /// per entry are covered so far; any other enabled language (see

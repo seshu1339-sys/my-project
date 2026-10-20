@@ -68,7 +68,7 @@ class _ProductPageState extends State<ProductPage> {
                 'productPageShareIcon',
               ),
               icon: Icons.share_outlined,
-              tooltip: 'Share product',
+              tooltip: 'Share product'.tr(context),
               onPressed: () => _share(context, p),
             ),
             pageIconButton(
@@ -81,7 +81,7 @@ class _ProductPageState extends State<ProductPage> {
               icon: store.wishlist.contains(p.id)
                   ? Icons.favorite
                   : Icons.favorite_border,
-              tooltip: 'Wishlist',
+              tooltip: 'Wishlist'.tr(context),
               onPressed: () => _toggleWishlist(context, p),
             ),
           ],
@@ -108,7 +108,7 @@ class _ProductPageState extends State<ProductPage> {
                   ),
                 ),
                 if (images.length > 1)
-                  Center(child: Text('Swipe to view ${images.length} images')),
+                  Center(child: Text('Swipe to view {n} images'.tr(context, {'n': '${images.length}'}))),
                 const SizedBox(height: 24),
                 Text(
                   p.text('name'),
@@ -127,19 +127,20 @@ class _ProductPageState extends State<ProductPage> {
                 ],
                 const SizedBox(height: 12),
                 Text(
-                  '${money(p.price(store.pincode))} / ${p.text('unit', 'each')}',
+                  '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}',
                   style: const TextStyle(
                     fontSize: 24,
                     color: AppTokens.primary,
                   ),
                 ),
                 if (store.pincode.isEmpty)
-                  const Text(
-                    'Base price shown. Set a pincode on the home page for local pricing.',
-                  ),
+                  Text('Base price shown. Set a pincode on the home page for local pricing.'.tr(context)),
                 if (p.number('compareAtPrice') > p.price(store.pincode))
                   Text(
-                    'Regular ${money(p.number('compareAtPrice'))}  •  Offer ${money(p.price(store.pincode))}',
+                    'Regular {regular}  •  Offer {offer}'.tr(context, {
+                      'regular': money(p.number('compareAtPrice')),
+                      'offer': money(p.price(store.pincode)),
+                    }),
                     style: const TextStyle(color: Colors.black54),
                   ),
                 if (variants.isNotEmpty)
@@ -147,7 +148,7 @@ class _ProductPageState extends State<ProductPage> {
                     padding: const EdgeInsets.only(top: 16),
                     child: DropdownButtonFormField<String>(
                       initialValue: selectedVariant,
-                      decoration: const InputDecoration(labelText: 'Variant'),
+                      decoration: InputDecoration(labelText: 'Variant'.tr(context)),
                       items: variants
                           .map(
                             (variant) => DropdownMenuItem(
@@ -164,7 +165,12 @@ class _ProductPageState extends State<ProductPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
-                      '${p.text('size').isEmpty ? '' : 'Size: ${p.text('size')}  '}${p.text('color').isEmpty ? '' : 'Color: ${p.text('color')}'}',
+                      [
+                        if (p.text('size').isNotEmpty)
+                          'Size: {size}'.tr(context, {'size': p.text('size')}),
+                        if (p.text('color').isNotEmpty)
+                          'Color: {color}'.tr(context, {'color': p.text('color')}),
+                      ].join('  '),
                     ),
                   ),
                 const SizedBox(height: 20),
@@ -213,13 +219,13 @@ class _ProductPageState extends State<ProductPage> {
                               onPressed: _canAdd(p)
                                   ? () {
                                       store.add(p);
-                                      message(context, 'Added to bag');
+                                      message(context, 'Added to bag'.tr(context));
                                     }
                                   : null,
                               icon: const Icon(Icons.shopping_bag_outlined),
                               label: Text(
                                 p.number('stock') <= 0
-                                    ? 'Currently unavailable'
+                                    ? 'Currently unavailable'.tr(context)
                                     : addLayout.entry
                                           .text('text', 'Add to bag')
                                           .tr(context),
@@ -279,7 +285,7 @@ class _ProductPageState extends State<ProductPage> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.storefront),
                     title: Text(shop.text('name')),
-                    subtitle: const Text('View shop & directions'),
+                    subtitle: Text('View shop & directions'.tr(context)),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.push(
                       context,
@@ -342,7 +348,7 @@ class _ProductPageState extends State<ProductPage> {
     try {
       await store.toggleWishlist(product.id);
       if (context.mounted) {
-        message(context, 'Wishlist updated');
+        message(context, 'Wishlist updated'.tr(context));
       }
     } catch (e) {
       if (context.mounted) {
@@ -353,10 +359,12 @@ class _ProductPageState extends State<ProductPage> {
 
   Future<void> _share(BuildContext context, Entry product) async {
     await Clipboard.setData(
-      ClipboardData(text: 'Check out ${product.text('name')}'),
+      ClipboardData(
+        text: 'Check out {name}'.tr(context, {'name': product.text('name')}),
+      ),
     );
     if (context.mounted) {
-      message(context, 'Product details copied');
+      message(context, 'Product details copied'.tr(context));
     }
   }
 }

@@ -39,7 +39,7 @@ class _CartPageState extends State<CartPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: widget.store,
     builder: (context, _) => Scaffold(
-      appBar: AppBar(title: const Text('Your shopping bag')),
+      appBar: AppBar(title: Text('Your shopping bag'.tr(context))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -112,7 +112,7 @@ class _CartPageState extends State<CartPage> {
                       final p = widget.store.product(line.key);
                       if (p == null) {
                         return ListTile(
-                          title: const Text('Item no longer available'),
+                          title: Text('Item no longer available'.tr(context)),
                           trailing: IconButton(
                             onPressed: () {
                               widget.store.cart.remove(line.key);
@@ -146,7 +146,7 @@ class _CartPageState extends State<CartPage> {
                                     ),
                                   ),
                                   IconButton(
-                                    tooltip: 'Remove one',
+                                    tooltip: 'Remove one'.tr(context),
                                     onPressed: busy
                                         ? null
                                         : () => widget.store.add(p, -1),
@@ -156,7 +156,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                   Text('${line.value}'),
                                   IconButton(
-                                    tooltip: 'Add one',
+                                    tooltip: 'Add one'.tr(context),
                                     onPressed: busy
                                         ? null
                                         : () => widget.store.add(p),
@@ -179,7 +179,7 @@ class _CartPageState extends State<CartPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Subtotal ${money(widget.store.total)}',
+                          'Subtotal {amount}'.tr(context, {'amount': money(widget.store.total)}),
                           style: TextStyle(
                             fontSize: deliveryConfigured ? 18 : 26,
                             fontWeight: deliveryConfigured
@@ -190,11 +190,13 @@ class _CartPageState extends State<CartPage> {
                         if (deliveryConfigured) ...[
                           Text(
                             widget.store.deliveryFee > 0
-                                ? 'Delivery fee ${money(widget.store.deliveryFee)}'
-                                : 'Delivery fee Free',
+                                ? 'Delivery fee {amount}'.tr(context, {
+                                    'amount': money(widget.store.deliveryFee),
+                                  })
+                                : 'Delivery fee Free'.tr(context),
                           ),
                           Text(
-                            'Total ${money(widget.store.grandTotal)}',
+                            'Total {amount}'.tr(context, {'amount': money(widget.store.grandTotal)}),
                             style: const TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
@@ -205,29 +207,25 @@ class _CartPageState extends State<CartPage> {
                     );
                   },
                 ),
-                const Text(
-                  'Prices and availability are checked again when you submit. Payment follows the shop payment policy.',
-                ),
+                Text('Prices and availability are checked again when you submit. Payment follows the shop payment policy.'.tr(context)),
                 Builder(
                   builder: (context) {
                     final business = widget.store.business;
                     final methods = <String, String>{
                       if (business.text('directVendorPaymentEnabled', 'true') !=
                           'false')
-                        'direct_vendor': 'Pay vendor directly',
+                        'direct_vendor': 'Pay vendor directly'.tr(context),
                       if (business.text('cashOnDeliveryEnabled') == 'true')
-                        'cash_on_delivery': 'Cash on delivery',
+                        'cash_on_delivery': 'Cash on delivery'.tr(context),
                       if (business.text('platformCollectionEnabled') == 'true')
-                        'platform_collected': 'Platform payment (future)',
+                        'platform_collected': 'Platform payment (future)'.tr(context),
                     };
                     if (!methods.containsKey(paymentMethod))
                       paymentMethod =
                           methods.keys.firstOrNull ?? 'direct_vendor';
                     return DropdownButtonFormField<String>(
                       initialValue: paymentMethod,
-                      decoration: const InputDecoration(
-                        labelText: 'Payment option',
-                      ),
+                      decoration: InputDecoration(labelText: 'Payment option'.tr(context)),
                       items: methods.entries
                           .map(
                             (entry) => DropdownMenuItem(
@@ -246,15 +244,11 @@ class _CartPageState extends State<CartPage> {
                 ),
                 const SizedBox(height: 20),
                 if (widget.store.pincode.isEmpty)
-                  const Text(
-                    'Add a delivery pincode on the home page before ordering.',
-                  ),
+                  Text('Add a delivery pincode on the home page before ordering.'.tr(context)),
                 TextField(
                   controller: address,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Delivery / service address',
-                  ),
+                  decoration: InputDecoration(labelText: 'Delivery / service address'.tr(context)),
                 ),
                 const SizedBox(height: 16),
                 Builder(builder: (context) => _buildSubmitButton(context)),
@@ -291,10 +285,7 @@ class _CartPageState extends State<CartPage> {
           : () async {
               if (widget.store.pincode.isEmpty ||
                   address.text.trim().length < 10) {
-                message(
-                  context,
-                  'Set your pincode and enter a complete address (at least 10 characters).',
-                );
+                message(context, 'Set your pincode and enter a complete address (at least 10 characters).'.tr(context));
                 return;
               }
               if (widget.store.live && widget.store.user == null) {
@@ -316,7 +307,7 @@ class _CartPageState extends State<CartPage> {
                 if (context.mounted) {
                   message(
                     context,
-                    'Order $id submitted. The shop will confirm fulfilment.',
+                    'Order {id} submitted. The shop will confirm fulfilment.'.tr(context, {'id': id}),
                   );
                 }
               } catch (e) {
@@ -331,10 +322,10 @@ class _CartPageState extends State<CartPage> {
             },
       child: Text(
         busy
-            ? 'Submitting…'
+            ? 'Submitting…'.tr(context)
             : widget.store.live
             ? layout.entry.text('text', 'Submit order request').tr(context)
-            : 'Preview checkout',
+            : 'Preview checkout'.tr(context),
         style: overrideTextStyle(layout.entry),
       ),
     );

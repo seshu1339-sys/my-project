@@ -51,19 +51,17 @@ class ShopsPage extends StatelessWidget {
               ),
             ),
             icon: const Icon(Icons.travel_explore_outlined),
-            label: const Text('Search products near me'),
+            label: Text('Search products near me'.tr(context)),
           ),
           const SizedBox(height: 12),
           Text(
             store.latitude == null
-                ? 'Showing shops in your pincode. Use GPS on the home page to search by service radius.'
-                : 'Showing shops within each shop’s service radius.',
+                ? 'Showing shops in your pincode. Use GPS on the home page to search by service radius.'.tr(context)
+                : 'Showing shops within each shop’s service radius.'.tr(context),
           ),
           const SizedBox(height: 20),
           if (shops.isEmpty)
-            const Text(
-              'No nearby shops found. Set or change your location on the home page.',
-            ),
+            Text('No nearby shops found. Set or change your location on the home page.'.tr(context)),
           if (shops.isNotEmpty)
             ShopMap(
               shops: shops,
@@ -82,7 +80,7 @@ class ShopsPage extends StatelessWidget {
                 leading: const Icon(Icons.storefront),
                 title: Text(shop.text('name')),
                 subtitle: Text(
-                  '${shop.text('address')}\n${store.latitude != null ? '${distanceKm(store.latitude!, store.longitude!, shop.number('latitude'), shop.number('longitude')).toStringAsFixed(1)} km away' : shop.text('pincode')}',
+                  '${shop.text('address')}\n${store.latitude != null ? '{km} km away'.tr(context, {'km': distanceKm(store.latitude!, store.longitude!, shop.number('latitude'), shop.number('longitude')).toStringAsFixed(1)}) : shop.text('pincode')}',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
