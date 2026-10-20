@@ -58,3 +58,10 @@ ios/Runner/GoogleService-Info.plist
 
 # Emulator-only switches (never deployed)
 functions/.env.local
+
+# Service-type browse list: only the .webp files + JSON are bundled into
+# the app (see pubspec.yaml); the same-named .png files are kept on disk
+# as full-quality backups only, and the samples/ folder is unused extras
+# -- neither is needed in version control.
+assets/services/*.png
+assets/services/samples/

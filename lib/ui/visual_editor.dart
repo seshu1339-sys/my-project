@@ -179,6 +179,13 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
       if (element.label.toLowerCase().contains(lower)) return element.key;
     }
     for (final group in elementGroups) {
+      if (group.isStatic) {
+        for (final key in group.staticKeys!) {
+          if ((layoutComponents[key] ?? key).toLowerCase().contains(lower))
+            return key;
+        }
+        continue;
+      }
       final members = group.members(widget.store);
       for (final member in members) {
         if (member.text('name').toLowerCase().contains(lower))
@@ -333,27 +340,40 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     _PreviewWidth.mobile => 390,
   };
 
-  Widget _wrapSection(String key, Widget child) => SectionTapRegion(
-    sectionKey: key,
-    label: layoutComponents[key] ?? key,
-    selection: selection,
-    onSelect: _select,
-    number: pageElementByKey(key)?.number,
-    showNumber: _showNumbers,
-    reorderable: reorderableHomeSections.any((d) => d.key == key),
-    onReorderDrop: (draggedKey) => _dropReorder(draggedKey, ontoKey: key),
-    liveResize: _resize.live,
-    onHeightDragStart: () => _startResize(key),
-    onHeightDragUpdate: (dy) => _resize.updateHeight(key, dy),
-    onHeightDragEnd: () => _endResize(key),
-    onWidthDragStart: () => _startResize(key),
-    onWidthDragUpdate: (dx) => _resize.updateWidth(key, dx),
-    onWidthDragEnd: () => _endResize(key),
-    onCornerDragStart: () => _startResize(key),
-    onCornerDragUpdate: (d) => _resize.updateCorner(key, d),
-    onCornerDragEnd: () => _endResize(key),
-    child: child,
-  );
+  // A plain layoutComponents key can ALSO be a static group's own fixed
+  // member (e.g. 'footerBadge3', one of the 6 fixed footer badges) --
+  // unlike a dynamic group's synthetic 'prefix-id' keys, these keep using
+  // this exact same section path (their own settings/section_<key> doc,
+  // full LayoutFieldsForm) and only need a decimal "28.3" display number
+  // instead of the flat whole number they used to have before the footer
+  // badges were consolidated under one main number.
+  Widget _wrapSection(String key, Widget child) {
+    final subPosition = subNumberForKey(widget.store, key);
+    return SectionTapRegion(
+      sectionKey: key,
+      label: layoutComponents[key] ?? key,
+      selection: selection,
+      onSelect: _select,
+      number: subPosition == null ? pageElementByKey(key)?.number : null,
+      numberLabel: subPosition == null
+          ? null
+          : '${subPosition.$1}.${subPosition.$2}',
+      showNumber: _showNumbers,
+      reorderable: reorderableHomeSections.any((d) => d.key == key),
+      onReorderDrop: (draggedKey) => _dropReorder(draggedKey, ontoKey: key),
+      liveResize: _resize.live,
+      onHeightDragStart: () => _startResize(key),
+      onHeightDragUpdate: (dy) => _resize.updateHeight(key, dy),
+      onHeightDragEnd: () => _endResize(key),
+      onWidthDragStart: () => _startResize(key),
+      onWidthDragUpdate: (dx) => _resize.updateWidth(key, dx),
+      onWidthDragEnd: () => _endResize(key),
+      onCornerDragStart: () => _startResize(key),
+      onCornerDragUpdate: (d) => _resize.updateCorner(key, d),
+      onCornerDragEnd: () => _endResize(key),
+      child: child,
+    );
+  }
 
   void _startResize(String key) {
     final saved = _currentEntryFor(key);
@@ -551,6 +571,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                           'Category',
                           child,
                         ),
+                        wrapProductItem: (product, child) => _wrapGroupItem(
+                          'crossSellProduct-${product.id}',
+                          'Product',
+                          child,
+                        ),
                       ),
                     ),
                   ),
@@ -700,6 +725,14 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
       final entry = _currentEntryFor(key);
       final name = entry.text('name', 'Item');
       return position == null ? name : '${position.$1}.${position.$2} – $name';
+    }
+    // A static group's own fixed member (e.g. 'footerBadge3') -- same
+    // decimal-number display as a dynamic group item above, but it keeps
+    // its plain layoutComponents label since it already has real content
+    // (text/icon) of its own, unlike a group item's generic "name".
+    final subPosition = subNumberForKey(widget.store, key);
+    if (subPosition != null) {
+      return '${subPosition.$1}.${subPosition.$2} – ${layoutComponents[key] ?? key}';
     }
     return numberedLabel(
       key,

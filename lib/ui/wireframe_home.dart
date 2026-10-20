@@ -51,6 +51,7 @@ class WireframeHome extends StatelessWidget {
     this.wrapSection = _identitySection,
     this.wrapPromoItem = _identityPromoItem,
     this.wrapCategoryItem = _identityCategoryItem,
+    this.wrapProductItem = _identityProductItem,
   });
   final Store store;
   final TextEditingController search;
@@ -76,6 +77,10 @@ class WireframeHome extends StatelessWidget {
   // Same hook, for one individual category tile.
   final Widget Function(Entry category, Widget child) wrapCategoryItem;
   static Widget _identityCategoryItem(Entry category, Widget child) => child;
+  // Same hook, for one individual product card inside the Fresh Fruits &
+  // Vegetables cross-sell strip.
+  final Widget Function(Entry product, Widget child) wrapProductItem;
+  static Widget _identityProductItem(Entry product, Widget child) => child;
 
   @override
   Widget build(BuildContext context) {
@@ -416,19 +421,29 @@ class WireframeHome extends StatelessWidget {
                           ),
                           if (carousel != null && i == promoInsertAt) carousel,
                           if (i == categoriesIndex)
-                            HomeCategoryProductStrip(
-                              title: 'Fresh Fruits & Vegetables'.tr(context),
-                              icon: Icons.eco_outlined,
-                              products: products
-                                  .where(
-                                    (p) =>
-                                        p.text('categoryId') ==
-                                            'cat-vegetables' ||
-                                        p.text('categoryId') == 'cat-fruits',
-                                  )
-                                  .toList(),
-                              store: store,
-                              onProduct: onProduct,
+                            wrapSection(
+                              'crossSellStrip',
+                              HomeCategoryProductStrip(
+                                layout: layoutFor(
+                                  context,
+                                  settings,
+                                  'crossSellStrip',
+                                ),
+                                defaultTitle: 'Fresh Fruits & Vegetables'
+                                    .tr(context),
+                                icon: Icons.eco_outlined,
+                                products: products
+                                    .where(
+                                      (p) =>
+                                          p.text('categoryId') ==
+                                              'cat-vegetables' ||
+                                          p.text('categoryId') == 'cat-fruits',
+                                    )
+                                    .toList(),
+                                store: store,
+                                onProduct: onProduct,
+                                wrapProductItem: wrapProductItem,
+                              ),
                             ),
                         ],
                         wrapSection(
@@ -468,7 +483,10 @@ class WireframeHome extends StatelessWidget {
                         : main;
                   },
                 ),
-                HomeFooterBadges(settings: settings, wrapSection: wrapSection),
+                wrapSection(
+                  'footerBadges',
+                  HomeFooterBadges(settings: settings, wrapSection: wrapSection),
+                ),
                 const SizedBox(height: 16),
               ],
             ),

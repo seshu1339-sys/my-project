@@ -5,20 +5,27 @@
 ///
 /// These are whole-number, standalone or group-main elements only. A
 /// repeating group's own members (one ad, one category, one carousel
-/// slide, one promotional box) are NOT listed here -- they're never
-/// stored, always computed fresh from their own collection's current
-/// `order` (element_groups.dart's `elementGroups`/`resolveSubKey`), so a
-/// newly added item automatically gets the next sub-number ("15.3") and
-/// nothing already numbered ever shifts. A group's own main number here
-/// (15, 16, 23, 24) controls ONLY the shared template -- above all, SIZE,
-/// so every item in that group is always exactly the same size; each
-/// item's own number (opened via GroupItemDesignForm) controls color,
-/// image, brightness and text style for that one item, never size.
+/// slide, one promotional box, one footer badge, one cross-sell product)
+/// are NOT listed here -- they're never stored, always computed fresh
+/// (element_groups.dart's `elementGroups`/`resolveSubKey`: from the
+/// group's own collection `order` for a dynamic group, or from a fixed
+/// position for a static one like footer badges), so a newly added item
+/// automatically gets the next sub-number ("15.3") and nothing already
+/// numbered ever shifts. A group's own main number here (15, 16, 23, 24,
+/// 25, 28) controls ONLY the shared template -- above all, SIZE, so every
+/// item in that group is always exactly the same size; each item's own
+/// number (opened via GroupItemDesignForm, or its own LayoutFieldsForm for
+/// a static group) controls color, image, brightness and text style for
+/// that one item, never size.
 ///
-/// Numbers are permanent once assigned here: a later round that numbers
-/// more of the page only ever appends new entries after the highest
-/// existing number, never renumbers one already given out, so a number an
-/// admin has already learned keeps meaning the same element.
+/// Numbers are permanent once assigned here, with one disclosed exception:
+/// numbers 23 onward were corrected/renumbered once, to fix a mismatch
+/// this file never actually had (23='ads'/24='boxes' was always right
+/// here) but element_groups.dart did (it used 24/25), and to make room for
+/// 'crossSellStrip' (25, newly added) and the 'footerBadges' group (28,
+/// replacing the 6 formerly-independent footerBadge1..6 numbers 27-32).
+/// From this point on, a later round only ever appends after the highest
+/// existing number.
 class PageElement {
   const PageElement(this.number, this.key, this.label);
   final int number;
@@ -68,63 +75,63 @@ const pageElements = <PageElement>[
     'boxes',
     'Promotional box template (group — see 24.1, 24.2, ...)',
   ),
-  PageElement(25, 'nearby', 'Nearby shops section'),
-  PageElement(26, 'nearbyShopCard', 'Nearby shop card'),
-  PageElement(27, 'footerBadge1', 'Footer badge 1 — Fresh & Premium Quality'),
-  PageElement(28, 'footerBadge2', 'Footer badge 2 — Fast & Safe Delivery'),
-  PageElement(29, 'footerBadge3', 'Footer badge 3 — Best Prices Always'),
-  PageElement(30, 'footerBadge4', 'Footer badge 4 — Easy Returns & Support'),
   PageElement(
-    31,
-    'footerBadge5',
-    'Footer badge 5 — Local Shops & Trusted Sellers',
+    25,
+    'crossSellStrip',
+    'Fresh Fruits & Vegetables strip (group — see 25.1, 25.2, ...)',
   ),
-  PageElement(32, 'footerBadge6', 'Footer badge 6 — Pay on Delivery'),
+  PageElement(26, 'nearby', 'Nearby shops section'),
+  PageElement(27, 'nearbyShopCard', 'Nearby shop card'),
+  PageElement(
+    28,
+    'footerBadges',
+    'Footer badges (group — see 28.1 .. 28.6)',
+  ),
   // --- Other screens (round 3) -- no live preview exists for these (the
   // admin Visual Editor only ever renders the home page), so these are
   // reachable only via "Go to number" and the Layout Settings dropdown,
   // not by clicking in a live preview, and the "Show numbers" overlay has
   // nothing to draw a badge on for them. ---
-  PageElement(33, 'productPageAddButton', 'Product page: "Add to bag" button'),
-  PageElement(34, 'productPageBuyButton', 'Product page: "Buy now" button'),
-  PageElement(35, 'productPageShareIcon', 'Product page: share icon'),
-  PageElement(36, 'productPageWishlistIcon', 'Product page: wishlist icon'),
+  PageElement(29, 'productPageAddButton', 'Product page: "Add to bag" button'),
+  PageElement(30, 'productPageBuyButton', 'Product page: "Buy now" button'),
+  PageElement(31, 'productPageShareIcon', 'Product page: share icon'),
+  PageElement(32, 'productPageWishlistIcon', 'Product page: wishlist icon'),
   PageElement(
-    37,
+    33,
     'productPageRelatedHeading',
     'Product page: "Related products" heading',
   ),
   PageElement(
-    38,
+    34,
     'productPageReviewsHeading',
     'Product page: "Community reviews" heading',
   ),
-  PageElement(39, 'categoryPageHeading', 'Category page: section headings'),
-  PageElement(40, 'cartEmptyMessage', 'Cart: empty-bag message'),
-  PageElement(41, 'cartEmptyIcon', 'Cart: empty-bag icon'),
-  PageElement(42, 'cartSubmitButton', 'Cart: submit order button'),
-  PageElement(43, 'servicesPageAppBarTitle', 'Services page: title'),
-  PageElement(44, 'shopsPageAppBarTitle', 'Shops page: title'),
-  PageElement(45, 'shopsPageHeading', 'Shops page: heading'),
+  PageElement(35, 'categoryPageHeading', 'Category page: section headings'),
+  PageElement(36, 'cartEmptyMessage', 'Cart: empty-bag message'),
+  PageElement(37, 'cartEmptyIcon', 'Cart: empty-bag icon'),
+  PageElement(38, 'cartSubmitButton', 'Cart: submit order button'),
+  PageElement(39, 'servicesPageAppBarTitle', 'Services page: title'),
+  PageElement(40, 'shopsPageAppBarTitle', 'Shops page: title'),
+  PageElement(41, 'shopsPageHeading', 'Shops page: heading'),
   PageElement(
-    46,
+    42,
     'shopPageDirectionsButton',
     'Shop page: "Get directions" button',
   ),
   PageElement(
-    47,
+    43,
     'shopPageRelatedHeading',
     'Shop page: "From this shop" heading',
   ),
-  PageElement(48, 'accountPageAppBarTitle', 'Account page: title'),
-  PageElement(49, 'accountDemoHeading', 'Account page: demo-mode heading'),
+  PageElement(44, 'accountPageAppBarTitle', 'Account page: title'),
+  PageElement(45, 'accountDemoHeading', 'Account page: demo-mode heading'),
   PageElement(
-    50,
+    46,
     'accountOrdersHeading',
     'Account page: "Your orders" heading',
   ),
-  PageElement(51, 'authFormHeading', 'Sign-in form: heading'),
-  PageElement(52, 'wishlistDialogTitle', 'Wishlist dialog: title'),
+  PageElement(47, 'authFormHeading', 'Sign-in form: heading'),
+  PageElement(48, 'wishlistDialogTitle', 'Wishlist dialog: title'),
 ];
 
 PageElement? pageElementByNumber(int number) =>

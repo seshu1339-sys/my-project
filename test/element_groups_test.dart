@@ -70,7 +70,7 @@ void main() {
       },
     );
 
-    test('ads (24) and boxes (25) are disambiguated by placement despite sharing the promo- prefix', () async {
+    test('ads (23) and boxes (24) are disambiguated by placement despite sharing the promo- prefix', () async {
       final store = await openStore();
       await store.save(
         'promotions',
@@ -85,10 +85,10 @@ void main() {
         const Entry('slide1', {'placement': 'carousel', 'order': 0}),
       );
 
-      expect(resolveSubKey(store, 24, 1), 'promo-ad1');
-      expect(resolveSubKey(store, 25, 1), 'promo-box1');
+      expect(resolveSubKey(store, 23, 1), 'promo-ad1');
+      expect(resolveSubKey(store, 24, 1), 'promo-box1');
       expect(resolveSubKey(store, 15, 1), 'promo-slide1');
-      expect(resolveSubKey(store, 24, 2), isNull);
+      expect(resolveSubKey(store, 23, 2), isNull);
     });
 
     test('subNumberForKey is the exact inverse of resolveSubKey', () async {
@@ -102,7 +102,39 @@ void main() {
         const Entry('adY', {'placement': 'ad', 'order': 10}),
       );
 
-      expect(subNumberForKey(store, 'promo-adY'), (24, 2));
+      expect(subNumberForKey(store, 'promo-adY'), (23, 2));
+    });
+
+    test('crossSellStrip (25) resolves vegetables/fruits products only, in order', () async {
+      final store = await openStore();
+      store.catalog['products'] = [];
+      await store.save(
+        'products',
+        const Entry('p1', {'categoryId': 'cat-vegetables', 'order': 0}),
+      );
+      await store.save(
+        'products',
+        const Entry('p2', {'categoryId': 'cat-dairy', 'order': 5}),
+      );
+      await store.save(
+        'products',
+        const Entry('p3', {'categoryId': 'cat-fruits', 'order': 10}),
+      );
+
+      expect(resolveSubKey(store, 25, 1), 'crossSellProduct-p1');
+      expect(
+        resolveSubKey(store, 25, 2),
+        'crossSellProduct-p3',
+        reason: 'cat-dairy (p2) is not a vegetable/fruit, so it is skipped',
+      );
+      expect(resolveSubKey(store, 25, 3), isNull);
+    });
+
+    test('footerBadges (28) is a fixed static group of exactly 6', () {
+      expect(resolveSubKey(Store(), 28, 1), 'footerBadge1');
+      expect(resolveSubKey(Store(), 28, 6), 'footerBadge6');
+      expect(resolveSubKey(Store(), 28, 7), isNull);
+      expect(subNumberForKey(Store(), 'footerBadge4'), (28, 4));
     });
   });
 

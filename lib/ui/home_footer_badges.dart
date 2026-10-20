@@ -24,54 +24,62 @@ class HomeFooterBadges extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 16),
-    child: Wrap(
-      alignment: WrapAlignment.spaceEvenly,
-      runSpacing: 16,
-      spacing: 16,
-      children: [
-        for (final (icon, label, key) in _badges)
-          Builder(
-            builder: (context) {
-              final layout = layoutFor(context, settings, key);
-              if (!layout.visible) return const SizedBox.shrink();
-              final entry = layout.entry;
-              final iconSize = entry.number('iconSize') > 0 ? clampedNumber(entry, 'iconSize', 24, 16, 48) : 24.0;
-              return wrapSection(
-                key,
-                SizedBox(
-                  width: 160,
-                  child: Column(
-                    children: [
-                      entry.text('iconUrl').isEmpty
-                          ? Icon(
-                              icon,
-                              size: iconSize,
-                              color: entry.text('textColor').isEmpty
-                                  ? Theme.of(context).colorScheme.primary
-                                  : colorFromHex(entry.text('textColor'), Theme.of(context).colorScheme.primary),
-                            )
-                          : Image.network(
-                              entry.text('iconUrl'),
-                              width: iconSize,
-                              height: iconSize,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, error, stack) => Icon(icon, size: iconSize, color: Theme.of(context).colorScheme.primary),
-                            ),
-                      const SizedBox(height: 6),
-                      Text(
-                        entry.text('text', label).tr(context),
-                        textAlign: TextAlign.center,
-                        style: sectionTextStyle(entry, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+  Widget build(BuildContext context) {
+    final mainLayout = layoutFor(context, settings, 'footerBadges');
+    if (!mainLayout.visible) return const SizedBox.shrink();
+    // Shared by every badge -- the group's own main is the ONLY place icon
+    // size is set, so all 6 are always exactly the same size (an
+    // individual badge's own, now-excluded 'iconSize' field, if it still
+    // has one left over from before this group existed, is never read).
+    final iconSize = clampedNumber(mainLayout.entry, 'iconSize', 24, 16, 48);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Wrap(
+        alignment: WrapAlignment.spaceEvenly,
+        runSpacing: 16,
+        spacing: 16,
+        children: [
+          for (final (icon, label, key) in _badges)
+            Builder(
+              builder: (context) {
+                final layout = layoutFor(context, settings, key);
+                if (!layout.visible) return const SizedBox.shrink();
+                final entry = layout.entry;
+                return wrapSection(
+                  key,
+                  SizedBox(
+                    width: 160,
+                    child: Column(
+                      children: [
+                        entry.text('iconUrl').isEmpty
+                            ? Icon(
+                                icon,
+                                size: iconSize,
+                                color: entry.text('textColor').isEmpty
+                                    ? Theme.of(context).colorScheme.primary
+                                    : colorFromHex(entry.text('textColor'), Theme.of(context).colorScheme.primary),
+                              )
+                            : Image.network(
+                                entry.text('iconUrl'),
+                                width: iconSize,
+                                height: iconSize,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, error, stack) => Icon(icon, size: iconSize, color: Theme.of(context).colorScheme.primary),
+                              ),
+                        const SizedBox(height: 6),
+                        Text(
+                          entry.text('text', label).tr(context),
+                          textAlign: TextAlign.center,
+                          style: sectionTextStyle(entry, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-      ],
-    ),
-  );
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
 }

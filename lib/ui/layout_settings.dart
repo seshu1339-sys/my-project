@@ -32,8 +32,10 @@ const layoutComponents = <String, String>{
   'adsLabel': '"ADS" label',
   'ads': 'Advertisement defaults',
   'boxes': 'Promotional box defaults',
+  'crossSellStrip': 'Fresh Fruits & Vegetables strip',
   'nearby': 'Nearby shops / map',
   'nearbyShopCard': 'Nearby shop card',
+  'footerBadges': 'Footer badges (shared size)',
   'footerBadge1': 'Footer badge 1',
   'footerBadge2': 'Footer badge 2',
   'footerBadge3': 'Footer badge 3',
@@ -187,6 +189,37 @@ const _smallBadgeExclusions = {
   'mobileWidth',
   'tabletWidth',
   'desktopWidth',
+};
+
+// Footer badge SUBS (one of the 6 fixed badges) -- same shape as the other
+// small badges above, but `iconSize` also moves out: it's now set once on
+// the group's own shared main ('footerBadges' below), so every badge is
+// always the same size, per the admin's own "sub-numbers have no size
+// option" rule.
+const _footerBadgeSubExclusions = {..._smallBadgeExclusions, 'iconSize'};
+
+// The footer badges GROUP MAIN ('footerBadges') controls ONLY the one
+// thing that must stay identical across all 6 badges -- icon size -- so
+// every other dimension field is excluded here.
+const _footerBadgesMainExclusions = {
+  'width',
+  'height',
+  'minWidth',
+  'maxWidth',
+  'minHeight',
+  'maxHeight',
+  'mobileWidth',
+  'tabletWidth',
+  'desktopWidth',
+  'mobileScale',
+  'tabletScale',
+  'desktopScale',
+  'padding',
+  'margin',
+  'gap',
+  'radius',
+  'borderWidth',
+  'fontSize',
 };
 
 List<String> componentFields(String component) => [
@@ -361,12 +394,13 @@ List<String> componentFields(String component) => [
                 'tabletWidth',
                 'desktopWidth',
               },
-              'footerBadge1': _smallBadgeExclusions,
-              'footerBadge2': _smallBadgeExclusions,
-              'footerBadge3': _smallBadgeExclusions,
-              'footerBadge4': _smallBadgeExclusions,
-              'footerBadge5': _smallBadgeExclusions,
-              'footerBadge6': _smallBadgeExclusions,
+              'footerBadges': _footerBadgesMainExclusions,
+              'footerBadge1': _footerBadgeSubExclusions,
+              'footerBadge2': _footerBadgeSubExclusions,
+              'footerBadge3': _footerBadgeSubExclusions,
+              'footerBadge4': _footerBadgeSubExclusions,
+              'footerBadge5': _footerBadgeSubExclusions,
+              'footerBadge6': _footerBadgeSubExclusions,
               for (final key in _otherScreenTextKeys)
                 key: _smallBadgeExclusions,
               for (final key in _otherScreenIconKeys) key: _iconExclusions,
@@ -379,6 +413,7 @@ List<String> componentFields(String component) => [
     'products',
     'popular',
     'localServices',
+    'crossSellStrip',
   ].contains(component))
     'imageHeight',
   if ([
@@ -395,7 +430,9 @@ List<String> componentFields(String component) => [
   // the grid/card images there read 'products' (see wireframe_home.dart),
   // so a brightness field under 'popular' itself would be shown but dead,
   // exactly the mistake this round is fixing elsewhere.
-  if (['categories', 'products', 'localServices'].contains(component))
+  if (['categories', 'products', 'localServices', 'crossSellStrip'].contains(
+    component,
+  ))
     'brightness',
   if (['products', 'popular', 'localServices'].contains(component)) ...[
     'rows',
@@ -487,6 +524,7 @@ const _animatedSections = {
   'categories',
   'popular',
   'localServices',
+  'crossSellStrip',
   'nearby',
   'ads',
   'boxes',
@@ -540,6 +578,7 @@ final _textOverridable = {
   'categories',
   'popular',
   'localServices',
+  'crossSellStrip',
   'nearby',
   'moreCategoriesTile',
   'adsLabel',

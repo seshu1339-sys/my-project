@@ -1,0 +1,182 @@
+[
+  {
+    "id": "plumber",
+    "display_name": "Plumber",
+    "image_file_name": "plumber.webp",
+    "display_order": 1
+  },
+  {
+    "id": "electrician",
+    "display_name": "Electrician",
+    "image_file_name": "electrician.webp",
+    "display_order": 2
+  },
+  {
+    "id": "carpenter",
+    "display_name": "Carpenter",
+    "image_file_name": "carpenter.webp",
+    "display_order": 3
+  },
+  {
+    "id": "painter",
+    "display_name": "Painter",
+    "image_file_name": "painter.webp",
+    "display_order": 4
+  },
+  {
+    "id": "ac_repair",
+    "display_name": "AC Repair",
+    "image_file_name": "ac_repair.webp",
+    "display_order": 5
+  },
+  {
+    "id": "fridge_repair",
+    "display_name": "Fridge Repair",
+    "image_file_name": "fridge_repair.webp",
+    "display_order": 6
+  },
+  {
+    "id": "washing_machine_repair",
+    "display_name": "Washing Machine Repair",
+    "image_file_name": "washing_machine_repair.webp",
+    "display_order": 7
+  },
+  {
+    "id": "tv_repair",
+    "display_name": "TV Repair",
+    "image_file_name": "tv_repair.webp",
+    "display_order": 8
+  },
+  {
+    "id": "mobile_repair",
+    "display_name": "Mobile Repair",
+    "image_file_name": "mobile_repair.webp",
+    "display_order": 9
+  },
+  {
+    "id": "computer_repair",
+    "display_name": "Computer Repair",
+    "image_file_name": "computer_repair.webp",
+    "display_order": 10
+  },
+  {
+    "id": "ro_water_purifier",
+    "display_name": "RO Water Purifier",
+    "image_file_name": "ro_water_purifier.webp",
+    "display_order": 11
+  },
+  {
+    "id": "geyser_repair",
+    "display_name": "Geyser Repair",
+    "image_file_name": "geyser_repair.webp",
+    "display_order": 12
+  },
+  {
+    "id": "inverter_and_battery",
+    "display_name": "Inverter & Battery",
+    "image_file_name": "inverter_and_battery.webp",
+    "display_order": 13
+  },
+  {
+    "id": "cctv_installation",
+    "display_name": "CCTV Installation",
+    "image_file_name": "cctv_installation.webp",
+    "display_order": 14
+  },
+  {
+    "id": "mason",
+    "display_name": "Mason",
+    "image_file_name": "mason.webp",
+    "display_order": 15
+  },
+  {
+    "id": "tiles_work",
+    "display_name": "Tiles Work",
+    "image_file_name": "tiles_work.webp",
+    "display_order": 16
+  },
+  {
+    "id": "welder",
+    "display_name": "Welder",
+    "image_file_name": "welder.webp",
+    "display_order": 17
+  },
+  {
+    "id": "house_cleaning",
+    "display_name": "House Cleaning",
+    "image_file_name": "house_cleaning.webp",
+    "display_order": 18
+  },
+  {
+    "id": "bathroom_cleaning",
+    "display_name": "Bathroom Cleaning",
+    "image_file_name": "bathroom_cleaning.webp",
+    "display_order": 19
+  },
+  {
+    "id": "sofa_cleaning",
+    "display_name": "Sofa Cleaning",
+    "image_file_name": "sofa_cleaning.webp",
+    "display_order": 20
+  },
+  {
+    "id": "pest_control",
+    "display_name": "Pest Control",
+    "image_file_name": "pest_control.webp",
+    "display_order": 21
+  },
+  {
+    "id": "water_tank_cleaning",
+    "display_name": "Water Tank Cleaning",
+    "image_file_name": "water_tank_cleaning.webp",
+    "display_order": 22
+  },
+  {
+    "id": "gardener",
+    "display_name": "Gardener",
+    "image_file_name": "gardener.webp",
+    "display_order": 23
+  },
+  {
+    "id": "bike_mechanic",
+    "display_name": "Bike Mechanic",
+    "image_file_name": "bike_mechanic.webp",
+    "display_order": 24
+  },
+  {
+    "id": "car_mechanic",
+    "display_name": "Car Mechanic",
+    "image_file_name": "car_mechanic.webp",
+    "display_order": 25
+  },
+  {
+    "id": "packers_and_movers",
+    "display_name": "Packers & Movers",
+    "image_file_name": "packers_and_movers.webp",
+    "display_order": 26
+  },
+  {
+    "id": "cook",
+    "display_name": "Cook",
+    "image_file_name": "cook.webp",
+    "display_order": 27
+  },
+  {
+    "id": "tailor",
+    "display_name": "Tailor",
+    "image_file_name": "tailor.webp",
+    "display_order": 28
+  },
+  {
+    "id": "beautician",
+    "display_name": "Beautician",
+    "image_file_name": "beautician.webp",
+    "display_order": 29
+  },
+  {
+    "id": "tutor",
+    "display_name": "Tutor",
+    "image_file_name": "tutor.webp",
+    "display_order": 30
+  }
+]
