@@ -8,6 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/ui/home_rotating_pages.dart';
+import 'package:ecommerce_app/ui/home_scheduled_promo.dart';
 
 const _types = [
   'slide',
@@ -292,6 +293,36 @@ void main() {
       store.dispose();
     });
   }
+
+  testWidgets('ads with very different amounts of text are exactly as wide', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await storeWith({});
+    store.catalog['promotions']!.removeWhere((e) => e.text('placement') == 'ad');
+    await store.save('promotions', const Entry('short', {'name': 'Hi', 'placement': 'ad', 'order': 0, 'active': true}));
+    await store.save('promotions', const Entry('long', {
+      'name': 'Big Savings Everyday on everything you need',
+      'description': 'A much longer line of supporting text that wraps over several lines of the box.',
+      'placement': 'ad',
+      'order': 1,
+      'active': true,
+    }));
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    final sizes = [
+      for (final e in find.byType(ScheduledPromo).evaluate()) tester.getSize(find.byWidget(e.widget)),
+    ];
+    expect(sizes.length, greaterThanOrEqualTo(2));
+    expect(sizes.map((s) => s.width).toSet(), hasLength(1), reason: 'ad widths: $sizes');
+    // The two ads (a promotional box below them has its own height).
+    expect(sizes.take(2).map((s) => s.height).toSet(), hasLength(1), reason: 'ad heights: $sizes');
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
 
   testWidgets('offers and ads keep separate animation settings', (tester) async {
     tester.view.physicalSize = const Size(1400, 1800);

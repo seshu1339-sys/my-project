@@ -129,7 +129,10 @@ class _ScheduledPromoState extends State<ScheduledPromo>
       // bottom; 'down' mirrors the same two-copy loop so content instead
       // enters from the top. Any other/blank value falls back to 'up'.
       final scrollsDown = widget.entry.text('direction', 'up') == 'down';
+      // Width is pinned too: left loose, a box with little text shrank to its
+      // content and sat narrower than its neighbours.
       Widget card() => SizedBox(
+        width: width,
         height: height,
         child: SingleChildScrollView(
           child: PromoCard(
