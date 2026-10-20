@@ -1,4 +1,5 @@
 import 'catalog.dart';
+import 'places.dart';
 
 /// A town the admin serves, from `settings/business.serviceTowns`.
 class ServiceTown {
@@ -102,13 +103,21 @@ String townFromPlaceName(String displayName, List<ServiceTown> towns) {
   return segments.first;
 }
 
-/// True when [promotion] is meant for [town]. A promotion without a
-/// `locations` list is general (every town).
-bool promotionListsTown(Entry promotion, String town) {
-  final wanted = _norm(town);
+/// True when [promotion] is meant for the customer's place. Its `locations`
+/// list holds towns ("Rajahmundry (East Godavari)", or just "Rajahmundry" in
+/// older offers), whole districts ("district:East Godavari") and whole states
+/// ("state:Telangana"); see [locationTokenMatches]. A promotion without a
+/// list is general (every town).
+bool promotionListsTown(
+  Entry promotion,
+  String town, {
+  String district = '',
+  String state = '',
+}) {
+  final customer = CustomerPlace(town: town, district: district, state: state);
   return parseLocationList(
     promotion.text('locations'),
-  ).any((name) => _norm(name) == wanted);
+  ).any((token) => locationTokenMatches(token, customer));
 }
 
 bool promotionIsGeneral(Entry promotion) =>
@@ -127,9 +136,18 @@ class TownOffers {
   final bool usedGeneral;
 }
 
-TownOffers promotionsForTown(List<Entry> promotions, String town) {
-  if (town.trim().isEmpty) return TownOffers(promotions);
-  final local = promotions.where((e) => promotionListsTown(e, town)).toList();
+TownOffers promotionsForTown(
+  List<Entry> promotions,
+  String town, {
+  String district = '',
+  String state = '',
+}) {
+  if (town.trim().isEmpty && district.trim().isEmpty && state.trim().isEmpty) {
+    return TownOffers(promotions);
+  }
+  final local = promotions
+      .where((e) => promotionListsTown(e, town, district: district, state: state))
+      .toList();
   if (local.isNotEmpty) return TownOffers(local);
   final general = promotions.where(promotionIsGeneral).toList();
   return TownOffers(general, usedGeneral: general.isNotEmpty);

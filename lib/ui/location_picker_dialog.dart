@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 import 'package:latlong2/latlong.dart';
 
 import '../data/store.dart';
@@ -8,13 +9,23 @@ import '../services/location.dart';
 import '../services/location_town.dart';
 import '../services/strings.dart';
 import 'location_picker.dart';
+import 'place_search_box.dart';
 import 'shared.dart';
 
 /// The "Where are you shopping?" dialog — pincode/address entry, GPS,
 /// place-name search, or drop-a-pin, all writing through `store.setLocation`.
 /// Extracted out of storefront.dart so the storefront shell stays a thin
-/// composition root; behavior is unchanged from the original inline version.
-Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
+/// composition root.
+///
+/// The top of the dialog is a live search over the Andhra Pradesh/Telangana
+/// places directory (a town name or a pincode); the directory file is fetched
+/// when this dialog opens (never with the home page) and cached afterwards.
+/// [locate] replaces the GPS lookup in tests.
+Future<void> showLocationPickerDialog(
+  BuildContext context,
+  Store store, {
+  Future<Position> Function()? locate,
+}) async {
   final pin = TextEditingController(text: store.pincode),
       address = TextEditingController(text: store.address);
   await showDialog<void>(
@@ -35,7 +46,23 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
               const Text(
                 'Set your pincode for local prices, or use GPS to find shops within their service radius.',
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              PlaceSearchBox(
+                loadNow: true,
+                onPlace: (place) async {
+                  // Chosen from the list: pincode mode (no GPS coordinates), exactly
+                  // like typing the pincode, plus the town/district/state for offers.
+                  await store.setLocation(
+                    place.pincode,
+                    place.label,
+                    town: place.town,
+                    district: place.district,
+                    state: place.state,
+                  );
+                  if (dialog.mounted) Navigator.pop(dialog);
+                },
+              ),
+              const SizedBox(height: 12),
               if (parseServiceTowns(store.business.text('serviceTowns'))
                   .isNotEmpty) ...[
                 DropdownButtonFormField<String>(
@@ -87,9 +114,8 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
               OutlinedButton.icon(
                 onPressed: () async {
                   try {
-                    final position = await currentPosition(
-                      action: 'set your shopping location',
-                    );
+                    final position = await (locate?.call() ??
+                        currentPosition(action: 'set your shopping location'));
                     final value = pin.text.trim();
                     if (value.isNotEmpty &&
                         !RegExp(r'^\d{6}$').hasMatch(value)) {
@@ -97,18 +123,29 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                         'Enter a valid pincode or clear it before using GPS.',
                       );
                     }
+                    // The nearest town from the directory's own coordinates
+                    // (works offline once cached); the reverse lookup only if
+                    // the directory is unavailable or the customer is outside it.
+                    final nearest = await nearestPlaceFor(
+                      position.latitude,
+                      position.longitude,
+                    );
                     await store.setLocation(
-                      value,
-                      address.text.trim().isEmpty
-                          ? 'Current GPS location'
-                          : address.text.trim(),
+                      value.isNotEmpty ? value : (nearest?.pincode ?? ''),
+                      address.text.trim().isNotEmpty
+                          ? address.text.trim()
+                          : (nearest?.label ?? 'Current GPS location'),
                       lat: position.latitude,
                       lng: position.longitude,
-                      town: await townForPoint(
-                        store,
-                        position.latitude,
-                        position.longitude,
-                      ),
+                      town:
+                          nearest?.town ??
+                          await townForPoint(
+                            store,
+                            position.latitude,
+                            position.longitude,
+                          ),
+                      district: nearest?.district,
+                      state: nearest?.state,
                     );
                     if (dialog.mounted) {
                       Navigator.pop(dialog);
@@ -120,7 +157,7 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                   }
                 },
                 icon: const Icon(Icons.my_location),
-                label: const Text('Use my current location'),
+                label: Text('Use my location'.tr(dialog)),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(

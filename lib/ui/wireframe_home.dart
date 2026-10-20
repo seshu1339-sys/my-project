@@ -119,6 +119,8 @@ class WireframeHome extends StatelessWidget {
     List<Entry> forTown(String placement) => promotionsForTown(
       promotions.where((e) => e.text('placement') == placement).toList(),
       store.town,
+      district: store.district,
+      state: store.state,
     ).entries;
     final offers = forTown('carousel');
     final ads = forTown('ad');
@@ -305,7 +307,7 @@ class WireframeHome extends StatelessWidget {
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
-                        child: offers.isEmpty && store.town.isNotEmpty
+                        child: offers.isEmpty && store.hasPlace
                             ? NoOffersNotice(store: store)
                             : HeroCarousel(
                           entries: offers,

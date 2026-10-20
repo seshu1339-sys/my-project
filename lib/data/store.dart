@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../domain/places.dart';
 import '../domain/towns.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
@@ -73,6 +74,10 @@ class Store extends ChangeNotifier {
       // location-tagged offers/ads they see and names the offers ticker.
       // '' until a location is chosen.
       town = '',
+      // ...and the district/state of the place they picked, so an offer can
+      // target a whole district or state. '' when unknown.
+      district = '',
+      state = '',
       profileName = '',
       language = 'en',
       error = '';
@@ -82,6 +87,10 @@ class Store extends ChangeNotifier {
   String? pendingEmailLink;
   String emailForSignInLink = '';
   User? get user => live ? FirebaseAuth.instance.currentUser : null;
+  /// Where the customer is, as offers are matched against it.
+  CustomerPlace get place =>
+      CustomerPlace(town: town, district: district, state: state);
+  bool get hasPlace => !place.isEmpty;
   Entry get business =>
       entries('settings').where((e) => e.id == 'business').firstOrNull ??
       const Entry('business', {'name': 'Local Market', 'radiusKm': 10});
@@ -120,6 +129,8 @@ class Store extends ChangeNotifier {
     pincode = prefs.getString('pincode') ?? '';
     address = prefs.getString('address') ?? '';
     town = prefs.getString('town') ?? '';
+    district = prefs.getString('district') ?? '';
+    state = prefs.getString('state') ?? '';
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
     final savedLanguage = prefs.getString('language');
@@ -259,6 +270,8 @@ class Store extends ChangeNotifier {
     double? lat,
     double? lng,
     String? town,
+    String? district,
+    String? state,
   }) async {
     // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
     // coordinate refresh) must not forget a town the customer already picked.
@@ -271,15 +284,21 @@ class Store extends ChangeNotifier {
             address: value,
             towns: parseServiceTowns(business.text('serviceTowns')),
           );
+    final nextDistrict = unchanged ? this.district : (district ?? '');
+    final nextState = unchanged ? this.state : (state ?? '');
     pincode = pin;
     address = value;
     this.town = nextTown;
+    this.district = nextDistrict;
+    this.state = nextState;
     latitude = lat;
     longitude = lng;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pincode', pin);
     await prefs.setString('address', value);
     await prefs.setString('town', this.town);
+    await prefs.setString('district', this.district);
+    await prefs.setString('state', this.state);
     if (lat != null && lng != null) {
       await prefs.setDouble('latitude', lat);
       await prefs.setDouble('longitude', lng);

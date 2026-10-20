@@ -17,24 +17,48 @@
       "target": "customer",
       "public": "build/web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/data/**",
+          "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+        }
+      ],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
     },
     {
       "target": "admin",
       "public": "build/admin_web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/data/**",
+          "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+        }
+      ],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
     },
     {
       "target": "vendor",
       "public": "build/vendor_web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/data/**",
+          "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+        }
+      ],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
     },
     {
       "target": "field",
       "public": "build/field_web",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "/data/**",
+          "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
+        }
+      ],
       "rewrites": [{"source": "**", "destination": "/index.html"}]
     }
   ],

@@ -35,4 +35,14 @@ RewriteRule ^ index.html [L]
   <FilesMatch "\.(woff2?|ttf|otf|png|jpg|jpeg|svg|wasm)$">
     Header set Cache-Control "public, max-age=2592000, immutable"
   </FilesMatch>
+  # The AP/Telangana places list is versioned by file name (places.v1.json), so
+  # it can be cached for a year; it is fetched only when a location dialog opens.
+  <FilesMatch "^places\.v[0-9]+\.json$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+# JSON compresses roughly 4x; make sure it is sent compressed.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE application/json
 </IfModule>

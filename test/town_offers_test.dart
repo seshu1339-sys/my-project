@@ -10,6 +10,7 @@ import 'package:ecommerce_app/domain/towns.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/ui/entry_editor.dart';
 import 'package:ecommerce_app/ui/location_picker_dialog.dart';
+import 'places_fixture.dart';
 
 Entry _promo(String id, String placement, {String locations = ''}) => Entry(
   id,
@@ -227,6 +228,7 @@ void main() {
     testWidgets('the location dialog lists the towns and picks one', (
       tester,
     ) async {
+      usePlacesFixture();
       final store = await _store();
       await tester.pumpWidget(
         MaterialApp(

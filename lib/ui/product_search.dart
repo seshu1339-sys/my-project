@@ -80,12 +80,16 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
     });
     try {
       final position = await currentPosition(action: 'search nearby products');
+      final nearest = await nearestPlaceFor(position.latitude, position.longitude);
       await store.setLocation(
-        store.pincode,
-        'Current GPS location',
+        store.pincode.isNotEmpty ? store.pincode : (nearest?.pincode ?? ''),
+        nearest?.label ?? 'Current GPS location',
         lat: position.latitude,
         lng: position.longitude,
-        town: await townForPoint(store, position.latitude, position.longitude),
+        town: nearest?.town ??
+            await townForPoint(store, position.latitude, position.longitude),
+        district: nearest?.district,
+        state: nearest?.state,
       );
       if (mounted) setState(() => locating = false);
     } catch (e) {
