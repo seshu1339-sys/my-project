@@ -117,38 +117,45 @@ flutter:
     - assets/services/tutor.webp
 
     # Product-library photos (categories + per-category products), generated
-    # in batches; see assets/images/library_status.json for progress.
+    # in batches; see assets/images/library_status.json for progress. Flutter does
+    # not recurse, so every folder that holds photos is listed; add new ones as
+    # generation continues (empty folders must not be listed).
     - assets/images/categories/
-    - assets/images/products/automobile_bike/
-    - assets/images/products/baby_care/
-    - assets/images/products/bags_luggage/
-    - assets/images/products/beauty_cosmetics/
-    - assets/images/products/cleaning_products/
-    - assets/images/products/clothing_fashion/
-    - assets/images/products/dairy_bakery/
-    - assets/images/products/electrical_items/
-    - assets/images/products/electronics/
-    - assets/images/products/fancy_accessories/
-    - assets/images/products/footwear/
-    - assets/images/products/fresh_fruits/
-    - assets/images/products/fresh_vegetables/
-    - assets/images/products/grocery_staples/
-    - assets/images/products/hardware_tools/
-    - assets/images/products/home_appliances/
-    - assets/images/products/home_decor_furnishing/
-    - assets/images/products/household_essentials/
-    - assets/images/products/kids_clothing/
-    - assets/images/products/kitchenware_utensils/
-    - assets/images/products/mens_clothing/
-    - assets/images/products/mobile_accessories/
-    - assets/images/products/personal_care/
-    - assets/images/products/plastic_household/
-    - assets/images/products/rice_dal_grains/
-    - assets/images/products/sarees_womens_wear/
-    - assets/images/products/snacks_beverages/
-    - assets/images/products/sports_fitness/
-    - assets/images/products/stationery_school/
-    - assets/images/products/toys_games/
+    - assets/images/products/dairy_bakery/bakery/
+    - assets/images/products/dairy_bakery/breads/
+    - assets/images/products/dairy_bakery/cheese_and_spreads/
+    - assets/images/products/dairy_bakery/milk_and_cultured/
+    - assets/images/products/fancy_accessories/bangles_and_bracelets/
+    - assets/images/products/fancy_accessories/earrings_and_necklaces/
+    - assets/images/products/fancy_accessories/hair_accessories/
+    - assets/images/products/fresh_fruits/local_fruits/
+    - assets/images/products/fresh_fruits/melons_and_tropical/
+    - assets/images/products/fresh_fruits/orchard_fruits/
+    - assets/images/products/fresh_fruits/seasonal_fruits/
+    - assets/images/products/fresh_vegetables/everyday_vegetables/
+    - assets/images/products/fresh_vegetables/gourds_and_pods/
+    - assets/images/products/fresh_vegetables/green_vegetables/
+    - assets/images/products/fresh_vegetables/leafy_and_aromatics/
+    - assets/images/products/grocery_staples/atta_flours_sooji/
+    - assets/images/products/grocery_staples/cooking_oils_and_ghee/
+    - assets/images/products/grocery_staples/masalas_and_spices/
+    - assets/images/products/grocery_staples/sweeteners_and_pantry/
+    - assets/images/products/household_essentials/daily_textiles/
+    - assets/images/products/household_essentials/home_utilities/
+    - assets/images/products/household_essentials/household_consumables/
+    - assets/images/products/household_essentials/laundry_utilities/
+    - assets/images/products/personal_care/bath_and_body/
+    - assets/images/products/personal_care/grooming/
+    - assets/images/products/personal_care/hair_care/
+    - assets/images/products/personal_care/oral_care/
+    - assets/images/products/rice_dal_grains/dals/
+    - assets/images/products/rice_dal_grains/grains_and_millets/
+    - assets/images/products/rice_dal_grains/rice/
+    - assets/images/products/rice_dal_grains/whole_pulses/
+    - assets/images/products/snacks_beverages/biscuits_and_sweets/
+    - assets/images/products/snacks_beverages/cold_beverages/
+    - assets/images/products/snacks_beverages/savoury_snacks/
+    - assets/images/products/snacks_beverages/tea_and_coffee/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
