@@ -392,9 +392,22 @@ exports.submitVerifiedReview = onCall(options, async request => {
     if (order.exists && order.data().lines?.some(line => line.productId === productId)) { purchasedProduct = true; break; }
   }
   if (!purchasedProduct) throw new HttpsError('permission-denied', 'Only verified purchases of this product can be reviewed.');
-  const reviewRef = db.collection('products').doc(productId).collection('reviews').doc(uid);
-  if ((await reviewRef.get()).exists) throw new HttpsError('already-exists', 'You already rated this product.');
-  await reviewRef.create({userId: uid, name: String(name || '').slice(0, 100), rating, text: text.trim(), verifiedPurchase: true, updatedAt: FieldValue.serverTimestamp()});
+  const productRef = db.collection('products').doc(productId);
+  const reviewRef = productRef.collection('reviews').doc(uid);
+  // The review and the product's precomputed avgRating/reviewCount (read by the customer UI to
+  // show stars) change together, so a rejected duplicate can never skew the average.
+  await db.runTransaction(async tx => {
+    const [existing, product] = await Promise.all([tx.get(reviewRef), tx.get(productRef)]);
+    if (existing.exists) throw new HttpsError('already-exists', 'You already rated this product.');
+    const knownCount = product.exists ? Number(product.data().reviewCount) : NaN;
+    // Products reviewed before these fields existed have no aggregate yet: rebuild it from the reviews.
+    const earlier = product.exists && !Number.isFinite(knownCount) ? await tx.get(productRef.collection('reviews')) : null;
+    tx.create(reviewRef, {userId: uid, name: String(name || '').slice(0, 100), rating, text: text.trim(), verifiedPurchase: true, updatedAt: FieldValue.serverTimestamp()});
+    if (!product.exists) return;
+    const count = earlier ? earlier.size : knownCount;
+    const total = earlier ? earlier.docs.reduce((sum, doc) => sum + (Number(doc.data().rating) || 0), 0) : (Number(product.data().avgRating) || 0) * count;
+    tx.update(productRef, {reviewCount: count + 1, avgRating: Math.round(((total + rating) / (count + 1)) * 100) / 100});
+  });
   const previousReviews = await db.collectionGroup('reviews').where('userId', '==', uid).limit(4).get();
   if (previousReviews.size >= 3) await db.collection('suspiciousReviews').add({userId: uid, productId, reason: 'Multiple verified reviews in a short period', createdAt: FieldValue.serverTimestamp(), reviewed: false});
   return {created: true};

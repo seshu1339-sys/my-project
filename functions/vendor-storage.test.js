@@ -7,10 +7,13 @@ const {doc, setDoc, Timestamp} = require('firebase/firestore');
 const jpeg = () => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const jpegMeta = {contentType: 'image/jpeg'};
 // Needs both emulators because the Storage rules read Firestore vendor records.
+// The Storage emulator looks those records up in the emulator's own project, so the test must
+// use that same project (GCLOUD_PROJECT, set by `firebase emulators:exec --project`), not a fixed name.
+const projectId = process.env.GCLOUD_PROJECT || 'demo-neighbourly';
 test('vendor photos: private application photos, approved-only product photos', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_STORAGE_EMULATOR_HOST}, async () => {
   const [host, port] = process.env.FIREBASE_STORAGE_EMULATOR_HOST.split(':');
   const env = await initializeTestEnvironment({
-    projectId: 'demo-neighbourly',
+    projectId,
     firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')},
     storage: {rules: readFileSync(resolve(__dirname, '../storage.rules'), 'utf8'), host, port: Number(port)},
   });
