@@ -40,7 +40,7 @@ const fields = <String, Map<String, String>>{
   'categories': {
     'name': 'Category name',
     'parentId': 'Parent category (optional)',
-    'imageUrl': 'Category image URL (optional)',
+    'imageUrl': 'Category image URL (optional — blank uses the built-in photo, if this category has one)',
     'order': 'Display order',
   },
   'shops': {

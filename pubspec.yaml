@@ -116,6 +116,10 @@ flutter:
     - assets/services/beautician.webp
     - assets/services/tutor.webp
 
+    # Built-in category photos for the home page's category circles (webp,
+    # 384 px; see lib/domain/category_images.dart).
+    - assets/category_icons/
+
     # Product-library photos (categories + per-category products), generated
     # in batches; see assets/images/library_status.json for progress. Flutter does
     # not recurse, so every folder that holds photos is listed; add new ones as

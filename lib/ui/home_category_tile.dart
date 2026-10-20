@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import '../domain/category_images.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
@@ -19,6 +20,50 @@ class HomeCategoryTile extends StatelessWidget {
   final VoidCallback onTap;
   final int index;
   final Entry? appearance;
+  /// The category's photo filling the circle: the admin's own photo (image
+  /// URL) if set, else the built-in one for that category, else its icon.
+  /// Every circle is the same [badgeSize]; the photo is cropped to fill it.
+  Widget _photo(
+    double badgeSize,
+    ComponentLayout layout,
+    Color accent,
+    List<IconData> icons,
+  ) {
+    final fallback = Icon(
+      icons[index % icons.length],
+      color: accent,
+      size: layout.n('iconSize', 30, 16, 72),
+    );
+    final url = entry.text('imageUrl');
+    final builtIn = url.isEmpty ? builtInCategoryImage(entry) : null;
+    if (url.isEmpty && builtIn == null) return fallback;
+    final tint = imageBrightnessTint(appearance ?? const Entry('', {}));
+    Widget broken(BuildContext _, Object e, StackTrace? s) => fallback;
+    return ClipOval(
+      child: builtIn != null
+          ? Image.asset(
+              builtIn,
+              key: ValueKey('category-photo-${entry.id}'),
+              width: badgeSize,
+              height: badgeSize,
+              fit: BoxFit.cover,
+              color: tint?.$1,
+              colorBlendMode: tint?.$2,
+              errorBuilder: broken,
+            )
+          : Image.network(
+              url,
+              key: ValueKey('category-photo-${entry.id}'),
+              width: badgeSize,
+              height: badgeSize,
+              fit: BoxFit.cover,
+              color: tint?.$1,
+              colorBlendMode: tint?.$2,
+              errorBuilder: broken,
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const icons = [
@@ -61,29 +106,7 @@ class HomeCategoryTile extends StatelessWidget {
                         border: selected ? Border.all(color: accent, width: 2) : null,
                         boxShadow: AppTokens.shadowSoft,
                       ),
-                      child: Center(
-                        child: entry.text('imageUrl').isEmpty
-                            ? Icon(
-                                icons[index % icons.length],
-                                color: accent,
-                                size: layout.n('iconSize', 30, 16, 72),
-                              )
-                            : ClipOval(
-                                child: Image.network(
-                                  entry.text('imageUrl'),
-                                  width: badgeSize,
-                                  height: badgeSize,
-                                  fit: BoxFit.cover,
-                                  color: imageBrightnessTint(appearance ?? const Entry('', {}))?.$1,
-                                  colorBlendMode: imageBrightnessTint(appearance ?? const Entry('', {}))?.$2,
-                                  errorBuilder: (_, e, s) => Icon(
-                                    icons[index % icons.length],
-                                    color: accent,
-                                    size: layout.n('iconSize', 30, 16, 72),
-                                  ),
-                                ),
-                              ),
-                      ),
+                      child: Center(child: _photo(badgeSize, layout, accent, icons)),
                     ),
                     const SizedBox(height: 10),
                     Text(

@@ -68,3 +68,8 @@ assets/services/samples/
 
 # Generated image batches / zips / contact sheets (large, reproducible)
 output/
+
+# Source images for the built-in category photos (the app bundles the optimized
+# copies in assets/category_icons/ instead).
+website-images/
+category-icons/
