@@ -57,11 +57,11 @@ past session; where they conflict with this file, this file is more current.
 
 ### 2026-10-20 (later) — Photos bundled, translations phase 2, two backend tests fixed (COMMITTED, NOT deployed)
 
-- :  lists every folder under  that holds photos (Flutter does not recurse; empty folders break clean builds, so only non-empty leaf folders are listed — add new ones as the library generation continues).
-- : account, email-link, services, product, category, reviews, shops, shop and cart screens now use . New tables: ,  (compact rows, built by ; column order hi, te, ta, kn, bn, mr, gu, pa, ml, or). Test: . Still English: the 12 non-top-10 languages (deliberately, quality) and a few thrown error messages (no BuildContext at throw site).
-- :  now writes / in the same transaction as the review (the UI and reviews.test.js already expected it).  failed only because it hard-coded project  while Storage rules look up Firestore in the emulator's own project — it now uses GCLOUD_PROJECT. Not a rules bug.
-- Backend suite under firestore+storage emulators: 54 pass, 0 fail, 7 skipped (Auth emulator not started). Run with ; Java is at .
-- Production still lacks the 10-20 admin/Services work (live bundle is from ~05:22 IST, up to ), and the new  is not deployed. Build for deploy only from .
+- `656b6b0`: `pubspec.yaml` lists every folder under `assets/images/` that holds photos. Flutter does not recurse and empty folders break clean builds, so only non-empty leaf folders are listed; add new ones as the library generation continues (`assets/images/library_status.json` shows progress).
+- `ae8d00c`: account, email-link, services, product, category, reviews, shops, shop and cart screens now use `.tr(context)`. New tables: `lib/services/strings_account.dart` and `strings_details.dart` (compact rows built by `strings_table.dart`; column order hi, te, ta, kn, bn, mr, gu, pa, ml, or). Test: `test/translation_phase2_test.dart`. Still English: the 12 languages outside the top 10 (deliberate, translation quality) and a few thrown error messages that have no BuildContext at the throw site.
+- `3c25b3a`: `submitVerifiedReview` now writes `avgRating`/`reviewCount` in the same transaction as the review (the UI and `reviews.test.js` already expected it). `vendor-storage.test.js` failed only because it hard-coded project `demo-neighbourly` while Storage rules look up Firestore in the emulator's own project; it now uses `GCLOUD_PROJECT`. Not a rules bug.
+- Backend suite under the firestore+storage emulators: 54 pass, 0 fail, 7 skipped (Auth emulator not started). Run with `firebase emulators:exec --only firestore,storage --project <id> "node <runner>"`; Java is at `C:/Program Files/Microsoft/jdk-21.0.12.101-hotspot/bin`.
+- Production still lacks the 10-20 admin/Services work (the live bundle is from about 05:22 IST, up to `e80f877`), and the new `submitVerifiedReview` is not deployed. Build for a deploy only from `git archive HEAD`.
 
 ### 2026-10-20 — Catch-up entry: work since 2026-10-02 (summarised from `git log`)
 
