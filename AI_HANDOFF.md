@@ -55,6 +55,39 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-10-20 — Catch-up entry: work since 2026-10-02 (summarised from `git log`)
+
+This entry was written from commit subjects, not from re-reading every diff.
+Run `git show <sha>` for detail. The older entries marked "NOT committed" (the
+customer-app/admin file splits) predate these commits; the working tree is now
+clean, so check `git log` rather than trusting those labels.
+
+- **2026-10-10 → 10-15** (`a1a3c7d`, `af5f841`, `c817713`, `630729b`): Admin
+  Visual Editor (8-handle resize, per-box ad-rail editing, full layout
+  customization form), premium redesign, removal of the dead Section
+  Customization screen, tracked `web/.htaccess` for Hostinger's SPA fallback.
+- **2026-10-17** (`cef6c23` … `9aa5a88`): header rework to match the hand-drawn
+  wireframe (Services image slot, office info top-right, dividers), uniform ad
+  rail boxes, working scrolling ticker; location picker, sign-in form and
+  complaint dialog extracted into own modules.
+- **2026-10-19** (`ca9423a` … `cb8cc01`): homepage layout fixes, ticker
+  alignment root cause (Flexible vs Expanded), and numbered elements #1–#52 on
+  every customer screen with a "Go to number" admin search; logo photo upload;
+  dead-field fixes (ticker font/weight/style, icon colors, photo brightness).
+- **2026-10-20** (`4f73c45`, `7fc2417`, `8837670`): admin panel rebuilt into
+  Design / Settings / Content, repeating-group sub-numbers, uneven ad size root
+  cause, Fresh Fruits & Vegetables strip (#25), footer badges grouped (#28),
+  service-type browse list on the Services page.
+- **2026-10-20** (`5c3748b`): product/category photos in `assets/images/` are
+  now bundled via `pubspec.yaml` (library is only partly generated; see
+  `assets/images/library_status.json`; no `lib/` code uses them yet); `output/`
+  is git-ignored.
+
+**State at this entry:** `flutter analyze` — 0 errors, 12 style infos;
+`flutter test` — 231/231 pass. Production deploy status of the 10-10 → 10-20
+work has NOT been verified here. Hostinger deploy and Phase 2 shape-based ad
+geo-targeting are not started.
+
 ### 2026-10-02 (later) — Vendor module split into smaller files (verified, COMMITTED)
 
 **Task:** modularize the complete Vendor module. Scope: `lib/ui/vendor.dart` (676 lines) and the app
