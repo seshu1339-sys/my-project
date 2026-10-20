@@ -72,7 +72,7 @@ void main() {
     test('typing part of a name or a pincode finds the town', () {
       List<String> names(String q) =>
           realIndex.search(q).map((p) => p.name).toList();
-      expect(names('Raj').take(5), contains('Rajahmundry'));
+      expect(names('Raj').first, 'Rajahmundry', reason: 'the big city before smaller towns');
       expect(names('rajahm').first, 'Rajahmundry');
       expect(names('533101').first, 'Rajahmundry');
       expect(names('Vijayaw').first, 'Vijayawada');

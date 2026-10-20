@@ -94,10 +94,13 @@ String describeLocationToken(String token) {
 }
 
 class _Indexed {
-  const _Indexed(this.place, this.lower, this.words);
+  const _Indexed(this.place, this.lower, this.words, this.weight);
   final Place place;
   final String lower;
   final List<String> words;
+  // How many pincodes the town spans: a city (Rajahmundry: 7) outranks a small
+  // town (Rajampet: 1) when both match what was typed equally well.
+  final int weight;
 }
 
 /// The directory, searchable. Pure (no I/O): build it from the parsed JSON.
@@ -111,6 +114,12 @@ class PlacesIndex {
       for (final d in json['districts'] as List)
         (name: (d as List)[0] as String, state: states[d[1] as int]),
     ];
+    final pincodesOfTown = <String, Set<Object?>>{};
+    for (final raw in json['places'] as List) {
+      final row = raw as List;
+      final town = row.length > 6 ? row[6] as String : row[0] as String;
+      (pincodesOfTown['$town|${row[1]}'] ??= {}).add(row[2]);
+    }
     final entries = <_Indexed>[];
     for (final raw in json['places'] as List) {
       final row = raw as List;
@@ -129,7 +138,12 @@ class PlacesIndex {
       );
       final lower = name.toLowerCase();
       entries.add(
-        _Indexed(place, lower, lower.split(RegExp(r'[\s()/\-]+'))),
+        _Indexed(
+          place,
+          lower,
+          lower.split(RegExp(r'[\s()/\-]+')),
+          pincodesOfTown['${place.town}|${row[1]}']?.length ?? 1,
+        ),
       );
     }
     return PlacesIndex._(states, districts, entries);
@@ -174,6 +188,8 @@ class PlacesIndex {
     scored.sort((a, b) {
       final byRank = a.$1.compareTo(b.$1);
       if (byRank != 0) return byRank;
+      final byWeight = b.$2.weight.compareTo(a.$2.weight);
+      if (byWeight != 0) return byWeight;
       final byLength = a.$2.lower.length.compareTo(b.$2.lower.length);
       return byLength != 0 ? byLength : a.$2.lower.compareTo(b.$2.lower);
     });
