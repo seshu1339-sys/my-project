@@ -7,6 +7,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'color_picker_field.dart';
 import 'design_tokens.dart';
+import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
 import 'home_section_config.dart';
@@ -19,6 +20,31 @@ import 'shared.dart';
 // paste a URL into.
 const _imageUrlFields = {'iconUrl', 'backgroundImage'};
 
+/// The Layout Settings dropdown: every component, in the admin's element-number
+/// order (1, 2, 3 ... 14, 15 ...), so numbers never appear out of sequence.
+/// "Header" (no number) comes first, a group's members (footer badges 28.1 ..
+/// 28.6) right after their group, "Page layout" after them, and the other
+/// screens' numbered elements (29+) follow. Includes the ticker banner (14),
+/// which is edited in its own editor ([externalLayoutComponents]).
+List<MapEntry<String, String>> layoutComponentChoices() {
+  final all = [...layoutComponents.entries, ...externalLayoutComponents.entries];
+  double rank(String key, int index) {
+    if (key == 'header') return 0;
+    final badge = RegExp(r'^footerBadge(\d)$').firstMatch(key);
+    if (badge != null) return 28 + int.parse(badge.group(1)!) / 10;
+    if (key == 'background') return 28.95;
+    final element = pageElementByKey(key);
+    return element != null ? element.number.toDouble() : 1000 + index.toDouble();
+  }
+
+  final ranked = [for (final (i, entry) in all.indexed) (rank(entry.key, i), i, entry)]
+    ..sort((a, b) {
+      final byRank = a.$1.compareTo(b.$1);
+      return byRank != 0 ? byRank : a.$2.compareTo(b.$2);
+    });
+  return [for (final item in ranked) item.$3];
+}
+
 class LayoutSettingsPage extends StatefulWidget {
   const LayoutSettingsPage({super.key, required this.store});
   final Store store;
@@ -30,6 +56,41 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
   final formKey = GlobalKey<LayoutFieldsFormState>();
   String component = 'search';
 
+  /// The ticker banner (14): its size, colors, text and speed are in the
+  /// Scrolling Text Settings editor, not a layout form.
+  Widget _externalEditorPanel() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This is the scrolling text banner at the top of the home page. '
+            'Its text, colors, font, size and speed are set in Scrolling Text Settings.',
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const ValueKey('open-scrolling-text-settings'),
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open Scrolling Text Settings'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => EntryEditor(
+                  store: widget.store,
+                  collection: 'scrollingText',
+                  entry: widget.store
+                      .entries('settings')
+                      .where((e) => e.id == 'scrollingText')
+                      .firstOrNull,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     if (widget.store.live && !widget.store.admin) {
@@ -40,7 +101,9 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('UI Customization / Layout Settings')),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: externalLayoutComponents.containsKey(component)
+          ? null
+          : SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Wrap(
@@ -75,7 +138,7 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
             isExpanded: true,
             decoration: const InputDecoration(labelText: 'Component'),
             items: [
-              for (final item in layoutComponents.entries)
+              for (final item in layoutComponentChoices())
                 DropdownMenuItem(
                   value: item.key,
                   child: Text(numberedLabel(item.key, item.value)),
@@ -91,11 +154,14 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
             },
           ),
           const SizedBox(height: 16),
-          LayoutFieldsForm(
-            key: formKey,
-            store: widget.store,
-            component: component,
-          ),
+          if (externalLayoutComponents.containsKey(component))
+            _externalEditorPanel()
+          else
+            LayoutFieldsForm(
+              key: formKey,
+              store: widget.store,
+              component: component,
+            ),
           const SizedBox(height: 24),
         ],
       ),

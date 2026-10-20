@@ -67,6 +67,15 @@ const layoutComponents = <String, String>{
   'wishlistDialogTitle': 'Wishlist dialog: title',
 };
 
+/// Numbered elements that appear in the Layout Settings list but are edited in
+/// their OWN dedicated editor rather than the generic layout form (their
+/// settings live in a different document, so a layout form here would save
+/// to the wrong place and change nothing). Selecting one shows a button that
+/// opens that editor. Number 14, the scrolling ticker banner, is one.
+const externalLayoutComponents = <String, String>{
+  'tickerMarquee': 'Ticker marquee banner',
+};
+
 const _footerBadgeKeys = {
   'footerBadge1',
   'footerBadge2',
