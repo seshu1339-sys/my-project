@@ -42,7 +42,11 @@ class PromoCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        // passthrough: a parent that fixes the width (the ad rail does) makes the
+        // card fill it. The default loose Stack let a box with little text
+        // shrink to its content and sit narrower than its neighbours.
         child: Stack(
+          fit: StackFit.passthrough,
           children: [
             _CardBody(
               entry: entry,

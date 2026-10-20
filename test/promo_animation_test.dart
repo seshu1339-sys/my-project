@@ -8,7 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/ui/home_rotating_pages.dart';
-import 'package:ecommerce_app/ui/home_scheduled_promo.dart';
+import 'package:ecommerce_app/ui/home_promo_card.dart';
 
 const _types = [
   'slide',
@@ -314,7 +314,8 @@ void main() {
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
     final sizes = [
-      for (final e in find.byType(ScheduledPromo).evaluate()) tester.getSize(find.byWidget(e.widget)),
+      for (final e in find.byType(PromoCard).evaluate())
+        tester.getSize(find.byWidget(e.widget)),
     ];
     expect(sizes.length, greaterThanOrEqualTo(2));
     expect(sizes.map((s) => s.width).toSet(), hasLength(1), reason: 'ad widths: $sizes');
