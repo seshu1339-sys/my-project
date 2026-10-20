@@ -150,6 +150,7 @@ const dimensionFields = <String, (String, double, double)>{
   'visibleCount': ('Visible banners / items', 1, 12),
   'speed': ('Scroll speed (pixels/second)', 10, 300),
   'animationMs': ('Rotation interval (milliseconds)', 1000, 120000),
+  'animationSpeed': ('Animation speed (1 = slow, 10 = fast)', 1, 10),
   'stopAfter': ('Stop scrolling after seconds (0 = continuous)', 0, 3600),
   'brightness': ('Brightness / highlight', .2, 2),
 };
@@ -242,6 +243,7 @@ List<String> componentFields(String component) => [
           'visibleCount',
           'speed',
           'animationMs',
+          'animationSpeed',
           'stopAfter',
           'brightness',
         }.contains(key) &&
@@ -458,8 +460,24 @@ List<String> componentFields(String component) => [
 /// kept in one place so neither list can silently drift from the other.
 const behaviorSettingsFields = <String, List<String>>{
   'notice': ['speed', 'direction'],
-  'promo': ['visibleCount', 'animationMs'],
-  'ads': ['speed', 'direction', 'scrollEnabled', 'stopAfter'],
+  'promo': [
+    'visibleCount',
+    'animationMs',
+    'animationType',
+    'animationSpeed',
+    'pauseOnTouch',
+  ],
+  'ads': [
+    'speed',
+    'direction',
+    'scrollEnabled',
+    'stopAfter',
+    'animationType',
+    'animationSpeed',
+    'animationMs',
+    'visibleCount',
+    'pauseOnTouch',
+  ],
   'boxes': ['speed', 'direction', 'scrollEnabled', 'stopAfter'],
 };
 

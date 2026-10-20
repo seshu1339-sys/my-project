@@ -34,6 +34,31 @@ class NominatimGeocoder {
   static const placeholderContactEmail = 'support@example.com';
   String get _userAgent => 'Neighbourly/1.0 (contact: $_contactEmail)';
 
+  /// The town/city name for a point, or '' when it cannot be worked out (offline,
+  /// rate limited, open sea...). Never throws: a missing town only means the
+  /// customer sees the general offers instead of a town's own.
+  Future<String> reverseTown(double latitude, double longitude) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'format': 'jsonv2',
+        'lat': '$latitude',
+        'lon': '$longitude',
+        'zoom': '12',
+        'addressdetails': '1',
+      });
+      final response = await _client.get(uri, headers: {'User-Agent': _userAgent});
+      if (response.statusCode != 200) return '';
+      final decoded = jsonDecode(response.body);
+      final address = decoded is Map ? decoded['address'] : null;
+      if (address is! Map) return '';
+      for (final key in const ['city', 'town', 'village', 'municipality', 'suburb', 'county']) {
+        final value = address[key];
+        if (value is String && value.trim().isNotEmpty) return value.trim();
+      }
+    } catch (_) {}
+    return '';
+  }
+
   Future<List<NominatimPlace>> search(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];

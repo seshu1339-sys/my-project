@@ -5,6 +5,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'admin_fields.dart';
 import 'color_picker_field.dart';
+import '../domain/towns.dart';
 import 'geo_target_picker.dart';
 import 'shared.dart';
 
@@ -469,6 +470,7 @@ class _EntryEditorState extends State<EntryEditor> {
             : null,
       );
     }
+    if (key == 'locations') return locationsField(label);
     if (key == 'geoTargetArea') {
       final entryData = widget.entry?.data;
       final effectiveShape =
@@ -684,6 +686,55 @@ class _EntryEditorState extends State<EntryEditor> {
         }
         return null;
       },
+    );
+  }
+
+  /// The Location field of an offer/ad: tap towns from the list set in
+  /// Business settings (serviceTowns), or type any town names, comma-separated.
+  /// Blank means every town. Stored as the same comma-separated text.
+  Widget locationsField(String label) {
+    final controller = controllers['locations']!;
+    final chosen = parseLocationList(controller.text);
+    final known = parseServiceTowns(widget.store.business.text('serviceTowns'));
+    bool has(String name) =>
+        chosen.any((c) => c.toLowerCase() == name.toLowerCase());
+    void toggle(String name) {
+      final next = has(name)
+          ? chosen.where((c) => c.toLowerCase() != name.toLowerCase()).toList()
+          : [...chosen, name];
+      setState(() => controller.text = next.join(', '));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (known.isNotEmpty) ...[
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final town in known)
+                FilterChip(
+                  key: ValueKey('location-chip-${town.name}'),
+                  label: Text(town.name),
+                  selected: has(town.name),
+                  onSelected: (_) => toggle(town.name),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        TextFormField(
+          key: ValueKey('locations-${controller.text}'),
+          initialValue: controller.text,
+          decoration: InputDecoration(
+            labelText: known.isNotEmpty ? 'Towns (comma-separated)' : label,
+          ),
+          onChanged: (v) => controller.text = v,
+        ),
+      ],
     );
   }
 

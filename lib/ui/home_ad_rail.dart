@@ -4,6 +4,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'home_promotions.dart';
+import 'home_rotating_pages.dart';
 import 'home_section_config.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
@@ -59,7 +60,7 @@ List<Entry> mergedPromoEntries({
 /// section. On mobile/tablet this is replaced by `ScheduledPromoCarousel`
 /// instead (see wireframe_home.dart) — both read from `mergedPromoEntries`
 /// above so neither ever shows a different set of ads than the other.
-class HomeAdRail extends StatelessWidget {
+class HomeAdRail extends StatefulWidget {
   const HomeAdRail({
     super.key,
     required this.adLayout,
@@ -88,8 +89,98 @@ class HomeAdRail extends StatelessWidget {
   final Widget Function(String sectionKey, Widget child) wrapSection;
   static Widget _identitySection(String sectionKey, Widget child) => child;
 
+  @override
+  State<HomeAdRail> createState() => _HomeAdRailState();
+}
+
+class _HomeAdRailState extends State<HomeAdRail> {
+  final rotation = RotatingPagesController();
+
+  @override
+  void dispose() {
+    rotation.dispose();
+    super.dispose();
+  }
+
+  ComponentLayout get adLayout => widget.adLayout;
+  ComponentLayout get boxLayout => widget.boxLayout;
+  List<Entry> get ads => widget.ads;
+  List<Entry> get boxes => widget.boxes;
+  ComponentLayout get adsLabelLayout => widget.adsLabelLayout;
+  ValueChanged<String> get onPromotion => widget.onPromotion;
+  Widget Function(String, Widget) get wrapSection => widget.wrapSection;
+
   Widget _item(Entry entry, String kind, Widget child) =>
-      wrapItem == null ? child : wrapItem!(entry, kind, child);
+      widget.wrapItem == null ? child : widget.wrapItem!(entry, kind, child);
+
+  // One ad box exactly as it has always been built (same border default,
+  // uniform width, shared height), so animated and plain rails look alike.
+  Widget _adBox(Entry ad) => _item(
+    ad,
+    'ad',
+    ScheduledPromo(
+      heightOverride: adLayout.height(240, floor: 120),
+      entry: _withAdBorderDefault(
+        _withUniformAdWidth(
+          Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
+          adLayout,
+        ),
+      ),
+      onTap: () => onPromotion(ad.text('target')),
+    ),
+  );
+
+  /// The ads cycling through the admin's chosen animation: `visibleCount`
+  /// boxes at a time (default: one fewer than there are ads, at most two, so
+  /// something always changes), every box the shared height.
+  Widget _animatedAds(PromoMotion motion) {
+    final height = adLayout.height(240, floor: 120);
+    final gap = adLayout.gap.clamp(0, 64).toDouble();
+    final fallback = (ads.length - 1).clamp(1, 2);
+    final visible = adLayout.entry
+        .number('visibleCount', fallback.toDouble())
+        .round()
+        .clamp(1, ads.length);
+    final carousel = motion.type == PromoAnimation.carousel;
+    final pages = carousel ? ads.length : (ads.length / visible).ceil();
+    final viewport = carousel
+        ? (height + gap) / carouselFraction(visible)
+        : visible * height + (visible - 1) * gap;
+    return Column(
+      children: [
+        SizedBox(
+          key: const ValueKey('ads-viewport'),
+          height: viewport,
+          child: RotatingPages(
+            key: ValueKey('ads-rotation-${motion.type.name}-$visible'),
+            motion: motion,
+            pageCount: pages,
+            slotsPerView: visible,
+            axis: Axis.vertical,
+            reverse: adLayout.entry.text('direction', 'up') == 'down',
+            controller: rotation,
+            pageBuilder: (context, index) => carousel
+                ? Padding(
+                    padding: EdgeInsets.symmetric(vertical: gap / 2),
+                    child: _adBox(ads[index % ads.length]),
+                  )
+                : Column(
+                    children: [
+                      for (var slot = 0; slot < visible; slot++) ...[
+                        if (slot > 0) SizedBox(height: gap),
+                        SizedBox(
+                          height: height,
+                          child: _adBox(ads[(index * visible + slot) % ads.length]),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+        RotatingDots(controller: rotation, count: pages),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Column(
@@ -129,30 +220,23 @@ class HomeAdRail extends StatelessWidget {
                     ),
                   ),
                 ),
-              for (final ad in ads)
-                Padding(
-                  padding: EdgeInsets.only(
-                    bottom: ad.number('spacing', adLayout.gap).clamp(0, 64),
-                  ),
-                  child: _item(
-                    ad,
-                    'ad',
-                    ScheduledPromo(
-                      // One shared height computed ONCE from adLayout (not
-                      // per-ad) and passed straight through, so every ad box
-                      // is visually identical regardless of how much its
-                      // own title/description text wraps.
-                      heightOverride: adLayout.height(240, floor: 120),
-                      entry: _withAdBorderDefault(
-                        _withUniformAdWidth(
-                          Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
-                          adLayout,
-                        ),
-                      ),
-                      onTap: () => onPromotion(ad.text('target')),
+              if (ads.length > 1 &&
+                  PromoMotion.from(adLayout.entry, defaultIntervalMs: 4000) !=
+                      null)
+                _animatedAds(
+                  PromoMotion.from(adLayout.entry, defaultIntervalMs: 4000)!,
+                )
+              else
+                for (final ad in ads)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: ad.number('spacing', adLayout.gap).clamp(0, 64),
                     ),
+                    // The shared height is computed ONCE from adLayout (not
+                    // per-ad) inside _adBox, so every ad box is visually
+                    // identical regardless of how much its own text wraps.
+                    child: _adBox(ad),
                   ),
-                ),
             ],
           ),
         ),

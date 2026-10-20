@@ -8,6 +8,7 @@ import '../services/strings.dart';
 import 'home_hero_slide.dart';
 import 'home_impression_once.dart';
 import 'home_promo_card.dart';
+import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
 
 class HeroCarousel extends StatefulWidget {
@@ -30,6 +31,7 @@ class HeroCarousel extends StatefulWidget {
 
 class _HeroCarouselState extends State<HeroCarousel> {
   final controller = PageController();
+  final rotation = RotatingPagesController();
   Timer? timer;
   int page = 0;
   int pageCount = 1;
@@ -85,6 +87,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
   void dispose() {
     timer?.cancel();
     controller.dispose();
+    rotation.dispose();
     super.dispose();
   }
 
@@ -120,6 +123,82 @@ class _HeroCarouselState extends State<HeroCarousel> {
           widget.entries.first.number('height', count == 1 ? 300 : 220),
           floor: 120,
         );
+        Widget slide(int entryIndex) {
+          final original = widget.entries[entryIndex % widget.entries.length];
+          final entry = Entry(original.id, {
+            ...widget.appearance.data,
+            ...original.data,
+          });
+          void tap() {
+            Analytics.click(entry);
+            widget.onTap(entry.text('target'));
+          }
+
+          if (count == 1 && height >= 300 && c.maxWidth >= 700) {
+            return ImpressionOnce(
+              entry: entry,
+              child: HomeHeroSlide(entry: entry, onTap: tap),
+            );
+          }
+          return SizedBox(
+            height: double.infinity,
+            child: ImpressionOnce(
+              entry: entry,
+              child: CompactBanner(entry: entry, onTap: tap),
+            ),
+          );
+        }
+
+        // An admin-chosen animation (Settings -> Today's Offers) replaces the
+        // plain page swipe; with none chosen the PageView below is unchanged.
+        final motion = PromoMotion.from(
+          widget.appearance,
+          defaultIntervalMs: 6000,
+        );
+        if (motion != null) {
+          final carousel = motion.type == PromoAnimation.carousel;
+          final pages = carousel ? widget.entries.length : pageCount;
+          return Column(
+            children: [
+              SizedBox(
+                key: const ValueKey('banner-viewport'),
+                height: height,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(layout.radius),
+                  child: RotatingPages(
+                    key: ValueKey('offers-rotation-${motion.type.name}'),
+                    motion: motion,
+                    pageCount: pages,
+                    slotsPerView: count,
+                    reverse: widget.reverse,
+                    controller: rotation,
+                    pageBuilder: (context, index) => carousel
+                        ? Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: layout.gap / 2,
+                            ),
+                            child: slide(index),
+                          )
+                        : Row(
+                            children: [
+                              for (var offset = 0; offset < count; offset++) ...[
+                                if (offset > 0) SizedBox(width: layout.gap),
+                                Expanded(child: slide(index * count + offset)),
+                              ],
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+              RotatingDots(
+                controller: rotation,
+                count: pages,
+                tooltipFor: (i) =>
+                    'Show promotion {n}'.tr(context, {'n': '${i + 1}'}),
+              ),
+            ],
+          );
+        }
         return Column(
           children: [
             SizedBox(

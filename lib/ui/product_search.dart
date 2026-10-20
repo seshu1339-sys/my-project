@@ -6,6 +6,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/geocoding.dart';
 import '../services/location.dart';
+import '../services/location_town.dart';
 import 'design_tokens.dart';
 import 'details.dart';
 import 'location_picker.dart';
@@ -84,6 +85,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
         'Current GPS location',
         lat: position.latitude,
         lng: position.longitude,
+        town: await townForPoint(store, position.latitude, position.longitude),
       );
       if (mounted) setState(() => locating = false);
     } catch (e) {
@@ -105,7 +107,13 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       ),
     );
     if (place == null) return;
-    await store.setLocation(store.pincode, place.displayName, lat: place.latitude, lng: place.longitude);
+    await store.setLocation(
+      store.pincode,
+      place.displayName,
+      lat: place.latitude,
+      lng: place.longitude,
+      town: townForPlace(store, place),
+    );
     if (mounted) setState(() => locationError = null);
   }
 
@@ -117,7 +125,13 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       MaterialPageRoute(builder: (_) => MapPinPickerPage(initialCenter: initial)),
     );
     if (point == null) return;
-    await store.setLocation(store.pincode, 'Pinned location', lat: point.latitude, lng: point.longitude);
+    await store.setLocation(
+      store.pincode,
+      'Pinned location',
+      lat: point.latitude,
+      lng: point.longitude,
+      town: await townForPoint(store, point.latitude, point.longitude),
+    );
     if (mounted) setState(() => locationError = null);
   }
 

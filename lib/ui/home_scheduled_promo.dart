@@ -8,6 +8,7 @@ import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'home_impression_once.dart';
 import 'home_promo_card.dart';
+import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
 
 /// Each promotion owns its playback clock, dimensions and stop timer.
@@ -235,6 +236,7 @@ class ScheduledPromoCarousel extends StatefulWidget {
 
 class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
   final controller = PageController();
+  final rotation = RotatingPagesController();
   Timer? timer;
   int page = 0;
 
@@ -288,6 +290,7 @@ class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
   void dispose() {
     timer?.cancel();
     controller.dispose();
+    rotation.dispose();
     super.dispose();
   }
 
@@ -299,6 +302,37 @@ class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
       MediaQuery.sizeOf(context).width,
     );
     final height = layout.height(200, floor: 140);
+    // An admin-chosen animation (Settings -> Advertisements) replaces the
+    // plain swipe; with none chosen the PageView below is unchanged.
+    final motion = PromoMotion.from(widget.appearance, defaultIntervalMs: 4000);
+    if (motion != null) {
+      return Column(
+        children: [
+          SizedBox(
+            key: const ValueKey('ad-carousel-viewport'),
+            height: height,
+            child: RotatingPages(
+              key: ValueKey('ads-rotation-${motion.type.name}'),
+              motion: motion,
+              pageCount: widget.entries.length,
+              controller: rotation,
+              pageBuilder: (context, i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: ScheduledPromo(
+                  entry: widget.entries[i],
+                  heightOverride: height,
+                  onTap: () => widget.onTap(widget.entries[i].text('target')),
+                ),
+              ),
+            ),
+          ),
+          RotatingDots(
+            controller: rotation,
+            count: widget.entries.length,
+          ),
+        ],
+      );
+    }
     return Column(
       children: [
         SizedBox(

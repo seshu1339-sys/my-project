@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/towns.dart';
 import '../services/search.dart';
 import '../services/strings.dart';
 import 'home_ad_rail.dart';
 import 'home_categories_section.dart';
 import 'home_category_product_strip.dart';
 import 'home_footer_badges.dart';
+import 'home_no_offers.dart';
 import 'home_local_services_section.dart';
 import 'home_nearby_section.dart';
 import 'home_popular_section.dart';
@@ -112,13 +114,15 @@ class WireframeHome extends StatelessWidget {
           ),
         )
         .toList();
-    final offers = promotions
-        .where((e) => e.text('placement') == 'carousel')
-        .toList();
-    final ads = promotions.where((e) => e.text('placement') == 'ad').toList();
-    final boxes = promotions
-        .where((e) => e.text('placement') == 'box')
-        .toList();
+    // Location-tagged offers/ads: with a town chosen, only the ones listing it
+    // (else the general, all-town ones) -- see promotionsForTown.
+    List<Entry> forTown(String placement) => promotionsForTown(
+      promotions.where((e) => e.text('placement') == placement).toList(),
+      store.town,
+    ).entries;
+    final offers = forTown('carousel');
+    final ads = forTown('ad');
+    final boxes = forTown('box');
     final localServices = localServiceEntries(
       store,
       searchService,
@@ -301,7 +305,9 @@ class WireframeHome extends StatelessWidget {
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
-                        child: HeroCarousel(
+                        child: offers.isEmpty && store.town.isNotEmpty
+                            ? NoOffersNotice(store: store)
+                            : HeroCarousel(
                           entries: offers,
                           appearance: sectionConfig(settings, 'promo'),
                           onTap: onPromotion,

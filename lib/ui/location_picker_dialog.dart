@@ -3,7 +3,10 @@ import 'package:latlong2/latlong.dart';
 
 import '../data/store.dart';
 import '../services/geocoding.dart';
+import '../domain/towns.dart';
 import '../services/location.dart';
+import '../services/location_town.dart';
+import '../services/strings.dart';
 import 'location_picker.dart';
 import 'shared.dart';
 
@@ -33,6 +36,39 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                 'Set your pincode for local prices, or use GPS to find shops within their service radius.',
               ),
               const SizedBox(height: 16),
+              if (parseServiceTowns(store.business.text('serviceTowns'))
+                  .isNotEmpty) ...[
+                DropdownButtonFormField<String>(
+                  key: const ValueKey('town-picker'),
+                  initialValue:
+                      parseServiceTowns(store.business.text('serviceTowns'))
+                          .any((t) => t.name == store.town)
+                      ? store.town
+                      : null,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Your town'.tr(dialog),
+                  ),
+                  items: [
+                    for (final town in parseServiceTowns(
+                      store.business.text('serviceTowns'),
+                    ))
+                      DropdownMenuItem(value: town.name, child: Text(town.name)),
+                  ],
+                  onChanged: (value) async {
+                    if (value == null) return;
+                    await store.setLocation(
+                      store.pincode,
+                      store.address,
+                      lat: store.latitude,
+                      lng: store.longitude,
+                      town: value,
+                    );
+                    if (dialog.mounted) Navigator.pop(dialog);
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
               TextField(
                 controller: pin,
                 keyboardType: TextInputType.number,
@@ -68,6 +104,11 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                           : address.text.trim(),
                       lat: position.latitude,
                       lng: position.longitude,
+                      town: await townForPoint(
+                        store,
+                        position.latitude,
+                        position.longitude,
+                      ),
                     );
                     if (dialog.mounted) {
                       Navigator.pop(dialog);
@@ -97,6 +138,7 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                     place.displayName,
                     lat: place.latitude,
                     lng: place.longitude,
+                    town: townForPlace(store, place),
                   );
                   if (dialog.mounted) Navigator.pop(dialog);
                 },
@@ -121,6 +163,11 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                     'Pinned location',
                     lat: point.latitude,
                     lng: point.longitude,
+                    town: await townForPoint(
+                      store,
+                      point.latitude,
+                      point.longitude,
+                    ),
                   );
                   if (dialog.mounted) Navigator.pop(dialog);
                 },

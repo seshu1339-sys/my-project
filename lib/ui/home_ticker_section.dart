@@ -45,10 +45,17 @@ class HomeTickerSection extends StatelessWidget {
         : store.pincode.isNotEmpty
         ? store.pincode
         : 'your area'.tr(context);
-    final label = translations is Map && translations[store.language] != null
+    final customText = translations is Map && translations[store.language] != null
         ? translations[store.language].toString()
-        : ticker.text('text').isNotEmpty
-        ? ticker.text('text')
+        : ticker.text('text');
+    // With a town chosen the label names it automatically and follows every
+    // location change; custom wording is used only if it opts in with {town}.
+    final label = store.town.isNotEmpty
+        ? (customText.contains('{town}')
+              ? customText.replaceAll('{town}', store.town)
+              : 'Today\'s {town} Offers'.tr(context, {'town': store.town}))
+        : customText.isNotEmpty
+        ? customText
         : 'Today\'s Best Offers in {location}'.tr(context, {
             'location': location,
           });

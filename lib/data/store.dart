@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../domain/towns.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
 
@@ -68,6 +69,10 @@ class Store extends ChangeNotifier {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   String pincode = '',
       address = '',
+      // The customer's town (e.g. "Narsipatnam"), which decides which
+      // location-tagged offers/ads they see and names the offers ticker.
+      // '' until a location is chosen.
+      town = '',
       profileName = '',
       language = 'en',
       error = '';
@@ -114,6 +119,7 @@ class Store extends ChangeNotifier {
     }
     pincode = prefs.getString('pincode') ?? '';
     address = prefs.getString('address') ?? '';
+    town = prefs.getString('town') ?? '';
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
     final savedLanguage = prefs.getString('language');
@@ -252,14 +258,28 @@ class Store extends ChangeNotifier {
     String value, {
     double? lat,
     double? lng,
+    String? town,
   }) async {
+    // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
+    // coordinate refresh) must not forget a town the customer already picked.
+    final unchanged = town == null && pin == pincode && value == address;
+    final nextTown = unchanged
+        ? this.town
+        : resolveTown(
+            town: town,
+            pincode: pin,
+            address: value,
+            towns: parseServiceTowns(business.text('serviceTowns')),
+          );
     pincode = pin;
     address = value;
+    this.town = nextTown;
     latitude = lat;
     longitude = lng;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pincode', pin);
     await prefs.setString('address', value);
+    await prefs.setString('town', this.town);
     if (lat != null && lng != null) {
       await prefs.setDouble('latitude', lat);
       await prefs.setDouble('longitude', lng);

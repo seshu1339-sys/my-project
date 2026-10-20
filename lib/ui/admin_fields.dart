@@ -62,6 +62,8 @@ const fields = <String, Map<String, String>>{
     'placement': 'Display location',
     'notifySubscribers': 'Push notification to subscribers',
     'target': 'Click action (shops / shop:ID / services / category:ID / product:ID / https://…)',
+    'locations':
+        'Location — towns this shows in (blank = every town)',
     'targetPincode':
         'Show only in this pincode (optional — blank shows everywhere)',
     'targetLatitude':
@@ -106,6 +108,10 @@ const fields = <String, Map<String, String>>{
     'whatsapp': 'WhatsApp number (country code included)',
     'supportEmail':
         'Public support email (shown to everyone — never your personal inbox)',
+    'serviceTowns':
+        'Towns you serve (comma-separated; add =pincode|pincode to match by pincode, e.g. Narsipatnam=531116|531115, Anakapalle)',
+    'noOffersMessage':
+        'Message when a town has no offers (blank = default; {town} = town name)',
     'websiteUrl': 'Website URL',
     'vendorSignupUrl': 'Become a Seller URL (the separate vendor onboarding site; blank uses the default)',
     'description': 'Office / head office details',

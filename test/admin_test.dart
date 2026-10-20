@@ -479,6 +479,9 @@ void main() {
     // Never touches "Choose area on map" — only an unrelated field changes.
     await tester.enterText(find.widgetWithText(TextFormField, 'Headline / ticker text'), 'Polygon ad (updated)');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    // The form gained a Location field, so the button can sit just under the fold.
+    await tester.drag(formScrollable, const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

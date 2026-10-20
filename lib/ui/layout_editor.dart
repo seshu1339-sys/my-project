@@ -7,6 +7,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'color_picker_field.dart';
 import 'design_tokens.dart';
+import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
 import 'home_section_config.dart';
 import 'page_elements.dart';
@@ -111,6 +112,7 @@ enum _FieldKind {
   fontStyle,
   fontWeight,
   animation,
+  animationType,
   alignment,
   direction,
   number,
@@ -120,6 +122,7 @@ enum _FieldKind {
 const _toggleLabels = {
   'visible': 'Visible on the site',
   'scrollEnabled': 'Scroll enabled',
+  'pauseOnTouch': 'Pause when touched or hovered',
 };
 
 _FieldKind _kindOf(String key) {
@@ -130,6 +133,7 @@ _FieldKind _kindOf(String key) {
   if (key == 'fontStyle') return _FieldKind.fontStyle;
   if (key == 'fontWeight') return _FieldKind.fontWeight;
   if (key == 'animation') return _FieldKind.animation;
+  if (key == 'animationType') return _FieldKind.animationType;
   if (key == 'alignment') return _FieldKind.alignment;
   if (key == 'direction') return _FieldKind.direction;
   if (dimensionFields.containsKey(key)) return _FieldKind.number;
@@ -219,12 +223,14 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           // stored bool.
           values[key] = key == 'visible'
               ? componentVisible(saved, widget.component)
-              : saved.text(key, 'false') == 'true';
+              : saved.text(key, key == 'pauseOnTouch' ? 'true' : 'false') ==
+                    'true';
         case _FieldKind.color:
         case _FieldKind.fontFamily:
         case _FieldKind.fontStyle:
         case _FieldKind.fontWeight:
         case _FieldKind.animation:
+        case _FieldKind.animationType:
         case _FieldKind.alignment:
         case _FieldKind.direction:
           values[key] = saved.text(key);
@@ -481,6 +487,24 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
                   DropdownMenuItem(value: 'up', child: Text('Up')),
                   DropdownMenuItem(value: 'down', child: Text('Down')),
                 ],
+          onChanged: (v) => _setValue(key, v ?? ''),
+        );
+      case _FieldKind.animationType:
+        return DropdownButtonFormField<String>(
+          key: ValueKey('${widget.component}-$key'),
+          initialValue: promoAnimationLabels.containsKey(values[key])
+              ? values[key] as String
+              : '',
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Animation type'),
+          items: [
+            const DropdownMenuItem(
+              value: '',
+              child: Text('None (original behavior)'),
+            ),
+            for (final option in promoAnimationLabels.entries)
+              DropdownMenuItem(value: option.key, child: Text(option.value)),
+          ],
           onChanged: (v) => _setValue(key, v ?? ''),
         );
       case _FieldKind.animation:
