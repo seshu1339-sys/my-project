@@ -50,6 +50,7 @@ class WireframeHome extends StatelessWidget {
     required this.productsKey,
     this.wrapSection = _identitySection,
     this.wrapPromoItem = _identityPromoItem,
+    this.wrapCategoryItem = _identityCategoryItem,
   });
   final Store store;
   final TextEditingController search;
@@ -70,7 +71,11 @@ class WireframeHome extends StatelessWidget {
   // than per whole section — see HomeAdRail's own wrapItem doc comment for
   // why a single section-level wrap isn't enough for the ad/box rail.
   final Widget Function(Entry entry, String kind, Widget child) wrapPromoItem;
-  static Widget _identityPromoItem(Entry entry, String kind, Widget child) => child;
+  static Widget _identityPromoItem(Entry entry, String kind, Widget child) =>
+      child;
+  // Same hook, for one individual category tile.
+  final Widget Function(Entry category, Widget child) wrapCategoryItem;
+  static Widget _identityCategoryItem(Entry category, Widget child) => child;
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +89,11 @@ class WireframeHome extends StatelessWidget {
     // Products no longer duplicates them — searching still finds a service
     // by name, just rendered in the Local Services section instead.
     final products = searchService
-        .text(store.visible('products'), search.text, store.visible('categories'))
+        .text(
+          store.visible('products'),
+          search.text,
+          store.visible('categories'),
+        )
         .where((e) => e.text('kind') != 'service')
         .toList();
     final promotions = store
@@ -105,7 +114,11 @@ class WireframeHome extends StatelessWidget {
     final boxes = promotions
         .where((e) => e.text('placement') == 'box')
         .toList();
-    final localServices = localServiceEntries(store, searchService, search.text);
+    final localServices = localServiceEntries(
+      store,
+      searchService,
+      search.text,
+    );
     // Resolved purely from the already-loaded shops catalog (no new
     // Firestore read) so product cards can show the selling shop's name.
     final shopNameById = {
@@ -124,19 +137,29 @@ class WireframeHome extends StatelessWidget {
     // product-chip strip above.
     final scrolling = store
         .visible('settings')
-        .firstWhere((e) => e.id == 'scrollingText', orElse: () => const Entry('scrollingText', {}));
+        .firstWhere(
+          (e) => e.id == 'scrollingText',
+          orElse: () => const Entry('scrollingText', {}),
+        );
     final tickerTextValue = noticeTickerText(scrolling, store.language);
     final notice = scrolling.active && tickerTextValue.isNotEmpty
         ? Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TickerStrip(
               text: tickerTextValue,
-              textColor: colorFromHex(scrolling.text('textColor'), Colors.white),
-              backgroundColor: colorFromHex(scrolling.text('backgroundColor'), const Color(0xff174c38)),
+              textColor: colorFromHex(
+                scrolling.text('textColor'),
+                Colors.white,
+              ),
+              backgroundColor: colorFromHex(
+                scrolling.text('backgroundColor'),
+                const Color(0xff174c38),
+              ),
               fontFamily: scrolling.text('fontFamily'),
               fontSize: scrolling.number('fontSize', 12),
               fontWeight: FontWeight.values.firstWhere(
-                (weight) => weight.value == scrolling.number('fontWeight', 400).round(),
+                (weight) =>
+                    weight.value == scrolling.number('fontWeight', 400).round(),
                 orElse: () => FontWeight.normal,
               ),
               speed: scrolling.number('speed', 70).clamp(10, 300),
@@ -209,7 +232,9 @@ class WireframeHome extends StatelessWidget {
                 if (!store.live)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text('Demo marketplace • explore the experience'.tr(context)),
+                    child: Text(
+                      'Demo marketplace • explore the experience'.tr(context),
+                    ),
                   ),
                 if (store.error.isNotEmpty)
                   Text(
@@ -288,8 +313,13 @@ class WireframeHome extends StatelessWidget {
                         categories: categories,
                         categoriesKey: categoriesKey,
                         onCategory: onCategory,
-                        moreTileLayout: layoutFor(context, settings, 'moreCategoriesTile'),
+                        moreTileLayout: layoutFor(
+                          context,
+                          settings,
+                          'moreCategoriesTile',
+                        ),
                         wrapSection: wrapSection,
+                        wrapCategoryItem: wrapCategoryItem,
                       ),
                       'popular': HomePopularSection(
                         store: store,
@@ -326,7 +356,9 @@ class WireframeHome extends StatelessWidget {
                     // beside the "All Categories" button), so "right after
                     // the ticker" is simply "first".
                     const promoInsertAt = 0;
-                    final categoriesIndex = orderedSectionKeys.indexWhere((d) => d.key == 'categories');
+                    final categoriesIndex = orderedSectionKeys.indexWhere(
+                      (d) => d.key == 'categories',
+                    );
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -361,26 +393,39 @@ class WireframeHome extends StatelessWidget {
                                   if (ctx != null) {
                                     Scrollable.ensureVisible(
                                       ctx,
-                                      duration: const Duration(milliseconds: 350),
+                                      duration: const Duration(
+                                        milliseconds: 350,
+                                      ),
                                       curve: Curves.easeOut,
                                     );
                                   }
                                 },
                               ),
                               const SizedBox(width: 10),
-                              Expanded(child: wrapSection('notice', tickerSection)),
+                              Expanded(
+                                child: wrapSection('notice', tickerSection),
+                              ),
                             ],
                           ),
                         ),
-                        for (final (i, descriptor) in orderedSectionKeys.indexed) ...[
-                          wrapSection(descriptor.key, reorderedSections[descriptor.key]!),
+                        for (final (i, descriptor)
+                            in orderedSectionKeys.indexed) ...[
+                          wrapSection(
+                            descriptor.key,
+                            reorderedSections[descriptor.key]!,
+                          ),
                           if (carousel != null && i == promoInsertAt) carousel,
                           if (i == categoriesIndex)
                             HomeCategoryProductStrip(
                               title: 'Fresh Fruits & Vegetables'.tr(context),
                               icon: Icons.eco_outlined,
                               products: products
-                                  .where((p) => p.text('categoryId') == 'cat-vegetables' || p.text('categoryId') == 'cat-fruits')
+                                  .where(
+                                    (p) =>
+                                        p.text('categoryId') ==
+                                            'cat-vegetables' ||
+                                        p.text('categoryId') == 'cat-fruits',
+                                  )
                                   .toList(),
                               store: store,
                               onProduct: onProduct,
@@ -394,7 +439,11 @@ class WireframeHome extends StatelessWidget {
                             located: located,
                             shops: shops,
                             onLocation: onLocation,
-                            shopCardLayout: layoutFor(context, settings, 'nearbyShopCard'),
+                            shopCardLayout: layoutFor(
+                              context,
+                              settings,
+                              'nearbyShopCard',
+                            ),
                             wrapSection: wrapSection,
                           ),
                         ),

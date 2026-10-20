@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
@@ -14,7 +13,11 @@ import 'shared.dart';
 /// overrides this exactly as before — this only fills in when neither has
 /// set one.
 Entry _withAdBorderDefault(Entry entry) => entry.text('borderColor').isEmpty
-    ? Entry(entry.id, {...entry.data, 'borderColor': '#D32F2F', 'borderWidth': 2.0})
+    ? Entry(entry.id, {
+        ...entry.data,
+        'borderColor': '#D32F2F',
+        'borderWidth': 2.0,
+      })
     : entry;
 
 /// The wireframe draws every ADS box the exact same size. The per-ad
@@ -35,21 +38,6 @@ Entry _withUniformAdWidth(Entry merged, ComponentLayout adLayout) {
     data.remove('width');
   }
   return Entry(merged.id, data);
-}
-
-/// Commits one dimension (`width`/`height`) onto a single ad/box promotion
-/// doc, preserving every other field — the exact same read-merge-save
-/// pattern as `adjustSectionField` in `home_section_config.dart`, just
-/// targeting one `promotions` entry instead of a shared `settings/section_*`
-/// doc. This is what lets each ad/box be resized independently in the
-/// Visual Editor: dragging one never touches the shared `ads`/`boxes`
-/// appearance defaults, only this one entry's own `width`/`height`.
-Future<void> adjustPromoDimension(Store store, String id, String field, double value) async {
-  final current = store.entries('promotions').firstWhere(
-    (e) => e.id == id,
-    orElse: () => Entry(id, const {}),
-  );
-  await store.save('promotions', Entry(id, {...current.data, field: value}));
 }
 
 /// Merges each ad/box promotion with its section's shared appearance config
@@ -115,23 +103,29 @@ class HomeAdRail extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (ads.isNotEmpty && componentVisible(adsLabelLayout.entry, 'adsLabel'))
+              if (ads.isNotEmpty &&
+                  componentVisible(adsLabelLayout.entry, 'adsLabel'))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: wrapSection(
                     'adsLabel',
                     Text(
                       adsLabelLayout.entry.text('text', 'ADS').tr(context),
-                      style: sectionTextStyle(
-                        adsLabelLayout.entry,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ).copyWith(
-                        letterSpacing: 1.2,
-                        color: adsLabelLayout.entry.text('textColor').isEmpty
-                            ? AppTokens.textMuted
-                            : colorFromHex(adsLabelLayout.entry.text('textColor'), AppTokens.textMuted),
-                      ),
+                      style:
+                          sectionTextStyle(
+                            adsLabelLayout.entry,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ).copyWith(
+                            letterSpacing: 1.2,
+                            color:
+                                adsLabelLayout.entry.text('textColor').isEmpty
+                                ? AppTokens.textMuted
+                                : colorFromHex(
+                                    adsLabelLayout.entry.text('textColor'),
+                                    AppTokens.textMuted,
+                                  ),
+                          ),
                     ),
                   ),
                 ),
@@ -150,7 +144,10 @@ class HomeAdRail extends StatelessWidget {
                       // own title/description text wraps.
                       heightOverride: adLayout.height(240, floor: 120),
                       entry: _withAdBorderDefault(
-                        _withUniformAdWidth(Entry(ad.id, {...adLayout.entry.data, ...ad.data}), adLayout),
+                        _withUniformAdWidth(
+                          Entry(ad.id, {...adLayout.entry.data, ...ad.data}),
+                          adLayout,
+                        ),
                       ),
                       onTap: () => onPromotion(ad.text('target')),
                     ),
@@ -173,7 +170,10 @@ class HomeAdRail extends StatelessWidget {
                     box,
                     'box',
                     ScheduledPromo(
-                      entry: Entry(box.id, {...boxLayout.entry.data, ...box.data}),
+                      entry: Entry(box.id, {
+                        ...boxLayout.entry.data,
+                        ...box.data,
+                      }),
                       onTap: () => onPromotion(box.text('target')),
                     ),
                   ),

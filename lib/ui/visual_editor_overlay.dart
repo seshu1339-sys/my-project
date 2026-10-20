@@ -20,7 +20,13 @@ class EditorSelection extends ValueNotifier<String?> {
 /// axis the admin is actually moving, and only that axis gets written at the
 /// end — a pure-height drag must never also stamp a width value).
 class LiveResize {
-  const LiveResize(this.key, {required this.baseHeight, required this.baseWidth, this.height, this.width});
+  const LiveResize(
+    this.key, {
+    required this.baseHeight,
+    required this.baseWidth,
+    this.height,
+    this.width,
+  });
   final String key;
   final double baseHeight;
   final double baseWidth;
@@ -38,39 +44,78 @@ class ResizeController {
   final ValueNotifier<LiveResize?> _live = ValueNotifier(null);
   ValueListenable<LiveResize?> get live => _live;
 
-  void start(String key, {required double baseHeight, required double baseWidth}) {
+  void start(
+    String key, {
+    required double baseHeight,
+    required double baseWidth,
+  }) {
     final current = _live.value;
-    if (current != null && current.key == key) return; // a handle on this section is already mid-drag
+    if (current != null && current.key == key)
+      return; // a handle on this section is already mid-drag
     _live.value = LiveResize(key, baseHeight: baseHeight, baseWidth: baseWidth);
   }
 
   void updateHeight(String key, double deltaY) {
     final current = _live.value;
     if (current == null || current.key != key) return;
-    final next = ((current.height ?? current.baseHeight) + deltaY).clamp(40.0, 1200.0);
-    _live.value = LiveResize(key, baseHeight: current.baseHeight, baseWidth: current.baseWidth, height: next, width: current.width);
+    final next = ((current.height ?? current.baseHeight) + deltaY).clamp(
+      40.0,
+      1200.0,
+    );
+    _live.value = LiveResize(
+      key,
+      baseHeight: current.baseHeight,
+      baseWidth: current.baseWidth,
+      height: next,
+      width: current.width,
+    );
   }
 
   void updateWidth(String key, double deltaX) {
     final current = _live.value;
     if (current == null || current.key != key) return;
-    final next = ((current.width ?? current.baseWidth) + deltaX).clamp(80.0, 3840.0);
-    _live.value = LiveResize(key, baseHeight: current.baseHeight, baseWidth: current.baseWidth, height: current.height, width: next);
+    final next = ((current.width ?? current.baseWidth) + deltaX).clamp(
+      80.0,
+      3840.0,
+    );
+    _live.value = LiveResize(
+      key,
+      baseHeight: current.baseHeight,
+      baseWidth: current.baseWidth,
+      height: current.height,
+      width: next,
+    );
   }
 
   void updateCorner(String key, Offset delta) {
     final current = _live.value;
     if (current == null || current.key != key) return;
-    final nextH = ((current.height ?? current.baseHeight) + delta.dy).clamp(40.0, 1200.0);
-    final nextW = ((current.width ?? current.baseWidth) + delta.dx).clamp(80.0, 3840.0);
-    _live.value = LiveResize(key, baseHeight: current.baseHeight, baseWidth: current.baseWidth, height: nextH, width: nextW);
+    final nextH = ((current.height ?? current.baseHeight) + delta.dy).clamp(
+      40.0,
+      1200.0,
+    );
+    final nextW = ((current.width ?? current.baseWidth) + delta.dx).clamp(
+      80.0,
+      3840.0,
+    );
+    _live.value = LiveResize(
+      key,
+      baseHeight: current.baseHeight,
+      baseWidth: current.baseWidth,
+      height: nextH,
+      width: nextW,
+    );
   }
 
   // Writes only the axis(es) actually dragged — a pure-height drag must
   // never also stamp a width value onto the section, and vice versa. This is
   // the ONLY Firestore write the whole gesture makes: no mid-drag writes, so
   // no echo-triggered rebuild storm.
-  Future<void> end(String key, {required Future<void> Function(double) saveHeight, required Future<void> Function(double) saveWidth}) async {
+  Future<void> end(
+    String key, {
+    required Future<void> Function(double) saveHeight,
+    required Future<void> Function(double) saveWidth,
+  }) async {
     final current = _live.value;
     _live.value = null;
     if (current == null || current.key != key) return;
@@ -88,7 +133,12 @@ enum _ResizeAxis { height, width }
 /// Listens to [liveResize] directly so only this pill repaints during a drag,
 /// not the whole page.
 class _ResizeBadge extends StatelessWidget {
-  const _ResizeBadge({required this.liveResize, required this.sectionKey, required this.axis, this.vertical = false});
+  const _ResizeBadge({
+    required this.liveResize,
+    required this.sectionKey,
+    required this.axis,
+    this.vertical = false,
+  });
   final ValueListenable<LiveResize?> liveResize;
   final String sectionKey;
   final _ResizeAxis axis;
@@ -110,7 +160,14 @@ class _ResizeBadge extends StatelessWidget {
           boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
         ),
         child: value != null
-            ? Text('${value.round()}px', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))
+            ? Text(
+                '${value.round()}px',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
             : const Icon(Icons.drag_handle, size: 14, color: Colors.white),
       );
     },
@@ -151,7 +208,9 @@ class _PixelFieldState extends State<PixelField> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.valuePx.round().toString());
+    _controller = TextEditingController(
+      text: widget.valuePx.round().toString(),
+    );
   }
 
   @override
@@ -172,7 +231,8 @@ class _PixelFieldState extends State<PixelField> {
     super.dispose();
   }
 
-  void _commitPx(double px) => widget.onChangedPx(px.clamp(widget.minPx, widget.maxPx).toDouble());
+  void _commitPx(double px) =>
+      widget.onChangedPx(px.clamp(widget.minPx, widget.maxPx).toDouble());
 
   void _nudge(double deltaPx) => _commitPx(widget.valuePx + deltaPx);
 
@@ -180,7 +240,13 @@ class _PixelFieldState extends State<PixelField> {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      SizedBox(width: 48, child: Text(widget.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+      SizedBox(
+        width: 48,
+        child: Text(
+          widget.label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+      ),
       IconButton(
         key: ValueKey('px-minus-${widget.label}'),
         icon: const Icon(Icons.remove_circle_outline, size: 18),
@@ -196,7 +262,12 @@ class _PixelFieldState extends State<PixelField> {
           textAlign: TextAlign.center,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           style: const TextStyle(fontSize: 13),
-          decoration: const InputDecoration(isDense: true, suffixText: 'px', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8)),
+          decoration: const InputDecoration(
+            isDense: true,
+            suffixText: 'px',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          ),
           onSubmitted: (text) {
             final parsed = double.tryParse(text.trim());
             if (parsed != null) _commitPx(parsed);
@@ -243,6 +314,7 @@ class SectionTapRegion extends StatelessWidget {
     this.onCornerDragUpdate,
     this.onCornerDragEnd,
     this.number,
+    this.numberLabel,
     this.showNumber = false,
     required this.child,
   });
@@ -259,6 +331,10 @@ class SectionTapRegion extends StatelessWidget {
   // element at once, so an admin can see "which part is which" while
   // toggled on. Default off: it must never affect an unrelated render.
   final int? number;
+  // Overrides the badge text with a decimal sub-number ("24.2") for one
+  // item inside a repeating group -- takes priority over [number] when
+  // both are set.
+  final String? numberLabel;
   final bool showNumber;
   // Called with the dragged section's key when it's dropped onto this one.
   final ValueChanged<String>? onReorderDrop;
@@ -316,24 +392,40 @@ class SectionTapRegion extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               content,
-              if (showNumber && number != null)
+              if (showNumber && (number != null || numberLabel != null))
                 Positioned(
                   key: ValueKey('number-badge-$sectionKey'),
                   top: 4,
                   left: 4,
                   child: IgnorePointer(
                     child: Container(
-                      width: 22,
-                      height: 22,
+                      constraints: const BoxConstraints(
+                        minWidth: 22,
+                        minHeight: 22,
+                      ),
+                      padding: numberLabel != null
+                          ? const EdgeInsets.symmetric(horizontal: 6)
+                          : EdgeInsets.zero,
                       alignment: Alignment.center,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         color: Colors.black87,
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 4)],
+                        shape: numberLabel != null
+                            ? BoxShape.rectangle
+                            : BoxShape.circle,
+                        borderRadius: numberLabel != null
+                            ? BorderRadius.circular(11)
+                            : null,
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black38, blurRadius: 4),
+                        ],
                       ),
                       child: Text(
-                        '$number',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                        numberLabel ?? '$number',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
@@ -349,8 +441,18 @@ class SectionTapRegion extends StatelessWidget {
                         color: AppTokens.primary,
                         borderRadius: BorderRadius.circular(999),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                       if (reorderable) ...[
@@ -360,9 +462,15 @@ class SectionTapRegion extends StatelessWidget {
                           data: sectionKey,
                           feedback: Material(
                             color: Colors.transparent,
-                            child: _HandleIcon(icon: Icons.drag_indicator, filled: true),
+                            child: _HandleIcon(
+                              icon: Icons.drag_indicator,
+                              filled: true,
+                            ),
                           ),
-                          childWhenDragging: _HandleIcon(icon: Icons.drag_indicator, dim: true),
+                          childWhenDragging: _HandleIcon(
+                            icon: Icons.drag_indicator,
+                            dim: true,
+                          ),
                           child: const Tooltip(
                             message: 'Drag to reorder',
                             child: _HandleIcon(icon: Icons.drag_indicator),
@@ -383,9 +491,12 @@ class SectionTapRegion extends StatelessWidget {
                   ValueListenableBuilder<LiveResize?>(
                     valueListenable: liveResize!,
                     builder: (context, live, _) {
-                      if (live == null || live.key != sectionKey) return const SizedBox.shrink();
-                      final dw = (live.width ?? live.baseWidth) - live.baseWidth;
-                      final dh = (live.height ?? live.baseHeight) - live.baseHeight;
+                      if (live == null || live.key != sectionKey)
+                        return const SizedBox.shrink();
+                      final dw =
+                          (live.width ?? live.baseWidth) - live.baseWidth;
+                      final dh =
+                          (live.height ?? live.baseHeight) - live.baseHeight;
                       if (dw == 0 && dh == 0) return const SizedBox.shrink();
                       return Positioned(
                         key: ValueKey('ghost-outline-$sectionKey'),
@@ -397,7 +508,10 @@ class SectionTapRegion extends StatelessWidget {
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               color: AppTokens.primary.withValues(alpha: .08),
-                              border: Border.all(color: AppTokens.primary, width: 2),
+                              border: Border.all(
+                                color: AppTokens.primary,
+                                width: 2,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
@@ -432,11 +546,16 @@ class SectionTapRegion extends StatelessWidget {
                         key: ValueKey('resize-handle-top-$sectionKey'),
                         behavior: HitTestBehavior.opaque,
                         onVerticalDragStart: (_) => onHeightDragStart?.call(),
-                        onVerticalDragUpdate: (d) => onHeightDragUpdate!(-d.delta.dy),
+                        onVerticalDragUpdate: (d) =>
+                            onHeightDragUpdate!(-d.delta.dy),
                         onVerticalDragEnd: (_) => onHeightDragEnd?.call(),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.resizeRow,
-                          child: _ResizeBadge(liveResize: liveResize!, sectionKey: sectionKey, axis: _ResizeAxis.height),
+                          child: _ResizeBadge(
+                            liveResize: liveResize!,
+                            sectionKey: sectionKey,
+                            axis: _ResizeAxis.height,
+                          ),
                         ),
                       ),
                     ),
@@ -450,11 +569,16 @@ class SectionTapRegion extends StatelessWidget {
                         key: ValueKey('resize-handle-$sectionKey'),
                         behavior: HitTestBehavior.opaque,
                         onVerticalDragStart: (_) => onHeightDragStart?.call(),
-                        onVerticalDragUpdate: (d) => onHeightDragUpdate!(d.delta.dy),
+                        onVerticalDragUpdate: (d) =>
+                            onHeightDragUpdate!(d.delta.dy),
                         onVerticalDragEnd: (_) => onHeightDragEnd?.call(),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.resizeRow,
-                          child: _ResizeBadge(liveResize: liveResize!, sectionKey: sectionKey, axis: _ResizeAxis.height),
+                          child: _ResizeBadge(
+                            liveResize: liveResize!,
+                            sectionKey: sectionKey,
+                            axis: _ResizeAxis.height,
+                          ),
                         ),
                       ),
                     ),
@@ -470,11 +594,17 @@ class SectionTapRegion extends StatelessWidget {
                         key: ValueKey('resize-handle-left-$sectionKey'),
                         behavior: HitTestBehavior.opaque,
                         onHorizontalDragStart: (_) => onWidthDragStart?.call(),
-                        onHorizontalDragUpdate: (d) => onWidthDragUpdate!(-d.delta.dx),
+                        onHorizontalDragUpdate: (d) =>
+                            onWidthDragUpdate!(-d.delta.dx),
                         onHorizontalDragEnd: (_) => onWidthDragEnd?.call(),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.resizeColumn,
-                          child: _ResizeBadge(liveResize: liveResize!, sectionKey: sectionKey, axis: _ResizeAxis.width, vertical: true),
+                          child: _ResizeBadge(
+                            liveResize: liveResize!,
+                            sectionKey: sectionKey,
+                            axis: _ResizeAxis.width,
+                            vertical: true,
+                          ),
                         ),
                       ),
                     ),
@@ -488,11 +618,17 @@ class SectionTapRegion extends StatelessWidget {
                         key: ValueKey('resize-handle-width-$sectionKey'),
                         behavior: HitTestBehavior.opaque,
                         onHorizontalDragStart: (_) => onWidthDragStart?.call(),
-                        onHorizontalDragUpdate: (d) => onWidthDragUpdate!(d.delta.dx),
+                        onHorizontalDragUpdate: (d) =>
+                            onWidthDragUpdate!(d.delta.dx),
                         onHorizontalDragEnd: (_) => onWidthDragEnd?.call(),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.resizeColumn,
-                          child: _ResizeBadge(liveResize: liveResize!, sectionKey: sectionKey, axis: _ResizeAxis.width, vertical: true),
+                          child: _ResizeBadge(
+                            liveResize: liveResize!,
+                            sectionKey: sectionKey,
+                            axis: _ResizeAxis.width,
+                            vertical: true,
+                          ),
                         ),
                       ),
                     ),
@@ -600,7 +736,8 @@ Widget _cornerHandle({
     key: ValueKey('resize-handle-corner-$keySuffix-$sectionKey'),
     behavior: HitTestBehavior.opaque,
     onPanStart: (_) => onStart?.call(),
-    onPanUpdate: (d) => onUpdate(Offset(d.delta.dx * signX, d.delta.dy * signY)),
+    onPanUpdate: (d) =>
+        onUpdate(Offset(d.delta.dx * signX, d.delta.dy * signY)),
     onPanEnd: (_) => onEnd?.call(),
     child: MouseRegion(
       cursor: cursor,
@@ -610,7 +747,11 @@ Widget _cornerHandle({
 );
 
 class _HandleIcon extends StatelessWidget {
-  const _HandleIcon({required this.icon, this.filled = false, this.dim = false});
+  const _HandleIcon({
+    required this.icon,
+    this.filled = false,
+    this.dim = false,
+  });
   final IconData icon;
   final bool filled, dim;
 
@@ -624,7 +765,9 @@ class _HandleIcon extends StatelessWidget {
       decoration: BoxDecoration(
         color: filled ? AppTokens.primary : Colors.black87,
         shape: BoxShape.circle,
-        boxShadow: filled ? const [BoxShadow(color: Colors.black38, blurRadius: 6)] : null,
+        boxShadow: filled
+            ? const [BoxShadow(color: Colors.black38, blurRadius: 6)]
+            : null,
       ),
       child: Icon(icon, size: 16, color: Colors.white),
     ),

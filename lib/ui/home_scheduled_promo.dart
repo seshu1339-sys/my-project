@@ -12,7 +12,12 @@ import 'layout_settings.dart';
 
 /// Each promotion owns its playback clock, dimensions and stop timer.
 class ScheduledPromo extends StatefulWidget {
-  const ScheduledPromo({super.key, required this.entry, required this.onTap, this.heightOverride});
+  const ScheduledPromo({
+    super.key,
+    required this.entry,
+    required this.onTap,
+    this.heightOverride,
+  });
   final Entry entry;
   final VoidCallback onTap;
   // When set, replaces the usual admin-configured/responsive height
@@ -41,7 +46,10 @@ class _ScheduledPromoState extends State<ScheduledPromo>
     super.initState();
     // An ad scrolled out of view must not keep animating: it wastes battery
     // and produces frames nobody sees. Pause while hidden, resume when shown.
-    watch = Timer.periodic(const Duration(milliseconds: 400), (_) => syncVisibility());
+    watch = Timer.periodic(
+      const Duration(milliseconds: 400),
+      (_) => syncVisibility(),
+    );
   }
 
   void syncVisibility() {
@@ -49,12 +57,15 @@ class _ScheduledPromoState extends State<ScheduledPromo>
     final box = context.findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return;
     final window = Offset.zero & MediaQuery.sizeOf(context);
-    final visible = !(box.localToGlobal(Offset.zero) & box.size).intersect(window).isEmpty;
+    final visible = !(box.localToGlobal(Offset.zero) & box.size)
+        .intersect(window)
+        .isEmpty;
     if (visible == onScreen) return;
     onScreen = visible;
     if (!visible) {
       animation.stop();
-    } else if (!paused && widget.entry.text('scrollEnabled', 'false') == 'true') {
+    } else if (!paused &&
+        widget.entry.text('scrollEnabled', 'false') == 'true') {
       animation.repeat();
     }
   }
@@ -151,7 +162,10 @@ class _ScheduledPromoState extends State<ScheduledPromo>
                       offset: Offset(
                         0,
                         moving && !MediaQuery.of(context).disableAnimations
-                            ? (scrollsDown ? animation.value - 1 : -animation.value) * cycle
+                            ? (scrollsDown
+                                      ? animation.value - 1
+                                      : -animation.value) *
+                                  cycle
                             : 0,
                       ),
                       child: OverflowBox(
@@ -171,7 +185,11 @@ class _ScheduledPromoState extends State<ScheduledPromo>
                     right: 0,
                     top: 0,
                     child: IconButton(
-                      tooltip: (paused ? 'Resume advertisement' : 'Pause advertisement').tr(context),
+                      tooltip:
+                          (paused
+                                  ? 'Resume advertisement'
+                                  : 'Pause advertisement')
+                              .tr(context),
                       onPressed: () => setState(() {
                         paused = !paused;
                         if (paused) {
@@ -229,7 +247,8 @@ class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
   @override
   void didUpdateWidget(covariant ScheduledPromoCarousel old) {
     super.didUpdateWidget(old);
-    if (old.entries.length != widget.entries.length && page >= widget.entries.length) {
+    if (old.entries.length != widget.entries.length &&
+        page >= widget.entries.length) {
       page = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && controller.hasClients) controller.jumpToPage(0);
@@ -275,7 +294,10 @@ class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
   @override
   Widget build(BuildContext context) {
     if (widget.entries.isEmpty) return const SizedBox.shrink();
-    final layout = ComponentLayout(widget.appearance, MediaQuery.sizeOf(context).width);
+    final layout = ComponentLayout(
+      widget.appearance,
+      MediaQuery.sizeOf(context).width,
+    );
     final height = layout.height(200, floor: 140);
     return Column(
       children: [
@@ -288,8 +310,15 @@ class _ScheduledPromoCarouselState extends State<ScheduledPromoCarousel> {
             onPageChanged: (v) => setState(() => page = v),
             itemBuilder: (context, i) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
+              // Same shared height the viewport SizedBox above already
+              // uses, passed straight through -- without this, each card
+              // fell back to computing its OWN height from its own
+              // per-entry data, so ads with leftover individual height
+              // values visibly differed in size while swiping between
+              // them, even though the viewport slot was already uniform.
               child: ScheduledPromo(
                 entry: widget.entries[i],
+                heightOverride: height,
                 onTap: () => widget.onTap(widget.entries[i].text('target')),
               ),
             ),

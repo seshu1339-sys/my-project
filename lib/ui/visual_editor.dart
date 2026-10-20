@@ -7,24 +7,26 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/app_theme.dart';
 import '../services/search.dart';
+import 'element_groups.dart';
 import 'entry_editor.dart';
+import 'group_item_design_form.dart';
+import 'group_settings_page.dart';
 import 'layout_defaults.dart';
 import 'layout_editor.dart';
 import 'layout_settings.dart';
-import 'home_ad_rail.dart';
 import 'home_section_config.dart';
 import 'page_elements.dart';
 import 'shared.dart';
 import 'visual_editor_overlay.dart';
 import 'wireframe_home.dart';
 
-// Keys for individually-selectable ad/box promotions are namespaced with
-// this prefix (e.g. 'promo-<firestoreId>') so they can share EditorSelection
-// and ResizeController with the 7 layout-component keys without colliding —
-// no promotion id is ever itself a bare layout-component key.
+// Ads/boxes/carousel slides keep this exact prefix -- it predates
+// numbering (built for per-ad resize) and HomeAdRail's wrapItem callback
+// still produces it. Categories/cross-sell-strip items use their own
+// group's keyPrefix from element_groups.dart. isGroupSubKey/
+// groupCollectionForKey/groupSubIdForKey (element_groups.dart) handle all
+// of these generically from here on.
 const _promoKeyPrefix = 'promo-';
-bool _isPromoKey(String key) => key.startsWith(_promoKeyPrefix);
-String _promoId(String key) => key.substring(_promoKeyPrefix.length);
 
 // Numbered elements whose settings already live in their OWN dedicated
 // Firestore doc with their own full admin editor, rather than the generic
@@ -32,9 +34,7 @@ String _promoId(String key) => key.substring(_promoKeyPrefix.length);
 // element uses. Selecting one of these opens that existing editor instead
 // of the inline panel -- same "point at the real editor" pattern already
 // used below for Theme/Business Profile/Promotions.
-const _externalEditorKeys = {
-  'tickerMarquee': ('settings', 'scrollingText'),
-};
+const _externalEditorKeys = {'tickerMarquee': ('settings', 'scrollingText')};
 
 enum _PreviewWidth { desktop, tablet, mobile }
 
@@ -99,29 +99,40 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     super.dispose();
   }
 
-  void _previewOnly(String what) => message(context, '$what — open the live site to try this for real.');
+  void _previewOnly(String what) =>
+      message(context, '$what — open the live site to try this for real.');
 
-  // A selected key is either one of the 7 layout-component sections (backed
-  // by settings/section_<key>) or one individually-selected ad/box promotion
-  // (backed by its own promotions/<id> doc, key 'promo-<id>') — these two
-  // helpers are the ONE place that distinction is resolved, so selection,
-  // undo/redo, cancel and the percent fields all agree on where a key's data
-  // actually lives without duplicating this branch everywhere.
+  // A selected key is one of: a layout-component section (backed by
+  // settings/section_<key>), an item inside a repeating group (backed by
+  // its own doc in that group's real collection -- element_groups.dart
+  // resolves exactly which), or a key with its own fully separate editor
+  // (_externalEditorKeys). These two helpers are the ONE place that
+  // distinction is resolved, so selection, undo/redo, cancel and the
+  // design form all agree on where a key's data actually lives without
+  // duplicating this branch everywhere.
   Entry _currentEntryFor(String key) {
-    if (_isPromoKey(key)) {
-      return widget.store.entries('promotions').firstWhere((e) => e.id == _promoId(key), orElse: () => Entry(_promoId(key), const {}));
-    }
+    if (isGroupSubKey(key)) return groupSubEntry(widget.store, key);
     final external = _externalEditorKeys[key];
     if (external != null) {
-      return widget.store.entries(external.$1).firstWhere((e) => e.id == external.$2, orElse: () => Entry(external.$2, const {}));
+      return widget.store
+          .entries(external.$1)
+          .firstWhere(
+            (e) => e.id == external.$2,
+            orElse: () => Entry(external.$2, const {}),
+          );
     }
     return sectionConfig(widget.store.entries('settings'), key);
   }
 
   Future<void> _saveEntryFor(String key, Map<String, dynamic> data) {
-    if (_isPromoKey(key)) return widget.store.save('promotions', Entry(_promoId(key), data));
+    if (isGroupSubKey(key))
+      return widget.store.save(
+        groupCollectionForKey(key),
+        Entry(groupSubIdForKey(key), data),
+      );
     final external = _externalEditorKeys[key];
-    if (external != null) return widget.store.save(external.$1, Entry(external.$2, data));
+    if (external != null)
+      return widget.store.save(external.$1, Entry(external.$2, data));
     return widget.store.save('settings', Entry('section_$key', data));
   }
 
@@ -133,20 +144,48 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     selection.value = key;
   }
 
-  // "Go to number": typing a number and pressing Enter jumps straight to
-  // that element's edit panel exactly as if its live-preview region had
-  // been clicked -- it reuses `_select`, so undo/redo/cancel all work
-  // identically either way. Only numbered elements (currently the Header's
-  // 12 -- see page_elements.dart) can be reached this way yet.
+  // "Go to number": typing a number (plain "16" or a group item's own
+  // "16.2"), or an item's name, jumps straight to its edit panel exactly
+  // as if its live-preview region had been clicked -- it reuses `_select`,
+  // so undo/redo/cancel all work identically either way.
   void _goToNumber(String text) {
-    final number = int.tryParse(text.trim());
-    final element = number == null ? null : pageElementByNumber(number);
-    if (element == null) {
-      message(context, 'No numbered element #$text yet.');
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final key = _resolveGoTo(trimmed);
+    if (key == null) {
+      message(context, 'No element matching "$trimmed" yet.');
       return;
     }
-    _select(element.key);
+    _select(key);
     goToNumber.clear();
+  }
+
+  String? _resolveGoTo(String query) {
+    final dot = query.indexOf('.');
+    if (dot > 0) {
+      final main = int.tryParse(query.substring(0, dot));
+      final sub = int.tryParse(query.substring(dot + 1));
+      if (main != null && sub != null)
+        return resolveSubKey(widget.store, main, sub);
+      return null;
+    }
+    final number = int.tryParse(query);
+    if (number != null) return pageElementByNumber(number)?.key;
+    // Not a number at all -- search by name: every standalone element's
+    // own label, plus every group item's own content name (so typing
+    // "Fruits" finds that one category without knowing its number).
+    final lower = query.toLowerCase();
+    for (final element in pageElements) {
+      if (element.label.toLowerCase().contains(lower)) return element.key;
+    }
+    for (final group in elementGroups) {
+      final members = group.members(widget.store);
+      for (final member in members) {
+        if (member.text('name').toLowerCase().contains(lower))
+          return '${group.keyPrefix}-${member.id}';
+      }
+    }
+    return null;
   }
 
   Future<void> _closeSelection({required bool restoreSnapshot}) async {
@@ -196,10 +235,17 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   Future<void> _openFullEditor(String collection, {String? entryId}) async {
     final entry = entryId == null
         ? null
-        : widget.store.entries(collection).where((e) => e.id == entryId).firstOrNull;
+        : widget.store
+              .entries(collection)
+              .where((e) => e.id == entryId)
+              .firstOrNull;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EntryEditor(store: widget.store, collection: collection, entry: entry),
+        builder: (_) => EntryEditor(
+          store: widget.store,
+          collection: collection,
+          entry: entry,
+        ),
       ),
     );
   }
@@ -209,15 +255,18 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
   // or removing the logo photo can never touch the shop name, tagline, or
   // any other Business Profile field, even though they all live in the
   // same settings/business doc. Same read-merge-save shape as
-  // adjustSectionField/adjustPromoDimension elsewhere in this app for
-  // exactly this "touch one field only" need.
+  // adjustSectionField elsewhere in this app for exactly this "touch one
+  // field only" need.
   Future<void> _uploadLogo() async {
     try {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file == null) return;
       setState(() => _logoBusy = true);
       final url = await widget.store.upload(file);
-      await widget.store.save('settings', Entry('business', {...widget.store.business.data, 'imageUrl': url}));
+      await widget.store.save(
+        'settings',
+        Entry('business', {...widget.store.business.data, 'imageUrl': url}),
+      );
       if (mounted) message(context, 'Logo photo updated');
     } catch (e) {
       if (mounted) message(context, e);
@@ -231,7 +280,8 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     try {
       final data = {...widget.store.business.data}..remove('imageUrl');
       await widget.store.save('settings', Entry('business', data));
-      if (mounted) message(context, 'Logo photo removed — showing the fallback icon');
+      if (mounted)
+        message(context, 'Logo photo removed — showing the fallback icon');
     } catch (e) {
       if (mounted) message(context, e);
     } finally {
@@ -314,13 +364,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     _resize.start(key, baseHeight: h > 0 ? h : 240, baseWidth: w > 0 ? w : 600);
   }
 
-  Future<void> _saveHeight(String key, double h) => _isPromoKey(key)
-      ? adjustPromoDimension(widget.store, _promoId(key), 'height', h)
-      : adjustSectionHeight(widget.store, key, h);
+  Future<void> _saveHeight(String key, double h) =>
+      adjustSectionHeight(widget.store, key, h);
 
-  Future<void> _saveWidth(String key, double w) => _isPromoKey(key)
-      ? adjustPromoDimension(widget.store, _promoId(key), 'width', w)
-      : adjustSectionWidth(widget.store, key, w);
+  Future<void> _saveWidth(String key, double w) =>
+      adjustSectionWidth(widget.store, key, w);
 
   Future<void> _endResize(String key) => _resize.end(
     key,
@@ -328,37 +376,45 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     saveWidth: (w) => _saveWidth(key, w),
   );
 
-  // Wraps one individual ad/box promotion (not the whole rail — see
-  // home_ad_rail.dart's wrapItem doc comment) in the exact same
-  // SectionTapRegion/ResizeController machinery the 7 layout sections use,
-  // just keyed by its own Firestore id so each one is selected, resized and
-  // saved completely independently of its neighbors. Not reorderable here —
-  // ad/box order isn't part of this bug fix's scope.
-  Widget _wrapPromoItem(Entry entry, String kind, Widget child) {
-    final key = '$_promoKeyPrefix${entry.id}';
+  // Wraps one individual item inside a repeating group (one ad, one box,
+  // one category...) in click-to-select only -- deliberately NO resize
+  // handles, unlike a real section: size lives only on the group's own
+  // main number now (see element_groups.dart's doc comment), so an
+  // individual item can never drift to a different size than its
+  // siblings. Not reorderable here either -- group order comes from each
+  // item's own `order` field (edited in its content editor), not drag.
+  Widget _wrapGroupItem(String key, String label, Widget child) {
+    final position = subNumberForKey(widget.store, key);
     return SectionTapRegion(
       sectionKey: key,
-      label: kind == 'ad' ? 'Ad' : 'Box',
+      label: label,
       selection: selection,
       onSelect: _select,
-      liveResize: _resize.live,
-      onHeightDragStart: () => _startResize(key),
-      onHeightDragUpdate: (dy) => _resize.updateHeight(key, dy),
-      onHeightDragEnd: () => _endResize(key),
-      onWidthDragStart: () => _startResize(key),
-      onWidthDragUpdate: (dx) => _resize.updateWidth(key, dx),
-      onWidthDragEnd: () => _endResize(key),
-      onCornerDragStart: () => _startResize(key),
-      onCornerDragUpdate: (d) => _resize.updateCorner(key, d),
-      onCornerDragEnd: () => _endResize(key),
+      numberLabel: position == null ? null : '${position.$1}.${position.$2}',
+      showNumber: _showNumbers,
       child: child,
     );
   }
 
-  Future<void> _dropReorder(String draggedKey, {required String ontoKey}) async {
+  Widget _wrapPromoItem(Entry entry, String kind, Widget child) =>
+      _wrapGroupItem(
+        '$_promoKeyPrefix${entry.id}',
+        kind == 'ad' ? 'Ad' : 'Box',
+        child,
+      );
+
+  Future<void> _dropReorder(
+    String draggedKey, {
+    required String ontoKey,
+  }) async {
     final settings = widget.store.entries('settings');
     final ordered = [...reorderableHomeSections]
-      ..sort((a, b) => sectionOrder(settings, a.key).compareTo(sectionOrder(settings, b.key)));
+      ..sort(
+        (a, b) => sectionOrder(
+          settings,
+          a.key,
+        ).compareTo(sectionOrder(settings, b.key)),
+      );
     final oldIndex = ordered.indexWhere((d) => d.key == draggedKey);
     final newIndex = ordered.indexWhere((d) => d.key == ontoKey);
     if (oldIndex == -1 || newIndex == -1 || oldIndex == newIndex) return;
@@ -373,16 +429,15 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
         title: const Text('Visual Editor'),
         actions: [
           SizedBox(
-            width: 150,
+            width: 200,
             child: TextField(
               controller: goToNumber,
               decoration: const InputDecoration(
                 isDense: true,
-                labelText: 'Go to number',
+                labelText: 'Go to number or name',
                 prefixIcon: Icon(Icons.pin_outlined, size: 18),
                 border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
               onSubmitted: _goToNumber,
             ),
           ),
@@ -396,9 +451,18 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           const SizedBox(width: 12),
           SegmentedButton<_PreviewWidth>(
             segments: const [
-              ButtonSegment(value: _PreviewWidth.desktop, icon: Icon(Icons.desktop_windows_outlined)),
-              ButtonSegment(value: _PreviewWidth.tablet, icon: Icon(Icons.tablet_mac_outlined)),
-              ButtonSegment(value: _PreviewWidth.mobile, icon: Icon(Icons.phone_iphone_outlined)),
+              ButtonSegment(
+                value: _PreviewWidth.desktop,
+                icon: Icon(Icons.desktop_windows_outlined),
+              ),
+              ButtonSegment(
+                value: _PreviewWidth.tablet,
+                icon: Icon(Icons.tablet_mac_outlined),
+              ),
+              ButtonSegment(
+                value: _PreviewWidth.mobile,
+                icon: Icon(Icons.phone_iphone_outlined),
+              ),
             ],
             selected: {previewWidth},
             onSelectionChanged: (s) => setState(() => previewWidth = s.first),
@@ -449,7 +513,10 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                       data: _simulatedWidth == null
                           ? MediaQuery.of(context)
                           : MediaQuery.of(context).copyWith(
-                              size: Size(_simulatedWidth!, MediaQuery.sizeOf(context).height),
+                              size: Size(
+                                _simulatedWidth!,
+                                MediaQuery.sizeOf(context).height,
+                              ),
                             ),
                       // WireframeHome already scrolls itself internally
                       // (bound to `scroll` below) — wrapping it in a second,
@@ -465,7 +532,8 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                         searchService: const SmartSearch(),
                         onSearch: () => setState(() {}),
                         onLocation: () => _previewOnly('Location picker'),
-                        onAssistedSearch: (_) => _previewOnly('Voice/image search'),
+                        onAssistedSearch: (_) =>
+                            _previewOnly('Voice/image search'),
                         onServices: () => _previewOnly('Services page'),
                         onAccount: () => _previewOnly('Account page'),
                         onCart: () => _previewOnly('Cart page'),
@@ -478,6 +546,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                         productsKey: productsKey,
                         wrapSection: _wrapSection,
                         wrapPromoItem: _wrapPromoItem,
+                        wrapCategoryItem: (category, child) => _wrapGroupItem(
+                          'category-${category.id}',
+                          'Category',
+                          child,
+                        ),
                       ),
                     ),
                   ),
@@ -503,26 +576,36 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     ),
   );
 
-  // Matches _startResize's own "0/automatic" fallback, so the pixel value
-  // shown here is the same number a drag would start from, not a
-  // momentarily-misleading 0px.
-  double _displayHeight(String key) {
-    final h = _currentEntryFor(key).number('height', 0);
-    return h > 0 ? h : 240;
-  }
-
-  double _displayWidth(String key) {
-    final w = _currentEntryFor(key).number('width', 0);
-    return w > 0 ? w : 600;
-  }
-
   Widget _panelBody(String key) {
-    if (_isPromoKey(key)) {
-      return Center(
-        child: TextButton.icon(
-          icon: const Icon(Icons.open_in_new),
-          label: const Text('Edit target, schedule, image & more'),
-          onPressed: () => _openFullEditor('promotions', entryId: _promoId(key)),
+    if (isGroupSubKey(key)) {
+      final collection = groupCollectionForKey(key);
+      final id = groupSubIdForKey(key);
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.open_in_new),
+              label: const Text(
+                'Edit content (text, image, link, schedule...)',
+              ),
+              onPressed: () => _openFullEditor(collection, entryId: id),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Design only — size is set once for the whole group on its main number.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            GroupItemDesignForm(
+              key: ValueKey(key),
+              store: widget.store,
+              collection: collection,
+              id: id,
+              onSaved: _onAutoSaved,
+            ),
+          ],
         ),
       );
     }
@@ -578,7 +661,8 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                   width: 48,
                   height: 48,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, error, stack) => const SizedBox(width: 48, height: 48),
+                  errorBuilder: (_, error, stack) =>
+                      const SizedBox(width: 48, height: 48),
                 ),
               ),
             ),
@@ -606,6 +690,23 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     );
   }
 
+  // "16.2 – Fruits" for a group item (its own live display name, with the
+  // sub-number recomputed from current order -- never stored, so it can
+  // never drift from what "Go to number" would resolve right now), or the
+  // usual "N – Label" for everything else.
+  String _titleFor(String key) {
+    if (isGroupSubKey(key)) {
+      final position = subNumberForKey(widget.store, key);
+      final entry = _currentEntryFor(key);
+      final name = entry.text('name', 'Item');
+      return position == null ? name : '${position.$1}.${position.$2} – $name';
+    }
+    return numberedLabel(
+      key,
+      layoutComponents[key] ?? pageElementByKey(key)?.label ?? key,
+    );
+  }
+
   Widget _inlinePanel(String key) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -615,10 +716,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
           children: [
             Expanded(
               child: Text(
-                _isPromoKey(key)
-                    ? 'Advertisement / promo box'
-                    : numberedLabel(key, layoutComponents[key] ?? pageElementByKey(key)?.label ?? key),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                _titleFor(key),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             IconButton(
@@ -632,52 +734,53 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
               onPressed: _historyIndex < _history.length - 1 ? _redo : null,
             ),
             OutlinedButton(
-              onPressed: _closing ? null : () => _closeSelection(restoreSnapshot: true),
+              onPressed: _closing
+                  ? null
+                  : () => _closeSelection(restoreSnapshot: true),
               child: const Text('Cancel'),
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: _closing ? null : () => _closeSelection(restoreSnapshot: false),
+              onPressed: _closing
+                  ? null
+                  : () => _closeSelection(restoreSnapshot: false),
               child: _closing
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text('Done'),
             ),
           ],
         ),
       ),
-      // Promo items (ad/box) aren't part of the layoutComponents/
-      // LayoutFieldsForm system below (they're individual promotions/<id>
-      // docs, not settings/section_<key> docs) — so they get their own
-      // pixel width/height row here. The 7 layout sections don't: their
-      // Width/Height fields now live in LayoutFieldsForm itself (below,
-      // with a "px" suffix), so showing them twice in two different places
-      // would be confusing — one spot per field, not two.
-      if (_isPromoKey(key))
+      // Group items (one ad, one category, ...) deliberately get NO
+      // width/height row here -- size lives only on the group's own main
+      // number (its Width/Height fields are in LayoutFieldsForm, selected
+      // separately), so every item in a group is always the same size.
+      if (behaviorSettingsFields.containsKey(key))
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              PixelField(
-                label: 'Width',
-                valuePx: _displayWidth(key),
-                minPx: 80,
-                maxPx: 3840,
-                onChangedPx: (px) => _saveWidth(key, px),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              icon: const Icon(Icons.tune, size: 18),
+              label: const Text('Scrolling / behavior settings'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => GroupSettingsPage(
+                    store: widget.store,
+                    component: key,
+                    title: '${layoutComponents[key] ?? key} Settings',
+                    fields: behaviorSettingsFields[key]!,
+                  ),
+                ),
               ),
-              PixelField(
-                label: 'Height',
-                valuePx: _displayHeight(key),
-                minPx: 40,
-                maxPx: 1200,
-                onChangedPx: (px) => _saveHeight(key, px),
-              ),
-            ],
+            ),
           ),
         ),
       const Divider(),

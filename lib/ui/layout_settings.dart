@@ -66,8 +66,12 @@ const layoutComponents = <String, String>{
 };
 
 const _footerBadgeKeys = {
-  'footerBadge1', 'footerBadge2', 'footerBadge3',
-  'footerBadge4', 'footerBadge5', 'footerBadge6',
+  'footerBadge1',
+  'footerBadge2',
+  'footerBadge3',
+  'footerBadge4',
+  'footerBadge5',
+  'footerBadge6',
 };
 
 // Plain heading/label/button text on the non-homepage screens -- these
@@ -80,19 +84,33 @@ const _footerBadgeKeys = {
 // a deliberately broader brush than the homepage got, given how many of
 // these there are.
 const _otherScreenTextKeys = {
-  'productPageAddButton', 'productPageBuyButton',
-  'productPageRelatedHeading', 'productPageReviewsHeading',
-  'categoryPageHeading', 'cartEmptyMessage', 'cartSubmitButton',
-  'servicesPageAppBarTitle', 'shopsPageAppBarTitle', 'shopsPageHeading',
-  'shopPageDirectionsButton', 'shopPageRelatedHeading',
-  'accountPageAppBarTitle', 'accountDemoHeading', 'accountOrdersHeading',
-  'authFormHeading', 'wishlistDialogTitle',
+  'productPageAddButton',
+  'productPageBuyButton',
+  'productPageRelatedHeading',
+  'productPageReviewsHeading',
+  'categoryPageHeading',
+  'cartEmptyMessage',
+  'cartSubmitButton',
+  'servicesPageAppBarTitle',
+  'shopsPageAppBarTitle',
+  'shopsPageHeading',
+  'shopPageDirectionsButton',
+  'shopPageRelatedHeading',
+  'accountPageAppBarTitle',
+  'accountDemoHeading',
+  'accountOrdersHeading',
+  'authFormHeading',
+  'wishlistDialogTitle',
 };
 // A handful of these (the two-states-share-one-label case, like
 // 'categoryPageHeading' covering both "Subcategories" and "{n} products")
 // get styling only, no single sensible text override.
 const _otherScreenStyleOnly = {'categoryPageHeading'};
-const _otherScreenIconKeys = {'productPageShareIcon', 'productPageWishlistIcon', 'cartEmptyIcon'};
+const _otherScreenIconKeys = {
+  'productPageShareIcon',
+  'productPageWishlistIcon',
+  'cartEmptyIcon',
+};
 
 const dimensionFields = <String, (String, double, double)>{
   'width': ('Width (0 = automatic)', 0, 3840),
@@ -140,8 +158,17 @@ const dimensionFields = <String, (String, double, double)>{
 // all 4 since they're identical in shape (an icon, optionally swapped for
 // an image, with its own color/size/padding/background/visibility).
 const _iconExclusions = {
-  'fontSize', 'gap', 'margin', 'radius', 'borderWidth',
-  'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+  'fontSize',
+  'gap',
+  'margin',
+  'radius',
+  'borderWidth',
+  'width',
+  'minWidth',
+  'maxWidth',
+  'mobileWidth',
+  'tabletWidth',
+  'desktopWidth',
 };
 
 // Small fixed icon+text pieces (the "More Categories" tile, "ADS" label,
@@ -150,8 +177,16 @@ const _iconExclusions = {
 // fontSize/iconSize/padding since (unlike the plain icon buttons) these
 // have both an icon AND a text label.
 const _smallBadgeExclusions = {
-  'gap', 'margin', 'radius', 'borderWidth',
-  'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+  'gap',
+  'margin',
+  'radius',
+  'borderWidth',
+  'width',
+  'minWidth',
+  'maxWidth',
+  'mobileWidth',
+  'tabletWidth',
+  'desktopWidth',
 };
 
 List<String> componentFields(String component) => [
@@ -187,8 +222,17 @@ List<String> componentFields(String component) => [
               // Height (and minHeight/maxHeight/*Scale, which feed it) and
               // iconSize are the only ones that actually do anything here.
               'logo': {
-                'fontSize', 'gap', 'padding', 'radius', 'borderWidth',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'fontSize',
+                'gap',
+                'padding',
+                'radius',
+                'borderWidth',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
               },
               // 'title'/'user' are plain inline text (business name+tagline,
               // the greeting) with no box/decoration of their own -- same
@@ -197,31 +241,85 @@ List<String> componentFields(String component) => [
               // title is a plain inline Text with no box or icon of its own,
               // so those never did anything (shown-but-dead fields).
               'title': {
-                'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
-                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
+                'gap',
+                'padding',
+                'margin',
+                'radius',
+                'borderWidth',
+                'iconSize',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
+                'height',
+                'minHeight',
+                'maxHeight',
+                'mobileScale',
+                'tabletScale',
+                'desktopScale',
               },
               // 'tagline' is the small muted line under the title — same
               // shape as 'title' above.
               'tagline': {
-                'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
-                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
+                'gap',
+                'padding',
+                'margin',
+                'radius',
+                'borderWidth',
+                'iconSize',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
+                'height',
+                'minHeight',
+                'maxHeight',
+                'mobileScale',
+                'tabletScale',
+                'desktopScale',
               },
               // Also excludes height/minHeight/maxHeight/*Scale -- same
               // "shown-but-dead" fix as 'title' above (iconSize was already
               // excluded here).
               'user': {
-                'gap', 'padding', 'margin', 'radius', 'borderWidth', 'iconSize',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
-                'height', 'minHeight', 'maxHeight', 'mobileScale', 'tabletScale', 'desktopScale',
+                'gap',
+                'padding',
+                'margin',
+                'radius',
+                'borderWidth',
+                'iconSize',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
+                'height',
+                'minHeight',
+                'maxHeight',
+                'mobileScale',
+                'tabletScale',
+                'desktopScale',
               },
               // 'location' is a small pill (background + radius), no
               // width/padding/margin controls (it already sizes to its own
               // content, like the other inline header items).
               'location': {
-                'gap', 'padding', 'margin', 'borderWidth', 'iconSize',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'gap',
+                'padding',
+                'margin',
+                'borderWidth',
+                'iconSize',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
               },
               'notificationIcon': _iconExclusions,
               'wishlistIcon': _iconExclusions,
@@ -232,8 +330,15 @@ List<String> componentFields(String component) => [
               // block, but it has no gap/icon of its own and sizes to its
               // own content like the other inline header items.
               'office': {
-                'gap', 'iconSize', 'margin',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'gap',
+                'iconSize',
+                'margin',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
               },
               'popular': {'gap', 'iconSize'},
               'localServices': {'gap', 'iconSize'},
@@ -247,8 +352,14 @@ List<String> componentFields(String component) => [
               // padding (unlike the other small badges above) since those
               // all apply visibly to its own box.
               'nearbyShopCard': {
-                'gap', 'margin',
-                'width', 'minWidth', 'maxWidth', 'mobileWidth', 'tabletWidth', 'desktopWidth',
+                'gap',
+                'margin',
+                'width',
+                'minWidth',
+                'maxWidth',
+                'mobileWidth',
+                'tabletWidth',
+                'desktopWidth',
               },
               'footerBadge1': _smallBadgeExclusions,
               'footerBadge2': _smallBadgeExclusions,
@@ -256,14 +367,27 @@ List<String> componentFields(String component) => [
               'footerBadge4': _smallBadgeExclusions,
               'footerBadge5': _smallBadgeExclusions,
               'footerBadge6': _smallBadgeExclusions,
-              for (final key in _otherScreenTextKeys) key: _smallBadgeExclusions,
+              for (final key in _otherScreenTextKeys)
+                key: _smallBadgeExclusions,
               for (final key in _otherScreenIconKeys) key: _iconExclusions,
             }[component]?.contains(key) ??
             false),
   ),
   if (component == 'search') ...['voiceIconSize', 'imageIconSize'],
-  if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'imageHeight',
-  if (['categories', 'products', 'popular', 'localServices'].contains(component)) 'columns',
+  if ([
+    'categories',
+    'products',
+    'popular',
+    'localServices',
+  ].contains(component))
+    'imageHeight',
+  if ([
+    'categories',
+    'products',
+    'popular',
+    'localServices',
+  ].contains(component))
+    'columns',
   // Adjusts the brightness/contrast of the category tile and product card
   // photos themselves (see home_category_tile.dart/home_product_tile.dart)
   // -- not just a decorative section background like 'ads'/'boxes' below.
@@ -271,7 +395,8 @@ List<String> componentFields(String component) => [
   // the grid/card images there read 'products' (see wireframe_home.dart),
   // so a brightness field under 'popular' itself would be shown but dead,
   // exactly the mistake this round is fixing elsewhere.
-  if (['categories', 'products', 'localServices'].contains(component)) 'brightness',
+  if (['categories', 'products', 'localServices'].contains(component))
+    'brightness',
   if (['products', 'popular', 'localServices'].contains(component)) ...[
     'rows',
     'imageWidth',
@@ -283,10 +408,23 @@ List<String> componentFields(String component) => [
     'tabletRows',
     'desktopRows',
   ],
-  if (component == 'promo') ...['visibleCount', 'animationMs'],
-  if (['notice', 'ads', 'boxes'].contains(component)) 'speed',
-  if (['ads', 'boxes'].contains(component)) ...['stopAfter', 'brightness'],
+  // 'speed'/'direction'/'scrollEnabled'/'visibleCount'/'animationMs'/
+  // 'stopAfter' moved out to each section's own "<Name> Settings" page
+  // (group_settings_page.dart) -- behavior, not look, per the admin's own
+  // Design/Settings/Content split. 'brightness' stays here: it's the
+  // ad/box's own photo brightness, a real design property.
+  if (['ads', 'boxes'].contains(component)) 'brightness',
 ];
+
+/// The behavior-only field list for each section's own dedicated
+/// "Settings" page -- the exact fields removed from allFieldsFor above,
+/// kept in one place so neither list can silently drift from the other.
+const behaviorSettingsFields = <String, List<String>>{
+  'notice': ['speed', 'direction'],
+  'promo': ['visibleCount', 'animationMs'],
+  'ads': ['speed', 'direction', 'scrollEnabled', 'stopAfter'],
+  'boxes': ['speed', 'direction', 'scrollEnabled', 'stopAfter'],
+};
 
 /// Which `dimensionFields` keys are real pixel quantities (get a "px"
 /// suffix in the admin form) versus unitless multipliers/counts/other units
@@ -295,10 +433,27 @@ List<String> componentFields(String component) => [
 /// animationMs/stopAfter are milliseconds/seconds, brightness is a
 /// 0.2-2 multiplier.
 const pixelFields = <String>{
-  'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight',
-  'mobileWidth', 'tabletWidth', 'desktopWidth', 'padding', 'margin', 'gap',
-  'gapX', 'radius', 'borderWidth', 'fontSize', 'iconSize', 'voiceIconSize',
-  'imageIconSize', 'imageHeight', 'imageWidth',
+  'width',
+  'height',
+  'minWidth',
+  'maxWidth',
+  'minHeight',
+  'maxHeight',
+  'mobileWidth',
+  'tabletWidth',
+  'desktopWidth',
+  'padding',
+  'margin',
+  'gap',
+  'gapX',
+  'radius',
+  'borderWidth',
+  'fontSize',
+  'iconSize',
+  'voiceIconSize',
+  'imageIconSize',
+  'imageHeight',
+  'imageWidth',
 };
 
 /// Google Fonts offered in the admin's Font family picker — five general
@@ -307,8 +462,16 @@ const pixelFields = <String>{
 /// `GoogleFonts.getFont` in shared.dart's `sectionTextStyle`, so these must
 /// be the exact canonical Google Fonts family names.
 const fontFamilyOptions = <String>[
-  'Poppins', 'Roboto', 'Lato', 'Montserrat', 'Open Sans',
-  'Inter', 'Nunito', 'Noto Sans Telugu', 'Ramabhadra', 'Mallanna',
+  'Poppins',
+  'Roboto',
+  'Lato',
+  'Montserrat',
+  'Open Sans',
+  'Inter',
+  'Nunito',
+  'Noto Sans Telugu',
+  'Ramabhadra',
+  'Mallanna',
 ];
 
 // Components whose section container is wrapped in `LayoutSection`
@@ -318,7 +481,16 @@ const fontFamilyOptions = <String>[
 // DefaultTextStyle.merge. See wireframe_home.dart/home_ad_rail.dart/
 // responsive_header_bar.dart for where each is actually wrapped.
 const _animatedSections = {
-  'header', 'notice', 'promo', 'categories', 'popular', 'localServices', 'nearby', 'ads', 'boxes', 'background',
+  'header',
+  'notice',
+  'promo',
+  'categories',
+  'popular',
+  'localServices',
+  'nearby',
+  'ads',
+  'boxes',
+  'background',
 };
 // Has its own entryDecoration/sectionTextStyle call but isn't wrapped in its
 // own LayoutSection (no entrance animation of its own).
@@ -332,7 +504,10 @@ const _decoratedOnly = {'search'};
 /// apply) is what makes layout_editor.dart's form and this file's own
 /// render-time checks impossible to drift apart.
 const _iconOnlyComponents = {
-  'notificationIcon', 'wishlistIcon', 'cartIcon', 'menuIcon',
+  'notificationIcon',
+  'wishlistIcon',
+  'cartIcon',
+  'menuIcon',
   ..._otherScreenIconKeys,
 };
 // Elements that read like a small pill/block (background + border, but no
@@ -341,8 +516,14 @@ const _iconOnlyComponents = {
 // color option, matching 'products'/'location' which already had one.
 // The small home-page badges joined for the same reason.
 const _pillLikeComponents = {
-  'products', 'location', 'tagline', 'office',
-  'moreCategoriesTile', 'popularFilterChips', 'adsLabel', 'nearbyShopCard',
+  'products',
+  'location',
+  'tagline',
+  'office',
+  'moreCategoriesTile',
+  'popularFilterChips',
+  'adsLabel',
+  'nearbyShopCard',
   ..._footerBadgeKeys,
   ..._otherScreenTextKeys,
 };
@@ -351,15 +532,27 @@ const _pillLikeComponents = {
 // Business Profile/the shops catalog per-entry and has no single sensible
 // one-field override).
 final _textOverridable = {
-  'title', 'user', 'location', 'tagline',
-  'notice', 'categories', 'popular', 'localServices', 'nearby',
-  'moreCategoriesTile', 'adsLabel',
+  'title',
+  'user',
+  'location',
+  'tagline',
+  'notice',
+  'categories',
+  'popular',
+  'localServices',
+  'nearby',
+  'moreCategoriesTile',
+  'adsLabel',
   ..._footerBadgeKeys,
   ..._otherScreenTextKeys,
 }..removeAll(_otherScreenStyleOnly);
 // Has a swappable icon image (iconUrl) alongside its own text/box -- unlike
 // the plain icon-only header buttons, these also show a text label.
-const _iconReplaceableWithText = {'moreCategoriesTile', 'nearbyShopCard', ..._footerBadgeKeys};
+const _iconReplaceableWithText = {
+  'moreCategoriesTile',
+  'nearbyShopCard',
+  ..._footerBadgeKeys,
+};
 // Elements whose fallback icon (shown when no image is set) can be
 // recolored, without the rest of the full icon-button treatment
 // (background/replace-image) -- 'logo''s image already comes from
@@ -381,10 +574,22 @@ List<String> allFieldsFor(String component) {
   return [
     'visible',
     ...componentFields(component),
-    if (decorated) ...['backgroundColor', 'gradientStart', 'gradientEnd', 'borderColor']
-    else if (pillLike || iconOnly) ...['backgroundColor', 'borderColor'],
-    if (textStyled) ...['textColor', 'fontFamily', 'fontStyle', 'fontWeight']
-    else if (iconOnly || _iconTintable.contains(component)) 'textColor',
+    if (decorated) ...[
+      'backgroundColor',
+      'gradientStart',
+      'gradientEnd',
+      'borderColor',
+    ] else if (pillLike || iconOnly) ...[
+      'backgroundColor',
+      'borderColor',
+    ],
+    if (textStyled) ...[
+      'textColor',
+      'fontFamily',
+      'fontStyle',
+      'fontWeight',
+    ] else if (iconOnly || _iconTintable.contains(component))
+      'textColor',
     if (_textOverridable.contains(component)) 'text',
     if (animated) 'animation',
     // Lets an admin set a real photo behind the "Today's Best Offers"
@@ -392,10 +597,12 @@ List<String> allFieldsFor(String component) {
     // bar -- scoped to just 'notice' for now, the one place this was asked
     // for, rather than every decorated section at once.
     if (component == 'notice') 'backgroundImage',
-    if (['notice', 'ads', 'boxes'].contains(component)) 'direction',
-    if (['ads', 'boxes'].contains(component)) 'scrollEnabled',
-    if (['products', 'popular', 'localServices'].contains(component)) 'alignment',
-    if (component == 'services' || iconOnly || _iconReplaceableWithText.contains(component)) 'iconUrl',
+    if (['products', 'popular', 'localServices'].contains(component))
+      'alignment',
+    if (component == 'services' ||
+        iconOnly ||
+        _iconReplaceableWithText.contains(component))
+      'iconUrl',
   ];
 }
 
@@ -578,7 +785,9 @@ Widget applyEntranceAnimation(Entry entry, Widget child) {
     curve: Curves.easeOut,
     builder: (context, t, builtChild) {
       final faded = Opacity(opacity: t, child: builtChild);
-      return animation == 'slide' ? Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded) : faded;
+      return animation == 'slide'
+          ? Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded)
+          : faded;
     },
     child: child,
   );

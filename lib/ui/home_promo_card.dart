@@ -8,7 +8,12 @@ import 'design_tokens.dart';
 import 'shared.dart';
 
 class PromoCard extends StatelessWidget {
-  const PromoCard({super.key, required this.entry, required this.onTap, this.exactHeight});
+  const PromoCard({
+    super.key,
+    required this.entry,
+    required this.onTap,
+    this.exactHeight,
+  });
   final Entry entry;
   final VoidCallback onTap;
   // When set, pins the card body to exactly this height (clipping any
@@ -18,12 +23,17 @@ class PromoCard extends StatelessWidget {
   final double? exactHeight;
   @override
   Widget build(BuildContext context) {
-    final decoration = entryDecoration(entry, fallback: AppTokens.tintFor(entry.id.hashCode));
+    final decoration = entryDecoration(
+      entry,
+      fallback: AppTokens.tintFor(entry.id.hashCode),
+    );
     // The wireframe's "ADS" rail wants plain, uniform boxes -- no eyebrow
     // label, no countdown badge -- unlike other promo placements (boxes,
     // offers), which keep their full card treatment unchanged.
     final isAd = entry.text('placement') == 'ad';
-    final countdownSeconds = isAd ? 0 : entry.number('countdownSeconds', 0).round();
+    final countdownSeconds = isAd
+        ? 0
+        : entry.number('countdownSeconds', 0).round();
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(
@@ -34,7 +44,12 @@ class PromoCard extends StatelessWidget {
         onTap: onTap,
         child: Stack(
           children: [
-            _CardBody(entry: entry, decoration: decoration, showEyebrow: !isAd, exactHeight: exactHeight),
+            _CardBody(
+              entry: entry,
+              decoration: decoration,
+              showEyebrow: !isAd,
+              exactHeight: exactHeight,
+            ),
             if (countdownSeconds > 0)
               Positioned(
                 top: 8,
@@ -64,7 +79,9 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
     super.initState();
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => remaining = remaining > 0 ? remaining - 1 : widget.seconds);
+      setState(
+        () => remaining = remaining > 0 ? remaining - 1 : widget.seconds,
+      );
     });
   }
 
@@ -91,7 +108,11 @@ class _CountdownBadgeState extends State<_CountdownBadge> {
           const SizedBox(width: 4),
           Text(
             '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}',
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -113,98 +134,130 @@ class _CardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final container = Container(
-          decoration: decoration.boxShadow == null
-              ? decoration.copyWith(boxShadow: AppTokens.shadowSoft)
-              : decoration,
-          child: ConstrainedBox(
-            constraints: exactHeight != null
-                ? BoxConstraints.tightFor(height: exactHeight)
-                : BoxConstraints(
-                    minHeight: clampedNumber(entry, 'height', 200, 100, 1200),
-                  ),
-            child: LayoutBuilder(
-              builder: (context, c) => Padding(
-                padding: EdgeInsets.all(
-                  clampedNumber(entry, 'padding', 24, 0, c.maxWidth / 8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (entry.text('imageUrl').isNotEmpty)
-                      ProductArt(entry, height: 100, appearance: entry),
-                    if (showEyebrow) ...[
-                      Text(
-                        (entry.text('placement') == 'ad'
-                                ? 'NEIGHBOURHOOD SPOTLIGHT'
-                                : 'CURATED FOR YOU')
-                            .tr(context),
-                        style: TextStyle(
-                          fontSize: clampedNumber(
-                            entry,
-                            'labelFontSize',
-                            10,
-                            10,
-                            24,
-                          ),
-                          color: colorFromHex(
-                            entry.text('textColor'),
-                            AppTokens.primaryDark,
-                          ),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.6,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+      decoration: decoration.boxShadow == null
+          ? decoration.copyWith(boxShadow: AppTokens.shadowSoft)
+          : decoration,
+      child: ConstrainedBox(
+        constraints: exactHeight != null
+            ? BoxConstraints.tightFor(height: exactHeight)
+            : BoxConstraints(
+                minHeight: clampedNumber(entry, 'height', 200, 100, 1200),
+              ),
+        child: LayoutBuilder(
+          builder: (context, c) => Padding(
+            padding: EdgeInsets.all(
+              clampedNumber(entry, 'padding', 24, 0, c.maxWidth / 8),
+            ),
+            // A fixed exactHeight is a hard, uncompromising cap (every
+            // ad/box in a group must be the exact same size) -- with
+            // sufficiently extreme admin-chosen font size/padding, the
+            // content can genuinely need more room than that cap
+            // allows even after the maxLines/ellipsis truncation
+            // below. FittedBox shrinks the whole block to fit instead
+            // of overflowing in that edge case, and is a complete
+            // no-op (scale 1.0) whenever content already fits, so the
+            // normal case renders exactly as before.
+            child: _maybeFitted(
+              exactHeight != null,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: exactHeight != null
+                    ? MainAxisSize.min
+                    : MainAxisSize.max,
+                children: [
+                  if (entry.text('imageUrl').isNotEmpty)
+                    ProductArt(entry, height: 100, appearance: entry),
+                  if (showEyebrow) ...[
                     Text(
-                      entry.text('name'),
-                      maxLines: exactHeight == null ? null : 2,
-                      overflow: exactHeight == null ? null : TextOverflow.ellipsis,
+                      (entry.text('placement') == 'ad'
+                              ? 'NEIGHBOURHOOD SPOTLIGHT'
+                              : 'CURATED FOR YOU')
+                          .tr(context),
                       style: TextStyle(
-                        fontSize: clampedNumber(entry, 'fontSize', 25, 10, 40),
-                        fontWeight: FontWeight.values.firstWhere(
-                          (weight) =>
-                              weight.value == entry.number('fontWeight', 700),
-                          orElse: () => FontWeight.w700,
+                        fontSize: clampedNumber(
+                          entry,
+                          'labelFontSize',
+                          10,
+                          10,
+                          24,
                         ),
                         color: colorFromHex(
                           entry.text('textColor'),
-                          AppTokens.textPrimary,
+                          AppTokens.primaryDark,
                         ),
-                        height: 1.1,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.6,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      entry.text('description'),
-                      // A fixed-height card (the ad rail's uniform boxes)
-                      // can't let the description grow with its own text --
-                      // one line, truncated, keeps every box the same size
-                      // regardless of how long the admin's copy is.
-                      maxLines: exactHeight == null ? null : 1,
-                      overflow: exactHeight == null ? null : TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorFromHex(
-                          entry.text('textColor'),
-                          AppTokens.textMuted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Icon(Icons.arrow_forward, color: colorFromHex(entry.text('textColor'), AppTokens.primary)),
+                    const SizedBox(height: 20),
                   ],
-                ),
+                  Text(
+                    entry.text('name'),
+                    maxLines: exactHeight == null ? null : 2,
+                    overflow: exactHeight == null
+                        ? null
+                        : TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: clampedNumber(entry, 'fontSize', 25, 10, 40),
+                      fontWeight: FontWeight.values.firstWhere(
+                        (weight) =>
+                            weight.value == entry.number('fontWeight', 700),
+                        orElse: () => FontWeight.w700,
+                      ),
+                      color: colorFromHex(
+                        entry.text('textColor'),
+                        AppTokens.textPrimary,
+                      ),
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    entry.text('description'),
+                    // A fixed-height card (the ad rail's uniform boxes)
+                    // can't let the description grow with its own text --
+                    // one line, truncated, keeps every box the same size
+                    // regardless of how long the admin's copy is.
+                    maxLines: exactHeight == null ? null : 1,
+                    overflow: exactHeight == null
+                        ? null
+                        : TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorFromHex(
+                        entry.text('textColor'),
+                        AppTokens.textMuted,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Icon(
+                    Icons.arrow_forward,
+                    color: colorFromHex(
+                      entry.text('textColor'),
+                      AppTokens.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-        );
+        ),
+      ),
+    );
     // Content that doesn't fit within exactHeight is clipped rather than
     // bleeding past the box's own bounds or growing the box -- this is
     // what actually guarantees uniform visible size; a bare BoxConstraints
     // tight height alone doesn't stop a Column from painting past it.
     return exactHeight == null ? container : ClipRect(child: container);
   }
+
+  // Wraps [child] in a FittedBox(scaleDown) only when [enabled] -- a
+  // complete no-op (scale 1.0) whenever the child already fits its given
+  // space, so this only ever changes anything in the rare extreme-values
+  // case a FittedBox is meant to guard against.
+  Widget _maybeFitted(bool enabled, Widget child) =>
+      enabled ? FittedBox(fit: BoxFit.scaleDown, child: child) : child;
 }
 
 class CompactBanner extends StatelessWidget {
