@@ -330,8 +330,18 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
-    await tester.pumpWidget(MaterialApp(home: ServicesPage(store: store)));
-    await tester.enterText(find.byType(TextField), 'Plumbing');
+    await tester.runAsync(() async {
+      await tester.pumpWidget(MaterialApp(home: ServicesPage(store: store)));
+      await tester.pump();
+    });
+    // The top search box filters the A-Z list of fixed service TYPES, not
+    // vendor listings directly -- typing the type's own name narrows to
+    // "Plumber", then drilling into it shows that type's real listings
+    // (matched by shared word stem, since "Plumbing visit" and "Plumber"
+    // are different words neither containing the other).
+    await tester.enterText(find.byType(TextField), 'Plumber');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(ListTile, 'Plumber'));
     await tester.pump();
     await tester.tap(find.text('Plumbing visit'));
     await tester.pump();

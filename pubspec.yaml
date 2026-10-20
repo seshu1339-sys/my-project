@@ -79,6 +79,43 @@ flutter:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 
+  # Service-type browse grid (Services page): the WebP photos are the ones
+  # actually shipped to the app; the same-named .png files next to them in
+  # assets/services/ are kept on disk as full-quality backups only and are
+  # deliberately NOT listed here, so they're never bundled into the app.
+  assets:
+    - assets/services/services_list.json
+    - assets/services/plumber.webp
+    - assets/services/electrician.webp
+    - assets/services/carpenter.webp
+    - assets/services/painter.webp
+    - assets/services/ac_repair.webp
+    - assets/services/fridge_repair.webp
+    - assets/services/washing_machine_repair.webp
+    - assets/services/tv_repair.webp
+    - assets/services/mobile_repair.webp
+    - assets/services/computer_repair.webp
+    - assets/services/ro_water_purifier.webp
+    - assets/services/geyser_repair.webp
+    - assets/services/inverter_and_battery.webp
+    - assets/services/cctv_installation.webp
+    - assets/services/mason.webp
+    - assets/services/tiles_work.webp
+    - assets/services/welder.webp
+    - assets/services/house_cleaning.webp
+    - assets/services/bathroom_cleaning.webp
+    - assets/services/sofa_cleaning.webp
+    - assets/services/pest_control.webp
+    - assets/services/water_tank_cleaning.webp
+    - assets/services/gardener.webp
+    - assets/services/bike_mechanic.webp
+    - assets/services/car_mechanic.webp
+    - assets/services/packers_and_movers.webp
+    - assets/services/cook.webp
+    - assets/services/tailor.webp
+    - assets/services/beautician.webp
+    - assets/services/tutor.webp
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
