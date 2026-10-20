@@ -1,0 +1,17 @@
+{
+  "planned": {
+    "category_images": 30,
+    "product_images": 450,
+    "total_images": 480,
+    "products_per_category": 15
+  },
+  "generated": {
+    "category_images": 30,
+    "product_images": 128
+  },
+  "retained_extra_images": 29,
+  "pending": 315,
+  "generating": 7,
+  "remaining": 322,
+  "failed": 0
+}

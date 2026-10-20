@@ -1,0 +1,24 @@
+{
+  "completion_status": "in_progress",
+  "verified_at_utc": "2026-10-20T07:43:45.951Z",
+  "planned": {
+    "category_images": 30,
+    "product_images": 450,
+    "total_images": 480,
+    "products_per_category": 15
+  },
+  "actual_readable_images": {
+    "categories": 30,
+    "products": 105
+  },
+  "total_readable_images": 135,
+  "remaining_images": 345,
+  "generation_states": {
+    "generated": 135,
+    "pending": 345
+  },
+  "total_image_bytes": 16568856,
+  "exact_duplicate_images": [],
+  "errors": [],
+  "all_generated_files_valid": true
+}

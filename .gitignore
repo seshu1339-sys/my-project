@@ -65,3 +65,6 @@ functions/.env.local
 # -- neither is needed in version control.
 assets/services/*.png
 assets/services/samples/
+
+# Generated image batches / zips / contact sheets (large, reproducible)
+output/

@@ -1,0 +1,112 @@
+{
+  "category_groups": {
+    "reviewed": 30,
+    "status": "passed_visual_review",
+    "checks": [
+      "5-6 representative product types",
+      "photorealistic grouped composition",
+      "white background",
+      "category match",
+      "no visible branding or watermark"
+    ]
+  },
+  "product_categories": {
+    "fresh_vegetables": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct product",
+        "complete recognizable product",
+        "white background",
+        "distinct original images"
+      ],
+      "original_reviewed_count": 20,
+      "retained_extra_images_reviewed": 5
+    },
+    "fresh_fruits": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ],
+      "original_reviewed_count": 20,
+      "retained_extra_images_reviewed": 5
+    },
+    "dairy_bakery": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ],
+      "original_reviewed_count": 20,
+      "retained_extra_images_reviewed": 5
+    },
+    "grocery_staples": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ],
+      "original_reviewed_count": 20,
+      "retained_extra_images_reviewed": 5
+    },
+    "rice_dal_grains": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ],
+      "original_reviewed_count": 20,
+      "retained_extra_images_reviewed": 5
+    },
+    "snacks_beverages": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ]
+    },
+    "personal_care": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ]
+    },
+    "household_essentials": {
+      "reviewed": 15,
+      "status": "passed_visual_review",
+      "checks": [
+        "correct category and product",
+        "recognizable complete product",
+        "white/light neutral background",
+        "no visible branding or watermark",
+        "distinct product photos"
+      ]
+    }
+  }
+}

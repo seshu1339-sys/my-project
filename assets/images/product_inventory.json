@@ -1,0 +1,1625 @@
+{
+  "schema_version": 1,
+  "scope": "Local review library only; no app integration, listing updates, uploads, or deployment.",
+  "target_category_images": 30,
+  "target_product_images": 450,
+  "source_catalog": "locamarket_products.csv",
+  "category_name_policy": "Existing display names preserved where available. Grocery subcategories retain Atta, Flours & Sooji; Cooking Oils & Ghee; Masalas & Spices. Household Essentials contains utilities; Cleaning Products contains chemicals and cleaning tools. Clothing & Fashion contains unisex basics; dedicated men's, women's and kids' categories contain their own distinct garments.",
+  "categories": [
+    {
+      "id": "fresh_vegetables",
+      "name": "Fresh & Vegetables",
+      "requested_name": "Fresh Vegetables",
+      "display_order": 1,
+      "category_group_products": "tomatoes, purple brinjals, okra, carrots, leafy amaranth, green capsicum",
+      "subcategories": [
+        {
+          "id": "everyday_vegetables",
+          "name": "Everyday Vegetables",
+          "products": [
+            "Fresh Tomato",
+            "Red Onion",
+            "Potato",
+            "Carrot"
+          ],
+          "retained_extra_products": [
+            "Beetroot"
+          ]
+        },
+        {
+          "id": "gourds_and_pods",
+          "name": "Gourds And Pods",
+          "products": [
+            "Bottle Gourd",
+            "Ridge Gourd",
+            "Bitter Gourd",
+            "Snake Gourd"
+          ],
+          "retained_extra_products": [
+            "Drumstick Pods"
+          ]
+        },
+        {
+          "id": "green_vegetables",
+          "name": "Green Vegetables",
+          "products": [
+            "Purple Brinjal",
+            "Okra",
+            "Green Capsicum",
+            "Green Peas"
+          ],
+          "retained_extra_products": [
+            "French Beans"
+          ]
+        },
+        {
+          "id": "leafy_and_aromatics",
+          "name": "Leafy And Aromatics",
+          "products": [
+            "Spinach Bunch",
+            "Amaranth Leaves",
+            "Coriander Leaves"
+          ],
+          "retained_extra_products": [
+            "Curry Leaves",
+            "Fresh Ginger"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fresh_fruits",
+      "name": "Fruits",
+      "requested_name": "Fresh Fruits",
+      "display_order": 2,
+      "category_group_products": "mangoes, bananas, apples, pomegranate, guava, green grapes",
+      "subcategories": [
+        {
+          "id": "local_fruits",
+          "name": "Local Fruits",
+          "products": [
+            "Banganapalli Mango",
+            "Banana Bunch",
+            "Guava",
+            "Papaya"
+          ],
+          "retained_extra_products": [
+            "Sapota"
+          ]
+        },
+        {
+          "id": "orchard_fruits",
+          "name": "Orchard Fruits",
+          "products": [
+            "Red Apple",
+            "Orange",
+            "Pomegranate",
+            "Mosambi Sweet Lime"
+          ],
+          "retained_extra_products": [
+            "Pear"
+          ]
+        },
+        {
+          "id": "melons_and_tropical",
+          "name": "Melons And Tropical",
+          "products": [
+            "Watermelon",
+            "Muskmelon",
+            "Pineapple",
+            "Tender Coconut"
+          ],
+          "retained_extra_products": [
+            "Dragon Fruit"
+          ]
+        },
+        {
+          "id": "seasonal_fruits",
+          "name": "Seasonal Fruits",
+          "products": [
+            "Green Grapes",
+            "Black Grapes",
+            "Custard Apple"
+          ],
+          "retained_extra_products": [
+            "Strawberries",
+            "Fresh Figs"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dairy_bakery",
+      "name": "Dairy & Bakery",
+      "requested_name": "Dairy & Bakery",
+      "display_order": 3,
+      "category_group_products": "milk in glass bottle, curd in bowl, paneer block, butter, sliced bread loaf, bread buns",
+      "subcategories": [
+        {
+          "id": "milk_and_cultured",
+          "name": "Milk And Cultured",
+          "products": [
+            "Fresh Milk Glass Bottle",
+            "Set Curd Bowl",
+            "Buttermilk Bottle",
+            "Plain Yogurt Cup"
+          ],
+          "retained_extra_products": [
+            "Fresh Cream Jar"
+          ]
+        },
+        {
+          "id": "cheese_and_spreads",
+          "name": "Cheese And Spreads",
+          "products": [
+            "Paneer Block",
+            "Butter Block",
+            "Cheese Slices",
+            "Cheddar Cheese Block"
+          ],
+          "retained_extra_products": [
+            "Cream Cheese Tub"
+          ]
+        },
+        {
+          "id": "breads",
+          "name": "Breads",
+          "products": [
+            "White Bread Loaf",
+            "Whole Wheat Bread Loaf",
+            "Milk Bread Buns",
+            "Pav Bread Rolls"
+          ],
+          "retained_extra_products": [
+            "Garlic Bread Baguette"
+          ]
+        },
+        {
+          "id": "bakery",
+          "name": "Bakery",
+          "products": [
+            "Plain Tea Cake",
+            "Butter Croissant",
+            "Chocolate Muffin"
+          ],
+          "retained_extra_products": [
+            "Fruit Rusk",
+            "Khari Puff Biscuits"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grocery_staples",
+      "name": "Grocery & Staples",
+      "requested_name": "Grocery & Staples",
+      "display_order": 4,
+      "category_group_products": "wheat flour in plain bowl, sunflower oil bottle, ghee jar, turmeric bowl, salt, jaggery",
+      "subcategories": [
+        {
+          "id": "atta_flours_sooji",
+          "name": "Atta Flours Sooji",
+          "products": [
+            "Whole Wheat Atta",
+            "Maida Refined Flour",
+            "Besan Gram Flour",
+            "Sooji Semolina"
+          ],
+          "retained_extra_products": [
+            "Rice Flour"
+          ]
+        },
+        {
+          "id": "cooking_oils_and_ghee",
+          "name": "Cooking Oils And Ghee",
+          "products": [
+            "Sunflower Oil",
+            "Groundnut Oil",
+            "Sesame Oil",
+            "Mustard Oil"
+          ],
+          "retained_extra_products": [
+            "Pure Ghee"
+          ]
+        },
+        {
+          "id": "masalas_and_spices",
+          "name": "Masalas And Spices",
+          "products": [
+            "Turmeric Powder",
+            "Red Chilli Powder",
+            "Coriander Powder",
+            "Cumin Seeds"
+          ],
+          "retained_extra_products": [
+            "Black Mustard Seeds"
+          ]
+        },
+        {
+          "id": "sweeteners_and_pantry",
+          "name": "Sweeteners And Pantry",
+          "products": [
+            "Iodized Salt",
+            "White Sugar",
+            "Jaggery Blocks"
+          ],
+          "retained_extra_products": [
+            "Tamarind",
+            "Dry Grated Coconut"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rice_dal_grains",
+      "name": "Rice, Dal & Grains",
+      "requested_name": "Rice, Dal & Grains",
+      "display_order": 5,
+      "category_group_products": "sona masoori rice, basmati rice, toor dal, moong dal, whole wheat, ragi millet in six bowls",
+      "subcategories": [
+        {
+          "id": "rice",
+          "name": "Rice",
+          "products": [
+            "Sona Masoori Rice",
+            "Basmati Rice",
+            "Brown Rice",
+            "Idli Rice"
+          ],
+          "retained_extra_products": [
+            "Red Rice"
+          ]
+        },
+        {
+          "id": "dals",
+          "name": "Dals",
+          "products": [
+            "Toor Dal",
+            "Moong Dal",
+            "Urad Dal",
+            "Chana Dal"
+          ],
+          "retained_extra_products": [
+            "Masoor Dal"
+          ]
+        },
+        {
+          "id": "whole_pulses",
+          "name": "Whole Pulses",
+          "products": [
+            "Kabuli Chickpeas",
+            "Black Chickpeas",
+            "Rajma Kidney Beans",
+            "Whole Green Moong"
+          ],
+          "retained_extra_products": [
+            "Black Eyed Peas"
+          ]
+        },
+        {
+          "id": "grains_and_millets",
+          "name": "Grains And Millets",
+          "products": [
+            "Whole Wheat Grain",
+            "Ragi Finger Millet",
+            "Jowar Sorghum"
+          ],
+          "retained_extra_products": [
+            "Bajra Pearl Millet",
+            "Foxtail Millet"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "snacks_beverages",
+      "name": "Snacks & Beverages",
+      "requested_name": "Snacks & Beverages",
+      "display_order": 6,
+      "category_group_products": "potato chips in bowl, murukku, biscuits, tea cup with tea leaves, coffee, fruit juice bottle",
+      "subcategories": [
+        {
+          "id": "savoury_snacks",
+          "name": "Savoury Snacks",
+          "products": [
+            "Potato Chips",
+            "Murukku Chakli",
+            "Mixture Namkeen",
+            "Roasted Peanuts"
+          ],
+          "retained_extra_products": [
+            "Banana Chips"
+          ]
+        },
+        {
+          "id": "biscuits_and_sweets",
+          "name": "Biscuits And Sweets",
+          "products": [
+            "Glucose Biscuits",
+            "Cream Sandwich Biscuits",
+            "Oat Cookies",
+            "Peanut Chikki"
+          ],
+          "retained_extra_products": [
+            "Sesame Laddoo"
+          ]
+        },
+        {
+          "id": "tea_and_coffee",
+          "name": "Tea And Coffee",
+          "products": [
+            "Loose Black Tea",
+            "Green Tea Bags",
+            "Filter Coffee Powder",
+            "Instant Coffee Granules"
+          ],
+          "retained_extra_products": [
+            "Hot Chocolate Powder"
+          ]
+        },
+        {
+          "id": "cold_beverages",
+          "name": "Cold Beverages",
+          "products": [
+            "Mango Juice Bottle",
+            "Orange Juice Bottle",
+            "Lemon Soda Bottle"
+          ],
+          "retained_extra_products": [
+            "Coconut Water Bottle"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "personal_care",
+      "name": "Personal Care",
+      "requested_name": "Personal Care",
+      "display_order": 7,
+      "category_group_products": "plain soap bar, shampoo bottle, toothpaste tube, toothbrush, hair oil bottle, deodorant roll-on",
+      "subcategories": [
+        {
+          "id": "bath_and_body",
+          "name": "Bath And Body",
+          "products": [
+            "Bath Soap Bar",
+            "Body Wash Bottle",
+            "Body Lotion Bottle",
+            "Hand Wash Pump"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "hair_care",
+          "name": "Hair Care",
+          "products": [
+            "Shampoo Bottle",
+            "Hair Conditioner Bottle",
+            "Coconut Hair Oil Bottle",
+            "Hair Serum Bottle"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "oral_care",
+          "name": "Oral Care",
+          "products": [
+            "Toothpaste Tube",
+            "Toothbrush",
+            "Mouthwash Bottle",
+            "Dental Floss Case"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "grooming",
+          "name": "Grooming",
+          "products": [
+            "Deodorant Roll On",
+            "Disposable Razor",
+            "Shaving Foam Can"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "household_essentials",
+      "name": "Household Essentials",
+      "requested_name": "Household Essentials",
+      "display_order": 8,
+      "category_group_products": "wooden clothes hangers, cotton towel, clothesline rope, aluminium foil roll, rubber doorstop, ironing board",
+      "subcategories": [
+        {
+          "id": "laundry_utilities",
+          "name": "Laundry Utilities",
+          "products": [
+            "Wooden Clothes Hangers",
+            "Steel Clothes Pegs",
+            "Cotton Clothesline Rope",
+            "Ironing Board"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "household_consumables",
+          "name": "Household Consumables",
+          "products": [
+            "Aluminium Foil Roll",
+            "Food Cling Film Roll",
+            "Baking Parchment Roll",
+            "Garbage Bag Roll"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "home_utilities",
+          "name": "Home Utilities",
+          "products": [
+            "Rubber Door Stopper",
+            "Rubber Hot Water Bag",
+            "Mosquito Net",
+            "Emergency Wax Candles"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "daily_textiles",
+          "name": "Daily Textiles",
+          "products": [
+            "Cotton Bath Towel",
+            "Cotton Hand Towel",
+            "Kitchen Cotton Towel"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "fancy_accessories",
+      "name": "Fancy Items & Accessories",
+      "requested_name": "Fancy Items & Accessories",
+      "display_order": 9,
+      "category_group_products": "colourful hair clips, bangles, jhumka earrings, beaded necklace, hairband, bracelet",
+      "subcategories": [
+        {
+          "id": "hair_accessories",
+          "name": "Hair Accessories",
+          "products": [
+            "Claw Hair Clip",
+            "Snap Hair Clips",
+            "Satin Scrunchies",
+            "Padded Hairband"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "earrings_and_necklaces",
+          "name": "Earrings And Necklaces",
+          "products": [
+            "Oxidized Jhumka Earrings",
+            "Pearl Stud Earrings",
+            "Hoop Earrings",
+            "Beaded Necklace"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "bangles_and_bracelets",
+          "name": "Bangles And Bracelets",
+          "products": [
+            "Glass Bangles Set",
+            "Metal Bangles Set",
+            "Beaded Bracelet",
+            "Charm Bracelet"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "decorative_accessories",
+          "name": "Decorative Accessories",
+          "products": [
+            "Decorative Brooch",
+            "Bindi Sheet",
+            "Fashion Finger Ring"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "plastic_household",
+      "name": "Plastic Household Products",
+      "requested_name": "Plastic Household Products",
+      "display_order": 10,
+      "category_group_products": "plastic bucket, mug, water jug, storage container, laundry basket, plastic stool",
+      "subcategories": [
+        {
+          "id": "bath_and_laundry",
+          "name": "Bath And Laundry",
+          "products": [
+            "Plastic Bucket",
+            "Plastic Bath Mug",
+            "Plastic Wash Tub",
+            "Plastic Laundry Basket"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "kitchen_storage",
+          "name": "Kitchen Storage",
+          "products": [
+            "Plastic Water Jug",
+            "Plastic Airtight Container",
+            "Plastic Spice Box",
+            "Plastic Lunch Box"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "home_organization",
+          "name": "Home Organization",
+          "products": [
+            "Plastic Storage Basket",
+            "Plastic Drawer Organizer",
+            "Plastic Shoe Rack",
+            "Plastic Utility Crate"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "furniture_and_utilities",
+          "name": "Furniture And Utilities",
+          "products": [
+            "Plastic Chair",
+            "Plastic Stool",
+            "Plastic Dustbin"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "electronics",
+      "name": "Electronics",
+      "requested_name": "Electronics",
+      "display_order": 11,
+      "category_group_products": "bluetooth speaker, over-ear headphones, flat television, keyboard, computer mouse, webcam",
+      "subcategories": [
+        {
+          "id": "audio",
+          "name": "Audio",
+          "products": [
+            "Bluetooth Speaker",
+            "Over Ear Headphones",
+            "Portable FM Radio",
+            "Desktop Computer Speakers"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "computing",
+          "name": "Computing",
+          "products": [
+            "Wired Keyboard",
+            "Wireless Computer Mouse",
+            "USB Webcam",
+            "External Hard Drive"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "displays_and_media",
+          "name": "Displays And Media",
+          "products": [
+            "LED Television",
+            "Computer Monitor",
+            "Mini Projector",
+            "Streaming Media Box"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "small_electronics",
+          "name": "Small Electronics",
+          "products": [
+            "Digital Alarm Clock",
+            "Pocket Calculator",
+            "Digital Camera"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "electrical_items",
+      "name": "Electrical Items",
+      "requested_name": "Electrical Items",
+      "display_order": 12,
+      "category_group_products": "LED bulb, wall switch, wall socket, extension board, coiled electrical wire, ceiling fan",
+      "subcategories": [
+        {
+          "id": "lighting",
+          "name": "Lighting",
+          "products": [
+            "LED Bulb",
+            "LED Tube Light",
+            "LED Panel Light",
+            "Bulb Holder"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "switches_and_power",
+          "name": "Switches And Power",
+          "products": [
+            "Wall Switch",
+            "Wall Socket",
+            "Extension Board",
+            "Three Pin Plug Top"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "wiring_and_protection",
+          "name": "Wiring And Protection",
+          "products": [
+            "Electrical Wire Coil",
+            "Insulation Tape Roll",
+            "Cable Ties",
+            "Miniature Circuit Breaker"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "fans_and_fittings",
+          "name": "Fans And Fittings",
+          "products": [
+            "Ceiling Fan",
+            "Exhaust Fan",
+            "Table Fan"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "mobile_accessories",
+      "name": "Mobile Accessories",
+      "requested_name": "Mobile Accessories",
+      "display_order": 13,
+      "category_group_products": "wall charger, USB cable, phone case, tempered glass protector, wired earphones, power bank",
+      "subcategories": [
+        {
+          "id": "charging",
+          "name": "Charging",
+          "products": [
+            "USB Wall Charger",
+            "USB Type C Cable",
+            "Lightning Charging Cable",
+            "Micro USB Cable"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "protection",
+          "name": "Protection",
+          "products": [
+            "Transparent Phone Case",
+            "Silicone Phone Case",
+            "Tempered Glass Screen Protector",
+            "Camera Lens Protector"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "audio_and_connectivity",
+          "name": "Audio And Connectivity",
+          "products": [
+            "Wired Earphones",
+            "True Wireless Earbuds",
+            "USB C Audio Adapter",
+            "Mobile OTG Adapter"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "stands_and_power",
+          "name": "Stands And Power",
+          "products": [
+            "Power Bank",
+            "Foldable Mobile Stand",
+            "Car Phone Mount"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "footwear",
+      "name": "Footwear – Shoes, Slippers & Sandals",
+      "requested_name": "Footwear – Shoes, Slippers & Sandals",
+      "display_order": 14,
+      "category_group_products": "men sports shoes, formal shoes, women's sandals, rubber slippers, kids shoes, walking sandals",
+      "subcategories": [
+        {
+          "id": "mens_shoes",
+          "name": "Mens Shoes",
+          "products": [
+            "Mens Running Shoes",
+            "Mens Formal Leather Shoes",
+            "Mens Casual Sneakers",
+            "Mens Loafers"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "womens_footwear",
+          "name": "Womens Footwear",
+          "products": [
+            "Womens Flat Sandals",
+            "Womens Wedge Sandals",
+            "Womens Ballet Flats",
+            "Womens Walking Shoes"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "slippers_and_sandals",
+          "name": "Slippers And Sandals",
+          "products": [
+            "Rubber Flip Flops",
+            "Mens Leather Sandals",
+            "Bathroom Slippers",
+            "Cushioned House Slippers"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "kids_footwear",
+          "name": "Kids Footwear",
+          "products": [
+            "Kids School Shoes",
+            "Kids Sports Shoes",
+            "Toddler Sandals"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "clothing_fashion",
+      "name": "Clothing & Fashion",
+      "requested_name": "Clothing & Fashion",
+      "display_order": 15,
+      "category_group_products": "hoodie, sweatshirt, windcheater, jogger trousers, cap, socks",
+      "subcategories": [
+        {
+          "id": "unisex_casual",
+          "name": "Unisex Casual",
+          "products": [
+            "Unisex Pullover Hoodie",
+            "Unisex Crewneck Sweatshirt",
+            "Unisex Windcheater Jacket",
+            "Unisex Jogger Trousers"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "active_basics",
+          "name": "Active Basics",
+          "products": [
+            "Athletic Track Pants",
+            "Athletic Track Jacket",
+            "Sports Compression Sleeves",
+            "Thermal Innerwear Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "fashion_basics",
+          "name": "Fashion Basics",
+          "products": [
+            "Cotton Ankle Socks",
+            "Wool Winter Socks",
+            "Baseball Cap",
+            "Knitted Beanie"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "wearable_accessories",
+          "name": "Wearable Accessories",
+          "products": [
+            "Plain Fashion Scarf",
+            "Fabric Waist Belt",
+            "Neck Tie"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "sarees_womens_wear",
+      "name": "Sarees & Women’s Wear",
+      "requested_name": "Sarees & Women’s Wear",
+      "display_order": 16,
+      "category_group_products": "cotton saree, silk saree, kurti, salwar set, blouse, dupatta",
+      "subcategories": [
+        {
+          "id": "sarees",
+          "name": "Sarees",
+          "products": [
+            "Cotton Saree",
+            "Silk Saree",
+            "Chiffon Saree",
+            "Linen Saree"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "ethnic_sets",
+          "name": "Ethnic Sets",
+          "products": [
+            "Cotton Kurti",
+            "Salwar Kameez Set",
+            "Anarkali Dress",
+            "Lehenga Choli Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "separates",
+          "name": "Separates",
+          "products": [
+            "Womens Blouse",
+            "Cotton Dupatta",
+            "Womens Leggings",
+            "Palazzo Pants"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "daily_wear",
+          "name": "Daily Wear",
+          "products": [
+            "Womens Cotton Nightdress",
+            "Womens Maxi Dress",
+            "Womens Tunic Top"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "mens_clothing",
+      "name": "Men’s Clothing",
+      "requested_name": "Men’s Clothing",
+      "display_order": 17,
+      "category_group_products": "formal shirt, polo shirt, jeans, kurta, dhoti, blazer",
+      "subcategories": [
+        {
+          "id": "shirts_and_tops",
+          "name": "Shirts And Tops",
+          "products": [
+            "Mens Formal Shirt",
+            "Mens Casual Check Shirt",
+            "Mens Polo Shirt",
+            "Mens Cotton T Shirt"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "trousers",
+          "name": "Trousers",
+          "products": [
+            "Mens Blue Jeans",
+            "Mens Chino Trousers",
+            "Mens Formal Trousers",
+            "Mens Cargo Pants"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "ethnic_wear",
+          "name": "Ethnic Wear",
+          "products": [
+            "Mens Cotton Kurta",
+            "Mens Dhoti",
+            "Mens Lungi",
+            "Mens Kurta Pyjama Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "outerwear_and_basics",
+          "name": "Outerwear And Basics",
+          "products": [
+            "Mens Formal Blazer",
+            "Mens Sleeveless Vest",
+            "Mens Cotton Pyjama Set"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "kids_clothing",
+      "name": "Kids’ Clothing",
+      "requested_name": "Kids’ Clothing",
+      "display_order": 18,
+      "category_group_products": "boys shirt, girls dress, kids T-shirt, shorts, traditional outfit, pyjama set",
+      "subcategories": [
+        {
+          "id": "boys",
+          "name": "Boys",
+          "products": [
+            "Boys Cotton Shirt",
+            "Boys Polo T Shirt",
+            "Boys Denim Jeans",
+            "Boys Cotton Shorts"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "girls",
+          "name": "Girls",
+          "products": [
+            "Girls Cotton Frock",
+            "Girls Party Dress",
+            "Girls Kurti Leggings Set",
+            "Girls Skirt Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "unisex_kids",
+          "name": "Unisex Kids",
+          "products": [
+            "Kids Printed T Shirt",
+            "Kids Jogger Pants",
+            "Kids Hooded Sweatshirt",
+            "Kids Pyjama Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "school_and_seasonal",
+          "name": "School And Seasonal",
+          "products": [
+            "Kids School Uniform Shirt",
+            "Kids School Uniform Pinafore",
+            "Kids Sweater"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "home_appliances",
+      "name": "Home Appliances",
+      "requested_name": "Home Appliances",
+      "display_order": 19,
+      "category_group_products": "mixer grinder, electric iron, washing machine, refrigerator, rice cooker, induction stove",
+      "subcategories": [
+        {
+          "id": "kitchen_appliances",
+          "name": "Kitchen Appliances",
+          "products": [
+            "Mixer Grinder",
+            "Electric Rice Cooker",
+            "Induction Cooktop",
+            "Electric Kettle"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "cooking_appliances",
+          "name": "Cooking Appliances",
+          "products": [
+            "Microwave Oven",
+            "Air Fryer",
+            "Sandwich Maker",
+            "Electric Hand Blender"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "laundry_and_cleaning",
+          "name": "Laundry And Cleaning",
+          "products": [
+            "Front Load Washing Machine",
+            "Steam Iron",
+            "Vacuum Cleaner",
+            "Garment Steamer"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "large_and_comfort",
+          "name": "Large And Comfort",
+          "products": [
+            "Double Door Refrigerator",
+            "Water Purifier",
+            "Storage Water Heater"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "kitchenware_utensils",
+      "name": "Kitchenware & Utensils",
+      "requested_name": "Kitchenware & Utensils",
+      "display_order": 20,
+      "category_group_products": "steel pressure cooker, kadai, saucepan, tawa, ladle, steel dinner plate",
+      "subcategories": [
+        {
+          "id": "cookware",
+          "name": "Cookware",
+          "products": [
+            "Stainless Steel Pressure Cooker",
+            "Iron Kadai",
+            "Nonstick Tawa",
+            "Steel Saucepan"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "utensils",
+          "name": "Utensils",
+          "products": [
+            "Steel Cooking Ladle",
+            "Steel Turner Spatula",
+            "Stainless Steel Tongs",
+            "Wire Whisk"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "prep_tools",
+          "name": "Prep Tools",
+          "products": [
+            "Wooden Chopping Board",
+            "Kitchen Knife",
+            "Vegetable Peeler",
+            "Steel Grater"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "serveware",
+          "name": "Serveware",
+          "products": [
+            "Steel Dinner Plate",
+            "Steel Tumbler",
+            "Steel Katori Bowl"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "beauty_cosmetics",
+      "name": "Beauty & Cosmetics",
+      "requested_name": "Beauty & Cosmetics",
+      "display_order": 21,
+      "category_group_products": "lipstick, compact powder, nail polish, kajal pencil, makeup brushes, face cream",
+      "subcategories": [
+        {
+          "id": "face_makeup",
+          "name": "Face Makeup",
+          "products": [
+            "Liquid Foundation Bottle",
+            "Compact Face Powder",
+            "Concealer Tube",
+            "Blush Palette"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "eyes_and_lips",
+          "name": "Eyes And Lips",
+          "products": [
+            "Kajal Pencil",
+            "Mascara Tube",
+            "Eyeliner Pen",
+            "Lipstick"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "nails_and_tools",
+          "name": "Nails And Tools",
+          "products": [
+            "Nail Polish Bottle",
+            "Nail Polish Remover Bottle",
+            "Makeup Brush Set",
+            "Makeup Sponge"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "skin_beauty",
+          "name": "Skin Beauty",
+          "products": [
+            "Face Moisturizer Jar",
+            "Sunscreen Tube",
+            "Face Serum Dropper"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "stationery_school",
+      "name": "Stationery & School Supplies",
+      "requested_name": "Stationery & School Supplies",
+      "display_order": 22,
+      "category_group_products": "notebook, pencils, pen set, eraser, geometry box, crayons",
+      "subcategories": [
+        {
+          "id": "writing",
+          "name": "Writing",
+          "products": [
+            "Ballpoint Pen",
+            "Gel Pen",
+            "Wooden Pencil",
+            "Highlighter Marker"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "notebooks_and_paper",
+          "name": "Notebooks And Paper",
+          "products": [
+            "Ruled Notebook",
+            "Drawing Sketchbook",
+            "A4 Paper Ream",
+            "Sticky Notes"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "school_tools",
+          "name": "School Tools",
+          "products": [
+            "Eraser",
+            "Pencil Sharpener",
+            "Geometry Box",
+            "Steel Ruler"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "office_supplies",
+          "name": "Office Supplies",
+          "products": [
+            "Stapler",
+            "Paper Clips",
+            "Glue Stick"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "toys_games",
+      "name": "Toys & Games",
+      "requested_name": "Toys & Games",
+      "display_order": 23,
+      "category_group_products": "teddy bear, toy car, building blocks, doll, board game, puzzle",
+      "subcategories": [
+        {
+          "id": "soft_toys_and_dolls",
+          "name": "Soft Toys And Dolls",
+          "products": [
+            "Teddy Bear",
+            "Soft Toy Rabbit",
+            "Baby Doll",
+            "Doll House"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "construction_and_learning",
+          "name": "Construction And Learning",
+          "products": [
+            "Building Blocks Set",
+            "Wooden Shape Learning Blocks",
+            "Shape Sorting Toy",
+            "Abacus"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "vehicles_and_action",
+          "name": "Vehicles And Action",
+          "products": [
+            "Toy Car",
+            "Toy Train",
+            "Toy Excavator",
+            "Pull Back Toy Bus"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "games_and_puzzles",
+          "name": "Games And Puzzles",
+          "products": [
+            "Jigsaw Puzzle",
+            "Ludo Board Game",
+            "Chess Set"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "bags_luggage",
+      "name": "Bags & Luggage",
+      "requested_name": "Bags & Luggage",
+      "display_order": 24,
+      "category_group_products": "school backpack, laptop bag, travel suitcase, duffel bag, handbag, sling bag",
+      "subcategories": [
+        {
+          "id": "backpacks",
+          "name": "Backpacks",
+          "products": [
+            "School Backpack",
+            "Laptop Backpack",
+            "Hiking Backpack",
+            "Drawstring Gym Bag"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "travel",
+          "name": "Travel",
+          "products": [
+            "Hard Shell Suitcase",
+            "Soft Travel Trolley",
+            "Travel Duffel Bag",
+            "Foldable Travel Bag"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "handbags_and_slings",
+          "name": "Handbags And Slings",
+          "products": [
+            "Womens Shoulder Handbag",
+            "Crossbody Sling Bag",
+            "Canvas Tote Bag",
+            "Evening Clutch Bag"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "utility_bags",
+          "name": "Utility Bags",
+          "products": [
+            "Laptop Sleeve",
+            "Insulated Lunch Bag",
+            "Pencil Pouch"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "home_decor_furnishing",
+      "name": "Home Decor & Furnishing",
+      "requested_name": "Home Decor & Furnishing",
+      "display_order": 25,
+      "category_group_products": "cushion, curtain, bedsheet, ceramic vase, photo frame, decorative lamp",
+      "subcategories": [
+        {
+          "id": "soft_furnishings",
+          "name": "Soft Furnishings",
+          "products": [
+            "Decorative Cushion",
+            "Cotton Curtain Pair",
+            "Printed Bedsheet Set",
+            "Sofa Throw Blanket"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "decorative_objects",
+          "name": "Decorative Objects",
+          "products": [
+            "Ceramic Flower Vase",
+            "Wooden Photo Frame",
+            "Decorative Wall Clock",
+            "Tabletop Figurine"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "lighting_and_wall_decor",
+          "name": "Lighting And Wall Decor",
+          "products": [
+            "Bedside Table Lamp",
+            "String Fairy Lights",
+            "Framed Wall Art",
+            "Macrame Wall Hanging"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "floor_and_table",
+          "name": "Floor And Table",
+          "products": [
+            "Woven Area Rug",
+            "Round Jute Rug",
+            "Coaster Set"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "hardware_tools",
+      "name": "Hardware & Tools",
+      "requested_name": "Hardware & Tools",
+      "display_order": 26,
+      "category_group_products": "claw hammer, screwdriver, adjustable wrench, pliers, drill, tape measure",
+      "subcategories": [
+        {
+          "id": "hand_tools",
+          "name": "Hand Tools",
+          "products": [
+            "Claw Hammer",
+            "Flathead Screwdriver",
+            "Adjustable Wrench",
+            "Combination Pliers"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "measuring_and_cutting",
+          "name": "Measuring And Cutting",
+          "products": [
+            "Measuring Tape",
+            "Spirit Level",
+            "Utility Knife",
+            "Metal Hacksaw"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "power_and_accessories",
+          "name": "Power And Accessories",
+          "products": [
+            "Cordless Drill",
+            "Drill Bit Set",
+            "Allen Key Set",
+            "Socket Wrench Set"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "fasteners_and_fittings",
+          "name": "Fasteners And Fittings",
+          "products": [
+            "Steel Nails",
+            "Wood Screws",
+            "Door Hinge"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "cleaning_products",
+      "name": "Cleaning Products",
+      "requested_name": "Cleaning Products",
+      "display_order": 27,
+      "category_group_products": "detergent, dishwash liquid, floor cleaner, toilet cleaner, broom, mop",
+      "subcategories": [
+        {
+          "id": "laundry_cleaners",
+          "name": "Laundry Cleaners",
+          "products": [
+            "Laundry Detergent Powder",
+            "Liquid Laundry Detergent",
+            "Fabric Conditioner Bottle",
+            "Laundry Stain Remover"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "kitchen_cleaners",
+          "name": "Kitchen Cleaners",
+          "products": [
+            "Dishwash Liquid Bottle",
+            "Dishwash Bar",
+            "Steel Scrubber",
+            "Sponge Scrub Pads"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "surface_cleaners",
+          "name": "Surface Cleaners",
+          "products": [
+            "Floor Cleaner Bottle",
+            "Toilet Cleaner Bottle",
+            "Glass Cleaner Spray",
+            "Disinfectant Liquid Bottle"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "cleaning_tools",
+          "name": "Cleaning Tools",
+          "products": [
+            "Coconut Leaf Broom",
+            "Floor Mop",
+            "Dustpan And Brush"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "baby_care",
+      "name": "Baby & Kids",
+      "requested_name": "Baby Care Products",
+      "display_order": 28,
+      "category_group_products": "diapers, baby wipes, baby bottle, baby soap, baby lotion, baby towel",
+      "subcategories": [
+        {
+          "id": "hygiene",
+          "name": "Hygiene",
+          "products": [
+            "Baby Diapers",
+            "Baby Wipes Pack",
+            "Baby Soap Bar",
+            "Baby Shampoo Bottle"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "feeding",
+          "name": "Feeding",
+          "products": [
+            "Baby Feeding Bottle",
+            "Baby Sippy Cup",
+            "Baby Silicone Feeding Bowl",
+            "Baby Feeding Spoon"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "comfort",
+          "name": "Comfort",
+          "products": [
+            "Baby Cotton Towel",
+            "Baby Swaddle Blanket",
+            "Baby Muslin Cloths",
+            "Baby Cotton Mittens"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "care_accessories",
+          "name": "Care Accessories",
+          "products": [
+            "Baby Soft Hair Brush",
+            "Baby Nail Scissors",
+            "Baby Teether"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "sports_fitness",
+      "name": "Sports & Fitness Accessories",
+      "requested_name": "Sports & Fitness Accessories",
+      "display_order": 29,
+      "category_group_products": "cricket bat, football, badminton racket, dumbbells, yoga mat, skipping rope",
+      "subcategories": [
+        {
+          "id": "cricket_and_ball_sports",
+          "name": "Cricket And Ball Sports",
+          "products": [
+            "Cricket Bat",
+            "Cricket Ball",
+            "Football",
+            "Basketball"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "racket_sports",
+          "name": "Racket Sports",
+          "products": [
+            "Badminton Racket",
+            "Badminton Shuttlecocks",
+            "Tennis Racket",
+            "Tennis Balls"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "fitness",
+          "name": "Fitness",
+          "products": [
+            "Dumbbell Pair",
+            "Yoga Mat",
+            "Resistance Band Set",
+            "Skipping Rope"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "training_accessories",
+          "name": "Training Accessories",
+          "products": [
+            "Exercise Foam Roller",
+            "Ankle Weight Pair",
+            "Sports Knee Support"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    },
+    {
+      "id": "automobile_bike",
+      "name": "Automobile & Bike Accessories",
+      "requested_name": "Automobile & Bike Accessories",
+      "display_order": 30,
+      "category_group_products": "motorcycle helmet, bike gloves, tyre inflator, car cover, bike lock, car cleaning brush",
+      "subcategories": [
+        {
+          "id": "rider_accessories",
+          "name": "Rider Accessories",
+          "products": [
+            "Motorcycle Helmet",
+            "Motorcycle Riding Gloves",
+            "Motorcycle Knee Guards",
+            "Motorcycle Rain Suit"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "vehicle_protection",
+          "name": "Vehicle Protection",
+          "products": [
+            "Motorcycle Body Cover",
+            "Car Body Cover",
+            "Bike Disc Brake Lock",
+            "Steering Wheel Lock"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "maintenance",
+          "name": "Maintenance",
+          "products": [
+            "Portable Tyre Inflator",
+            "Tyre Pressure Gauge",
+            "Jumper Cable Set",
+            "Motorcycle Chain Lubricant"
+          ],
+          "retained_extra_products": []
+        },
+        {
+          "id": "interior_and_utilities",
+          "name": "Interior And Utilities",
+          "products": [
+            "Car Floor Mat Set",
+            "Car Seat Cushion",
+            "Car Trunk Organizer"
+          ],
+          "retained_extra_products": []
+        }
+      ]
+    }
+  ],
+  "products_per_category": 15,
+  "selection_policy": "15 products per category, balanced across four subcategories (4+4+4+3). Already generated surplus photos retained separately in extra_images_manifest.json; no new surplus generation."
+}

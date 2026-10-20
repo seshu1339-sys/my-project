@@ -1,0 +1,760 @@
+{
+  "schema_version": 1,
+  "note": "Previously generated images retained for optional review; excluded from the 15-per-category main target.",
+  "entries": [
+    {
+      "id": "product_fresh_vegetables_beetroot",
+      "kind": "product",
+      "category_id": "fresh_vegetables",
+      "category_name": "Fresh & Vegetables",
+      "subcategory": "Everyday Vegetables",
+      "subcategory_id": "everyday_vegetables",
+      "product_name": "Beetroot",
+      "image_filename": "beetroot.webp",
+      "relative_path": "products/fresh_vegetables/everyday_vegetables/beetroot.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Beetroot. Category: Fresh & Vegetables. Subcategory: Everyday Vegetables. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 182956,
+      "sha256": "875560c50f56cfbd79c5036311572f2aae6e98bd64b9f5878016bf1135d7e078",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-8d834eae-269c-4c79-a295-598beb9b974e.png",
+      "generated_at_utc": "2026-10-20T06:35:30.911Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_vegetables_drumstick_pods",
+      "kind": "product",
+      "category_id": "fresh_vegetables",
+      "category_name": "Fresh & Vegetables",
+      "subcategory": "Gourds And Pods",
+      "subcategory_id": "gourds_and_pods",
+      "product_name": "Drumstick Pods",
+      "image_filename": "drumstick_pods.webp",
+      "relative_path": "products/fresh_vegetables/gourds_and_pods/drumstick_pods.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Drumstick Pods. Category: Fresh & Vegetables. Subcategory: Gourds And Pods. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 93374,
+      "sha256": "422b51f0425795d1c1b708296c69c279b44906653c75e161556c885235db244e",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-182e94c4-e726-43ec-ba53-4f854b8b24e1.png",
+      "generated_at_utc": "2026-10-20T06:35:57.753Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_vegetables_french_beans",
+      "kind": "product",
+      "category_id": "fresh_vegetables",
+      "category_name": "Fresh & Vegetables",
+      "subcategory": "Green Vegetables",
+      "subcategory_id": "green_vegetables",
+      "product_name": "French Beans",
+      "image_filename": "french_beans.webp",
+      "relative_path": "products/fresh_vegetables/green_vegetables/french_beans.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: French Beans. Category: Fresh & Vegetables. Subcategory: Green Vegetables. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 94738,
+      "sha256": "cd3e16421ba17c20be28ee5e158e540cc2ca7bd4366d765f88c3d221560cd208",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-67fe2367-74a6-4950-81c2-b19cfc451cdf.png",
+      "generated_at_utc": "2026-10-20T06:41:20.350Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_vegetables_curry_leaves",
+      "kind": "product",
+      "category_id": "fresh_vegetables",
+      "category_name": "Fresh & Vegetables",
+      "subcategory": "Leafy And Aromatics",
+      "subcategory_id": "leafy_and_aromatics",
+      "product_name": "Curry Leaves",
+      "image_filename": "curry_leaves.webp",
+      "relative_path": "products/fresh_vegetables/leafy_and_aromatics/curry_leaves.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Curry Leaves. Category: Fresh & Vegetables. Subcategory: Leafy And Aromatics. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 125574,
+      "sha256": "5a61d5886146626e4719ef042a3efc7f42187f334e96b3a2909964f23c4d8675",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-1ab4d0f6-cf5c-4908-90c2-29d2aabd86da.png",
+      "generated_at_utc": "2026-10-20T06:42:21.193Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_vegetables_fresh_ginger",
+      "kind": "product",
+      "category_id": "fresh_vegetables",
+      "category_name": "Fresh & Vegetables",
+      "subcategory": "Leafy And Aromatics",
+      "subcategory_id": "leafy_and_aromatics",
+      "product_name": "Fresh Ginger",
+      "image_filename": "fresh_ginger.webp",
+      "relative_path": "products/fresh_vegetables/leafy_and_aromatics/fresh_ginger.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Fresh Ginger. Category: Fresh & Vegetables. Subcategory: Leafy And Aromatics. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 132962,
+      "sha256": "6e3b589d7ef8000877955fbabcf167d855585e00f5dca9b5ec3cb2107f712dd3",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-e69130cd-e369-4239-ae08-034a471e5811.png",
+      "generated_at_utc": "2026-10-20T06:40:58.374Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_fruits_sapota",
+      "kind": "product",
+      "category_id": "fresh_fruits",
+      "category_name": "Fruits",
+      "subcategory": "Local Fruits",
+      "subcategory_id": "local_fruits",
+      "product_name": "Sapota",
+      "image_filename": "sapota.webp",
+      "relative_path": "products/fresh_fruits/local_fruits/sapota.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Sapota. Category: Fruits. Subcategory: Local Fruits. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 195344,
+      "sha256": "2505419c246624021a234eb945e81f4db9b81f9f433af7be16c14c373842ab3c",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-98dc252b-e9d4-4ee4-9d1b-d59dd5ab77bb.png",
+      "generated_at_utc": "2026-10-20T06:44:47.068Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_fruits_pear",
+      "kind": "product",
+      "category_id": "fresh_fruits",
+      "category_name": "Fruits",
+      "subcategory": "Orchard Fruits",
+      "subcategory_id": "orchard_fruits",
+      "product_name": "Pear",
+      "image_filename": "pear.webp",
+      "relative_path": "products/fresh_fruits/orchard_fruits/pear.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Pear. Category: Fruits. Subcategory: Orchard Fruits. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 80482,
+      "sha256": "1c2331a54486054310f15d9f3f2e0769e2a019647dbd67246975cef69020ec1b",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-181543d4-5286-4727-bcae-5e24da49c304.png",
+      "generated_at_utc": "2026-10-20T06:48:14.782Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_fruits_dragon_fruit",
+      "kind": "product",
+      "category_id": "fresh_fruits",
+      "category_name": "Fruits",
+      "subcategory": "Melons And Tropical",
+      "subcategory_id": "melons_and_tropical",
+      "product_name": "Dragon Fruit",
+      "image_filename": "dragon_fruit.webp",
+      "relative_path": "products/fresh_fruits/melons_and_tropical/dragon_fruit.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Dragon Fruit. Category: Fruits. Subcategory: Melons And Tropical. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 165640,
+      "sha256": "d03e42e63e14717a947450220fa02dc561f878922adac83370734650ccac180e",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-10ad1293-d9d9-46ba-a80b-289ac840a88b.png",
+      "generated_at_utc": "2026-10-20T06:47:07.421Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_fruits_strawberries",
+      "kind": "product",
+      "category_id": "fresh_fruits",
+      "category_name": "Fruits",
+      "subcategory": "Seasonal Fruits",
+      "subcategory_id": "seasonal_fruits",
+      "product_name": "Strawberries",
+      "image_filename": "strawberries.webp",
+      "relative_path": "products/fresh_fruits/seasonal_fruits/strawberries.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Strawberries. Category: Fruits. Subcategory: Seasonal Fruits. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 162644,
+      "sha256": "9f4afb9fb6d78497b235364fb77835b02ba41eec83e190c5b2bab2bdde2f4c4b",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-bfe3808c-b4d9-41c7-b09b-d071effdc761.png",
+      "generated_at_utc": "2026-10-20T06:51:58.553Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_fresh_fruits_fresh_figs",
+      "kind": "product",
+      "category_id": "fresh_fruits",
+      "category_name": "Fruits",
+      "subcategory": "Seasonal Fruits",
+      "subcategory_id": "seasonal_fruits",
+      "product_name": "Fresh Figs",
+      "image_filename": "fresh_figs.webp",
+      "relative_path": "products/fresh_fruits/seasonal_fruits/fresh_figs.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Fresh Figs. Category: Fruits. Subcategory: Seasonal Fruits. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product.",
+      "file_size_bytes": 168836,
+      "sha256": "542678976864bf316e9a098ac05f53daa5e01605da1feea1b10a03af7cd58149",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-b1822893-6a3d-4d97-bad7-8d56d341600c.png",
+      "generated_at_utc": "2026-10-20T06:51:31.416Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_dairy_bakery_fresh_cream_jar",
+      "kind": "product",
+      "category_id": "dairy_bakery",
+      "category_name": "Dairy & Bakery",
+      "subcategory": "Milk And Cultured",
+      "subcategory_id": "milk_and_cultured",
+      "product_name": "Fresh Cream Jar",
+      "image_filename": "fresh_cream_jar.webp",
+      "relative_path": "products/dairy_bakery/milk_and_cultured/fresh_cream_jar.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Fresh Cream Jar. Category: Dairy & Bakery. Subcategory: Milk And Cultured. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 39704,
+      "sha256": "5ec0941100d05f9d9279601b1d57aa2c9cf3851e9ec7f16aeea9bb35f8eaa850",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-e6d9dea3-9709-4f89-b2bb-68dd95e076b1.png",
+      "generated_at_utc": "2026-10-20T06:53:38.139Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_dairy_bakery_cream_cheese_tub",
+      "kind": "product",
+      "category_id": "dairy_bakery",
+      "category_name": "Dairy & Bakery",
+      "subcategory": "Cheese And Spreads",
+      "subcategory_id": "cheese_and_spreads",
+      "product_name": "Cream Cheese Tub",
+      "image_filename": "cream_cheese_tub.webp",
+      "relative_path": "products/dairy_bakery/cheese_and_spreads/cream_cheese_tub.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Cream Cheese Tub. Category: Dairy & Bakery. Subcategory: Cheese And Spreads. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 50728,
+      "sha256": "c2e7fdeeb1e11059cb5eb74252a1400ef938218212df7814c73307597ace9f71",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-11c1ee95-3742-4051-aee3-8c2dcb71fe05.png",
+      "generated_at_utc": "2026-10-20T06:56:45.553Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_dairy_bakery_garlic_bread_baguette",
+      "kind": "product",
+      "category_id": "dairy_bakery",
+      "category_name": "Dairy & Bakery",
+      "subcategory": "Breads",
+      "subcategory_id": "breads",
+      "product_name": "Garlic Bread Baguette",
+      "image_filename": "garlic_bread_baguette.webp",
+      "relative_path": "products/dairy_bakery/breads/garlic_bread_baguette.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Garlic Bread Baguette. Category: Dairy & Bakery. Subcategory: Breads. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 149370,
+      "sha256": "74777c735efc212baad5d92927ae5925a0b6d86df10a3621ff9c215d53800fb2",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-c48cd193-ac91-484c-89fa-4973840f6210.png",
+      "generated_at_utc": "2026-10-20T06:58:23.028Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_dairy_bakery_fruit_rusk",
+      "kind": "product",
+      "category_id": "dairy_bakery",
+      "category_name": "Dairy & Bakery",
+      "subcategory": "Bakery",
+      "subcategory_id": "bakery",
+      "product_name": "Fruit Rusk",
+      "image_filename": "fruit_rusk.webp",
+      "relative_path": "products/dairy_bakery/bakery/fruit_rusk.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Fruit Rusk. Category: Dairy & Bakery. Subcategory: Bakery. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 243546,
+      "sha256": "a7dcc5a6d594dd635b1e61b73a28035f21db9940858b7e731edc7e2b50a8cb99",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-f913c188-b8c3-46a7-8575-4c9db8c2f0cf.png",
+      "generated_at_utc": "2026-10-20T07:00:04.608Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_dairy_bakery_khari_puff_biscuits",
+      "kind": "product",
+      "category_id": "dairy_bakery",
+      "category_name": "Dairy & Bakery",
+      "subcategory": "Bakery",
+      "subcategory_id": "bakery",
+      "product_name": "Khari Puff Biscuits",
+      "image_filename": "khari_puff_biscuits.webp",
+      "relative_path": "products/dairy_bakery/bakery/khari_puff_biscuits.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Khari Puff Biscuits. Category: Dairy & Bakery. Subcategory: Bakery. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 143190,
+      "sha256": "bce11e8d70a3671525726f3cfe8205ac1044dc6a6a354924f31b80603b72a47a",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-08db07b6-7609-498b-a855-8b95431da90c.png",
+      "generated_at_utc": "2026-10-20T07:00:36.384Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_grocery_staples_rice_flour",
+      "kind": "product",
+      "category_id": "grocery_staples",
+      "category_name": "Grocery & Staples",
+      "subcategory": "Atta Flours Sooji",
+      "subcategory_id": "atta_flours_sooji",
+      "product_name": "Rice Flour",
+      "image_filename": "rice_flour.webp",
+      "relative_path": "products/grocery_staples/atta_flours_sooji/rice_flour.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Rice Flour. Category: Grocery & Staples. Subcategory: Atta Flours Sooji. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 110190,
+      "sha256": "03895df842fda37f99f9a7069086ed9e7a3257e9256d6490671bece2306827de",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-b12a5fb1-2c40-41ae-b68f-675c0beb5ffd.png",
+      "generated_at_utc": "2026-10-20T07:03:51.538Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_grocery_staples_pure_ghee",
+      "kind": "product",
+      "category_id": "grocery_staples",
+      "category_name": "Grocery & Staples",
+      "subcategory": "Cooking Oils And Ghee",
+      "subcategory_id": "cooking_oils_and_ghee",
+      "product_name": "Pure Ghee",
+      "image_filename": "pure_ghee.webp",
+      "relative_path": "products/grocery_staples/cooking_oils_and_ghee/pure_ghee.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Pure Ghee. Category: Grocery & Staples. Subcategory: Cooking Oils And Ghee. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 78314,
+      "sha256": "e10c7fe0d0dc8043ac1271a16e5c2042f2934a1f6eb870bdc6eceefa1aa1290c",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-e36efb43-f35d-445d-8fd2-8fc102fbd4d1.png",
+      "generated_at_utc": "2026-10-20T07:10:20.826Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_grocery_staples_black_mustard_seeds",
+      "kind": "product",
+      "category_id": "grocery_staples",
+      "category_name": "Grocery & Staples",
+      "subcategory": "Masalas And Spices",
+      "subcategory_id": "masalas_and_spices",
+      "product_name": "Black Mustard Seeds",
+      "image_filename": "black_mustard_seeds.webp",
+      "relative_path": "products/grocery_staples/masalas_and_spices/black_mustard_seeds.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Black Mustard Seeds. Category: Grocery & Staples. Subcategory: Masalas And Spices. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 145794,
+      "sha256": "cc35899edeb94cfd71614a771449c8e37a37a516128bd9b3fb1018810f8cde89",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-9a865dd7-8c7f-4ad8-a4b5-9839a502563e.png",
+      "generated_at_utc": "2026-10-20T07:09:53.216Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_grocery_staples_tamarind",
+      "kind": "product",
+      "category_id": "grocery_staples",
+      "category_name": "Grocery & Staples",
+      "subcategory": "Sweeteners And Pantry",
+      "subcategory_id": "sweeteners_and_pantry",
+      "product_name": "Tamarind",
+      "image_filename": "tamarind.webp",
+      "relative_path": "products/grocery_staples/sweeteners_and_pantry/tamarind.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Tamarind. Category: Grocery & Staples. Subcategory: Sweeteners And Pantry. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 182088,
+      "sha256": "29dc0669fcb3b3a128f39112026e6e28446057e900835d4e4d5aae1b4f5dec1b",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-a86e79bc-c8f6-4cb5-9ae8-1a015d1ac9b8.png",
+      "generated_at_utc": "2026-10-20T07:05:12.288Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_grocery_staples_dry_grated_coconut",
+      "kind": "product",
+      "category_id": "grocery_staples",
+      "category_name": "Grocery & Staples",
+      "subcategory": "Sweeteners And Pantry",
+      "subcategory_id": "sweeteners_and_pantry",
+      "product_name": "Dry Grated Coconut",
+      "image_filename": "dry_grated_coconut.webp",
+      "relative_path": "products/grocery_staples/sweeteners_and_pantry/dry_grated_coconut.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Dry Grated Coconut. Category: Grocery & Staples. Subcategory: Sweeteners And Pantry. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 105648,
+      "sha256": "d54532b10c1539ef5e1e1d035d9061f070d31e77c6e0c5f8a3ca48006af71625",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-457a60a5-334b-4b3b-98ad-d620f9d6b94d.png",
+      "generated_at_utc": "2026-10-20T07:11:18.083Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_rice_dal_grains_red_rice",
+      "kind": "product",
+      "category_id": "rice_dal_grains",
+      "category_name": "Rice, Dal & Grains",
+      "subcategory": "Rice",
+      "subcategory_id": "rice",
+      "product_name": "Red Rice",
+      "image_filename": "red_rice.webp",
+      "relative_path": "products/rice_dal_grains/rice/red_rice.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Red Rice. Category: Rice, Dal & Grains. Subcategory: Rice. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 180626,
+      "sha256": "b0bc6679d26ebe51f6e810cac38e878de24b906ce772c10688805fbc3d6ac279",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-42e18fce-29d2-456e-b8b7-53126aefdf4b.png",
+      "generated_at_utc": "2026-10-20T07:13:48.803Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_rice_dal_grains_masoor_dal",
+      "kind": "product",
+      "category_id": "rice_dal_grains",
+      "category_name": "Rice, Dal & Grains",
+      "subcategory": "Dals",
+      "subcategory_id": "dals",
+      "product_name": "Masoor Dal",
+      "image_filename": "masoor_dal.webp",
+      "relative_path": "products/rice_dal_grains/dals/masoor_dal.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Masoor Dal. Category: Rice, Dal & Grains. Subcategory: Dals. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 162576,
+      "sha256": "81440cf6402c5471f8f974b44a7b8490914505638bd4b3e0558528b8be913792",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-20c8439a-2f47-405e-9ef3-e04381496bfe.png",
+      "generated_at_utc": "2026-10-20T07:17:19.048Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_rice_dal_grains_black_eyed_peas",
+      "kind": "product",
+      "category_id": "rice_dal_grains",
+      "category_name": "Rice, Dal & Grains",
+      "subcategory": "Whole Pulses",
+      "subcategory_id": "whole_pulses",
+      "product_name": "Black Eyed Peas",
+      "image_filename": "black_eyed_peas.webp",
+      "relative_path": "products/rice_dal_grains/whole_pulses/black_eyed_peas.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Black Eyed Peas. Category: Rice, Dal & Grains. Subcategory: Whole Pulses. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 151870,
+      "sha256": "2b54d9ab89399049b9b2c94f702a96fe7398f5813af822781fc2459e594c9ec6",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-5e0ad0eb-17de-4514-ab23-0d9903df852b.png",
+      "generated_at_utc": "2026-10-20T07:21:12.885Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_rice_dal_grains_bajra_pearl_millet",
+      "kind": "product",
+      "category_id": "rice_dal_grains",
+      "category_name": "Rice, Dal & Grains",
+      "subcategory": "Grains And Millets",
+      "subcategory_id": "grains_and_millets",
+      "product_name": "Bajra Pearl Millet",
+      "image_filename": "bajra_pearl_millet.webp",
+      "relative_path": "products/rice_dal_grains/grains_and_millets/bajra_pearl_millet.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Bajra Pearl Millet. Category: Rice, Dal & Grains. Subcategory: Grains And Millets. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 172666,
+      "sha256": "210e6c4eb5dff8a565620c46ab339e97a66aa156c145a6d00b97d777b966ec97",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-7be1413f-e31a-4468-99ee-f2309b3fa921.png",
+      "generated_at_utc": "2026-10-20T07:18:41.671Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_rice_dal_grains_foxtail_millet",
+      "kind": "product",
+      "category_id": "rice_dal_grains",
+      "category_name": "Rice, Dal & Grains",
+      "subcategory": "Grains And Millets",
+      "subcategory_id": "grains_and_millets",
+      "product_name": "Foxtail Millet",
+      "image_filename": "foxtail_millet.webp",
+      "relative_path": "products/rice_dal_grains/grains_and_millets/foxtail_millet.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Foxtail Millet. Category: Rice, Dal & Grains. Subcategory: Grains And Millets. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 151632,
+      "sha256": "ac6898e1969fd1561659b4f308a04932615990bb10ece1f396578c5f626c609f",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-4099cc3c-2fdb-45e8-9bb3-826da4b28e82.png",
+      "generated_at_utc": "2026-10-20T07:22:08.665Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_snacks_beverages_banana_chips",
+      "kind": "product",
+      "category_id": "snacks_beverages",
+      "category_name": "Snacks & Beverages",
+      "subcategory": "Savoury Snacks",
+      "subcategory_id": "savoury_snacks",
+      "product_name": "Banana Chips",
+      "image_filename": "banana_chips.webp",
+      "relative_path": "products/snacks_beverages/savoury_snacks/banana_chips.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Banana Chips. Category: Snacks & Beverages. Subcategory: Savoury Snacks. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 135032,
+      "sha256": "454620541ed8745cf446cfa4ba350429ca3f21ca4c9ff005fd40f9fa594b0972",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-600c2cb3-e23f-4d72-b0b2-4c0479e36ada.png",
+      "generated_at_utc": "2026-10-20T07:24:11.453Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_snacks_beverages_sesame_laddoo",
+      "kind": "product",
+      "category_id": "snacks_beverages",
+      "category_name": "Snacks & Beverages",
+      "subcategory": "Biscuits And Sweets",
+      "subcategory_id": "biscuits_and_sweets",
+      "product_name": "Sesame Laddoo",
+      "image_filename": "sesame_laddoo.webp",
+      "relative_path": "products/snacks_beverages/biscuits_and_sweets/sesame_laddoo.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Sesame Laddoo. Category: Snacks & Beverages. Subcategory: Biscuits And Sweets. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 157474,
+      "sha256": "332dc7b381a035aad2bcd8013cf4ff6cbc80a0cdeaf171d264d62a2dbf1c976d",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-24db92e9-e784-4e66-bf9d-0d38741403bd.png",
+      "generated_at_utc": "2026-10-20T07:25:16.565Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_snacks_beverages_hot_chocolate_powder",
+      "kind": "product",
+      "category_id": "snacks_beverages",
+      "category_name": "Snacks & Beverages",
+      "subcategory": "Tea And Coffee",
+      "subcategory_id": "tea_and_coffee",
+      "product_name": "Hot Chocolate Powder",
+      "image_filename": "hot_chocolate_powder.webp",
+      "relative_path": "products/snacks_beverages/tea_and_coffee/hot_chocolate_powder.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Hot Chocolate Powder. Category: Snacks & Beverages. Subcategory: Tea And Coffee. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 91104,
+      "sha256": "cac8222485e65a127149f5e1347727f21d2fca67d68f7348aa2caceb052d615a",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-1418e711-75c3-43ad-a160-0714a6ff308f.png",
+      "generated_at_utc": "2026-10-20T07:30:19.796Z",
+      "library_role": "retained_extra"
+    },
+    {
+      "id": "product_snacks_beverages_coconut_water_bottle",
+      "kind": "product",
+      "category_id": "snacks_beverages",
+      "category_name": "Snacks & Beverages",
+      "subcategory": "Cold Beverages",
+      "subcategory_id": "cold_beverages",
+      "product_name": "Coconut Water Bottle",
+      "image_filename": "coconut_water_bottle.webp",
+      "relative_path": "products/snacks_beverages/cold_beverages/coconut_water_bottle.webp",
+      "dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "requested_dimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "generation_status": "generated",
+      "generation_prompt": "Use case: product-mockup. Create one ORIGINAL premium Indian e-commerce INDIVIDUAL PRODUCT photograph. EXACT PRODUCT: Coconut Water Bottle. Category: Snacks & Beverages. Subcategory: Cold Beverages. Show only this precise product type, in a familiar realistic Indian-market form. Entire product fully visible, centered, with 12 percent safe margin, clean seamless WHITE studio background and gentle realistic grounded shadow. Consistent bright soft studio daylight from upper left, realistic material textures, tack-sharp focus, tasteful three-quarter catalog view, thumbnail-readable silhouette. Square 1024x1024 minimum. Unbranded, no text, logos, labels, watermarks, prices, hands, people, clutter or unnecessary decorations. Shoes, gloves and paired goods as a complete matched pair; sets as a neatly grouped complete set; clothing shown fully laid flat or on an invisible mannequin with no human. Foods shown as a small realistic retail quantity, on a plain neutral plate or bowl only if necessary for loose powders or grains; avoid food props. This must be a newly generated standalone product photo, not a reused category image, not a collage, not a sprite sheet, and not the same image as any other product. All packaging is deliberately plain and unlettered. Use blank keys, blank covers and symbol-free surfaces where applicable; never include promotional or brand text.",
+      "file_size_bytes": 30992,
+      "sha256": "12c627d4c1bfcae33e453b55f5d6db5711a3a649d034fb796aeaea0e8015d92f",
+      "source_generated_image": "C:/Users/Lappy/.codex/generated_images/01a15726-6cf0-7e00-b10e-0a7e94e6f27f/exec-30e09d3e-d631-4b8d-9273-55dd6ee7a986.png",
+      "generated_at_utc": "2026-10-20T07:31:22.069Z",
+      "library_role": "retained_extra"
+    }
+  ]
+}
