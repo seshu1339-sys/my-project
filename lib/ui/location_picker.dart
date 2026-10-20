@@ -11,7 +11,9 @@ import '../services/geocoding.dart';
 /// the free OpenStreetMap Nominatim API. Pops with the selected
 /// [NominatimPlace], or null if dismissed without a choice.
 class PlaceSearchSheet extends StatefulWidget {
-  const PlaceSearchSheet({super.key, this.geocoder});
+  const PlaceSearchSheet({super.key, this.geocoder, this.contactEmail});
+  // The public support email (admin: Business settings) sent to Nominatim as its contact.
+  final String? contactEmail;
   // Injectable for tests; a real instance is created lazily otherwise.
   final NominatimGeocoder? geocoder;
   @override
@@ -19,7 +21,7 @@ class PlaceSearchSheet extends StatefulWidget {
 }
 
 class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
-  late final NominatimGeocoder geocoder = widget.geocoder ?? NominatimGeocoder();
+  late final NominatimGeocoder geocoder = widget.geocoder ?? NominatimGeocoder(contactEmail: widget.contactEmail);
   final query = TextEditingController();
   Timer? debounce;
   List<NominatimPlace> results = const [];

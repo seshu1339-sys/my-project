@@ -87,7 +87,9 @@ Future<void> showLocationPickerDialog(BuildContext context, Store store) async {
                   final place = await showModalBottomSheet<NominatimPlace>(
                     context: dialog,
                     isScrollControlled: true,
-                    builder: (_) => const PlaceSearchSheet(),
+                    builder: (_) => PlaceSearchSheet(
+                      contactEmail: store.business.text('supportEmail'),
+                    ),
                   );
                   if (place == null) return;
                   await store.setLocation(

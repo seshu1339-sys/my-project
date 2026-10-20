@@ -21,9 +21,18 @@ class NominatimPlace {
 /// app and a way to contact its operator (see
 /// https://operations.osmfoundation.org/policies/nominatim/).
 class NominatimGeocoder {
-  NominatimGeocoder({http.Client? client}) : _client = client ?? http.Client();
+  NominatimGeocoder({http.Client? client, String? contactEmail})
+    : _client = client ?? http.Client(),
+      _contactEmail = (contactEmail ?? '').trim().isEmpty
+          ? placeholderContactEmail
+          : contactEmail!.trim();
   final http.Client _client;
-  static const _userAgent = 'Neighbourly/1.0 (contact: info@locamarket.in, https://locamarket.in)';
+  final String _contactEmail;
+
+  /// Dummy contact used until the owner sets the public support email in the
+  /// admin panel (Business settings -> supportEmail), which callers pass in.
+  static const placeholderContactEmail = 'support@example.com';
+  String get _userAgent => 'Neighbourly/1.0 (contact: $_contactEmail)';
 
   Future<List<NominatimPlace>> search(String query) async {
     final trimmed = query.trim();
@@ -33,7 +42,7 @@ class NominatimGeocoder {
       'q': trimmed,
       'limit': '8',
     });
-    final response = await _client.get(uri, headers: const {'User-Agent': _userAgent});
+    final response = await _client.get(uri, headers: {'User-Agent': _userAgent});
     if (response.statusCode != 200) {
       throw StateError('Could not search for that place. Please try again.');
     }

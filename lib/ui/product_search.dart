@@ -100,7 +100,9 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
     final place = await showModalBottomSheet<NominatimPlace>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const PlaceSearchSheet(),
+      builder: (_) => PlaceSearchSheet(
+        contactEmail: store.business.text('supportEmail'),
+      ),
     );
     if (place == null) return;
     await store.setLocation(store.pincode, place.displayName, lat: place.latitude, lng: place.longitude);

@@ -36,6 +36,15 @@ void main() {
     expect(client.lastHeaders?['User-Agent'], isNotEmpty);
   });
 
+  test('User-Agent uses the admin-set support email, else a placeholder', () async {
+    final custom = _FakeClient((_) async => _json([]));
+    await NominatimGeocoder(client: custom, contactEmail: ' help@shop.test ').search('x');
+    expect(custom.lastHeaders?['User-Agent'], contains('help@shop.test'));
+    final fallback = _FakeClient((_) async => _json([]));
+    await NominatimGeocoder(client: fallback, contactEmail: '').search('x');
+    expect(fallback.lastHeaders?['User-Agent'], contains(NominatimGeocoder.placeholderContactEmail));
+  });
+
   test('search parses valid results and skips malformed ones', () async {
     final client = _FakeClient(
       (_) async => _json([
