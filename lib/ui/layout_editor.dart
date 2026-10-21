@@ -10,6 +10,7 @@ import 'design_tokens.dart';
 import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
+import 'text_animation.dart';
 import 'home_section_config.dart';
 import 'page_elements.dart';
 import 'shared.dart';
@@ -179,6 +180,7 @@ enum _FieldKind {
   fontWeight,
   animation,
   animationType,
+  textAnimation,
   alignment,
   direction,
   number,
@@ -200,6 +202,9 @@ _FieldKind _kindOf(String key) {
   if (key == 'fontWeight') return _FieldKind.fontWeight;
   if (key == 'animation') return _FieldKind.animation;
   if (key == 'animationType') return _FieldKind.animationType;
+  if (key == 'textAnimation' || key == 'headingAnimation') {
+    return _FieldKind.textAnimation;
+  }
   if (key == 'alignment') return _FieldKind.alignment;
   if (key == 'direction') return _FieldKind.direction;
   if (dimensionFields.containsKey(key)) return _FieldKind.number;
@@ -297,6 +302,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
         case _FieldKind.fontWeight:
         case _FieldKind.animation:
         case _FieldKind.animationType:
+        case _FieldKind.textAnimation:
         case _FieldKind.alignment:
         case _FieldKind.direction:
           values[key] = saved.text(key);
@@ -459,6 +465,54 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     return null;
   }
 
+  // A slider under every number box: it shows the current value (not just the
+  // allowed minimum and maximum) and moves the value as it is dragged.
+  Widget _numberSlider(String key) {
+    final rule = dimensionFields[key]!;
+    final lo = rule.$2, hi = rule.$3;
+    final typed = double.tryParse(controllers[key]!.text.trim());
+    final decimals = hi - lo <= 3 ? 2 : 0;
+    String show(double v) {
+      final s = v.toStringAsFixed(decimals);
+      return decimals == 0 || !s.contains('.')
+          ? s
+          : s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    }
+    final unit = pixelFields.contains(key) ? ' px' : '';
+    final step = decimals == 0 ? 1.0 : (hi - lo <= 1.5 ? .05 : .1);
+    final divisions = ((hi - lo) / step).round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          typed == null
+              ? 'Current value: not set (default)'
+              : 'Current value: ${show(typed)}$unit',
+          key: ValueKey('${widget.component}-$key-current'),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            tickMarkShape: SliderTickMarkShape.noTickMark,
+          ),
+          child: Slider(
+            key: ValueKey('${widget.component}-$key-slider'),
+            min: lo,
+            max: hi,
+            divisions: divisions,
+            value: (typed ?? lo).clamp(lo, hi).toDouble(),
+            label: show((typed ?? lo).clamp(lo, hi).toDouble()) + unit,
+            onChanged: (v) {
+              setState(() => controllers[key]!.text = show(v));
+              _onFieldChanged();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _fieldWidget(String key) {
     switch (_kindOf(key)) {
       case _FieldKind.toggle:
@@ -480,10 +534,16 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           key: ValueKey('${widget.component}-$key'),
           label: key == 'textColor' && isIconOnly
               ? 'Icon color'
+              : key == 'textColor' && widget.component == 'search'
+              ? 'Typed text color'
               : const {
                   'backgroundColor': 'Background color',
                   'textColor': 'Text color',
                   'borderColor': 'Border color',
+                  'searchIconColor': 'Search icon color',
+                  'micIconColor': 'Mic icon color',
+                  'cameraIconColor': 'Camera icon color',
+                  'placeholderColor': 'Placeholder text color',
                   'gradientStart': 'Gradient start',
                   'gradientEnd': 'Gradient end',
                 }[key]!,
@@ -569,6 +629,25 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               child: Text('None (original behavior)'),
             ),
             for (final option in promoAnimationLabels.entries)
+              DropdownMenuItem(value: option.key, child: Text(option.value)),
+          ],
+          onChanged: (v) => _setValue(key, v ?? ''),
+        );
+      case _FieldKind.textAnimation:
+        return DropdownButtonFormField<String>(
+          key: ValueKey('${widget.component}-$key'),
+          initialValue: textAnimationLabels.containsKey(values[key])
+              ? values[key] as String
+              : '',
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: key == 'headingAnimation'
+                ? '"Today\'s Offers" heading animation'
+                : 'Banner text animation (e.g. "Big Savings Everyday")',
+          ),
+          items: [
+            const DropdownMenuItem(value: '', child: Text('None')),
+            for (final option in textAnimationLabels.entries)
               DropdownMenuItem(value: option.key, child: Text(option.value)),
           ],
           onChanged: (v) => _setValue(key, v ?? ''),
@@ -678,22 +757,39 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
                   'iconUrl': 'Icon image URL (optional)',
                   'backgroundImage':
                       'Background photo URL (optional — or use Upload below)',
-                  'text':
-                      'Text content (optional — leave blank for the default)',
+                  'text': widget.component == 'office'
+                      ? 'Office address and phone (shown exactly as typed)'
+                      : 'Text content (optional — leave blank for the default)',
                 }[key],
             suffixText: isPixel ? 'px' : null,
+            alignLabelWithHint: key == 'text' && widget.component == 'office',
             helperText: dimensionFields.containsKey(key)
                 ? '${dimensionFields[key]!.$2} – ${dimensionFields[key]!.$3}'
                 : null,
           ),
           keyboardType: dimensionFields.containsKey(key)
               ? const TextInputType.numberWithOptions(decimal: true)
+              : key == 'text' && widget.component == 'office'
+              ? TextInputType.multiline
               : TextInputType.text,
-          onChanged: (_) => _onFieldChanged(),
+          minLines: key == 'text' && widget.component == 'office' ? 3 : 1,
+          maxLines: key == 'text' && widget.component == 'office' ? 6 : 1,
+          onChanged: (_) {
+            // A typed number moves its slider; every field still saves as before.
+            if (dimensionFields.containsKey(key)) setState(() {});
+            _onFieldChanged();
+          },
           validator: dimensionFields.containsKey(key)
               ? (v) => _numberValidator(key, v)
               : null,
         );
+        if (dimensionFields.containsKey(key)) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [field, _numberSlider(key)],
+          );
+        }
         if (!_imageUrlFields.contains(key)) return field;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

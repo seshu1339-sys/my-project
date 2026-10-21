@@ -67,6 +67,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
+      await tester.ensureVisible(find.widgetWithText(DropdownButtonFormField<String>, 'Font family'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Font family'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Poppins').last);
@@ -85,6 +87,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
+      await tester.ensureVisible(find.widgetWithText(DropdownButtonFormField<String>, 'Font style'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Font style'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Italic').last);
@@ -122,6 +126,8 @@ void main() {
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
       expect(find.widgetWithText(DropdownButtonFormField<String>, 'Entrance animation'), findsOneWidget);
+      await tester.ensureVisible(find.text('Preview'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Preview'));
       await tester.pump();
       expect(tester.takeException(), isNull);

@@ -6,6 +6,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'shared.dart';
+import 'text_animation.dart';
 
 class PromoCard extends StatelessWidget {
   const PromoCard({
@@ -196,7 +197,7 @@ class _CardBody extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                   ],
-                  Text(
+                  animatedText(entry, 'textAnimation', Text(
                     entry.text('name'),
                     maxLines: exactHeight == null ? null : 2,
                     overflow: exactHeight == null
@@ -215,7 +216,7 @@ class _CardBody extends StatelessWidget {
                       ),
                       height: 1.1,
                     ),
-                  ),
+                  )),
                   const SizedBox(height: 12),
                   Text(
                     entry.text('description'),
@@ -283,14 +284,14 @@ class CompactBanner extends StatelessWidget {
               children: [
                 if (entry.text('imageUrl').isNotEmpty)
                   ProductArt(entry, height: 120, appearance: entry),
-                Text(
+                animatedText(entry, 'textAnimation', Text(
                   entry.text('name'),
                   style: sectionTextStyle(
                     entry,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
+                )),
                 const SizedBox(height: 8),
                 Text(entry.text('description')),
                 const SizedBox(height: 12),

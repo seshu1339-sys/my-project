@@ -8,6 +8,7 @@ import '../domain/catalog.dart';
 import 'color_picker_field.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
+import 'text_animation.dart';
 
 const _fontWeightOptions = <String, String>{
   '400': 'Normal',
@@ -89,6 +90,7 @@ class GroupItemDesignFormState extends State<GroupItemDesignForm> {
       'fontFamily': saved.text('fontFamily'),
       'fontStyle': saved.text('fontStyle'),
       'fontWeight': saved.text('fontWeight'),
+      'textAnimation': saved.text('textAnimation'),
     };
   }
 
@@ -125,7 +127,7 @@ class GroupItemDesignFormState extends State<GroupItemDesignForm> {
           data[entry.key] = text;
         }
       }
-      for (final key in ['fontFamily', 'fontStyle', 'fontWeight']) {
+      for (final key in ['fontFamily', 'fontStyle', 'fontWeight', 'textAnimation']) {
         final value = (values[key] as String?) ?? '';
         if (value.isEmpty) {
           data.remove(key);
@@ -311,6 +313,24 @@ class GroupItemDesignFormState extends State<GroupItemDesignForm> {
               onChanged: (v) => _setValue('fontWeight', v ?? ''),
             ),
           ),
+          // Banner/ad text only: animates this item's title (e.g. "Big Savings Everyday").
+          if (widget.collection == 'promotions')
+            SizedBox(
+              width: columnWidth,
+              child: DropdownButtonFormField<String>(
+                initialValue: textAnimationLabels.containsKey(values['textAnimation'])
+                    ? values['textAnimation'] as String
+                    : '',
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Title text animation'),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('None')),
+                  for (final e in textAnimationLabels.entries)
+                    DropdownMenuItem(value: e.key, child: Text(e.value)),
+                ],
+                onChanged: (v) => _setValue('textAnimation', v ?? ''),
+              ),
+            ),
         ],
       );
     },

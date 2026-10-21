@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../domain/catalog.dart';
 import 'design_tokens.dart';
 import 'shared.dart';
+import 'text_animation.dart';
 
 class HomeHeroSlide extends StatelessWidget {
   const HomeHeroSlide({super.key, required this.entry, required this.onTap});
@@ -82,7 +83,7 @@ class HomeHeroSlide extends StatelessWidget {
                           ),
                           const SizedBox(height: 20),
                           Flexible(
-                            child: Text(
+                            child: animatedText(entry, 'textAnimation', Text(
                               entry.text('name'),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
@@ -99,7 +100,7 @@ class HomeHeroSlide extends StatelessWidget {
                                       AppTokens.textPrimary,
                                     ),
                                   ),
-                            ),
+                            )),
                           ),
                           const SizedBox(height: 16),
                           Flexible(

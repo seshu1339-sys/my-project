@@ -658,6 +658,21 @@ List<String> allFieldsFor(String component) {
       'textColor',
     if (_textOverridable.contains(component)) 'text',
     if (animated) 'animation',
+    // Search Box: its own colour for every part, so the search icon, mic icon,
+    // camera icon and placeholder text are each set separately (the border has
+    // the generic "Border color" above).
+    if (component == 'search') ...[
+      'searchIconColor',
+      'micIconColor',
+      'cameraIconColor',
+      'placeholderColor',
+    ],
+    // Animations for the text inside banners/ads (an offer's title such as
+    // "Big Savings Everyday") and for the "Today's Offers" heading.
+    if (['promo', 'ads', 'boxes'].contains(component)) 'textAnimation',
+    if (component == 'promo') 'headingAnimation',
+    // The office address and phone, typed once and shown exactly as typed.
+    if (component == 'office') 'text',
     // Lets an admin set a real photo behind the "Today's Best Offers"
     // strip, turning it into an actual banner instead of a plain-colored
     // bar -- scoped to just 'notice' for now, the one place this was asked
@@ -666,6 +681,7 @@ List<String> allFieldsFor(String component) {
     if (['products', 'popular', 'localServices'].contains(component))
       'alignment',
     if (component == 'services' ||
+        component == 'logo' ||
         iconOnly ||
         _iconReplaceableWithText.contains(component))
       'iconUrl',

@@ -202,6 +202,18 @@ class WireframeHome extends StatelessWidget {
     final theme =
         settings.where((e) => e.id == 'theme').firstOrNull ??
         const Entry('', {});
+    // Side padding of the page. The header is laid out OUTSIDE it so its line
+    // stretches from the left edge of the screen to the right edge; its content
+    // gets the same padding inside.
+    final edge = page
+        .n(
+          'padding',
+          MediaQuery.sizeOf(context).width < 700 ? 10 : 18,
+          0,
+          48,
+        )
+        .clamp(0, MediaQuery.sizeOf(context).width / 24)
+        .toDouble();
     return Container(
       decoration: entryDecoration(
         Entry('background', {
@@ -214,17 +226,27 @@ class WireframeHome extends StatelessWidget {
       ),
       child: SingleChildScrollView(
         controller: scroll,
-        child: Padding(
-          padding: EdgeInsets.all(
-            page
-                .n(
-                  'padding',
-                  MediaQuery.sizeOf(context).width < 700 ? 10 : 18,
-                  0,
-                  48,
-                )
-                .clamp(0, MediaQuery.sizeOf(context).width / 24),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DefaultTextStyle.merge(
+              style: sectionTextStyle(page.styled(context)),
+              child: ResponsiveHeader(
+                store: store,
+                search: search,
+                onSearch: onSearch,
+                onLocation: onLocation,
+                onServices: onServices,
+                onAccount: onAccount,
+                onCart: onCart,
+                onAssistedSearch: onAssistedSearch,
+                onProduct: onProduct,
+                wrapSection: wrapSection,
+                edgePadding: edge,
+              ),
+            ),
+            Padding(
+          padding: EdgeInsets.fromLTRB(edge, 0, edge, edge),
           child: LayoutSection(
             layout: ComponentLayout(
               Entry(page.entry.id, {...page.entry.data, 'padding': 0}),
@@ -233,18 +255,6 @@ class WireframeHome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ResponsiveHeader(
-                  store: store,
-                  search: search,
-                  onSearch: onSearch,
-                  onLocation: onLocation,
-                  onServices: onServices,
-                  onAccount: onAccount,
-                  onCart: onCart,
-                  onAssistedSearch: onAssistedSearch,
-                  onProduct: onProduct,
-                  wrapSection: wrapSection,
-                ),
                 if (!store.live)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -506,6 +516,8 @@ class WireframeHome extends StatelessWidget {
               ],
             ),
           ),
+            ),
+          ],
         ),
       ),
     );

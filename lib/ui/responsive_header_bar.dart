@@ -31,7 +31,11 @@ class ResponsiveHeader extends StatelessWidget {
     required this.onAssistedSearch,
     required this.onProduct,
     this.wrapSection = _identityHeaderSection,
+    this.edgePadding = 0,
   });
+  // The page's side padding, applied INSIDE the header so the header's own
+  // line/background runs edge to edge while its content keeps the page margin.
+  final double edgePadding;
   final Store store;
   final TextEditingController search;
   final VoidCallback onSearch, onLocation, onServices, onAccount, onCart;
@@ -178,7 +182,12 @@ class ResponsiveHeader extends StatelessWidget {
     final officeLayout = layoutFor(context, settings, 'office');
     return LayoutSection(
       layout: header,
-      child: LayoutBuilder(
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: edgePadding,
+          vertical: edgePadding / 2,
+        ),
+        child: LayoutBuilder(
         builder: (context, c) {
           final narrow = c.maxWidth < 900;
           // Thin vertical separators between header sections, matching the
@@ -197,10 +206,10 @@ class ResponsiveHeader extends StatelessWidget {
           return Directionality(
             // Keep the logo at the physical top-left in every language.
             textDirection: TextDirection.ltr,
-            child: Wrap(
+            child: _headerRow(
+              narrow: narrow,
               spacing: header.gap,
               runSpacing: header.gap,
-              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 // Logo icon/image + "Locamarket" wordmark + tagline, matching
                 // the reference design's header lockup.
@@ -214,7 +223,10 @@ class ResponsiveHeader extends StatelessWidget {
                         child: SizedBox(
                           height: logo.height(36, floor: 28),
                           width: logo.height(36, floor: 28),
-                          child: store.business.text('imageUrl').isEmpty
+                          child: (logo.entry.text('iconUrl').isNotEmpty
+                                      ? logo.entry.text('iconUrl')
+                                      : store.business.text('imageUrl'))
+                                  .isEmpty
                               ? Icon(
                                   Icons.storefront_rounded,
                                   size: logo.n('iconSize', 32, 20, 96),
@@ -226,7 +238,9 @@ class ResponsiveHeader extends StatelessWidget {
                                         ),
                                 )
                               : Image.network(
-                                  store.business.text('imageUrl'),
+                                  logo.entry.text('iconUrl').isNotEmpty
+                                      ? logo.entry.text('iconUrl')
+                                      : store.business.text('imageUrl'),
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, error, stack) => const Icon(
                                     Icons.storefront_rounded,
@@ -677,12 +691,13 @@ class ResponsiveHeader extends StatelessWidget {
                       ],
                     ),
                   ),
-                divider(),
-                // Visible office address + phone (was hamburger-menu-only,
-                // behind "Office / Head Office") — placed last so it sits
-                // at the header's top-right corner, matching the wireframe.
-                if (officeLayout.visible)
-                  wrapSection(
+              ],
+              // Visible office address + phone (was hamburger-menu-only,
+              // behind "Office / Head Office") — kept apart from the rest so
+              // on a wide screen it sits at the header's far right corner.
+              office: !officeLayout.visible
+                  ? null
+                  : wrapSection(
                     'office',
                     Material(
                       color: officeLayout.entry.text('backgroundColor').isEmpty
@@ -742,11 +757,41 @@ class ResponsiveHeader extends StatelessWidget {
                                   vertical: 4,
                                 ),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 220),
+                            constraints: BoxConstraints(
+                              maxWidth: officeLayout.entry.text('text').isEmpty
+                                  ? 220
+                                  : 360,
+                            ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // The admin's own text (Layout Settings -> Office
+                                // address & phone) wins and is shown exactly as typed.
+                                if (officeLayout.entry.text('text').isNotEmpty)
+                                  Text(
+                                    officeLayout.entry.text('text'),
+                                    textAlign: TextAlign.right,
+                                    style:
+                                        sectionTextStyle(
+                                          officeLayout.entry,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                        ).copyWith(
+                                          color:
+                                              officeLayout.entry
+                                                  .text('textColor')
+                                                  .isEmpty
+                                              ? null
+                                              : colorFromHex(
+                                                  officeLayout.entry.text(
+                                                    'textColor',
+                                                  ),
+                                                  Colors.black87,
+                                                ),
+                                        ),
+                                  )
+                                else ...[
                                 if (store.business.text('address').isNotEmpty)
                                   Text(
                                     store.business.text('address'),
@@ -795,6 +840,7 @@ class ResponsiveHeader extends StatelessWidget {
                                                 ),
                                         ),
                                   ),
+                                ],
                               ],
                             ),
                           ),
@@ -802,13 +848,54 @@ class ResponsiveHeader extends StatelessWidget {
                       ),
                     ),
                   ),
-              ],
             ),
           );
         },
       ),
+      ),
     );
   }
+}
+
+/// Lays the header out as one wrapping row. On a wide screen the office
+/// address/phone is pinned to the far right corner; on a narrow screen it
+/// simply wraps in with the rest.
+Widget _headerRow({
+  required bool narrow,
+  required double spacing,
+  required double runSpacing,
+  required List<Widget> children,
+  Widget? office,
+}) {
+  if (office == null || narrow) {
+    return Wrap(
+      spacing: spacing,
+      runSpacing: runSpacing,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [...children, ?office],
+    );
+  }
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      Expanded(
+        child: Wrap(
+          spacing: spacing,
+          runSpacing: runSpacing,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: children,
+        ),
+      ),
+      SizedBox(width: spacing),
+      Container(
+        width: 1.5,
+        height: 32,
+        color: AppTokens.textMuted.withValues(alpha: .25),
+      ),
+      SizedBox(width: spacing),
+      office,
+    ],
+  );
 }
 
 /// Shared rendering for the 4 plain header icon buttons (notifications,

@@ -5,7 +5,9 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
+import 'home_section_config.dart';
 import 'shared.dart';
+import 'text_animation.dart';
 
 /// The "Today's Best Offers" strip at the top of the homepage: a label
 /// (admin-overridable, defaults to "Today's Best Offers in `<location>`") plus
@@ -101,7 +103,7 @@ class HomeTickerSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
+              animatedText(sectionConfig(settings, 'promo'), 'headingAnimation', Text(
                 label,
                 maxLines: 1,
                 style:
@@ -117,7 +119,7 @@ class HomeTickerSection extends StatelessWidget {
                               AppTokens.primaryDark,
                             ),
                     ),
-              ),
+              )),
               const SizedBox(width: 12),
               for (final product in chips) ...[
                 _OfferChip(product: product, onTap: () => onProduct(product)),

@@ -37,11 +37,15 @@ class ResponsiveSearchBox extends StatelessWidget {
             math.max(48, MediaQuery.textScalerOf(context).scale(font) * 1.5) +
             padding * 2,
       );
+      Color tint(String key, Color fallback) => layout.entry.text(key).isEmpty
+          ? fallback
+          : colorFromHex(layout.entry.text(key), fallback);
       Widget icon(
         String tooltip,
         IconData icon,
         String field,
         VoidCallback action,
+        Color color,
       ) => IconButton(
         tooltip: tooltip,
         onPressed: action,
@@ -50,7 +54,7 @@ class ResponsiveSearchBox extends StatelessWidget {
         icon: Icon(
           icon,
           size: layout.n(field, 22, 16, width < 360 ? 28 : 48),
-          color: AppTokens.accentOrange,
+          color: color,
         ),
       );
       return Align(
@@ -79,7 +83,7 @@ class ResponsiveSearchBox extends StatelessWidget {
                 constraints: const BoxConstraints(minWidth: 40, minHeight: 44),
                 style: IconButton.styleFrom(
                   backgroundColor: AppTokens.primary,
-                  foregroundColor: Colors.white,
+                  foregroundColor: tint('searchIconColor', Colors.white),
                   shape: const CircleBorder(),
                 ),
                 icon: Icon(Icons.search, size: layout.n('iconSize', 20, 16, width < 360 ? 28 : 48)),
@@ -93,6 +97,9 @@ class ResponsiveSearchBox extends StatelessWidget {
                       .copyWith(fontSize: font),
                   decoration: InputDecoration(
                     hintText: 'Search products'.tr(context),
+                    hintStyle: layout.entry.text('placeholderColor').isEmpty
+                        ? null
+                        : TextStyle(color: tint('placeholderColor', Colors.grey)),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -107,6 +114,7 @@ class ResponsiveSearchBox extends StatelessWidget {
                 Icons.mic_none,
                 'voiceIconSize',
                 () => onAssistedSearch(false),
+                tint('micIconColor', AppTokens.accentOrange),
               ),
               SizedBox(width: gap),
               icon(
@@ -114,6 +122,7 @@ class ResponsiveSearchBox extends StatelessWidget {
                 Icons.camera_alt_outlined,
                 'imageIconSize',
                 () => onAssistedSearch(true),
+                tint('cameraIconColor', AppTokens.accentOrange),
               ),
             ],
           ),

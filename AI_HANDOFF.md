@@ -686,3 +686,12 @@ right now."
 ### 2026-10-21 — Town filter for products + place backfill (user-approved)
 - `Store.visibleProducts({all})`: customers with a chosen town see only products/services of that town (product's own `town`, else its shop's); no town chosen or unknown town = shown. Admin preview shows all. Used by home, category, services, shop, search, product page.
 - Live backfill (additive, only missing fields): 4 shops got town/district/state (Narsipatnam). The 49 live products have no shop so nothing to copy; they show everywhere until given a shop.
+
+### 2026-10-21 — Admin/frontend change request (6 items) (COMMITTED locally; not deployed, not pushed)
+1. Logo: Layout Settings #1 now has "Icon image URL" + Upload image (`iconUrl` on `section_logo`); the header uses it first, else Business Profile `imageUrl`, else the icon.
+2. Every numeric setting (`dimensionFields`) shows "Current value: X px" and a slider under its box (`LayoutFieldsFormState._numberSlider`).
+3. Search Box (#6): separate colours `searchIconColor`, `micIconColor`, `cameraIconColor`, `placeholderColor` (+ existing Border color; `textColor` relabelled "Typed text color"). No such colour settings existed elsewhere, so nothing was removed.
+4. Office (#12): multi-line "Office address and phone" box (`text` on `section_office`), shown exactly as typed, right-aligned at the header's far right on wide screens (`_headerRow`); empty = old Business Profile address/phone.
+5. Header is laid out outside the page padding (`WireframeHome` + `ResponsiveHeader.edgePadding`) so it runs edge to edge.
+6. #15: `textAnimation` (banner text e.g. "Big Savings Everyday", also ads/boxes) and `headingAnimation` ("Today's Offers" label) with 7 effects (`lib/ui/text_animation.dart`); per-item override `textAnimation` on promotions in GroupItemDesignForm.
+Tests: `test/admin_header_changes_test.dart`; Flutter 328 pass.
