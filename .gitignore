@@ -73,3 +73,6 @@ output/
 # copies in assets/category_icons/ instead).
 website-images/
 category-icons/
+
+# Per-flavor Android Firebase configs (never committed)
+android/app/src/*/google-services.json

@@ -36,3 +36,16 @@ deployed yet (the owner must run `firebase deploy --only functions`). Local comm
 | Admin | web only | Business Studio | - |
 | Vendor | Android | V Loca Market | in.locamarket.vendor |
 | Staff | Android | S Loca Market | in.locamarket.staff |
+
+## Phase 1 (done on branch split-apps): three Android flavors
+- `android/app/build.gradle.kts`: flavors `customer` (in.locamarket.locamark, "Loca Market"), `vendor` (in.locamarket.vendor,
+  "V Loca Market"), `staff` (in.locamarket.staff, "S Loca Market"); `pubspec.yaml` `default-flavor: customer`.
+- Firebase: two new Android apps registered in project e-commerce-app-a3897 by CLI (vendor 1:462582150390:android:da5046af1a0f52888d28d7,
+  staff 1:462582150390:android:229235cd6563ea778d28d7), each with the upload-key SHA-1 and SHA-256. The app is configured through
+  dart-defines, so each flavor has its own `firebase-config-android-<flavor>.json` (git-ignored, same keys, different FIREBASE_APP_ID).
+- Build one: `flutter build apk --flavor vendor -t lib/main_vendor.dart --dart-define-from-file=firebase-config-android-vendor.json`
+  (customer: default `-t lib/main.dart` + `firebase-config-android.json`; staff: `--flavor staff -t lib/main_field.dart` + `...-staff.json`).
+- Customer icon from the supplied logo is in `android/app/src/customer/res`. Vendor/staff icons wait for the owner's approval of the
+  "V"/"S" designs (then: node icons script -> `src/vendor/res`, `src/staff/res`).
+- Checked with aapt2: package names and labels are right. Vendor and staff builds contain no admin route; the customer build
+  still contains `/jyothi9` (kept until the owner says to remove it, before the Play Store release).

@@ -36,6 +36,32 @@ android {
         versionName = flutter.versionName
     }
 
+    // Three Android apps from this one project, all on the same Firebase backend. Each flavor has its own
+    // package name, name and icon (src/<flavor>/res). Build one with, for example:
+    //   flutter build apk --flavor vendor -t lib/main_vendor.dart --dart-define-from-file=firebase-config-android-vendor.json
+    buildFeatures {
+        resValues = true // the per-flavor app name
+    }
+
+    flavorDimensions += "app"
+    productFlavors {
+        create("customer") {
+            dimension = "app"
+            applicationId = "in.locamarket.locamark"
+            resValue("string", "app_name", "Loca Market")
+        }
+        create("vendor") {
+            dimension = "app"
+            applicationId = "in.locamarket.vendor"
+            resValue("string", "app_name", "V Loca Market")
+        }
+        create("staff") {
+            dimension = "app"
+            applicationId = "in.locamarket.staff"
+            resValue("string", "app_name", "S Loca Market")
+        }
+    }
+
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
             create("release") {
