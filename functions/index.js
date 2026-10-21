@@ -9,6 +9,7 @@ const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
+const {locationStamp} = require('./places');
 Object.assign(exports, require('./notifications'));
 Object.assign(exports, require('./vendor-photos'));
 Object.assign(exports, require('./field-assistant'));
@@ -314,7 +315,9 @@ exports.submitVendorChange = onCall(options, async request => {
   const target = db.collection(collection).doc(targetId);
   let oldValue = {}, newValue = safeChanges;
   if (isNew) {
-    newValue = {...safeChanges, kind: safeChanges.kind || 'product', stock: safeChanges.stock ?? 0, shopId: vendor.shopId, active: true};
+    // The product carries its shop's place (pincode, town, district, state, GPS) so it shows where it is.
+    const shopPlace = vendor.shopId ? locationStamp((await db.collection('shops').doc(vendor.shopId).get()).data() || {}) : {};
+    newValue = {...safeChanges, kind: safeChanges.kind || 'product', stock: safeChanges.stock ?? 0, shopId: vendor.shopId, ...shopPlace, active: true};
   } else {
     const current = await target.get();
     const data = current.data();

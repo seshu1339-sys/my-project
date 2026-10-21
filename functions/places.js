@@ -27,4 +27,14 @@ function placeForPincode(pincode) {
   return found ? {town: found.town, district: found.district, state: found.state} : {};
 }
 
-module.exports = {placeForPincode};
+/// The place details an approved product or shop carries so the site can show (and later filter by)
+/// where it is: the shop's pincode and GPS plus the town/district/state found from the pincode.
+function locationStamp(shop = {}) {
+  const out = {};
+  const pincode = String(shop.pincode || '').trim();
+  if (pincode) Object.assign(out, {pincode}, placeForPincode(pincode));
+  for (const key of ['latitude', 'longitude']) if (Number.isFinite(shop[key])) out[key] = shop[key];
+  return out;
+}
+
+module.exports = {placeForPincode, locationStamp};

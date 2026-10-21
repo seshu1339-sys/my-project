@@ -9,6 +9,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
+const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -165,11 +166,14 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
     return {status: 'rejected'};
   }
   let shopId = data.shopId;
+  // Where the product is: the new shop's details, or the existing shop's own record.
+  let shopPlace = locationStamp(data.shop || {});
+  if (data.shopId) shopPlace = locationStamp((await db.collection('shops').doc(data.shopId).get()).data() || {});
   const batch = db.batch();
   if (!shopId) {
     const shopRef = db.collection('shops').doc();
     shopId = shopRef.id;
-    batch.set(shopRef, {...data.shop, active: true, createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp()});
+    batch.set(shopRef, {...data.shop, ...shopPlace, active: true, createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp()});
   }
   const productRef = db.collection('products').doc();
   const imageUrls = [];
@@ -180,7 +184,7 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
   }
   batch.set(productRef, {
     name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product', categoryId: data.item.categoryId || '',
-    shopId, imageUrl: imageUrls[0] || '', images: imageUrls.slice(1), active: true,
+    shopId, ...shopPlace, imageUrl: imageUrls[0] || '', images: imageUrls.slice(1), active: true,
     createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp(),
   });
   batch.update(ref, {status: 'approved', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp(), decidedBy: request.auth.uid, resolvedShopId: shopId, resolvedProductId: productRef.id});

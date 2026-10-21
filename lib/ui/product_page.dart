@@ -294,6 +294,25 @@ class _ProductPageState extends State<ProductPage> {
                       ),
                     ),
                   ),
+                if (shop != null && p.text('kind') != 'service')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place_outlined, size: 18),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            [
+                              shop.text('address'),
+                              p.text('town'),
+                              p.text('pincode', shop.text('pincode')),
+                            ].where((part) => part.isNotEmpty).join(', '),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (shop != null && p.text('kind') == 'service') ...[
                   Text(shop.text('address')),
                   ProductArt(shop, height: 140),
