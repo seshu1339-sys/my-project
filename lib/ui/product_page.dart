@@ -48,7 +48,7 @@ class _ProductPageState extends State<ProductPage> {
           ? (p.data['variants'] as List).map((item) => item.toString()).toList()
           : <String>[];
       final related = store
-          .visible('products')
+          .visibleProducts()
           .where(
             (item) =>
                 item.id != p.id &&

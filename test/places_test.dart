@@ -327,6 +327,27 @@ void main() {
       reopened.dispose();
     });
 
+    test('products are filtered to the chosen town; unknown-town items and no town show everything', () async {
+      final store = await _store();
+      store.catalog['shops']!.clear();
+      store.catalog['products']!
+        ..clear()
+        ..addAll(const [
+          Entry('p1', {'name': 'RAJ ITEM', 'town': 'Rajahmundry', 'active': true}),
+          Entry('p2', {'name': 'WARANGAL ITEM', 'town': 'Warangal', 'active': true}),
+          Entry('p3', {'name': 'OLD ITEM', 'shopId': 's1', 'active': true}),
+          Entry('p4', {'name': 'NOWHERE ITEM', 'active': true}),
+        ]);
+      store.catalog['shops']!.add(const Entry('s1', {'name': 'Shop', 'town': 'Warangal'}));
+      expect(store.visibleProducts().map((p) => p.id), ['p1', 'p2', 'p3', 'p4'], reason: 'no town chosen: nothing hidden');
+      await store.setLocation('533101', 'x', town: 'Rajahmundry', district: 'East Godavari', state: 'Andhra Pradesh');
+      expect(store.visibleProducts().map((p) => p.id), ['p1', 'p4']);
+      expect(store.visibleProducts(all: true).length, 4);
+      await store.setLocation('506002', 'x', town: 'Warangal', district: 'Warangal Urban', state: 'Telangana');
+      expect(store.visibleProducts().map((p) => p.id), ['p2', 'p3', 'p4'], reason: "an old product follows its shop's town");
+      store.dispose();
+    });
+
     test('a GPS fix stores the pincode of the nearest town when the typed one is from another town', () async {
       usePlacesFixture();
       await PlacesDirectory.instance.load();

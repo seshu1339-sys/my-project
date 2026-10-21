@@ -682,3 +682,7 @@ right now."
 ### 2026-10-21 — Vendor/staff product location (COMMITTED locally; not deployed/pushed)
 - Flow already existed: vendor `submitVendorChange(newProduct)` -> `vendorChanges` pending -> admin `reviewVendorChange`; staff `submitFieldEntry` -> `fieldSubmissions` -> admin `reviewFieldEntry`. Nothing is public until approved.
 - Added: approved products (and staff-created shops) now carry `pincode/town/district/state/latitude/longitude` (`locationStamp` in `functions/places.js`, from the shop); product page shows address, town, pincode. Test: `functions/place-products.test.js`. Needs functions + hosting deploy.
+
+### 2026-10-21 — Town filter for products + place backfill (user-approved)
+- `Store.visibleProducts({all})`: customers with a chosen town see only products/services of that town (product's own `town`, else its shop's); no town chosen or unknown town = shown. Admin preview shows all. Used by home, category, services, shop, search, product page.
+- Live backfill (additive, only missing fields): 4 shops got town/district/state (Narsipatnam). The 49 live products have no shop so nothing to copy; they show everywhere until given a shop.

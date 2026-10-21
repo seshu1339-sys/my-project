@@ -100,7 +100,7 @@ class WireframeHome extends StatelessWidget {
     // by name, just rendered in the Local Services section instead.
     final products = searchService
         .text(
-          store.visible('products'),
+          store.visibleProducts(all: showAllLocations),
           search.text,
           store.visible('categories'),
         )

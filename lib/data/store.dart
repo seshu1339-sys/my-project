@@ -141,6 +141,27 @@ class Store extends ChangeNotifier {
         ..sort((a, b) => a.number('order').compareTo(b.number('order')));
   List<Entry> visible(String collection) =>
       entries(collection).where((e) => e.visibleAt(DateTime.now())).toList();
+  /// The town a product is sold in: its own, else its shop's (older products have no town of their own).
+  String productTown(Entry product) {
+    final own = product.text('town');
+    if (own.isNotEmpty) return own;
+    final shop = entries('shops').where((s) => s.id == product.text('shopId')).firstOrNull;
+    return shop?.text('town') ?? '';
+  }
+
+  /// Visible products and services for the customer's chosen town: items of other towns are hidden.
+  /// Nothing is hidden while no town is chosen, and an item with no known town shows everywhere.
+  /// [all] (the admin preview) ignores the town.
+  List<Entry> visibleProducts({bool all = false}) {
+    final items = visible('products');
+    if (all || town.isEmpty) return items;
+    final mine = town.trim().toLowerCase();
+    return items.where((p) {
+      final there = productTown(p).trim().toLowerCase();
+      return there.isEmpty || there == mine;
+    }).toList();
+  }
+
   Entry? product(String id) =>
       entries('products').where((e) => e.id == id).firstOrNull;
   double get total => cart.entries.fold(

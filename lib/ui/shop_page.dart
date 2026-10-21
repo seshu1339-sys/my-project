@@ -114,7 +114,7 @@ class ShopPage extends StatelessWidget {
             ),
             for (final p
                 in store
-                    .visible('products')
+                    .visibleProducts()
                     .where((e) => e.text('shopId') == shop.id))
               ListTile(
                 title: Text(p.text('name')),

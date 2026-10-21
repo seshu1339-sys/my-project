@@ -26,7 +26,7 @@ class CategoryPage extends StatelessWidget {
         .where((item) => item.text('parentId') == categoryId)
         .toList();
     final products = store
-        .visible('products')
+        .visibleProducts()
         .where((item) => item.text('categoryId') == categoryId)
         .toList();
     return Scaffold(

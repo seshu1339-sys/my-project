@@ -154,7 +154,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
         shop.number('longitude'),
       );
       if (distance > radiusKm) continue;
-      for (final product in store.visible('products').where((p) => p.text('shopId') == shop.id)) {
+      for (final product in store.visibleProducts().where((p) => p.text('shopId') == shop.id)) {
         matches.add(_Match(shop, product, distance));
       }
     }

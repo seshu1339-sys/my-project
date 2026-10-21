@@ -18,7 +18,7 @@ List<Entry> localServiceEntries(
   SmartSearch searchService, [
   String query = '',
 ]) => searchService
-    .text(store.visible('products'), query, store.visible('categories'))
+    .text(store.visibleProducts(), query, store.visible('categories'))
     .where((entry) => entry.text('kind') == 'service')
     .toList();
 
@@ -46,7 +46,7 @@ bool _sharesWordStem(String a, String b) {
 List<Entry> categoryServiceListings(Store store, ServiceCategory category) {
   final roots = category.id.split('_').where((w) => w.length >= 4).toList();
   if (roots.isEmpty) roots.add(category.id);
-  return store.visible('products').where((entry) {
+  return store.visibleProducts().where((entry) {
     if (entry.text('kind') != 'service') return false;
     final words = '${entry.text('name')} ${entry.text('description')} ${entry.text('tags')}'
         .toLowerCase()
