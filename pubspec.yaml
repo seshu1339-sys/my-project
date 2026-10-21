@@ -51,6 +51,8 @@ dependencies:
   http: ^1.2.0
   speech_to_text: ^7.0.0
   google_fonts: ^6.2.1
+  # Photo -> WebP in the browser (lib/services/image_compress_web.dart)
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

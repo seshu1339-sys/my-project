@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/image_compress.dart';
 import 'store.dart';
 
 /// Every Storage upload path `Store` exposes — one admin catalog-image
@@ -114,15 +115,7 @@ Future<({Uint8List bytes, String ext, String type})> _readImage(Store store, XFi
       'Image uploads require a connected Firebase project. You can use an image URL in the demo.',
     );
   }
-  final bytes = await file.readAsBytes();
-  if (bytes.length > 5 * 1024 * 1024) {
-    throw StateError('Choose an image smaller than 5 MB.');
-  }
-  final ext = file.name.split('.').last.toLowerCase();
-  final type = ext == 'png'
-      ? 'image/png'
-      : ext == 'webp'
-      ? 'image/webp'
-      : 'image/jpeg';
-  return (bytes: bytes, ext: ext, type: type);
+  // Every upload is shrunk and saved as WebP first (lib/services/image_compress.dart).
+  final prepared = await prepareImageForUpload(await file.readAsBytes(), file.name);
+  return (bytes: prepared.bytes, ext: prepared.ext, type: prepared.type);
 }

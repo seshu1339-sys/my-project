@@ -67,3 +67,17 @@ deployed yet (the owner must run `firebase deploy --only functions`). Local comm
   Add vendor, admin, a forged admin claim with no OTP session) against every private collection, reads and writes. Passes.
 - Not done / owner's call later: Firebase App Check (needs Play Integrity setup in the console; enforcing it could lock out the
   live apps, so it is off until the new apps are released); removing `/jyothi9` from the customer web app.
+
+## Phase 3: every photo becomes a WebP (done on branch split-apps)
+- Client: `lib/services/image_compress.dart` (`prepareImageForUpload`), used by the one place all uploads read their photo
+  (`_readImage` in `lib/data/store_uploads.dart`): admin catalog, vendor, staff, Quick Add. Longest side 1600 px, WebP quality 80.
+  Android: `ImageWebp.kt` + `MainActivity.kt` (method channel `in.locamarket/image`, rotation applied, off the UI thread).
+  Web: `image_compress_web.dart` (canvas, `package:web`). If a device cannot encode WebP the original is uploaded and the server
+  converts it. People may now pick photos up to 15 MB (they are shrunk before the 5 MB Storage limit applies).
+- Server: `functions/image-webp.js` (`optimizeUploadedImage`, Storage trigger in asia-south1, sharp). Any JPEG/PNG that lands in
+  catalog/, quickItems/, fieldSubmissions/, fieldStaffApplications/, vendorApplications/, vendorProducts/, vendorShopPhotos/ is
+  converted in place to WebP, keeping its download token; a marker stops a second pass. Existing photos are NOT touched.
+- Measured with `tool/webp_probe.dart`: Android emulator 3000x2000 PNG 1.67 MB -> 87.6 KB WebP (1600x1067);
+  Chrome 2.5 MB -> 87.2 KB. Tests: Flutter 391, backend 86.
+- Needs `firebase deploy --only functions` (new trigger) for the server safety net; sharp is loaded lazily so discovery stays fast
+  (deploy dry run passes with FUNCTIONS_DISCOVERY_TIMEOUT=120).
