@@ -121,7 +121,10 @@ class PlacesIndex {
       (pincodesOfTown['$town|${row[1]}'] ??= {}).add(row[2]);
     }
     final entries = <_Indexed>[];
+    final coordinates = filledCoordinates(json['places'] as List);
+    var rowNumber = -1;
     for (final raw in json['places'] as List) {
+      rowNumber++;
       final row = raw as List;
       final name = row[0] as String;
       final district = districts[row[1] as int];
@@ -132,8 +135,8 @@ class PlacesIndex {
         pincode: '${row[2]}',
         village: row[3] == 1,
         head: row[3] == 2,
-        latitude: (row[4] as num).toDouble(),
-        longitude: (row[5] as num).toDouble(),
+        latitude: coordinates[rowNumber].$1,
+        longitude: coordinates[rowNumber].$2,
         town: row.length > 6 ? row[6] as String : name,
       );
       final lower = name.toLowerCase();
@@ -277,6 +280,52 @@ class PlacesIndex {
     }
     return null;
   }
+}
+
+/// A coordinate for every row of the directory. About a quarter of the rows have none (stored as
+/// 0, 0), so each of those gets an estimate from its neighbours: the other offices with the same
+/// pincode, else the same first 5 digits, else the first 4, else the district's average. That way the
+/// nearest place to a GPS fix can be found everywhere. functions/places.js does exactly the same
+/// (a test keeps the two identical).
+List<(double, double)> filledCoordinates(List places) {
+  bool has(num lat, num lng) => !(lat == 0 && lng == 0);
+  double round3(double value) => (value * 1000).round() / 1000;
+  List<String> keysOf(List row) {
+    final pin = '${row[2]}';
+    return [
+      'p$pin',
+      'a${pin.substring(0, math.min(5, pin.length))}',
+      'b${pin.substring(0, math.min(4, pin.length))}',
+      'd${row[1]}',
+    ];
+  }
+
+  final sums = <String, List<double>>{};
+  for (final raw in places) {
+    final row = raw as List;
+    if (!has(row[4] as num, row[5] as num)) continue;
+    for (final key in keysOf(row)) {
+      final have = sums.putIfAbsent(key, () => [0, 0, 0]);
+      have[0] += (row[4] as num).toDouble();
+      have[1] += (row[5] as num).toDouble();
+      have[2] += 1;
+    }
+  }
+  return [
+    for (final raw in places)
+      () {
+        final row = raw as List;
+        final lat = (row[4] as num).toDouble(), lng = (row[5] as num).toDouble();
+        if (has(lat, lng)) return (lat, lng);
+        for (final key in keysOf(row)) {
+          final found = sums[key];
+          if (found != null) {
+            return (round3(found[0] / found[2]), round3(found[1] / found[2]));
+          }
+        }
+        return (0.0, 0.0);
+      }(),
+  ];
 }
 
 /// Great-circle distance in kilometres.

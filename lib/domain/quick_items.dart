@@ -76,18 +76,33 @@ String quickCountdown(Duration left) {
 String quickDurationLabel(String unit, int value) =>
     unit == 'days' ? '$value ${value == 1 ? 'day' : 'days'}' : '$value ${value == 1 ? 'hour' : 'hours'}';
 
-/// Live right now at [locationId] (null = any), optionally in one category: the customer's view.
+String _same(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+/// Whether an item was added for the customer's town. The town is the one the customer chose with
+/// "Choose your location" (a name from the pincode directory); the district keeps two towns of the
+/// same name apart when both are known.
+bool quickItemAtPlace(Entry item, {required String town, String district = ''}) {
+  if (town.isEmpty) return false;
+  final itemTown = item.text('locationTown', item.text('locationName'));
+  if (_same(itemTown) != _same(town)) return false;
+  final itemDistrict = item.text('locationDistrict');
+  return district.isEmpty || itemDistrict.isEmpty || _same(itemDistrict) == _same(district);
+}
+
+/// Live right now in the customer's town ([town], with [district] when known), optionally in one
+/// category: the customer's view.
 List<Entry> liveQuickItems(
   Iterable<Entry> items,
   DateTime now, {
-  String? locationId,
+  required String town,
+  String district = '',
   String? categoryId,
 }) {
   final live = items
       .where(
         (item) =>
             quickPhase(item, now) == QuickPhase.live &&
-            (locationId == null || item.text('locationId') == locationId) &&
+            quickItemAtPlace(item, town: town, district: district) &&
             (categoryId == null || item.text('categoryId') == categoryId),
       )
       .toList();

@@ -87,10 +87,6 @@ class Store extends ChangeNotifier {
   // position (and moves the town along with it when they travel). A town or pincode
   // picked by hand is never moved by GPS.
   bool followsGps = false;
-  // Quick Add Item: the location (from the admin's list) whose short-lived items the
-  // customer is browsing, remembered on this device. '' until chosen.
-  String quickLocationId = '';
-  bool quickLocationAsked = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
   String? pendingEmailLink;
@@ -200,8 +196,6 @@ class Store extends ChangeNotifier {
     district = prefs.getString('district') ?? '';
     state = prefs.getString('state') ?? '';
     followsGps = prefs.getBool('followsGps') ?? false;
-    quickLocationId = prefs.getString('quickLocationId') ?? '';
-    quickLocationAsked = prefs.getBool('quickLocationAsked') ?? false;
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
     final savedLanguage = prefs.getString('language');
@@ -322,53 +316,19 @@ class Store extends ChangeNotifier {
     );
   }
 
-  /// The active locations customers can browse short-lived items in.
+  /// Extra places the admin added (optional: staff pick towns from the pincode directory).
   List<Entry> get quickLocations =>
       entries('locations').where((l) => l.active).toList();
-  Entry? get quickLocation =>
-      quickLocations.where((l) => l.id == quickLocationId).firstOrNull;
 
-  /// Live items at the customer's chosen location, optionally one category.
-  List<Entry> quickItemsHere({String? categoryId, DateTime? now}) =>
-      quickLocation == null
-      ? const []
-      : liveQuickItems(
-          catalog['quickItems'] ?? const [],
-          now ?? DateTime.now(),
-          locationId: quickLocationId,
-          categoryId: categoryId,
-        );
-
-  Future<void> setQuickLocation(String id) async {
-    quickLocationId = id;
-    quickLocationAsked = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('quickLocationId', id);
-    await prefs.setBool('quickLocationAsked', true);
-    notifyListeners();
-  }
-
-  Future<void> markQuickLocationAsked() async {
-    quickLocationAsked = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('quickLocationAsked', true);
-    notifyListeners();
-  }
-
-  /// The listed location nearest to a point, or null when none has coordinates.
-  Entry? nearestQuickLocation(double lat, double lng) {
-    Entry? best;
-    var bestKm = double.infinity;
-    for (final l in quickLocations) {
-      if (l.number('latitude') == 0 && l.number('longitude') == 0) continue;
-      final km = distanceKm(lat, lng, l.number('latitude'), l.number('longitude'));
-      if (km < bestKm) {
-        bestKm = km;
-        best = l;
-      }
-    }
-    return best;
-  }
+  /// Live Quick Add items in the town the customer chose with "Choose your location" (the same
+  /// town that decides their offers), optionally one category. None until a town is chosen.
+  List<Entry> quickItemsHere({String? categoryId, DateTime? now}) => liveQuickItems(
+    catalog['quickItems'] ?? const [],
+    now ?? DateTime.now(),
+    town: town,
+    district: district,
+    categoryId: categoryId,
+  );
 
   Future<void> save(String collection, Entry entry) async {
     if (live) {

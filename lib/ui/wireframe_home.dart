@@ -440,7 +440,7 @@ class WireframeHome extends StatelessWidget {
                           ),
                         ),
                         // Quick Add Item: "Showing items in: <location>" + "Fresh today".
-                        QuickFreshToday(store: store, prompt: !showAllLocations),
+                        QuickFreshToday(store: store),
                         for (final (i, descriptor)
                             in orderedSectionKeys.indexed) ...[
                           wrapSection(

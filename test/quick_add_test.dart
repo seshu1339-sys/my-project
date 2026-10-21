@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -6,40 +7,44 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
+import 'package:ecommerce_app/domain/places.dart';
 import 'package:ecommerce_app/domain/quick_items.dart';
 import 'package:ecommerce_app/ui/admin_search.dart';
 import 'package:ecommerce_app/ui/quick_add.dart';
 import 'package:ecommerce_app/ui/quick_admin.dart';
 import 'package:ecommerce_app/ui/quick_fresh.dart';
+import 'places_fixture.dart';
 
 final _now = DateTime(2026, 10, 21, 9, 0);
+final realIndexJson = jsonDecode(placesFileText) as Map<String, dynamic>;
 
-Future<Store> _store({bool withLocations = true}) async {
+Future<Store> _store({bool extraPlace = false}) async {
   SharedPreferences.setMockInitialValues({});
   final store = Store();
   await store.init();
   store.catalog['categories'] = [
     for (var i = 0; i < 24; i++) Entry('cat-$i', {'name': 'Category $i', 'order': i, 'parentId': ''}),
   ];
-  if (withLocations) {
+  if (extraPlace) {
     store.catalog['locations'] = const [
-      Entry('loc-raj', {'name': 'Rajahmundry', 'latitude': 17.0, 'longitude': 81.8, 'order': 0}),
-      Entry('loc-kak', {'name': 'Kakinada', 'latitude': 16.95, 'longitude': 82.24, 'order': 1}),
-      Entry('loc-off', {'name': 'Closed', 'latitude': 10.0, 'longitude': 78.0, 'order': 2, 'active': false}),
+      Entry('loc-mkt', {'name': 'Old Market', 'town': 'Rajahmundry', 'order': 0}),
+      Entry('loc-off', {'name': 'Closed', 'order': 1, 'active': false}),
     ];
   }
   return store;
 }
 
-Entry _item(String id, {String status = 'approved', DateTime? starts, DateTime? ends, String location = 'loc-raj', String category = 'cat-1', Map<String, dynamic> more = const {}}) =>
+Entry _item(String id, {String status = 'approved', DateTime? starts, DateTime? ends, String town = 'Rajahmundry', String district = 'East Godavari', String category = 'cat-1', Map<String, dynamic> more = const {}}) =>
     Entry(id, {
       'name': 'Item $id',
       'price': 30.0,
       'unit': 'per kg',
       'categoryId': category,
       'categoryName': 'Category 1',
-      'locationId': location,
-      'locationName': location == 'loc-raj' ? 'Rajahmundry' : 'Kakinada',
+      'locationName': town,
+      'locationTown': town,
+      'locationDistrict': district,
+      'locationPincode': '533101',
       'status': status,
       'imageUrl': '',
       'ownerName': 'Ravi Staff',
@@ -50,11 +55,23 @@ Entry _item(String id, {String status = 'approved', DateTime? starts, DateTime? 
       ...more,
     });
 
-const _vendor = Entry('v1', {'role': 'vendor', 'code': 'VN001', 'name': 'Ramu', 'locationId': 'loc-raj', 'locationName': 'Rajahmundry', 'active': true});
+// A vendor whose shop was locked by GPS at (17.0005, 81.804) in Rajahmundry.
+const _vendor = Entry('v1', {
+  'role': 'vendor', 'code': 'VN001', 'name': 'Ramu', 'active': true, 'shopLocked': true,
+  'locationTown': 'Rajahmundry', 'locationDistrict': 'East Godavari', 'locationPincode': '533101',
+  'shopLatitude': 17.0005, 'shopLongitude': 81.804,
+});
+const _newVendor = Entry('v2', {'role': 'vendor', 'code': 'VN002', 'name': 'New', 'active': true, 'shopLocked': false});
 const _staff = Entry('s1', {'role': 'staff', 'code': 'ST001', 'name': 'Ravi', 'active': true});
 
+const _atShop = QuickFix(17.0006, 81.804); // about 11 m from the shop
+const _awayFromShop = QuickFix(17.003, 81.804); // about 280 m from the shop
+
+Place _place(String town, String district, String pincode) =>
+    Place(name: town, district: district, state: 'Andhra Pradesh', pincode: pincode, village: false, latitude: 17, longitude: 81.8, town: town);
+
 void _phone(WidgetTester tester) {
-  tester.view.physicalSize = const Size(500, 2400);
+  tester.view.physicalSize = const Size(500, 2600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -66,6 +83,8 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.tap(finder);
   await tester.pump();
 }
+
+QuickPhotoResult _photoResult([String id = 'photo-1']) => QuickPhotoResult(id, Uint8List.fromList(_tinyPng));
 
 void main() {
   group('timing rules', () {
@@ -99,7 +118,7 @@ void main() {
       expect(quickCountdown(const Duration(seconds: -5)), '<1m');
     });
 
-    test('customers get only live items of the chosen location and category, soonest-ending first', () {
+    test('customers get only live items of their own town and category, soonest-ending first', () {
       final live = _now.subtract(const Duration(minutes: 10));
       final items = [
         _item('later', starts: live, ends: _now.add(const Duration(hours: 5))),
@@ -108,12 +127,40 @@ void main() {
         _item('notYet', starts: _now.add(const Duration(hours: 1)), ends: _now.add(const Duration(hours: 4))),
         _item('pending', status: 'pending'),
         _item('rejected', status: 'rejected'),
-        _item('elsewhere', location: 'loc-kak', starts: live, ends: _now.add(const Duration(hours: 2))),
+        _item('elsewhere', town: 'Kakinada', starts: live, ends: _now.add(const Duration(hours: 2))),
         _item('otherCat', category: 'cat-9', starts: live, ends: _now.add(const Duration(hours: 2))),
       ];
-      expect(liveQuickItems(items, _now, locationId: 'loc-raj').map((i) => i.id), ['soon', 'otherCat', 'later']);
-      expect(liveQuickItems(items, _now, locationId: 'loc-raj', categoryId: 'cat-1').map((i) => i.id), ['soon', 'later']);
-      expect(liveQuickItems(items, _now, locationId: 'loc-kak').map((i) => i.id), ['elsewhere']);
+      List<String> ids(Iterable<Entry> list) => [for (final i in list) i.id];
+      expect(ids(liveQuickItems(items, _now, town: 'Rajahmundry', district: 'East Godavari')), ['soon', 'otherCat', 'later']);
+      expect(ids(liveQuickItems(items, _now, town: 'Rajahmundry', categoryId: 'cat-1')), ['soon', 'later']);
+      expect(ids(liveQuickItems(items, _now, town: 'Kakinada')), ['elsewhere']);
+      expect(liveQuickItems(items, _now, town: ''), isEmpty, reason: 'no town chosen: nothing');
+    });
+
+    test('town matching ignores case and spacing, and keeps same-named towns of different districts apart', () {
+      final item = _item('a', town: 'Rajahmundry', district: 'East Godavari');
+      expect(quickItemAtPlace(item, town: ' rajahmundry '), isTrue);
+      expect(quickItemAtPlace(item, town: 'Rajahmundry', district: 'east  godavari'), isTrue);
+      expect(quickItemAtPlace(item, town: 'Rajahmundry', district: 'Krishna'), isFalse);
+      expect(quickItemAtPlace(item, town: 'Kakinada'), isFalse);
+      // an item from an extra place the admin added has only a name
+      expect(quickItemAtPlace(const Entry('x', {'locationName': 'Old Market'}), town: 'Old Market'), isTrue);
+    });
+  });
+
+  group('the pincode directory gives every place a coordinate', () {
+    test('rows without coordinates get a neighbour estimate (the same numbers as the server)', () {
+      final filled = filledCoordinates(realIndexJson['places'] as List);
+      expect(filled.length, (realIndexJson['places'] as List).length);
+      expect(filled.where((c) => c.$1 == 0 && c.$2 == 0), isEmpty, reason: 'no place is left without a location');
+      expect(filled[1], (14.352, 77.348)); // Achampalle -- same as functions/places.js
+      expect(filled[2], (14.085, 77.437)); // Adadakulapalli
+      expect(filled[3], (13.805, 77.044)); // Agali S.O
+    });
+
+    test('the nearest town to a GPS fix is found, and nothing outside Andhra Pradesh and Telangana', () {
+      expect(realIndex.nearestTown(17.0005, 81.804)?.town, 'Rajahmundry');
+      expect(realIndex.nearestTown(13.0, 77.5), isNull, reason: 'Bengaluru');
     });
   });
 
@@ -136,9 +183,201 @@ void main() {
       expect(adminSearchMatches('VN012', 'Ramu', 'VN012', 'uid2'), isTrue);
       expect(adminSearchMatches('ST006', 'Ravi', 'ST005', 'uid1'), isFalse);
     });
+
+    test('the distance from the shop is measured in metres', () {
+      expect(quickMetresFromShop(_vendor, _atShop)!, lessThan(quickShopRadiusMetres));
+      expect(quickMetresFromShop(_vendor, _awayFromShop)!, greaterThan(quickShopRadiusMetres));
+      expect(quickMetresFromShop(_newVendor, _atShop), isNull, reason: 'no shop location yet');
+    });
   });
 
-  group('Staff and Vendor phone screens', () {
+  group('vendor: the shop is set once by GPS and locked', () {
+    testWidgets('before it is set only the setup button shows; after, Add items and My Items', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _newVendor))));
+      expect(find.byKey(const ValueKey('quick-shop-setup')), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-add-button')), findsNothing);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _vendor))));
+      expect(find.byKey(const ValueKey('quick-shop-setup')), findsNothing);
+      expect(find.byKey(const ValueKey('quick-add-button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-my-items-button')), findsOneWidget);
+      expect(find.textContaining('Rajahmundry, East Godavari • 533101 (locked)'), findsOneWidget);
+    });
+
+    testWidgets('GPS finds the nearest town and pincode, then Save and lock sends the GPS fix', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      final calls = <String>[];
+      Map<String, dynamic>? sent;
+      final env = QuickEnv(
+        locate: () async => _atShop,
+        findPlace: (lat, lng) async => _place('Rajahmundry', 'East Godavari', '533101'),
+        call: (name, data) async {
+          calls.add(name);
+          sent = data;
+          return {};
+        },
+      );
+      await tester.pumpWidget(MaterialApp(home: QuickShopSetupPage(store: store, account: _newVendor, env: env)));
+      expect(find.byKey(const ValueKey('quick-lock-shop')), findsNothing, reason: 'nothing to lock before the GPS reading');
+      await tester.tap(find.byKey(const ValueKey('quick-find-shop')));
+      await tester.pumpAndSettle();
+      expect(find.text('Rajahmundry, East Godavari'), findsOneWidget);
+      expect(find.text('Andhra Pradesh • Pincode 533101'), findsOneWidget);
+      expect(find.textContaining('locked'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('quick-lock-shop')));
+      await tester.pumpAndSettle();
+      expect(calls, ['setQuickShopLocation']);
+      expect(sent, {'latitude': 17.0006, 'longitude': 81.804});
+    });
+
+    testWidgets('outside Andhra Pradesh / Telangana, or with GPS off, there is a clear message and no lock button', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      await tester.pumpWidget(MaterialApp(
+        home: QuickShopSetupPage(store: store, account: _newVendor, env: QuickEnv(locate: () async => const QuickFix(13.0, 77.5), findPlace: (a, b) async => null)),
+      ));
+      await tester.tap(find.byKey(const ValueKey('quick-find-shop')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('outside Andhra Pradesh and Telangana'), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-lock-shop')), findsNothing);
+      await tester.pumpWidget(MaterialApp(
+        home: QuickShopSetupPage(store: store, account: _newVendor, env: QuickEnv(locate: () async => throw StateError('Turn on location services on this device, then try again.'))),
+      ));
+      await tester.tap(find.byKey(const ValueKey('quick-find-shop')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Turn on location services'), findsOneWidget);
+    });
+
+    testWidgets('a vendor sees up to 5 item rows, each with its own photo, name, rate and unit', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      await tester.pumpWidget(MaterialApp(home: QuickBatchFormPage(store: store, account: _vendor, category: const Entry('cat-0', {'name': 'Vegetables'}))));
+      expect(find.byKey(const ValueKey('quick-row-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-location-fixed')), findsOneWidget);
+      for (var i = 1; i < 5; i++) {
+        await _tap(tester, find.byKey(const ValueKey('quick-row-add')));
+      }
+      for (var i = 0; i < 5; i++) {
+        expect(find.byKey(ValueKey('quick-row-$i'), skipOffstage: false), findsOneWidget);
+        expect(find.byKey(ValueKey('quick-camera-$i'), skipOffstage: false), findsOneWidget);
+        expect(find.byKey(ValueKey('quick-gallery-$i'), skipOffstage: false), findsOneWidget);
+      }
+      expect(find.byKey(const ValueKey('quick-row-add')), findsNothing, reason: 'five is the most');
+      await _tap(tester, find.byKey(const ValueKey('quick-row-remove-4')));
+      expect(find.byKey(const ValueKey('quick-row-4'), skipOffstage: false), findsNothing);
+      expect(find.byKey(const ValueKey('quick-row-add'), skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('at the shop (within 100 m): all rows are saved in one go, with the GPS fix', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      Map<String, dynamic>? sent;
+      var n = 0;
+      final env = QuickEnv(
+        locate: () async => _atShop,
+        pick: (source) async => _photoResult('p${++n}'),
+        call: (name, data) async {
+          expect(name, 'saveQuickItems');
+          sent = data;
+          return {'status': 'pending'};
+        },
+      );
+      await tester.pumpWidget(MaterialApp(home: QuickBatchFormPage(store: store, account: _vendor, category: const Entry('cat-0', {'name': 'Vegetables'}), env: env)));
+      await _tap(tester, find.byKey(const ValueKey('quick-row-add')));
+      Future<void> fill(int i, String name, String rate, String unit) async {
+        await _tap(tester, find.byKey(ValueKey('quick-gallery-$i')));
+        await tester.enterText(find.byKey(ValueKey('quick-name-$i')), name);
+        await tester.enterText(find.byKey(ValueKey('quick-rate-$i')), rate);
+        await tester.ensureVisible(find.byKey(ValueKey('quick-unit-$i')));
+        await tester.pump();
+        await tester.tap(find.byKey(ValueKey('quick-unit-$i')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(unit).last);
+        await tester.pumpAndSettle();
+      }
+
+      await fill(0, 'Tomatoes', '30', 'per kg');
+      await fill(1, 'Mangoes', '90', 'per dozen');
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      await tester.pumpAndSettle();
+      expect(sent, isNotNull);
+      expect(sent!['categoryId'], 'cat-0');
+      expect(sent!['latitude'], 17.0006);
+      expect(sent!['longitude'], 81.804);
+      expect(sent!['items'], [
+        {'submissionId': 'p1', 'name': 'Tomatoes', 'price': 30.0, 'unit': 'per kg'},
+        {'submissionId': 'p2', 'name': 'Mangoes', 'price': 90.0, 'unit': 'per dozen'},
+      ]);
+      expect(sent!.containsKey('locationTown'), isFalse, reason: 'the vendor never sends a place');
+      expect(find.text('Add more items'), findsOneWidget);
+    });
+
+    testWidgets('away from the shop (over 100 m): nothing is sent and the message says so', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      final calls = <String>[];
+      final env = QuickEnv(
+        locate: () async => _awayFromShop,
+        pick: (source) async => _photoResult(),
+        call: (name, data) async {
+          calls.add(name);
+          return {};
+        },
+      );
+      await tester.pumpWidget(MaterialApp(home: QuickBatchFormPage(store: store, account: _vendor, category: const Entry('cat-0', {'name': 'Vegetables'}), env: env)));
+      await _tap(tester, find.byKey(const ValueKey('quick-gallery-0')));
+      await tester.enterText(find.byKey(const ValueKey('quick-name-0')), 'Tomatoes');
+      await tester.enterText(find.byKey(const ValueKey('quick-rate-0')), '30');
+      await tester.ensureVisible(find.byKey(const ValueKey('quick-unit-0')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('quick-unit-0')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('per kg').last);
+      await tester.pumpAndSettle();
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(find.text(quickNotAtShop, skipOffstage: false), findsWidgets);
+      expect(find.textContaining('మీరు మీ షాప్ దగ్గర లేరు', skipOffstage: false), findsWidgets);
+    });
+
+    testWidgets('each row must be complete; the problems say which item', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      final calls = <String>[];
+      await tester.pumpWidget(MaterialApp(
+        home: QuickBatchFormPage(store: store, account: _vendor, category: const Entry('cat-0', {'name': 'Vegetables'}), env: QuickEnv(locate: () async => _atShop, call: (n, d) async { calls.add(n); return {}; })),
+      ));
+      await _tap(tester, find.byKey(const ValueKey('quick-row-add')));
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      expect(calls, isEmpty);
+      expect(find.text('• Item 1: Take or choose a photo of the item.', skipOffstage: false), findsOneWidget);
+      expect(find.text('• Item 2: Enter the item name.', skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('editing an item also needs the vendor to be at the shop', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      final calls = <String>[];
+      var fix = _awayFromShop;
+      final env = QuickEnv(locate: () async => fix, call: (n, d) async { calls.add(n); return {}; });
+      await tester.pumpWidget(MaterialApp(
+        home: QuickItemFormPage(store: store, account: _vendor, category: const Entry('cat-1', {'name': 'Category 1'}), editing: _item('e1', status: 'rejected', more: {'unit': 'per kg'}), env: env),
+      ));
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(find.textContaining('మీరు మీ షాప్ దగ్గర లేరు', skipOffstage: false), findsWidgets);
+      fix = _atShop;
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      await tester.pumpAndSettle();
+      expect(calls, ['saveQuickItem']);
+    });
+  });
+
+  group('staff phone screens', () {
     testWidgets('all 24 categories are big buttons', (tester) async {
       _phone(tester);
       final store = await _store();
@@ -157,16 +396,7 @@ void main() {
       expect(find.byKey(const ValueKey('quick-my-items-button')), findsNothing);
     });
 
-    testWidgets('an active account sees its code and the big buttons', (tester) async {
-      _phone(tester);
-      final store = await _store();
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _vendor))));
-      expect(find.text('VN001'), findsOneWidget);
-      expect(find.byKey(const ValueKey('quick-add-button')), findsOneWidget);
-      expect(find.byKey(const ValueKey('quick-my-items-button')), findsOneWidget);
-    });
-
-    testWidgets('staff pick a location from the list and a photo with Camera or Gallery; the payload carries them', (tester) async {
+    testWidgets('taking the photo reads GPS and selects the nearest town and pincode; the payload carries them', (tester) async {
       _phone(tester);
       final store = await _store();
       final sources = <ImageSource>[];
@@ -176,39 +406,39 @@ void main() {
           store: store,
           account: _staff,
           category: const Entry('cat-0', {'name': 'Fruits'}),
-          pick: (source) async {
-            sources.add(source);
-            return QuickPhotoResult('photo-1', Uint8List.fromList(_tinyPng));
-          },
-          submit: (payload) async {
-            sent = payload;
-            return {'status': 'pending'};
-          },
+          env: QuickEnv(
+            locate: () async => const QuickFix(17.0005, 81.804),
+            findPlace: (lat, lng) async => _place('Rajahmundry', 'East Godavari', '533101'),
+            pick: (source) async {
+              sources.add(source);
+              return _photoResult();
+            },
+            call: (name, data) async {
+              sent = data;
+              return {'status': 'pending'};
+            },
+          ),
         ),
       ));
       // nothing filled in: every problem is listed and nothing is sent
       await _tap(tester, find.byKey(const ValueKey('quick-save')));
       expect(find.byKey(const ValueKey('quick-error'), skipOffstage: false), findsOneWidget);
       expect(find.text('• Take or choose a photo of the item.', skipOffstage: false), findsOneWidget);
+      expect(find.text('• Choose the location.', skipOffstage: false), findsOneWidget);
       expect(sent, isNull);
-      // staff have a location dropdown, not a fixed one
-      expect(find.byKey(const ValueKey('quick-location')), findsOneWidget);
-      expect(find.byKey(const ValueKey('quick-location-fixed')), findsNothing);
+      expect(find.text('Town not found yet'), findsOneWidget);
+      // the photo is taken -> the town is found from GPS
       await _tap(tester, find.byKey(const ValueKey('quick-camera')));
-      await _tap(tester, find.byKey(const ValueKey('quick-gallery')));
-      expect(sources, [ImageSource.camera, ImageSource.gallery]);
+      await tester.pumpAndSettle();
+      expect(sources, [ImageSource.camera]);
       expect(find.byKey(const ValueKey('quick-photo-preview')), findsOneWidget);
+      expect(find.text('Rajahmundry, East Godavari'), findsOneWidget);
+      expect(find.text('Pincode 533101 • from your location'), findsOneWidget);
       await tester.enterText(find.byKey(const ValueKey('quick-name')), 'Bananas');
       await tester.enterText(find.byKey(const ValueKey('quick-rate')), '45');
       await tester.tap(find.byKey(const ValueKey('quick-unit')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('per piece').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('quick-location')));
-      await tester.pumpAndSettle();
-      // only active locations are offered
-      expect(find.text('Closed'), findsNothing);
-      await tester.tap(find.text('Kakinada').last);
       await tester.pumpAndSettle();
       await _tap(tester, find.byKey(const ValueKey('quick-duration-3')));
       await _tap(tester, find.byKey(const ValueKey('quick-save')));
@@ -219,7 +449,11 @@ void main() {
         'categoryId': 'cat-0',
         'price': 45.0,
         'unit': 'per piece',
-        'locationId': 'loc-kak',
+        'locationTown': 'Rajahmundry',
+        'locationDistrict': 'East Godavari',
+        'locationPincode': '533101',
+        'latitude': 17.0005,
+        'longitude': 81.804,
         'startMode': 'now',
         'durationUnit': 'hours',
         'durationValue': 3,
@@ -227,42 +461,99 @@ void main() {
       expect(find.text('Add next item'), findsOneWidget);
     });
 
-    testWidgets('a vendor\'s location is fixed and is never sent', (tester) async {
+    testWidgets('staff can search another town from the directory and it is kept even after more photos', (tester) async {
       _phone(tester);
       final store = await _store();
+      usePlacesFixture();
       Map<String, dynamic>? sent;
+      final kakinada = realIndex.search('Kakinada', limit: 1).first;
       await tester.pumpWidget(MaterialApp(
         home: QuickItemFormPage(
           store: store,
-          account: _vendor,
-          category: const Entry('cat-0', {'name': 'Vegetables'}),
-          pick: (source) async => QuickPhotoResult('p', Uint8List.fromList(_tinyPng)),
-          submit: (payload) async {
-            sent = payload;
-            return {};
-          },
+          account: _staff,
+          category: const Entry('cat-0', {'name': 'Fruits'}),
+          env: QuickEnv(
+            locate: () async => const QuickFix(17.0005, 81.804),
+            findPlace: (lat, lng) async => _place('Rajahmundry', 'East Godavari', '533101'),
+            loadPlaces: () async => realIndex,
+            pick: (source) async => _photoResult(),
+            call: (name, data) async {
+              sent = data;
+              return {};
+            },
+          ),
         ),
       ));
-      expect(find.byKey(const ValueKey('quick-location')), findsNothing);
-      expect(find.byKey(const ValueKey('quick-location-fixed')), findsOneWidget);
-      expect(find.text('Rajahmundry'), findsOneWidget);
       await _tap(tester, find.byKey(const ValueKey('quick-gallery')));
-      await tester.enterText(find.byKey(const ValueKey('quick-name')), 'Tomatoes');
-      await tester.enterText(find.byKey(const ValueKey('quick-rate')), '30');
+      await tester.pumpAndSettle();
+      expect(find.text('Rajahmundry, East Godavari'), findsOneWidget);
+      await _tap(tester, find.byKey(const ValueKey('quick-place-change')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('quick-place-search')), 'Kakinada');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey('quick-place-${kakinada.pincode}-${kakinada.name}')));
+      await tester.pumpAndSettle();
+      expect(find.text(kakinada.label), findsOneWidget);
+      expect(find.text('Pincode ${kakinada.pincode}'), findsOneWidget);
+      await _tap(tester, find.byKey(const ValueKey('quick-gallery'))); // another photo: GPS must not undo their choice
+      await tester.pumpAndSettle();
+      expect(find.text(kakinada.label), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('quick-name')), 'Bananas');
+      await tester.enterText(find.byKey(const ValueKey('quick-rate')), '45');
       await tester.tap(find.byKey(const ValueKey('quick-unit')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('per kg').last);
       await tester.pumpAndSettle();
       await _tap(tester, find.byKey(const ValueKey('quick-save')));
       await tester.pumpAndSettle();
-      expect(sent, isNotNull);
-      expect(sent!.containsKey('locationId'), isFalse);
-      expect(sent!['name'], 'Tomatoes');
+      expect(sent!['locationTown'], kakinada.town);
+      expect(sent!['locationDistrict'], kakinada.district);
+      expect(sent!['locationPincode'], kakinada.pincode);
+    });
+
+    testWidgets('with GPS off the town is chosen by hand, and an extra place the admin added can be used', (tester) async {
+      _phone(tester);
+      final store = await _store(extraPlace: true);
+      Map<String, dynamic>? sent;
+      await tester.pumpWidget(MaterialApp(
+        home: QuickItemFormPage(
+          store: store,
+          account: _staff,
+          category: const Entry('cat-0', {'name': 'Fruits'}),
+          env: QuickEnv(
+            locate: () async => throw StateError('no gps'),
+            loadPlaces: () async => realIndex,
+            pick: (source) async => _photoResult(),
+            call: (name, data) async {
+              sent = data;
+              return {};
+            },
+          ),
+        ),
+      ));
+      await _tap(tester, find.byKey(const ValueKey('quick-gallery')));
+      await tester.pumpAndSettle();
+      expect(find.text('Town not found yet'), findsOneWidget);
+      await _tap(tester, find.byKey(const ValueKey('quick-place-change')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('quick-extra-loc-mkt')), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-extra-loc-off')), findsNothing, reason: 'inactive extras are not offered');
+      await tester.tap(find.byKey(const ValueKey('quick-extra-loc-mkt')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('quick-name')), 'Bananas');
+      await tester.enterText(find.byKey(const ValueKey('quick-rate')), '45');
+      await tester.tap(find.byKey(const ValueKey('quick-unit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('per kg').last);
+      await tester.pumpAndSettle();
+      await _tap(tester, find.byKey(const ValueKey('quick-save')));
+      await tester.pumpAndSettle();
+      expect(sent!['locationId'], 'loc-mkt');
+      expect(sent!.containsKey('locationTown'), isFalse);
     });
 
     testWidgets('Schedule asks for a date and time; hours and days offer 1-4 and 1-3', (tester) async {
       _phone(tester);
-      final store = await _store();
       final timing = QuickTiming();
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickTimingFields(timing: timing)))));
       expect(find.byKey(const ValueKey('quick-pick-schedule')), findsNothing, reason: 'Now: no date picker');
@@ -285,7 +576,6 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('quick-duration-3')));
       await tester.pump();
       expect(timing.toPayload(), {'startMode': 'schedule', 'durationUnit': 'days', 'durationValue': 3});
-      store.dispose();
     });
 
     testWidgets('My Items: items land in Scheduled / Live / Expired with the right buttons', (tester) async {
@@ -306,31 +596,27 @@ void main() {
           store: store,
           account: _staff,
           stream: Stream.value(items),
-          call: (name, data) async {
+          env: QuickEnv(call: (name, data) async {
             calls.add('$name:${data['itemId']}');
             return {};
-          },
+          }),
         ),
       ));
       await tester.pump();
-      // Scheduled tab: waiting for approval + scheduled for later
       expect(find.byKey(const ValueKey('quick-item-wait')), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-item-later')), findsOneWidget);
       expect(find.text('Waiting for admin approval'), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-item-now')), findsNothing);
       expect(find.byKey(const ValueKey('quick-cancel-wait')), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-edit-wait')), findsOneWidget);
-      // cancel works
       await tester.tap(find.byKey(const ValueKey('quick-cancel-wait')));
       await tester.pump();
       expect(calls, ['cancelQuickItem:wait']);
-      // Live tab: countdown
       await tester.tap(find.text('Live'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('quick-item-now')), findsOneWidget);
       expect(find.textContaining('Available for 2h'), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-reactivate-now')), findsNothing);
-      // Expired tab: finished, rejected, cancelled -- each can be re-activated
       await tester.tap(find.text('Expired'));
       await tester.pumpAndSettle();
       for (final id in ['done', 'no', 'stopped']) {
@@ -339,17 +625,52 @@ void main() {
       }
       expect(find.text('Rejected: blurry'), findsOneWidget);
       expect(find.text('Cancelled'), findsOneWidget);
-      // re-activate asks for the timing, then sends it for approval
       await tester.tap(find.byKey(const ValueKey('quick-reactivate-done')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('quick-reactivate-confirm')));
       await tester.pumpAndSettle();
       expect(calls.last, 'reactivateQuickItem:done');
     });
+
+    testWidgets('a vendor re-activating an item must be at the shop', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      final real = DateTime.now();
+      final calls = <Map<String, dynamic>>[];
+      var fix = _awayFromShop;
+      await tester.pumpWidget(MaterialApp(
+        home: QuickMyItemsPage(
+          store: store,
+          account: _vendor,
+          stream: Stream.value([_item('done', starts: real.subtract(const Duration(hours: 5)), ends: real.subtract(const Duration(hours: 1)))]),
+          env: QuickEnv(locate: () async => fix, call: (name, data) async {
+            calls.add({'name': name, ...data});
+            return {};
+          }),
+        ),
+      ));
+      await tester.pump();
+      await tester.tap(find.text('Expired'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('quick-reactivate-done')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('quick-reactivate-confirm')));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(find.text(quickNotAtShop), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      fix = _atShop;
+      await tester.tap(find.byKey(const ValueKey('quick-reactivate-done')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('quick-reactivate-confirm')));
+      await tester.pumpAndSettle();
+      expect(calls.single['name'], 'reactivateQuickItem');
+      expect(calls.single['latitude'], 17.0006);
+    });
   });
 
   group('admin screens', () {
-    testWidgets('the list shows code, role, location and Inactive; Add opens the form', (tester) async {
+    testWidgets('the list shows code, role, town and Inactive; Add opens the form', (tester) async {
       _phone(tester);
       final store = await _store();
       await tester.pumpWidget(MaterialApp(
@@ -369,7 +690,7 @@ void main() {
       expect(find.text('Add Staff / Vendor'), findsWidgets);
     });
 
-    testWidgets('creating a vendor needs name, phone, email, photo and a location; the reset link is shown', (tester) async {
+    testWidgets('creating a vendor needs name, phone, email and photo only -- no location is typed in', (tester) async {
       _phone(tester);
       final store = await _store();
       Map<String, dynamic>? sent;
@@ -385,19 +706,16 @@ void main() {
       ));
       await tester.tap(find.text('Vendor (VN...)'));
       await tester.pump();
+      expect(find.byKey(const ValueKey('quick-account-location')), findsNothing, reason: 'the vendor sets the shop by GPS');
+      expect(find.byKey(const ValueKey('quick-account-location-note'), skipOffstage: false), findsOneWidget);
       await _tap(tester, find.byKey(const ValueKey('quick-account-create')));
       expect(sent, isNull);
       expect(find.textContaining('Enter the name'), findsOneWidget);
-      expect(find.textContaining('shop location'), findsWidgets);
       await _tap(tester, find.byKey(const ValueKey('quick-account-photo')));
       await tester.pump();
       await tester.enterText(find.byKey(const ValueKey('quick-account-name')), 'Ramu Fresh');
       await tester.enterText(find.byKey(const ValueKey('quick-account-phone')), '9876543210');
       await tester.enterText(find.byKey(const ValueKey('quick-account-email')), 'ramu@example.test');
-      await tester.tap(find.byKey(const ValueKey('quick-account-location')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Rajahmundry').last);
-      await tester.pumpAndSettle();
       await _tap(tester, find.byKey(const ValueKey('quick-account-create')));
       await tester.pumpAndSettle();
       expect(sent, {
@@ -407,13 +725,12 @@ void main() {
         'phone': '9876543210',
         'email': 'ramu@example.test',
         'photoUrl': 'https://example.test/p.jpg',
-        'locationId': 'loc-raj',
       });
       expect(find.text('Created: VN001'), findsOneWidget);
       expect(find.text('https://reset.example/abc'), findsOneWidget);
     });
 
-    testWidgets('details page: name, code, phone, location, Active switch and pending items with Approve / Reject', (tester) async {
+    testWidgets('details page: name, code, phone, locked town, Active switch, Unlock and pending items with Approve / Reject', (tester) async {
       _phone(tester);
       final store = await _store();
       final calls = <String>[];
@@ -421,10 +738,13 @@ void main() {
         home: QuickAccountDetailPage(
           store: store,
           uid: 'v1',
-          accountStream: Stream.value(const Entry('v1', {'role': 'vendor', 'code': 'VN012', 'name': 'Ramu', 'phone': '9876543210', 'email': 'r@e.test', 'locationName': 'Rajahmundry', 'photoUrl': '', 'active': true})),
+          accountStream: Stream.value(const Entry('v1', {
+            'role': 'vendor', 'code': 'VN012', 'name': 'Ramu', 'phone': '9876543210', 'email': 'r@e.test', 'photoUrl': '', 'active': true,
+            'shopLocked': true, 'locationTown': 'Rajahmundry', 'locationDistrict': 'East Godavari', 'locationPincode': '533101',
+          })),
           itemsStream: Stream.value([_item('p1', status: 'pending'), _item('p2', status: 'pending'), _item('old', status: 'rejected')]),
           call: (name, data) async {
-            calls.add('$name:${data['active'] ?? data['itemIds']}:${data['approved'] ?? ''}');
+            calls.add('$name:${data['active'] ?? data['itemIds'] ?? data['resetShopLocation']}:${data['approved'] ?? ''}');
             return {};
           },
         ),
@@ -433,22 +753,24 @@ void main() {
       expect(find.text('Ramu'), findsOneWidget);
       expect(find.text('VN012 • Vendor'), findsOneWidget);
       expect(find.text('9876543210'), findsOneWidget);
-      expect(find.text('Rajahmundry'), findsOneWidget);
+      expect(find.text('Rajahmundry, East Godavari • 533101'), findsOneWidget);
       expect(find.text('Pending items (2)'), findsOneWidget);
       expect(find.text('Added by: Ravi Staff (ST001)'), findsWidgets);
+      // Unlock the shop location
+      await _tap(tester, find.byKey(const ValueKey('quick-unlock-shop')));
+      await tester.pumpAndSettle();
+      expect(calls.last, 'updateQuickAccount:true:');
       // Active switch
       expect(tester.widget<SwitchListTile>(find.byKey(const ValueKey('quick-active-switch'))).value, isTrue);
       await _tap(tester, find.byKey(const ValueKey('quick-active-switch')));
       await tester.pumpAndSettle();
       expect(calls.last, 'setQuickAccountActive:false:');
-      // approve one, approve all
       await _tap(tester, find.byKey(const ValueKey('quick-approve-p1')));
       await tester.pumpAndSettle();
       expect(calls.last, 'reviewQuickItems:[p1]:true');
       await _tap(tester, find.byKey(const ValueKey('quick-approve-all')));
       await tester.pumpAndSettle();
       expect(calls.last, anyOf('reviewQuickItems:[p1, p2]:true', 'reviewQuickItems:[p2, p1]:true'));
-      // reject with a reason
       await _tap(tester, find.byKey(const ValueKey('quick-reject-p2')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('quick-reject-reason')), 'wrong price');
@@ -457,7 +779,23 @@ void main() {
       expect(calls.last, 'reviewQuickItems:[p2]:false');
     });
 
-    testWidgets('all items page: shows who added each item and where; filters; Approve all', (tester) async {
+    testWidgets('a vendor who has not set the shop yet says so, with no Unlock button', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      await tester.pumpWidget(MaterialApp(
+        home: QuickAccountDetailPage(
+          store: store,
+          uid: 'v2',
+          accountStream: Stream.value(const Entry('v2', {'role': 'vendor', 'code': 'VN002', 'name': 'New', 'active': true, 'shopLocked': false})),
+          itemsStream: Stream.value(const []),
+        ),
+      ));
+      await tester.pump();
+      expect(find.text('Shop location not set yet'), findsOneWidget);
+      expect(find.byKey(const ValueKey('quick-unlock-shop')), findsNothing);
+    });
+
+    testWidgets('all items page: shows who added each item, the town and pincode; filters; Approve all', (tester) async {
       _phone(tester);
       final store = await _store();
       final calls = <List<Object?>>[];
@@ -467,7 +805,7 @@ void main() {
           store: store,
           stream: Stream.value([
             _item('p1', status: 'pending'),
-            _item('p2', status: 'pending', location: 'loc-kak', more: {'ownerName': 'Sita Staff', 'ownerCode': 'ST002'}),
+            _item('p2', status: 'pending', town: 'Kakinada', more: {'ownerName': 'Sita Staff', 'ownerCode': 'ST002', 'locationPincode': '533001'}),
             _item('l1', starts: live, ends: live.add(const Duration(hours: 2))),
           ]),
           call: (name, data) async {
@@ -482,31 +820,37 @@ void main() {
       expect(find.byKey(const ValueKey('quick-review-l1')), findsNothing, reason: 'pending filter first');
       expect(find.text('Added by: Sita Staff (ST002)'), findsOneWidget);
       expect(find.text('Location: Kakinada'), findsOneWidget);
+      expect(find.text('Pincode: 533001'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('quick-approve-all-pending')));
       await tester.pumpAndSettle();
       expect(calls.single.toSet(), {'p1', 'p2'});
       await _tap(tester, find.byKey(const ValueKey('quick-filter-live')));
-      await tester.pump();
       expect(find.byKey(const ValueKey('quick-review-l1')), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-review-p1')), findsNothing);
       expect(find.byKey(const ValueKey('quick-reject-l1')), findsOneWidget, reason: 'a live item can be taken down');
       await _tap(tester, find.byKey(const ValueKey('quick-filter-all')));
-      await tester.pump();
       expect(find.byKey(const ValueKey('quick-review-p1')), findsOneWidget);
       expect(find.byKey(const ValueKey('quick-review-l1')), findsOneWidget);
     });
   });
 
   group('customer website', () {
-    testWidgets('shows "Showing items in", the live items with a countdown, and hides finished ones', (tester) async {
-      _phone(tester);
+    Future<Store> chosenTown({String town = 'Rajahmundry', String district = 'East Godavari'}) async {
       final store = await _store();
-      store.quickLocationId = 'loc-raj';
-      store.quickLocationAsked = true;
+      store.town = town;
+      store.district = district;
+      return store;
+    }
+
+    final liveFrom = _now.subtract(const Duration(minutes: 5));
+
+    testWidgets('shows "Showing items in" the customer\'s own town, the live items with a countdown, and hides finished ones', (tester) async {
+      _phone(tester);
+      final store = await chosenTown();
       store.catalog['quickItems'] = [
-        _item('tom', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(hours: 2, minutes: 15)), more: {'name': 'Tomatoes'}),
+        _item('tom', starts: liveFrom, ends: _now.add(const Duration(hours: 2, minutes: 15)), more: {'name': 'Tomatoes'}),
         _item('over', starts: _now.subtract(const Duration(hours: 5)), ends: _now.subtract(const Duration(minutes: 1)), more: {'name': 'Gone Beans'}),
-        _item('kak', location: 'loc-kak', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(hours: 1)), more: {'name': 'Kakinada Mangoes'}),
+        _item('kak', town: 'Kakinada', starts: liveFrom, ends: _now.add(const Duration(hours: 1)), more: {'name': 'Kakinada Mangoes'}),
         _item('wait', status: 'pending', more: {'name': 'Pending Peas'}),
       ];
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now)))));
@@ -518,17 +862,15 @@ void main() {
       expect(find.text('Available for 2h 15m'), findsOneWidget);
       expect(find.text('₹30 per kg'), findsOneWidget);
       expect(find.text('Gone Beans'), findsNothing);
-      expect(find.text('Kakinada Mangoes'), findsNothing);
+      expect(find.text('Kakinada Mangoes'), findsNothing, reason: 'another town\'s item');
       expect(find.text('Pending Peas'), findsNothing);
     });
 
     testWidgets('the same item disappears once its time is up', (tester) async {
       _phone(tester);
-      final store = await _store();
-      store.quickLocationId = 'loc-raj';
-      store.quickLocationAsked = true;
+      final store = await chosenTown();
       store.catalog['quickItems'] = [
-        _item('tom', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(minutes: 30)), more: {'name': 'Tomatoes'}),
+        _item('tom', starts: liveFrom, ends: _now.add(const Duration(minutes: 30)), more: {'name': 'Tomatoes'}),
       ];
       var clock = _now;
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => clock)))));
@@ -540,116 +882,79 @@ void main() {
       expect(find.text('Tomatoes'), findsNothing);
     });
 
-    testWidgets('Change lets the customer pick any location, and it is remembered on the device', (tester) async {
+    testWidgets('Change uses the normal "Choose your location" and the items follow the new town', (tester) async {
       _phone(tester);
-      final store = await _store();
-      store.quickLocationId = 'loc-raj';
-      store.quickLocationAsked = true;
+      final store = await chosenTown();
       store.catalog['quickItems'] = [
-        _item('kak', location: 'loc-kak', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(hours: 1)), more: {'name': 'Kakinada Mangoes'}),
+        _item('tom', starts: liveFrom, ends: _now.add(const Duration(hours: 2)), more: {'name': 'Tomatoes'}),
+        _item('kak', town: 'Kakinada', starts: liveFrom, ends: _now.add(const Duration(hours: 1)), more: {'name': 'Kakinada Mangoes'}),
       ];
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now)))));
+      var opened = 0;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: QuickFreshToday(
+              store: store,
+              now: () => _now,
+              choose: (context, s) async {
+                opened++;
+                await s.setLocation('533001', 'Kakinada', town: 'Kakinada', district: 'East Godavari', state: 'Andhra Pradesh');
+              },
+            ),
+          ),
+        ),
+      ));
       await tester.pump();
+      expect(find.text('Tomatoes'), findsOneWidget);
       expect(find.text('Kakinada Mangoes'), findsNothing);
       await tester.tap(find.byKey(const ValueKey('quick-change-location')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('quick-location-loc-raj')), findsOneWidget);
-      expect(find.byKey(const ValueKey('quick-location-loc-off')), findsNothing, reason: 'inactive location is not offered');
-      await tester.tap(find.byKey(const ValueKey('quick-location-loc-kak')));
-      await tester.pumpAndSettle();
+      expect(opened, 1);
       expect(find.text('Showing items in: Kakinada'), findsOneWidget);
       expect(find.text('Kakinada Mangoes'), findsOneWidget);
-      // remembered
-      final reopened = Store();
-      await reopened.init();
-      expect(reopened.quickLocationId, 'loc-kak');
-      expect(reopened.quickLocationAsked, isTrue);
+      expect(find.text('Tomatoes'), findsNothing);
     });
 
-    testWidgets('first visit: allow location -> the nearest listed location is chosen', (tester) async {
+    testWidgets('no town chosen yet: asked to choose, and no items are shown', (tester) async {
       _phone(tester);
       final store = await _store();
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now, locate: () async => const _Position(16.96, 82.2)))),
-      ));
-      await tester.pumpAndSettle();
-      expect(find.text('Fresh items near you'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('quick-prompt-allow')));
-      await tester.pumpAndSettle();
-      expect(store.quickLocationId, 'loc-kak', reason: 'nearest to 16.96, 82.2');
-      expect(find.text('Showing items in: Kakinada'), findsOneWidget);
-    });
-
-    testWidgets('first visit: if location is denied they are asked to pick from the list', (tester) async {
-      _phone(tester);
-      final store = await _store();
-      await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now, locate: () async => throw StateError('denied')))),
-      ));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('quick-prompt-allow')));
-      await tester.pumpAndSettle();
-      expect(find.text('Choose a location'), findsOneWidget);
-      expect(find.textContaining('please pick one from the list'), findsOneWidget);
-      expect(store.quickLocationId, isEmpty);
-      await tester.tap(find.byKey(const ValueKey('quick-location-loc-raj')));
-      await tester.pumpAndSettle();
-      expect(store.quickLocationId, 'loc-raj');
-    });
-
-    testWidgets('they can also choose from the list straight away, and are not asked again', (tester) async {
-      _phone(tester);
-      final store = await _store();
+      store.catalog['quickItems'] = [_item('tom', starts: liveFrom, ends: _now.add(const Duration(hours: 2)), more: {'name': 'Tomatoes'})];
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now)))));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('quick-prompt-choose')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('quick-location-loc-kak')));
-      await tester.pumpAndSettle();
-      expect(store.quickLocationId, 'loc-kak');
-      // a later visit does not ask again
-      final again = Store();
-      await again.init();
-      again.catalog['locations'] = store.catalog['locations']!;
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: again, now: () => _now)))));
-      await tester.pumpAndSettle();
-      expect(find.text('Fresh items near you'), findsNothing);
-      expect(find.text('Showing items in: Kakinada'), findsOneWidget);
+      await tester.pump();
+      expect(find.text('Choose your location to see fresh items'), findsOneWidget);
+      expect(find.text('Choose'), findsOneWidget);
+      expect(find.text('Tomatoes'), findsNothing);
     });
 
-    testWidgets('the admin preview never asks the first-visit question, and nothing shows without locations', (tester) async {
+    testWidgets('a town with nothing live says so; and nothing shows at all while no item is approved', (tester) async {
       _phone(tester);
-      final store = await _store();
-      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, prompt: false)))));
-      await tester.pumpAndSettle();
-      expect(find.text('Fresh items near you'), findsNothing);
-      final empty = await _store(withLocations: false);
+      final store = await chosenTown(town: 'Warangal', district: 'Warangal Urban');
+      store.catalog['quickItems'] = [_item('tom', starts: liveFrom, ends: _now.add(const Duration(hours: 2)))];
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now)))));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('quick-none-here')), findsOneWidget);
+      final empty = await chosenTown();
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: empty)))));
-      await tester.pumpAndSettle();
+      await tester.pump();
       expect(find.byKey(const ValueKey('quick-showing-in')), findsNothing);
     });
 
-    testWidgets('a category page lists its live quick items for the chosen location', (tester) async {
+    testWidgets('a category page lists its live quick items for the customer\'s town', (tester) async {
       _phone(tester);
-      final store = await _store();
-      store.quickLocationId = 'loc-raj';
-      store.quickLocationAsked = true;
+      final store = await chosenTown();
       store.catalog['quickItems'] = [
-        _item('tom', category: 'cat-1', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(hours: 2)), more: {'name': 'Tomatoes'}),
-        _item('shirt', category: 'cat-9', starts: _now.subtract(const Duration(minutes: 5)), ends: _now.add(const Duration(hours: 2)), more: {'name': 'Shirts'}),
+        _item('tom', category: 'cat-1', starts: liveFrom, ends: _now.add(const Duration(hours: 2)), more: {'name': 'Tomatoes'}),
+        _item('shirt', category: 'cat-9', starts: liveFrom, ends: _now.add(const Duration(hours: 2)), more: {'name': 'Shirts'}),
+        _item('kak', category: 'cat-1', town: 'Kakinada', starts: liveFrom, ends: _now.add(const Duration(hours: 2)), more: {'name': 'Kakinada Mangoes'}),
       ];
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickCategoryItems(store: store, categoryId: 'cat-1', now: () => _now)))));
       await tester.pump();
       expect(find.text('Fresh today in Rajahmundry'), findsOneWidget);
       expect(find.text('Tomatoes'), findsOneWidget);
       expect(find.text('Shirts'), findsNothing);
+      expect(find.text('Kakinada Mangoes'), findsNothing);
     });
   });
-}
-
-class _Position {
-  const _Position(this.latitude, this.longitude);
-  final double latitude, longitude;
 }
 
 // A 1x1 transparent PNG, enough for the photo preview.

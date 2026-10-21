@@ -8,8 +8,6 @@ import '../domain/quick_items.dart';
 import 'moderation_dialogs.dart';
 import 'quick_add.dart';
 
-typedef QuickCall = Future<Map<String, dynamic>> Function(String name, Map<String, dynamic> data);
-
 String _cleanError(Object e) => '$e'.replaceFirst(RegExp(r'^\[[^\]]*\]\s*'), '').replaceFirst('Bad state: ', '');
 
 /// Admin: every Quick Add Staff and Vendor, with a button to add one.
@@ -93,7 +91,6 @@ class QuickAccountForm extends StatefulWidget {
 class _QuickAccountFormState extends State<QuickAccountForm> {
   String role = 'staff';
   final name = TextEditingController(), phone = TextEditingController(), email = TextEditingController(), shop = TextEditingController();
-  String? locationId;
   String photoUrl = '';
   bool busy = false;
   List<String> errors = const [];
@@ -125,7 +122,6 @@ class _QuickAccountFormState extends State<QuickAccountForm> {
     if (!RegExp(r'^\+?[0-9][0-9 -]{6,17}$').hasMatch(phone.text.trim())) 'Enter a valid phone number.',
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim())) 'Enter a valid email address.',
     if (photoUrl.isEmpty) 'Add the person\'s photo.',
-    if (role == 'vendor' && (locationId == null || locationId!.isEmpty)) 'Choose the vendor\'s shop location.',
   ];
 
   Future<void> create() async {
@@ -140,7 +136,6 @@ class _QuickAccountFormState extends State<QuickAccountForm> {
         'phone': phone.text.trim(),
         'email': email.text.trim(),
         'photoUrl': photoUrl,
-        if (role == 'vendor') 'locationId': locationId,
         if (role == 'vendor' && shop.text.trim().isNotEmpty) 'shopName': shop.text.trim(),
       });
       if (!mounted) return;
@@ -176,7 +171,6 @@ class _QuickAccountFormState extends State<QuickAccountForm> {
 
   @override
   Widget build(BuildContext context) {
-    final locations = widget.store.quickLocations;
     return Scaffold(
       appBar: AppBar(title: const Text('Add Staff / Vendor')),
       body: ListView(
@@ -206,16 +200,11 @@ class _QuickAccountFormState extends State<QuickAccountForm> {
           if (role == 'vendor') ...[
             const SizedBox(height: 12),
             TextField(controller: shop, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Shop name (optional)', border: OutlineInputBorder())),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              key: const ValueKey('quick-account-location'),
-              initialValue: locations.any((l) => l.id == locationId) ? locationId : null,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Shop location (fixed; the vendor cannot change it)', border: OutlineInputBorder()),
-              items: [for (final l in locations) DropdownMenuItem(value: l.id, child: Text(l.text('name', l.id)))],
-              onChanged: (v) => setState(() => locationId = v),
+            const Padding(
+              key: ValueKey('quick-account-location-note'),
+              padding: EdgeInsets.only(top: 8),
+              child: Text('No location to type: the vendor takes GPS at the shop on first login, and the nearest town and pincode are set and locked automatically.'),
             ),
-            if (locations.isEmpty) const Padding(padding: EdgeInsets.only(top: 6), child: Text('Add locations first (Quick Add locations).')),
           ],
           const SizedBox(height: 16),
           if (errors.isNotEmpty) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [for (final e in errors) Text('• $e')]))),
@@ -249,8 +238,6 @@ class QuickAccountDetailPage extends StatelessWidget {
 
   Future<void> _edit(BuildContext context, Entry account) async {
     final name = TextEditingController(text: account.text('name')), phone = TextEditingController(text: account.text('phone'));
-    String? locationId = account.text('locationId');
-    final isVendor = account.text('role') == 'vendor';
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialog) => StatefulBuilder(
@@ -260,14 +247,6 @@ class QuickAccountDetailPage extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: name, decoration: const InputDecoration(labelText: 'Name')),
               TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
-              if (isVendor)
-                DropdownButtonFormField<String>(
-                  initialValue: store.quickLocations.any((l) => l.id == locationId) ? locationId : null,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Shop location'),
-                  items: [for (final l in store.quickLocations) DropdownMenuItem(value: l.id, child: Text(l.text('name', l.id)))],
-                  onChanged: (v) => setState(() => locationId = v),
-                ),
             ]),
           ),
           actions: [
@@ -280,7 +259,7 @@ class QuickAccountDetailPage extends StatelessWidget {
     if (ok != true || !context.mounted) return;
     await runModerationAction(
       context,
-      () => _call('updateQuickAccount', {'uid': uid, 'name': name.text.trim(), 'phone': phone.text.trim(), if (isVendor && locationId != null) 'locationId': locationId}),
+      () => _call('updateQuickAccount', {'uid': uid, 'name': name.text.trim(), 'phone': phone.text.trim()}),
     );
   }
 
@@ -318,8 +297,24 @@ class QuickAccountDetailPage extends StatelessWidget {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.place_outlined),
-                title: Text(account.text('role') == 'vendor' ? account.text('locationName', 'No location') : 'Any location in the list'),
-                subtitle: account.text('role') == 'vendor' ? const Text('Fixed shop location') : null,
+                title: Text(
+                  account.text('role') != 'vendor'
+                      ? 'Any town (found from GPS)'
+                      : account.data['shopLocked'] == true
+                      ? '${account.text('locationTown')}, ${account.text('locationDistrict')} • ${account.text('locationPincode')}'
+                      : 'Shop location not set yet',
+                  key: const ValueKey('quick-detail-location'),
+                ),
+                subtitle: account.text('role') == 'vendor'
+                    ? Text(account.data['shopLocked'] == true ? 'Locked at the shop by GPS. The vendor cannot change it.' : 'The vendor sets it by GPS at the shop.')
+                    : null,
+                trailing: account.text('role') == 'vendor' && account.data['shopLocked'] == true
+                    ? TextButton(
+                        key: const ValueKey('quick-unlock-shop'),
+                        onPressed: () => runModerationAction(context, () => _call('updateQuickAccount', {'uid': uid, 'resetShopLocation': true})),
+                        child: const Text('Unlock'),
+                      )
+                    : null,
               ),
               SwitchListTile(
                 key: const ValueKey('quick-active-switch'),
@@ -416,6 +411,7 @@ class QuickItemReviewTile extends StatelessWidget {
                 Text(item.text('name'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                 Text('₹${item.number('price')} ${item.text('unit')} • ${item.text('categoryName')}'),
                 Text('Location: ${item.text('locationName')}'),
+                if (item.text('locationPincode').isNotEmpty) Text('Pincode: ${item.text('locationPincode')}'),
                 Text('Added by: ${item.text('ownerName')} (${item.text('ownerCode')})', key: ValueKey('quick-added-by-${item.id}')),
               ]),
             ),
