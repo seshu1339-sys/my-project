@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/places.dart';
 import '../services/location.dart';
+import '../services/places_directory.dart';
 import 'shop_map.dart';
 
 /// Returns every reason a field entry must not be submitted yet. Mirrors the
@@ -48,8 +50,11 @@ List<String> fieldEntryErrors({
 /// photo are present; GPS auto-captures on open with a "Recapture" fallback,
 /// exactly like VendorRegistrationForm.
 class FieldEntryForm extends StatefulWidget {
-  const FieldEntryForm({super.key, required this.store});
+  const FieldEntryForm({super.key, required this.store, this.locate, this.findPlace});
   final Store store;
+  // Test seams: the phone's GPS and the pincode directory.
+  final Future<Position> Function()? locate;
+  final Future<Place?> Function(double latitude, double longitude)? findPlace;
   @override
   State<FieldEntryForm> createState() => _FieldEntryFormState();
 }
@@ -80,6 +85,9 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
   Position? position;
   String? locationError;
   bool capturingLocation = true;
+  // The town nearest to the GPS fix (from the pincode directory); a new shop's pincode is filled from it.
+  Place? nearestPlace;
+  bool pincodeFromGps = false;
 
   @override
   void initState() {
@@ -93,10 +101,28 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
       locationError = null;
     });
     try {
-      final result = await currentPosition(action: "capture the shop's location");
+      final result = await (widget.locate ?? () => currentPosition(action: "capture the shop's location"))();
       if (mounted) setState(() { position = result; capturingLocation = false; });
+      await _findTown(result);
     } catch (e) {
       if (mounted) setState(() { locationError = '$e'.replaceFirst('Bad state: ', ''); capturingLocation = false; });
+    }
+  }
+
+  /// The nearest town and pincode for a GPS fix; fills an empty pincode so the staff member need not type it.
+  Future<void> _findTown(Position fix) async {
+    try {
+      final place = await (widget.findPlace ?? (lat, lng) async => (await PlacesDirectory.instance.load()).nearestTown(lat, lng))(fix.latitude, fix.longitude);
+      if (!mounted || place == null) return;
+      setState(() {
+        nearestPlace = place;
+        if (shopPincode.text.trim().isEmpty || pincodeFromGps) {
+          shopPincode.text = place.pincode;
+          pincodeFromGps = true;
+        }
+      });
+    } catch (_) {
+      /* No directory or no town: the pincode can still be typed. */
     }
   }
 
@@ -195,7 +221,23 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
       else ...[
         TextField(controller: shopName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Shop name')),
         TextField(controller: shopAddress, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop address')),
-        TextField(controller: shopPincode, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Pincode', counterText: '')),
+        TextField(
+          key: const ValueKey('field-shop-pincode'),
+          controller: shopPincode,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          onChanged: (_) => pincodeFromGps = false,
+          decoration: const InputDecoration(labelText: 'Pincode', counterText: ''),
+        ),
+        if (nearestPlace != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Nearest town from your location: ${nearestPlace!.town}, ${nearestPlace!.district} (${nearestPlace!.pincode})',
+              key: const ValueKey('field-nearest-town'),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
       ],
     ])));
   }

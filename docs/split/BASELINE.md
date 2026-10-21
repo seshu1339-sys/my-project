@@ -81,3 +81,13 @@ deployed yet (the owner must run `firebase deploy --only functions`). Local comm
   Chrome 2.5 MB -> 87.2 KB. Tests: Flutter 391, backend 86.
 - Needs `firebase deploy --only functions` (new trigger) for the server safety net; sharp is loaded lazily so discovery stays fast
   (deploy dry run passes with FUNCTIONS_DISCOVERY_TIMEOUT=120).
+
+## Phases 4 and 5: vendor and staff apps checked (done on branch split-apps)
+- Vendor: `QuickAddPanel` now shows "Today: X of N items added" (N = admin's setting, default 6) and disables "Add items" at the limit
+  (server still enforces). Staff the same with 15. Checked the screens on the Android emulator at phone size with fake data
+  (`tool/quick_probe.dart`): panel before/after the shop lock, category buttons, 5-item form, staff form, My Items -- no overflow.
+- Staff field entry (`FieldEntryForm`): a new shop's pincode is filled from the GPS fix (nearest town from the pincode directory,
+  shown under the field); what the staff member typed is never overwritten.
+- Not testable without a real phone / real accounts: GPS accuracy, the camera app, FCM, sign-in with a created account. See the
+  on-phone test list given to the owner.
+- Tests: Flutter 398+.

@@ -191,6 +191,34 @@ void main() {
     });
   });
 
+  group('daily limit display', () {
+    test('the day is the Indian calendar day, like on the server', () {
+      expect(quickDayKey(DateTime.utc(2026, 10, 21, 18, 29)), '2026-10-21');
+      expect(quickDayKey(DateTime.utc(2026, 10, 21, 18, 31)), '2026-10-22');
+    });
+
+    test('the limit is the admin setting, else 15 for staff and 6 for vendors', () {
+      expect(quickDailyLimit('staff', const Entry('business', {})), 15);
+      expect(quickDailyLimit('vendor', const Entry('business', {})), 6);
+      expect(quickDailyLimit('staff', const Entry('business', {'quickItemsPerDayStaff': 20})), 20);
+      expect(quickDailyLimit('vendor', const Entry('business', {'quickItemsPerDayVendor': 0})), 6);
+    });
+
+    testWidgets('the panel shows how many items were added today and stops at the limit', (tester) async {
+      _phone(tester);
+      final store = await _store();
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _vendor, usedToday: 2, dailyLimit: 6))));
+      expect(find.text('Today: 2 of 6 items added.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const ValueKey('quick-add-button'))).onPressed, isNotNull);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _vendor, usedToday: 6, dailyLimit: 6))));
+      expect(find.text('Daily limit reached: 6 of 6 items today.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const ValueKey('quick-add-button'))).onPressed, isNull);
+      expect(find.byKey(const ValueKey('quick-my-items-button')), findsOneWidget, reason: 'My Items stays available');
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: QuickAddPanel(store: store, account: _vendor))));
+      expect(find.byKey(const ValueKey('quick-today')), findsNothing, reason: 'nothing while the count is loading');
+    });
+  });
+
   group('vendor: the shop is set once by GPS and locked', () {
     testWidgets('before it is set only the setup button shows; after, Add items and My Items', (tester) async {
       _phone(tester);

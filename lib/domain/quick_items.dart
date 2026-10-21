@@ -73,6 +73,19 @@ String quickCountdown(Duration left) {
   return '${left.inMinutes}m';
 }
 
+/// The calendar day in India (IST) as YYYY-MM-DD: the day the daily limit counts in (same as the server's dayKey).
+String quickDayKey(DateTime now) {
+  final ist = now.toUtc().add(const Duration(hours: 5, minutes: 30));
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${ist.year}-${two(ist.month)}-${two(ist.day)}';
+}
+
+/// Items per day for a role: the admin's setting (Business profile), else 15 staff / 6 vendors.
+int quickDailyLimit(String role, Entry business) {
+  final raw = business.number(role == 'staff' ? 'quickItemsPerDayStaff' : 'quickItemsPerDayVendor');
+  return raw >= 1 && raw <= 1000 && raw == raw.roundToDouble() ? raw.round() : (role == 'staff' ? 15 : 6);
+}
+
 String quickDurationLabel(String unit, int value) =>
     unit == 'days' ? '$value ${value == 1 ? 'day' : 'days'}' : '$value ${value == 1 ? 'hour' : 'hours'}';
 

@@ -331,17 +331,34 @@ class QuickAddHome extends StatelessWidget {
           // Not a Quick Add account (or still loading): show nothing, the rest of the app is unchanged.
           return const SizedBox.shrink();
         }
-        return QuickAddPanel(store: store, account: Entry(uid, snapshot.data!.data()!));
+        final account = Entry(uid, snapshot.data!.data()!);
+        // How many items were added today (the limit counts a day in India time).
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: store.firestore
+              .collection('quickItems')
+              .where('ownerUid', isEqualTo: uid)
+              .where('dayKey', isEqualTo: quickDayKey(DateTime.now()))
+              .snapshots(),
+          builder: (context, today) => QuickAddPanel(
+            store: store,
+            account: account,
+            usedToday: today.data?.size,
+            dailyLimit: quickDailyLimit(account.text('role'), store.business),
+          ),
+        );
       },
     );
   }
 }
 
 class QuickAddPanel extends StatelessWidget {
-  const QuickAddPanel({super.key, required this.store, required this.account, this.env = const QuickEnv()});
+  const QuickAddPanel({super.key, required this.store, required this.account, this.env = const QuickEnv(), this.usedToday, this.dailyLimit});
   final Store store;
   final Entry account;
   final QuickEnv env;
+  // Items added today and the daily limit; null while still loading.
+  final int? usedToday, dailyLimit;
+  bool get limitReached => usedToday != null && dailyLimit != null && usedToday! >= dailyLimit!;
   bool get active => account.data['active'] == true;
   bool get isVendor => account.text('role') == 'vendor';
   bool get shopLocked => account.data['shopLocked'] == true;
@@ -376,6 +393,15 @@ class QuickAddPanel extends StatelessWidget {
             ])
           else
             const Text('First set your shop location. Stand at your shop and tap the button below. It is locked for good once saved.'),
+          if (usedToday != null && dailyLimit != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                limitReached ? 'Daily limit reached: $usedToday of $dailyLimit items today.' : 'Today: $usedToday of $dailyLimit items added.',
+                key: const ValueKey('quick-today'),
+                style: TextStyle(fontWeight: FontWeight.w600, color: limitReached ? Colors.red : null),
+              ),
+            ),
           const SizedBox(height: 12),
           if (!active)
             const Text(
@@ -404,7 +430,7 @@ class QuickAddPanel extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton.icon(
                   key: const ValueKey('quick-add-button'),
-                  onPressed: () => Navigator.push(
+                  onPressed: limitReached ? null : () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(builder: (_) => QuickCategoryPage(store: store, account: account, env: env)),
                   ),
