@@ -13,3 +13,9 @@ Request of 2026-10-21: simpler admin ("Business studio"), everything in its prop
 - Files: `admin.dart` (shell), `admin_frame.dart` (AdminPageFrame / AdminEmbedScope / AdminNeedsFirebase),
   `admin_entry_list.dart` (the list of one collection), `admin_settings.dart`, `admin_page_preview.dart` (Page view).
 - Insights is now the first page, so two phone-width overflows in it were fixed.
+
+## Step B -- single-record settings (done)
+- Business Profile, Theme and Scrolling Text open straight as one form (`AdminSingleRecord`, `EntryEditor(embedded: true)`):
+  no list, no "Add new", saving keeps you on the form. A project that never saved one gets the form empty; the first Save creates it.
+- The Theme record had no name, so its own form refused to save ("Enter a name"): the name field now starts as "Theme", and a nameless
+  record shows its section name in lists. (Animations becomes the fourth single-record section in step D.)

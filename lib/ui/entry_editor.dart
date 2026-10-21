@@ -39,10 +39,14 @@ class EntryEditor extends StatefulWidget {
     required this.store,
     required this.collection,
     this.entry,
+    this.embedded = false,
   });
   final Store store;
   final String collection;
   final Entry? entry;
+  // True when the form is shown inside a Settings section (Business Profile, Theme, Scrolling Text): no title bar of its own,
+  // and saving stays on the form instead of closing it.
+  final bool embedded;
   @override
   State<EntryEditor> createState() => _EntryEditorState();
 }
@@ -156,6 +160,8 @@ class _EntryEditorState extends State<EntryEditor> {
                     '');
       return MapEntry(key, TextEditingController(text: text));
     });
+    // The Theme record was saved without a name before, which made its form refuse to save ("Enter a name"): give it one.
+    if (widget.collection == 'theme' && controllers['name']!.text.trim().isEmpty) controllers['name']!.text = 'Theme';
   }
 
   @override
@@ -237,6 +243,8 @@ class _EntryEditorState extends State<EntryEditor> {
       if (end != null) {
         data['endsAt'] = end.toUtc().toIso8601String();
       }
+      // The Theme record used to be saved without any name (a blank row in the old list); it now always has one.
+      if (widget.collection == 'theme' && (data['name']?.toString() ?? '').isEmpty) data['name'] = 'Theme';
       final id =
           widget.entry?.id ??
           (widget.collection == 'settings'
@@ -271,7 +279,7 @@ class _EntryEditorState extends State<EntryEditor> {
         );
       }
       if (mounted) {
-        Navigator.pop(context);
+        if (!widget.embedded) Navigator.pop(context);
         message(context, 'Saved successfully');
       }
     } catch (e) {
@@ -744,15 +752,22 @@ class _EntryEditorState extends State<EntryEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(
-        widget.entry == null
-            ? 'Add ${widget.collection}'
-            : 'Edit ${widget.entry!.text('name')}',
+  Widget build(BuildContext context) {
+    final body = _formBody();
+    if (widget.embedded) return body;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.entry == null
+              ? 'Add ${widget.collection}'
+              : 'Edit ${widget.entry!.text('name', adminSections[widget.collection] ?? widget.collection)}',
+        ),
       ),
-    ),
-    body: Center(
+      body: body,
+    );
+  }
+
+  Widget _formBody() => Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
         child: Form(
@@ -793,7 +808,7 @@ class _EntryEditorState extends State<EntryEditor> {
                               );
                             }
                           } catch (e) {
-                            if (context.mounted) {
+                            if (mounted) {
                               message(context, e);
                             }
                           } finally {
@@ -840,6 +855,5 @@ class _EntryEditorState extends State<EntryEditor> {
           ),
         ),
       ),
-    ),
-  );
+    );
 }

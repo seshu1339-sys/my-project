@@ -126,7 +126,7 @@ class AdminEntryList extends StatelessWidget {
                         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
                         child: ListTile(
                           leading: Icon(e.active ? Icons.check_circle_outline : Icons.pause_circle_outline),
-                          title: Text(e.text('name')),
+                          title: Text(e.text('name', adminSections[section] ?? section)),
                           subtitle: Text(
                             section == 'promotions'
                                 ? '${e.id} • ${promotionStatusLabel(e)} • Order ${e.number('order').toInt()}'

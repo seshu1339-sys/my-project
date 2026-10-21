@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
 import 'admin_entry_list.dart';
 import 'admin_frame.dart';
 import 'admin_page_preview.dart';
+import 'entry_editor.dart';
 import 'field_moderation.dart';
 import 'layout_editor.dart';
 import 'visual_editor.dart';
@@ -43,6 +45,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: FieldModerationPage(store: widget.store)));
       case 'layout':
         return _LayoutMenu(store: widget.store);
+      // One record each: the form opens directly, with no list and no "Add new".
+      case 'settings':
+      case 'theme':
+      case 'scrollingText':
+        return AdminSingleRecord(store: widget.store, section: key);
       default:
         return AdminEntryList(store: widget.store, section: key);
     }
@@ -87,6 +94,26 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       ],
     );
   }
+}
+
+/// A setting that exists once (Business Profile, Theme, Scrolling Text): its form, straight away. A project that has never saved it
+/// gets the same form, empty, and the first Save creates it.
+class AdminSingleRecord extends StatelessWidget {
+  const AdminSingleRecord({super.key, required this.store, required this.section});
+  final Store store;
+  final String section;
+
+  static String recordId(String section) => section == 'settings' ? 'business' : section;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: store,
+    builder: (context, _) {
+      final Entry? record = store.entries('settings').where((e) => e.id == recordId(section)).firstOrNull;
+      // Keyed by "exists yet": the form is rebuilt once when the first Save creates the record.
+      return EntryEditor(key: ValueKey('single-$section-${record != null}'), store: store, collection: section, entry: record, embedded: true);
+    },
+  );
 }
 
 /// Settings → Layout: the three ways of changing how the site looks.
