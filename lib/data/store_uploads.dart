@@ -74,6 +74,19 @@ extension StoreUploads on Store {
     return image.bytes;
   }
 
+  /// Quick Add Item: stores one item photo at quickItems/$uid/$submissionId (private until the
+  /// admin approves the item) and returns its bytes for the preview. Only an Active Quick Add
+  /// account may write there; the caller then calls saveQuickItem.
+  Future<Uint8List> uploadQuickPhoto(String submissionId, XFile file) async {
+    final uid = user?.uid;
+    if (uid == null) throw StateError('Sign in first.');
+    final image = await _readImage(this, file);
+    await FirebaseStorage.instance
+        .ref('quickItems/$uid/$submissionId')
+        .putData(image.bytes, SettableMetadata(contentType: image.type));
+    return image.bytes;
+  }
+
   /// Stores one of a field-staff item's photos at its own per-submission,
   /// per-index path (fieldSubmissions/$uid/${submissionId}_$index — not a
   /// fixed slot the way vendor photos are, since a submission id is already

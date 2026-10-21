@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_registration_form.dart';
+import 'quick_add.dart';
 import 'field_workspace.dart';
 
 /// Streams the signed-in staff member's own fieldStaff/{uid} doc and shows the
@@ -41,9 +42,20 @@ class _FieldHomePageState extends State<FieldHomePage> {
         builder: (context, snapshot) {
           if (snapshot.hasError) return const _Message(title: 'Could not load your access status', body: 'Please check your connection and try again.');
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          if (!snapshot.data!.exists) return FieldRegistrationForm(store: store);
           final status = snapshot.data!.data()?['status'];
           if (status == 'active') return FieldWorkspace(store: store, uid: user.uid);
+          // An account the admin created for Quick Add goes straight to Quick Add.
+          return QuickAccountGate(store: store, role: 'staff', quickOnly: () => QuickAddOnly(store: store), otherwise: () => _fieldStage(snapshot.data!, status));
+        },
+      ),
+    );
+  }
+
+  Widget _fieldStage(DocumentSnapshot<Map<String, dynamic>> snapshot, Object? status) {
+    {
+      {
+        {
+          if (!snapshot.exists) return FieldRegistrationForm(store: store);
           if (status == 'suspended') {
             return const _Message(title: 'Access suspended', body: 'Your field staff access has been suspended by the administrator. Contact them to have it reinstated.');
           }
@@ -54,9 +66,9 @@ class _FieldHomePageState extends State<FieldHomePage> {
             title: 'Waiting for approval',
             body: 'Your access request is waiting for administrator approval. You will be able to submit entries here once it is approved.',
           );
-        },
-      ),
-    );
+        }
+      }
+    }
   }
 }
 

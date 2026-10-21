@@ -8,7 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 
 void main() {
-  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0]) {
+  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0, 1720.0, 1880.0, 1920.0]) {
     testWidgets('admin studio has no overflow at width $width', (
       tester,
     ) async {
@@ -23,7 +23,7 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
-      final narrow = width < 1300;
+      final narrow = width < 1900;
       // Below the breakpoint the navigation buttons collapse into one menu; above it
       // they stay a plain row of labelled buttons. Either way nothing may overflow.
       expect(find.byTooltip('More'), narrow ? findsOneWidget : findsNothing);

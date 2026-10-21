@@ -9,6 +9,7 @@ const adminSections = <String, String>{
   'shops': 'Shops',
   'promotions': 'Promotions',
   'productImageLibrary': 'Product Image Library',
+  'locations': 'Quick Add locations',
   'settings': 'Business profile',
   'scrollingText': 'Scrolling Text Settings',
   'theme': 'Theme Settings',
@@ -29,6 +30,14 @@ const fields = <String, Map<String, String>>{
     'images': 'Additional image URLs (one per line)',
     'tags': 'Search keywords',
     'prices': 'Pincode prices (one per line: 560001=249)',
+    'order': 'Display order',
+  },
+  'locations': {
+    'name': 'Location name (shown to customers and staff)',
+    'town': 'Town',
+    'pincode': 'Pincode',
+    'latitude': 'Latitude (used to find the nearest location)',
+    'longitude': 'Longitude',
     'order': 'Display order',
   },
   'productImageLibrary': {
@@ -101,6 +110,8 @@ const fields = <String, Map<String, String>>{
     'countdownSeconds': 'Countdown timer badge, seconds (e.g. 60 = 1 min, 120 = 2 min, 0 = hidden)',
   },
   'settings': {
+    'quickItemsPerDayStaff': 'Quick Add: items per day for each Staff member (default 15)',
+    'quickItemsPerDayVendor': 'Quick Add: items per day for each Vendor (default 6)',
     'name': 'Business name',
     'tagline': 'Tagline',
     'address': 'Business address',

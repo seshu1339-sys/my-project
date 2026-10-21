@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
 import '../domain/places.dart';
+import '../domain/quick_items.dart';
 import '../domain/towns.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
@@ -86,6 +87,10 @@ class Store extends ChangeNotifier {
   // position (and moves the town along with it when they travel). A town or pincode
   // picked by hand is never moved by GPS.
   bool followsGps = false;
+  // Quick Add Item: the location (from the admin's list) whose short-lived items the
+  // customer is browsing, remembered on this device. '' until chosen.
+  String quickLocationId = '';
+  bool quickLocationAsked = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
   String? pendingEmailLink;
@@ -195,6 +200,8 @@ class Store extends ChangeNotifier {
     district = prefs.getString('district') ?? '';
     state = prefs.getString('state') ?? '';
     followsGps = prefs.getBool('followsGps') ?? false;
+    quickLocationId = prefs.getString('quickLocationId') ?? '';
+    quickLocationAsked = prefs.getBool('quickLocationAsked') ?? false;
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
     final savedLanguage = prefs.getString('language');
@@ -290,8 +297,77 @@ class Store extends ChangeNotifier {
         );
       }
     }
+    if (live) _watchQuickItems();
     ready = true;
     notifyListeners();
+  }
+
+  // Customers read only APPROVED quick items (the rules allow nothing else); the clock decides
+  // which of those are live.
+  void _watchQuickItems() {
+    _subscriptions.add(
+      firestore
+          .collection('quickItems')
+          .where('status', isEqualTo: 'approved')
+          .limit(_catalogPageLimit)
+          .snapshots()
+          .listen((snapshot) {
+            catalog['quickItems'] = snapshot.docs
+                .map((d) => Entry(d.id, d.data()))
+                .toList();
+            notifyListeners();
+          }, onError: (Object _) {
+            /* Quick items are optional; browsing must not break without them. */
+          }),
+    );
+  }
+
+  /// The active locations customers can browse short-lived items in.
+  List<Entry> get quickLocations =>
+      entries('locations').where((l) => l.active).toList();
+  Entry? get quickLocation =>
+      quickLocations.where((l) => l.id == quickLocationId).firstOrNull;
+
+  /// Live items at the customer's chosen location, optionally one category.
+  List<Entry> quickItemsHere({String? categoryId, DateTime? now}) =>
+      quickLocation == null
+      ? const []
+      : liveQuickItems(
+          catalog['quickItems'] ?? const [],
+          now ?? DateTime.now(),
+          locationId: quickLocationId,
+          categoryId: categoryId,
+        );
+
+  Future<void> setQuickLocation(String id) async {
+    quickLocationId = id;
+    quickLocationAsked = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('quickLocationId', id);
+    await prefs.setBool('quickLocationAsked', true);
+    notifyListeners();
+  }
+
+  Future<void> markQuickLocationAsked() async {
+    quickLocationAsked = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('quickLocationAsked', true);
+    notifyListeners();
+  }
+
+  /// The listed location nearest to a point, or null when none has coordinates.
+  Entry? nearestQuickLocation(double lat, double lng) {
+    Entry? best;
+    var bestKm = double.infinity;
+    for (final l in quickLocations) {
+      if (l.number('latitude') == 0 && l.number('longitude') == 0) continue;
+      final km = distanceKm(lat, lng, l.number('latitude'), l.number('longitude'));
+      if (km < bestKm) {
+        bestKm = km;
+        best = l;
+      }
+    }
+    return best;
   }
 
   Future<void> save(String collection, Entry entry) async {

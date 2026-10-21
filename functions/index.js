@@ -11,6 +11,7 @@ initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 Object.assign(exports, require('./notifications'));
+Object.assign(exports, require('./quick-items'));
 Object.assign(exports, require('./vendor-photos'));
 Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));

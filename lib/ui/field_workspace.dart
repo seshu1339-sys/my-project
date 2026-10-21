@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_entry_form.dart';
+import 'quick_add.dart';
 
 /// Shown only once the staff member's fieldStaff doc is 'active'. Lists past
 /// submissions and starts a new one; the server independently re-checks
@@ -33,6 +34,7 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         },
       ),
       const SizedBox(height: 8),
+      QuickAddHome(store: store),
       const Text('Capture an item at a vendor shop. Nothing you submit is visible to customers until an administrator approves it.'),
       const SizedBox(height: 16),
       FilledButton.icon(

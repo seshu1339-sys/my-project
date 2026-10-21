@@ -26,6 +26,7 @@ import 'complaint_moderation.dart';
 import 'entry_editor.dart';
 import 'vendor_moderation.dart';
 import 'admin_search.dart';
+import 'quick_admin.dart';
 import 'ai_agent_page.dart';
 import 'admin_list_labels.dart';
 export 'admin_fields.dart';
@@ -315,19 +316,21 @@ class _AdminPageState extends State<AdminPage> {
         'Orders': (Icons.receipt_long, (_) => AdminOrders(store: widget.store)),
         'Vendors': (Icons.storefront, (_) => VendorModerationPage(store: widget.store)),
         'Field Assistants': (Icons.badge_outlined, (_) => FieldModerationPage(store: widget.store)),
+        'Quick Add': (Icons.bolt, (_) => QuickAccountsPage(store: widget.store)),
+        'Quick Items': (Icons.fact_check_outlined, (_) => QuickItemsAdminPage(store: widget.store)),
         'Complaints': (Icons.report_problem_outlined, (_) => ComplaintModerationPage(store: widget.store)),
         'Insights': (Icons.insights, (_) => AdminInsightsPage(store: widget.store)),
         'Search': (Icons.search, (_) => AdminSearchPage(store: widget.store)),
         'AI Agent': (Icons.smart_toy_outlined, (_) => AiAgentPage(store: widget.store)),
       };
       void openNav(String label) => Navigator.push(context, MaterialPageRoute<void>(builder: navTargets[label]!.$2));
-      // Below ~1300px, the AppBar actions (page view toggle, other-settings menu, layout
+      // Below ~1900px, the AppBar actions (page view toggle, other-settings menu, layout
       // settings, sign out, plus the 7 nav buttons including AI Agent) would overflow;
       // collapse the navigation buttons into one menu there and keep today's full row on
       // wider screens. A RenderFlex overflow here clips silently in release builds (no
       // debug stripes), so this threshold must stay ahead of the actual content width,
       // not just "look wide enough" — raised from 1100 when AI Agent became the 7th button.
-      final narrow = MediaQuery.sizeOf(context).width < 1300;
+      final narrow = MediaQuery.sizeOf(context).width < 1900;
       return Scaffold(
         appBar: AppBar(
           title: const Text('Business studio'),

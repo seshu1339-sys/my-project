@@ -72,6 +72,8 @@ class _EntryEditorState extends State<EntryEditor> {
     'searchRadiusMaxKm',
     'vendorPhotoLimit',
     'fieldPhotoLimit',
+    'quickItemsPerDayStaff',
+    'quickItemsPerDayVendor',
     'deliveryFee',
     'freeDeliveryAbove',
     'width',
@@ -696,6 +698,11 @@ class _EntryEditorState extends State<EntryEditor> {
               v.isNotEmpty &&
               (n < 1 || n > 9)) {
             return 'Enter a number from 1 to 9';
+          }
+          if (['quickItemsPerDayStaff', 'quickItemsPerDayVendor'].contains(key) &&
+              v.isNotEmpty &&
+              (n < 1 || n > 1000 || n != n.round())) {
+            return 'Enter a whole number from 1 to 1000';
           }
         }
         if (['startsAt', 'endsAt'].contains(key) &&

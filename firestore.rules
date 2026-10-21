@@ -14,8 +14,20 @@ service cloud.firestore {
     function admin() { return signedIn() && request.auth.token.admin == true && adminSessionValid(); }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
-      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary'];
-      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary'];
+      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
+      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
+    }
+    // Quick Add Item: accounts are created and switched on/off only by the admin (functions);
+    // an account can read its own record. Items are written only by functions. The public sees
+    // only APPROVED items (the site also checks the start/end time); owners and the admin see all.
+    match /quickAccounts/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /quickItems/{id} {
+      allow read: if resource.data.status == 'approved'
+        || (signedIn() && resource.data.ownerUid == request.auth.uid) || admin();
+      allow write: if false;
     }
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || admin());

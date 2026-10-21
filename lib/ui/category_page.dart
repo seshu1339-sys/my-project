@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'product_page.dart';
+import 'quick_fresh.dart';
 import 'shared.dart';
 
 class CategoryPage extends StatelessWidget {
@@ -63,6 +64,7 @@ class CategoryPage extends StatelessWidget {
                 ),
               ),
           ],
+          QuickCategoryItems(store: store, categoryId: categoryId),
           const SizedBox(height: 20),
           pageHeadingText(
             context,

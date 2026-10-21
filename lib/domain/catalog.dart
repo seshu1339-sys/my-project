@@ -282,6 +282,8 @@ const collections = [
   'settings',
   'productImageLibrary',
   'vendorShopPhotos',
+  // Quick Add Item: the towns staff add items in and customers browse by.
+  'locations',
 ];
 
 Map<String, List<Entry>> demoCatalog() => {

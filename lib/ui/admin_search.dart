@@ -4,10 +4,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/store.dart';
 import 'entry_editor.dart';
 import 'moderation_dialogs.dart';
+import 'quick_admin.dart';
 import 'staff_detail_page.dart';
 import 'vendor_detail_page.dart';
 
-enum _Kind { vendor, staff, shop }
+enum _Kind { vendor, staff, shop, quick }
+
+/// The search rule: an exact code (ST005, VN012, V...) or id, else part of the name.
+bool adminSearchMatches(String query, String name, String? code, String id) {
+  if (query.isEmpty) return true;
+  final q = query.trim().toLowerCase();
+  if (code != null && code.toLowerCase() == q) return true;
+  if (id.toLowerCase() == q) return true;
+  return name.toLowerCase().contains(q);
+}
 
 class _Result {
   const _Result(this.kind, this.id, this.name, this.code);
@@ -42,13 +52,7 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
     super.dispose();
   }
 
-  bool _matches(String query, String name, String? code, String id) {
-    if (query.isEmpty) return true;
-    final q = query.trim().toLowerCase();
-    if (code != null && code.toLowerCase() == q) return true;
-    if (id.toLowerCase() == q) return true;
-    return name.toLowerCase().contains(q);
-  }
+  bool _matches(String query, String name, String? code, String id) => adminSearchMatches(query, name, code, id);
 
   Future<void> _backfill() async {
     setState(() => backfilling = true);
@@ -67,6 +71,8 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
         Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VendorDetailPage(store: store, vendorUid: result.id)));
       case _Kind.staff:
         Navigator.push(context, MaterialPageRoute<void>(builder: (_) => StaffDetailPage(store: store, staffUid: result.id)));
+      case _Kind.quick:
+        Navigator.push(context, MaterialPageRoute<void>(builder: (_) => QuickAccountDetailPage(store: store, uid: result.id)));
       case _Kind.shop:
         final entry = store.entries('shops').where((e) => e.id == result.id).firstOrNull;
         if (entry != null) {
@@ -91,7 +97,7 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
           controller: search,
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.search),
-            labelText: 'Search by Vendor ID, Staff ID, Shop ID, or name',
+            labelText: 'Search by Vendor ID, Staff ID, Shop ID, Quick Add code (ST001 / VN001), or name',
             border: OutlineInputBorder(),
           ),
           onChanged: (_) => setState(() {}),
@@ -104,7 +110,9 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
               stream: store.firestore.collection('vendorApplications').snapshots(),
               builder: (context, applicationSnapshot) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: store.firestore.collection('fieldStaff').snapshots(),
-                builder: (context, staffSnapshot) {
+                builder: (context, staffSnapshot) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: store.firestore.collection('quickAccounts').snapshots(),
+                builder: (context, quickSnapshot) {
                 final query = search.text;
                 // A vendor that hasn't been decided yet has no `vendors` doc at
                 // all (approveVendor only creates one on approval) — only
@@ -125,6 +133,9 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
                   for (final doc in staffSnapshot.data?.docs ?? const [])
                     if (_matches(query, (doc.data()['name'] ?? doc.id).toString(), doc.data()['staffCode'] as String?, doc.id))
                       _Result(_Kind.staff, doc.id, (doc.data()['name'] ?? doc.id).toString(), doc.data()['staffCode'] as String?),
+                  for (final doc in quickSnapshot.data?.docs ?? const [])
+                    if (_matches(query, (doc.data()['name'] ?? doc.id).toString(), doc.data()['code'] as String?, doc.id))
+                      _Result(_Kind.quick, doc.id, (doc.data()['name'] ?? doc.id).toString(), doc.data()['code'] as String?),
                   for (final entry in store.entries('shops'))
                     if (_matches(query, entry.text('name'), entry.text('shopCode').isEmpty ? null : entry.text('shopCode'), entry.id))
                       _Result(_Kind.shop, entry.id, entry.text('name'), entry.text('shopCode').isEmpty ? null : entry.text('shopCode')),
@@ -149,8 +160,8 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
                   itemCount: results.length,
                   itemBuilder: (context, i) {
                     final r = results[i];
-                    final kindLabel = switch (r.kind) { _Kind.vendor => 'Vendor', _Kind.staff => 'Staff', _Kind.shop => 'Shop' };
-                    final kindIcon = switch (r.kind) { _Kind.vendor => Icons.storefront, _Kind.staff => Icons.badge_outlined, _Kind.shop => Icons.store_outlined };
+                    final kindLabel = switch (r.kind) { _Kind.vendor => 'Vendor', _Kind.staff => 'Staff', _Kind.shop => 'Shop', _Kind.quick => 'Quick Add' };
+                    final kindIcon = switch (r.kind) { _Kind.vendor => Icons.storefront, _Kind.staff => Icons.badge_outlined, _Kind.shop => Icons.store_outlined, _Kind.quick => Icons.bolt };
                     return Card(child: ListTile(
                       leading: Icon(kindIcon),
                       title: Text(r.name),
@@ -161,6 +172,7 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
                   },
                 );
                 },
+              ),
               ),
             ),
           ),

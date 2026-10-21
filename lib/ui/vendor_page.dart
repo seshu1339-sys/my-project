@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'quick_add.dart';
 import 'vendor_registration_form.dart';
 import 'vendor_workspace.dart';
 
@@ -74,6 +76,21 @@ class _VendorPageState extends State<VendorPage> {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final application = snapshot.data!.data();
           final status = application?['status'];
+          // An account the admin created for Quick Add, with no vendor application of its own,
+          // goes straight to Quick Add instead of the registration form.
+          if (status != 'approved') {
+            return QuickAccountGate(store: store, role: 'vendor', quickOnly: () => QuickAddOnly(store: store), otherwise: () => _applicationStage(uid, user, application, status));
+          }
+          return _applicationStage(uid, user, application, status);
+        },
+      ),
+    );
+  }
+
+  Widget _applicationStage(String uid, User user, Map<String, dynamic>? application, Object? status) {
+    {
+      {
+        {
           if (application == null || status == 'rejected') return VendorRegistrationForm(store: store, email: user.email ?? '', previous: application);
           if (status == 'pending') return _pending(application);
           if (status == 'payment_required') return _feePayment(application);
@@ -90,9 +107,9 @@ class _VendorPageState extends State<VendorPage> {
               return VendorWorkspace(store: store, uid: uid);
             },
           );
-        },
-      ),
-    );
+        }
+      }
+    }
   }
 
   Widget _suspended(Map<String, dynamic> vendor) {

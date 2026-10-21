@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/location.dart';
+import 'quick_add.dart';
 
 /// Business features. Only built once the application status is approved; the
 /// server independently refuses every one of these actions for anyone else.
@@ -241,6 +242,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
     ),
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
+    QuickAddHome(store: store),
     const SizedBox(height: 20),
     _shopPhotosSection(),
     const SizedBox(height: 20),
