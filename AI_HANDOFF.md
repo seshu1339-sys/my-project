@@ -672,3 +672,9 @@ card/language sync bug fixed (`bdc525e`). See `docs/notifications.md`,
 narrative reports from that period. Treat those as historical snapshots,
 not current status — this file's log is authoritative for "what's true
 right now."
+
+### 2026-10-21 — Location-change push notification (COMMITTED locally; NOT deployed, NOT pushed)
+
+- Did not exist before (pushes were only per-offer). Added `notifyLocationOffers` (`functions/notifications.js`, Firestore trigger on `notificationSubscribers/{uid}`): when an enabled subscriber's `pincode` changes it sends ONE push "Offers in <town>" listing only live offers/ads tagged for that place (`locationOffers` in `notifications-domain.js`; general or other-place offers never included). Dedupe: `send()` claim key = place + offer set, 24 h reclaim; same pincode rewrites, no offers, customer opt-out and the admin master switch send nothing.
+- Client: `Store.followsGps` ("Use my location" follows the phone; hand-picked towns never move), `pincodeForGps`, app-open follow in `main.dart`, "Enable alerts" opens the location dialog when no place is set. The "Choose your location" pill already wrote the pincode to the subscriber doc, so it triggers the same push.
+- Needs `firebase deploy --only functions` (new trigger) + hosting for the client. Tests: backend 71/71, Flutter 316 pass.

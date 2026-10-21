@@ -6,6 +6,7 @@ import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 import 'account_auth_form.dart';
+import 'location_picker_dialog.dart';
 import 'account_complaint_dialog.dart' as complaint_dialog;
 import 'account_complaints_section.dart';
 import 'account_language_field.dart';
@@ -206,6 +207,11 @@ class _AccountPageState extends State<AccountPage> {
                             );
                             if (context.mounted) {
                               message(context, 'Price-drop and offer alerts enabled'.tr(context));
+                              // Offers are sent for the customer's town, so alerts need a location.
+                              if (!widget.store.hasPlace) {
+                                message(context, 'Choose your location so we can send offers for your town.'.tr(context));
+                                await showLocationPickerDialog(context, widget.store);
+                              }
                             }
                           }),
                     icon: const Icon(Icons.notifications_active_outlined),

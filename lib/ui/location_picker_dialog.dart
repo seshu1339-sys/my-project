@@ -132,7 +132,7 @@ Future<void> showLocationPickerDialog(
                       position.longitude,
                     );
                     await store.setLocation(
-                      value.isNotEmpty ? value : (nearest?.pincode ?? ''),
+                      pincodeForGps(value, nearest),
                       address.text.trim().isNotEmpty
                           ? address.text.trim()
                           : (nearest?.label ?? 'Current GPS location'),
@@ -147,6 +147,7 @@ Future<void> showLocationPickerDialog(
                           ),
                       district: nearest?.district,
                       state: nearest?.state,
+                      followGps: true,
                     );
                     await completeStoredPlace(store);
                     if (dialog.mounted) {

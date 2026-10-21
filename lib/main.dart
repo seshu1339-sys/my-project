@@ -18,6 +18,7 @@ import 'services/analytics.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
 import 'services/location.dart';
+import 'services/location_town.dart';
 import 'services/app_theme.dart';
 import 'services/localization.dart';
 
@@ -104,11 +105,31 @@ Future<void> _refreshLocationOnOpen(Store store) async {
   await WidgetsBinding.instance.endOfFrame;
   final position = await currentPositionIfPermitted();
   if (position != null) {
+    // Someone who chose "Use my location" has the town follow their phone: when they
+    // have travelled to another town, the stored place (and so the offers shown and
+    // the location push notification) moves with them. A town picked by hand never moves.
+    final nearest = store.followsGps
+        ? await nearestPlaceFor(position.latitude, position.longitude)
+        : null;
+    if (nearest != null && nearest.town != store.town) {
+      await store.setLocation(
+        pincodeForGps(store.pincode, nearest),
+        nearest.label,
+        lat: position.latitude,
+        lng: position.longitude,
+        town: nearest.town,
+        district: nearest.district,
+        state: nearest.state,
+        followGps: true,
+      );
+      return;
+    }
     await store.setLocation(
       store.pincode,
       store.address,
       lat: position.latitude,
       lng: position.longitude,
+      followGps: store.followsGps,
     );
   }
 }

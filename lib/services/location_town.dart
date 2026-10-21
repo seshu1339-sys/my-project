@@ -23,6 +23,16 @@ Future<Place?> nearestPlaceFor(double latitude, double longitude) async {
   }
 }
 
+/// The pincode to store for a GPS fix: the typed one when it belongs to the same town as
+/// the nearest place, else that place's own -- so a stale pincode left from another town
+/// never decides which offers (or push notifications) the customer gets.
+String pincodeForGps(String typed, Place? nearest) {
+  if (nearest == null) return typed;
+  if (typed.isEmpty) return nearest.pincode;
+  final known = PlacesDirectory.instance.ready?.byPincode(typed);
+  return known != null && known.town == nearest.town ? typed : nearest.pincode;
+}
+
 /// The town for a searched place: the admin's own spelling when one of the
 /// place name's parts is a configured town, else the name's first part.
 String townForPlace(Store store, NominatimPlace place) => townFromPlaceName(

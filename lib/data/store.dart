@@ -82,6 +82,10 @@ class Store extends ChangeNotifier {
       language = 'en',
       error = '';
   String paymentBrand = '', paymentLast4 = '';
+  // True when the customer chose "Use my location": the app then follows their phone's
+  // position (and moves the town along with it when they travel). A town or pincode
+  // picked by hand is never moved by GPS.
+  bool followsGps = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
   String? pendingEmailLink;
@@ -169,6 +173,7 @@ class Store extends ChangeNotifier {
     town = prefs.getString('town') ?? '';
     district = prefs.getString('district') ?? '';
     state = prefs.getString('state') ?? '';
+    followsGps = prefs.getBool('followsGps') ?? false;
     latitude = prefs.getDouble('latitude');
     longitude = prefs.getDouble('longitude');
     final savedLanguage = prefs.getString('language');
@@ -349,7 +354,9 @@ class Store extends ChangeNotifier {
     String? town,
     String? district,
     String? state,
+    bool followGps = false,
   }) async {
+    followsGps = followGps;
     // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
     // coordinate refresh) must not forget a town the customer already picked.
     final unchanged = town == null && pin == pincode && value == address;
@@ -376,6 +383,7 @@ class Store extends ChangeNotifier {
     await prefs.setString('town', this.town);
     await prefs.setString('district', this.district);
     await prefs.setString('state', this.state);
+    await prefs.setBool('followsGps', followsGps);
     if (lat != null && lng != null) {
       await prefs.setDouble('latitude', lat);
       await prefs.setDouble('longitude', lng);

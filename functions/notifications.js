@@ -6,7 +6,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
-const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
+const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, locationOffers, locationNoticeKey, locationNoticeCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
 const {flagOff, promotionMatchesLocation, promotionMatchesPlace} = require('./domain');
 const {placeForPincode} = require('./places');
 const {requireAdminSession} = require('./admin-session');
@@ -168,6 +168,30 @@ exports.notifyOfferPublished = onDocumentWritten({document: 'promotions/{promoti
   if (before && after.notifiedKey !== before.notifiedKey) return;
   await releaseOffer(event.params.promotionId);
 });
+/// A customer who moves to another place (GPS follow, the "Choose your location" pill, a new
+/// pincode) hears once about the live offers made for that place -- never other places' offers.
+/// The same place with the same offers is not announced again for 24 hours, so going back and
+/// forth between two towns, or saving the same location twice, cannot repeat the notification.
+const LOCATION_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+async function announceLocationOffers(uid, subscriber, now = Date.now()) {
+  if (!subscriber?.enabled) return 'not-subscribed';
+  const place = placeForPincode(subscriber.pincode);
+  if (!place) return 'no-place';
+  if (flagOff(((await db.collection('settings').doc('business').get()).data() || {}).offerNotificationsEnabled)) return 'disabled';
+  const promotions = [];
+  for await (const doc of pages(db.collection('promotions').orderBy('__name__'))) promotions.push({id: doc.id, data: doc.data()});
+  const offers = locationOffers(promotions, place, subscriber, now);
+  if (!offers.length) return 'no-offers';
+  return send(uid, locationNoticeKey(place, offers), locationNoticeCopy(place, offers), {type: 'locationOffers', town: place.town}, {reclaimAfterMs: LOCATION_NOTICE_WINDOW_MS});
+}
+exports.notifyLocationOffers = onDocumentWritten({document: 'notificationSubscribers/{uid}', region: 'asia-south1', maxInstances: 3}, async event => {
+  const after = event.data?.after?.data();
+  if (!after?.enabled) return;
+  const before = event.data.before?.data();
+  // Only a changed place counts: refreshing the same pincode or coordinates sends nothing.
+  if (before?.enabled && before.pincode === after.pincode) return;
+  await announceLocationOffers(event.params.uid, after);
+});
 // ...and this check catches offers whose scheduled start arrives without any edit.
 exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
   for await (const offer of pages(db.collection('promotions').orderBy('__name__'))) {
@@ -256,4 +280,4 @@ exports.offerAudienceSize = onCall(adminOptions, async request => {
 });
 // Exposed for reuse by other function modules (e.g. functions/storage-maintenance.js), which
 // otherwise only see the onCall/onSchedule handlers above via index.js's Object.assign(exports, ...).
-exports._internal = {send, pages, hash};
+exports._internal = {send, pages, hash, announceLocationOffers};

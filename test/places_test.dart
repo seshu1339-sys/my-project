@@ -11,6 +11,7 @@ import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/places.dart';
 import 'package:ecommerce_app/domain/towns.dart';
 import 'package:ecommerce_app/main.dart';
+import 'package:ecommerce_app/services/location_town.dart';
 import 'package:ecommerce_app/services/places_directory.dart';
 import 'package:ecommerce_app/ui/entry_editor.dart';
 import 'package:ecommerce_app/ui/location_picker_dialog.dart';
@@ -308,6 +309,33 @@ void main() {
       expect(find.text("Today's Warangal Offers"), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       store.dispose();
+    });
+
+    test('"Use my location" is remembered and follows the phone; a hand-picked town never does', () async {
+      final store = await _store();
+      expect(store.followsGps, isFalse);
+      await store.setLocation('533101', 'x', town: 'Rajahmundry', district: 'East Godavari', state: 'Andhra Pradesh', followGps: true);
+      expect(store.followsGps, isTrue);
+      await store.setLocation('533101', 'x', lat: 16.9, lng: 81.7, followGps: store.followsGps);
+      expect(store.followsGps, isTrue);
+      final reopened = Store();
+      await reopened.init();
+      expect(reopened.followsGps, isTrue);
+      await reopened.setLocation('520001', 'Vijayawada', town: 'Vijayawada', district: 'Krishna', state: 'Andhra Pradesh');
+      expect(reopened.followsGps, isFalse, reason: 'choosing a town by hand stops following the GPS');
+      store.dispose();
+      reopened.dispose();
+    });
+
+    test('a GPS fix stores the pincode of the nearest town when the typed one is from another town', () async {
+      usePlacesFixture();
+      await PlacesDirectory.instance.load();
+      final raj = realIndex.townNamed('Rajahmundry')!;
+      final vij = realIndex.townNamed('Vijayawada')!;
+      expect(pincodeForGps('', raj), raj.pincode);
+      expect(pincodeForGps(vij.pincode, raj), raj.pincode);
+      expect(pincodeForGps(raj.pincode, raj), raj.pincode);
+      expect(pincodeForGps('560001', null), '560001');
     });
 
     test('the district and state survive a restart, and a GPS refresh keeps them', () async {

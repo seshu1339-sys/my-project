@@ -83,7 +83,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       final position = await currentPosition(action: 'search nearby products');
       final nearest = await nearestPlaceFor(position.latitude, position.longitude);
       await store.setLocation(
-        store.pincode.isNotEmpty ? store.pincode : (nearest?.pincode ?? ''),
+        pincodeForGps(store.pincode, nearest),
         nearest?.label ?? 'Current GPS location',
         lat: position.latitude,
         lng: position.longitude,
@@ -91,6 +91,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
             await townForPoint(store, position.latitude, position.longitude),
         district: nearest?.district,
         state: nearest?.state,
+        followGps: true,
       );
       await completeStoredPlace(store);
       if (mounted) setState(() => locating = false);

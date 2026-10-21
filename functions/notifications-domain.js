@@ -34,4 +34,25 @@ function offerCopy(data) {
   const body = [data.name || data.title, data.description].filter(v => typeof v === 'string' && v.trim()).join(' - ').slice(0, 180);
   return {title: 'New offer', body: body || 'A new offer is available. Open the shop to explore.'};
 }
-module.exports = {active, price, priceDrop, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};
+// ---- "You moved to a new place": the live offers made specifically for that place.
+const {promotionMatchesLocation, promotionMatchesPlace, parseLocationList} = require('./domain');
+const LOCATION_OFFER_PLACEMENTS = ['carousel', 'ad', 'box'];
+const placeLabel = place => String(place.town || '').trim();
+/// Live offers/ads aimed at specific places that include [place] (never general offers and never
+/// another place's), best first: by their display order, then id. [promotions] is [{id, data}].
+function locationOffers(promotions, place, subscriber = {}, now = Date.now()) {
+  return promotions
+    .filter(({data}) => active(data, now) && LOCATION_OFFER_PLACEMENTS.includes(data.placement) && !isOff(data.notifySubscribers)
+      && parseLocationList(data.locations).length > 0 && promotionMatchesPlace(data, place)
+      && promotionMatchesLocation(data, {customerPincode: subscriber.pincode, customerLatitude: subscriber.latitude, customerLongitude: subscriber.longitude}))
+    .sort((a, b) => (Number(a.data.order) || 0) - (Number(b.data.order) || 0) || String(a.id).localeCompare(String(b.id)));
+}
+// One notice per place and set of offers: the same place with the same offers is never announced twice.
+const locationNoticeKey = (place, offers) => `location:${placeLabel(place).toLowerCase()}|${String(place.district || '').toLowerCase()}:${offers.map(o => `${o.id}@${o.data.startsAt || ''}`).join(',')}`;
+function locationNoticeCopy(place, offers) {
+  const names = offers.map(o => String(o.data.name || o.data.title || '').trim()).filter(Boolean);
+  const shown = names.slice(0, 3).join(' • ');
+  const more = names.length > 3 ? ` +${names.length - 3} more` : '';
+  return {title: `Offers in ${placeLabel(place)}`, body: (shown ? shown + more : 'New offers are available near you. Open the shop to explore.').slice(0, 180)};
+}
+module.exports = {locationOffers, locationNoticeKey, locationNoticeCopy, active, price, priceDrop, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};
