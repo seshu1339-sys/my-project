@@ -27,6 +27,7 @@ import 'entry_editor.dart';
 import 'vendor_moderation.dart';
 import 'admin_search.dart';
 import 'ai_agent_page.dart';
+import 'admin_list_labels.dart';
 export 'admin_fields.dart';
 export 'admin_orders.dart';
 export 'complaint_moderation.dart';
@@ -46,6 +47,16 @@ String _promotionAreaLabel(Entry promotion) {
   return (promotion.number('targetLatitude') != 0 || promotion.number('targetLongitude') != 0)
       ? 'Circle area'
       : 'No area targeting';
+}
+
+/// " • ⚠ No shop, No photo" appended to a product's list line when it is incomplete.
+String _productProblemsSuffix(Entry product, Store store) {
+  final problems = productProblems(
+    product,
+    categoryIds: {for (final c in store.entries('categories')) c.id},
+    shopIds: {for (final s in store.entries('shops')) s.id},
+  );
+  return problems.isEmpty ? '' : ' • ⚠ ${problems.join(', ')}';
 }
 
 class AdminPage extends StatefulWidget {
@@ -454,8 +465,12 @@ class _AdminPageState extends State<AdminPage> {
                             ),
                             title: Text(e.text('name')),
                             subtitle: Text(
-                              '${e.id} • ${e.active ? 'Published' : 'Hidden'} • Order ${e.number('order').toInt()}'
-                              '${section == 'promotions' ? ' • ${_promotionAreaLabel(e)}' : ''}',
+                              section == 'promotions'
+                                  ? '${e.id} • ${promotionStatusLabel(e)} • Order ${e.number('order').toInt()}'
+                                        ' • Location: ${promotionLocationLabel(e)}'
+                                        ' • ${_promotionAreaLabel(e)}'
+                                  : '${e.id} • ${e.active ? 'Published' : 'Hidden'} • Order ${e.number('order').toInt()}'
+                                        '${section == 'products' ? _productProblemsSuffix(e, widget.store) : ''}',
                             ),
                             trailing: Wrap(
                               spacing: 2,

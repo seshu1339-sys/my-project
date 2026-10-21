@@ -7,6 +7,7 @@ import '../services/geocoding.dart';
 import '../domain/towns.dart';
 import '../services/location.dart';
 import '../services/location_town.dart';
+import '../services/place_resolver.dart';
 import '../services/strings.dart';
 import 'location_picker.dart';
 import 'place_search_box.dart';
@@ -147,6 +148,7 @@ Future<void> showLocationPickerDialog(
                       district: nearest?.district,
                       state: nearest?.state,
                     );
+                    await completeStoredPlace(store);
                     if (dialog.mounted) {
                       Navigator.pop(dialog);
                     }
@@ -177,6 +179,7 @@ Future<void> showLocationPickerDialog(
                     lng: place.longitude,
                     town: townForPlace(store, place),
                   );
+                  await completeStoredPlace(store);
                   if (dialog.mounted) Navigator.pop(dialog);
                 },
                 icon: const Icon(Icons.search),
@@ -227,6 +230,9 @@ Future<void> showLocationPickerDialog(
               return;
             }
             await store.setLocation(pin.text.trim(), address.text.trim());
+            // A typed pincode becomes a town/district/state too, so offers made for
+            // that place reach this customer (and no other place's do).
+            await completeStoredPlace(store);
             if (dialog.mounted) {
               Navigator.pop(dialog);
             }

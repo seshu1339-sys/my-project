@@ -87,6 +87,44 @@ class Store extends ChangeNotifier {
   String? pendingEmailLink;
   String emailForSignInLink = '';
   User? get user => live ? FirebaseAuth.instance.currentUser : null;
+  /// Completes the stored place from the places directory: the town (and its
+  /// district/state) of a typed pincode, or the district/state of a town that
+  /// came from a place-name search. Only ever fills what is missing, never
+  /// replaces what the customer picked. Returns whether anything changed.
+  Future<bool> completePlace(PlacesIndex index) async {
+    var nextTown = town, nextDistrict = district, nextState = state;
+    if (nextTown.isEmpty && pincode.isNotEmpty) {
+      final place = index.byPincode(pincode);
+      if (place != null) {
+        nextTown = place.town;
+        nextDistrict = place.district;
+        nextState = place.state;
+      }
+    } else if (nextTown.isNotEmpty && nextDistrict.isEmpty) {
+      // The typed pincode settles which town of that name is meant, when it agrees.
+      final byPin = pincode.isNotEmpty ? index.byPincode(pincode) : null;
+      final place = byPin != null && byPin.town.toLowerCase() == nextTown.toLowerCase()
+          ? byPin
+          : index.townNamed(nextTown);
+      if (place != null) {
+        nextDistrict = place.district;
+        nextState = place.state;
+      }
+    }
+    if (nextTown == town && nextDistrict == district && nextState == state) {
+      return false;
+    }
+    town = nextTown;
+    district = nextDistrict;
+    state = nextState;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('town', town);
+    await prefs.setString('district', district);
+    await prefs.setString('state', state);
+    notifyListeners();
+    return true;
+  }
+
   /// Where the customer is, as offers are matched against it.
   CustomerPlace get place =>
       CustomerPlace(town: town, district: district, state: state);
@@ -239,6 +277,45 @@ class Store extends ChangeNotifier {
       catalog[collection]!.add(entry);
       await _persistDemo();
       notifyListeners();
+    }
+  }
+
+  /// Writes ONLY the given fields of an existing document (and deletes the
+  /// [remove]d ones), leaving every other field as it is in the database right
+  /// now. An admin form must use this rather than [save]: a form built from a
+  /// copy loaded earlier would otherwise write that old copy back over fields
+  /// changed meanwhile -- stock lowered by an order, a rating added by a review.
+  /// If the document no longer exists, [fallback] is saved in full instead.
+  Future<void> updateFields(
+    String collection,
+    String id,
+    Map<String, dynamic> changes, {
+    Set<String> remove = const {},
+    Entry? fallback,
+  }) async {
+    if (changes.isEmpty && remove.isEmpty) return;
+    if (live) {
+      final ref = firestore.collection(collection).doc(id);
+      try {
+        await ref.update({
+          ...changes,
+          for (final key in remove) key: FieldValue.delete(),
+        });
+      } on FirebaseException catch (e) {
+        if (e.code == 'not-found' && fallback != null) {
+          await ref.set(fallback.data);
+        } else {
+          rethrow;
+        }
+      }
+    } else {
+      final current = catalog[collection]?.where((e) => e.id == id).firstOrNull;
+      if (current == null) {
+        if (fallback != null) await save(collection, fallback);
+        return;
+      }
+      final next = {...current.data, ...changes}..removeWhere((k, _) => remove.contains(k));
+      await save(collection, Entry(id, next));
     }
   }
 

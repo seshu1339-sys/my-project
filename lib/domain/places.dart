@@ -249,6 +249,21 @@ class PlacesIndex {
   static int _importance(Place place) =>
       place.head ? 0 : (place.village ? 2 : 1);
 
+  /// The place a pincode belongs to: its head office if it has one, else its
+  /// first town-type office, else any office with that pincode. Null when the
+  /// pincode is not in the directory (outside Andhra Pradesh / Telangana).
+  Place? byPincode(String pincode) {
+    Place? town, any;
+    for (final entry in _entries) {
+      final place = entry.place;
+      if (place.pincode != pincode) continue;
+      if (place.head) return place;
+      if (!place.village) town ??= place;
+      any ??= place;
+    }
+    return town ?? any;
+  }
+
   /// A town-type place with this exact name, for resolving a stored town.
   Place? townNamed(String name, {String? district}) {
     final wanted = _norm(name);

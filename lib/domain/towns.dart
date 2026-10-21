@@ -123,17 +123,25 @@ bool promotionListsTown(
 bool promotionIsGeneral(Entry promotion) =>
     parseLocationList(promotion.text('locations')).isEmpty;
 
-/// The promotions to show for [town]:
-/// - no town chosen yet: everything (nothing is hidden before a location is set);
-/// - otherwise only those listing the town;
-/// - if none list it, the general (all-town) ones instead, flagged via
-///   [TownOffers.usedGeneral] so the page can say so;
+/// The promotions to show for a customer's place:
+/// - no place chosen yet: only the general (all-town) ones -- an offer made for
+///   one town must never reach a customer who has not chosen that location;
+///   [TownOffers.hiddenForLocation] counts those held back, so the page can ask
+///   the customer to choose a location;
+/// - otherwise only those listing the town, its district or its state;
+/// - if none do, the general ones instead, flagged via [TownOffers.usedGeneral];
 /// - if there are no general ones either, an empty list (the page then shows
 ///   its default "no offers" message rather than empty boxes).
+/// [showAll] (the admin's editor preview) skips the filter entirely.
 class TownOffers {
-  const TownOffers(this.entries, {this.usedGeneral = false});
+  const TownOffers(
+    this.entries, {
+    this.usedGeneral = false,
+    this.hiddenForLocation = 0,
+  });
   final List<Entry> entries;
   final bool usedGeneral;
+  final int hiddenForLocation;
 }
 
 TownOffers promotionsForTown(
@@ -141,9 +149,15 @@ TownOffers promotionsForTown(
   String town, {
   String district = '',
   String state = '',
+  bool showAll = false,
 }) {
+  if (showAll) return TownOffers(promotions);
   if (town.trim().isEmpty && district.trim().isEmpty && state.trim().isEmpty) {
-    return TownOffers(promotions);
+    final general = promotions.where(promotionIsGeneral).toList();
+    return TownOffers(
+      general,
+      hiddenForLocation: promotions.length - general.length,
+    );
   }
   final local = promotions
       .where((e) => promotionListsTown(e, town, district: district, state: state))

@@ -9,18 +9,22 @@ import 'design_tokens.dart';
 /// empty box. The admin can reword it (Business settings -> noOffersMessage;
 /// `{town}` is replaced by the town's name).
 class NoOffersNotice extends StatelessWidget {
-  const NoOffersNotice({super.key, required this.store});
+  const NoOffersNotice({super.key, required this.store, this.onLocation});
   final Store store;
+  // Tapping the notice opens the location dialog (used when no location is chosen yet).
+  final VoidCallback? onLocation;
 
   @override
   Widget build(BuildContext context) {
     final custom = store.business.text('noOffersMessage');
-    final text = custom.isNotEmpty
+    final text = !store.hasPlace
+        ? 'Choose your location to see offers for your town.'.tr(context)
+        : custom.isNotEmpty
         ? custom.replaceAll('{town}', store.town)
         : 'No offers in {town} yet. Check back soon!'.tr(context, {
             'town': store.town,
           });
-    return Container(
+    final box = Container(
       key: const ValueKey('no-offers-notice'),
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -41,5 +45,8 @@ class NoOffersNotice extends StatelessWidget {
         ],
       ),
     );
+    return store.hasPlace || onLocation == null
+        ? box
+        : InkWell(onTap: onLocation, child: box);
   }
 }

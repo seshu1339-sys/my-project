@@ -50,6 +50,8 @@ class WireframeHome extends StatelessWidget {
     required this.scroll,
     required this.categoriesKey,
     required this.productsKey,
+    // The admin's editor preview shows every offer/ad whatever the location rules.
+    this.showAllLocations = false,
     this.wrapSection = _identitySection,
     this.wrapPromoItem = _identityPromoItem,
     this.wrapCategoryItem = _identityCategoryItem,
@@ -64,6 +66,7 @@ class WireframeHome extends StatelessWidget {
   final ValueChanged<String> onCategory, onPromotion;
   final ScrollController scroll;
   final GlobalKey categoriesKey, productsKey;
+  final bool showAllLocations;
   // Lets the admin Visual Editor overlay click-to-select/dim behavior onto
   // individual sections without this widget knowing anything about editing —
   // every real customer render (the only caller that omits this) gets this
@@ -116,15 +119,17 @@ class WireframeHome extends StatelessWidget {
         .toList();
     // Location-tagged offers/ads: with a town chosen, only the ones listing it
     // (else the general, all-town ones) -- see promotionsForTown.
-    List<Entry> forTown(String placement) => promotionsForTown(
+    TownOffers forTown(String placement) => promotionsForTown(
       promotions.where((e) => e.text('placement') == placement).toList(),
       store.town,
       district: store.district,
       state: store.state,
-    ).entries;
-    final offers = forTown('carousel');
-    final ads = forTown('ad');
-    final boxes = forTown('box');
+      showAll: showAllLocations,
+    );
+    final offersForTown = forTown('carousel');
+    final offers = offersForTown.entries;
+    final ads = forTown('ad').entries;
+    final boxes = forTown('box').entries;
     final localServices = localServiceEntries(
       store,
       searchService,
@@ -307,8 +312,10 @@ class WireframeHome extends StatelessWidget {
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
-                        child: offers.isEmpty && store.hasPlace
-                            ? NoOffersNotice(store: store)
+                        child: offers.isEmpty &&
+                                (store.hasPlace ||
+                                    offersForTown.hiddenForLocation > 0)
+                            ? NoOffersNotice(store: store, onLocation: onLocation)
                             : HeroCarousel(
                           entries: offers,
                           appearance: sectionConfig(settings, 'promo'),

@@ -36,6 +36,15 @@ const _promoKeyPrefix = 'promo-';
 // used below for Theme/Business Profile/Promotions.
 const _externalEditorKeys = {'tickerMarquee': ('settings', 'scrollingText')};
 
+// The admin form that edits each of those documents. The ticker's own document
+// (settings/scrollingText) is edited by the "Scrolling Text Settings" form --
+// opening the plain settings collection showed the Business Profile fields.
+const _externalEditorForms = {'tickerMarquee': 'scrollingText'};
+
+/// The admin form collection that edits an external numbered element (null for
+/// the ordinary ones), e.g. 'tickerMarquee' -> 'scrollingText'.
+String? externalEditorForm(String key) => _externalEditorForms[key];
+
 enum _PreviewWidth { desktop, tablet, mobile }
 
 /// The admin "Visual Editor": the real, live `WireframeHome` rendered inside
@@ -239,7 +248,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
     setState(() {});
   }
 
-  Future<void> _openFullEditor(String collection, {String? entryId}) async {
+  Future<void> _openFullEditor(
+    String collection, {
+    String? entryId,
+    String? formCollection,
+  }) async {
     final entry = entryId == null
         ? null
         : widget.store
@@ -250,7 +263,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
       MaterialPageRoute<void>(
         builder: (_) => EntryEditor(
           store: widget.store,
-          collection: collection,
+          collection: formCollection ?? collection,
           entry: entry,
         ),
       ),
@@ -564,6 +577,7 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
                         scroll: scroll,
                         categoriesKey: categoriesKey,
                         productsKey: productsKey,
+                        showAllLocations: true,
                         wrapSection: _wrapSection,
                         wrapPromoItem: _wrapPromoItem,
                         wrapCategoryItem: (category, child) => _wrapGroupItem(
@@ -640,7 +654,11 @@ class _VisualEditorPageState extends State<VisualEditorPage> {
         child: TextButton.icon(
           icon: const Icon(Icons.open_in_new),
           label: const Text('Open its full settings editor'),
-          onPressed: () => _openFullEditor(external.$1, entryId: external.$2),
+          onPressed: () => _openFullEditor(
+            external.$1,
+            entryId: external.$2,
+            formCollection: _externalEditorForms[key],
+          ),
         ),
       );
     }

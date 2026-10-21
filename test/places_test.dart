@@ -176,7 +176,11 @@ void main() {
       expect(ids(rajahmundry), ['town', 'district', 'multi']);
       expect(ids(const CustomerPlace(town: 'Warangal', district: 'Warangal Urban', state: 'Telangana')), ['state']);
       expect(ids(const CustomerPlace(town: 'Chennai', state: 'Tamil Nadu')), ['everyone']);
-      expect(ids(const CustomerPlace()), ['town', 'district', 'state', 'multi', 'everyone']);
+      // No location chosen: only the general offers; the ones aimed at places are held back.
+      expect(ids(const CustomerPlace()), ['everyone']);
+      final held = promotionsForTown(all, '');
+      expect(held.hiddenForLocation, 4);
+      expect(promotionsForTown(all, '', showAll: true).entries, hasLength(5), reason: 'the admin preview shows everything');
     });
 
     test('chips read plainly', () {

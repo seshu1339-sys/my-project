@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../services/place_resolver.dart';
 import '../services/search.dart';
 import 'account.dart';
 import 'details.dart';
@@ -72,9 +73,25 @@ class _StorefrontState extends State<Storefront> {
     }
   }
 
+  bool _resolvingPlace = false;
+  String _triedPlace = '';
+  // A customer whose stored location has a pincode but no town (typed by hand,
+  // or saved before towns existed) would otherwise see only the general offers.
+  // When some offer is aimed at specific places, look the pincode up once.
+  void _resolvePlaceIfNeeded() {
+    if (_resolvingPlace || !needsPlaceResolution(store)) return;
+    final key = [store.pincode, store.town, store.district].join('|');
+    if (key == _triedPlace) return; // already tried for this exact location
+    _triedPlace = key;
+    _resolvingPlace = true;
+    completeStoredPlace(store).whenComplete(() => _resolvingPlace = false);
+  }
+
   @override
   void initState() {
     super.initState();
+    store.addListener(_resolvePlaceIfNeeded);
+    _resolvePlaceIfNeeded();
     timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         setState(() {});
@@ -84,6 +101,7 @@ class _StorefrontState extends State<Storefront> {
 
   @override
   void dispose() {
+    store.removeListener(_resolvePlaceIfNeeded);
     timer?.cancel();
     search.dispose();
     scroll.dispose();

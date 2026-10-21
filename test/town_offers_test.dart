@@ -97,7 +97,7 @@ void main() {
       ];
       List<String> ids(String town) =>
           promotionsForTown(all, town).entries.map((e) => e.id).toList();
-      expect(ids(''), ['narsi', 'anak', 'everyone']); // no town yet: all
+      expect(ids(''), ['everyone']); // no town chosen: general offers only
       expect(ids('Narsipatnam'), ['narsi', 'anak']);
       expect(ids('narsipatnam'), ['narsi', 'anak']); // case-insensitive
       expect(ids('Anakapalle'), ['anak']);
@@ -212,14 +212,24 @@ void main() {
       store.dispose();
     });
 
-    testWidgets('with no town chosen every offer still shows', (tester) async {
+    testWidgets('with no location chosen a town\'s offers stay hidden and the customer is asked to choose', (tester) async {
       await _wide(tester);
       final store = await _store(
-        promotions: [_promo('Narsipatnam special', 'carousel', locations: 'Narsipatnam')],
+        promotions: [
+          _promo('Narsipatnam special', 'carousel', locations: 'Narsipatnam'),
+          _promo('Narsipatnam ad', 'ad', locations: 'Narsipatnam'),
+        ],
       );
       await tester.pumpWidget(MarketApp(store: store));
       await tester.pump();
-      expect(find.text('Narsipatnam special'), findsWidgets);
+      expect(find.text('Narsipatnam special'), findsNothing);
+      expect(find.text('Narsipatnam ad'), findsNothing);
+      expect(find.byKey(const ValueKey('no-offers-notice')), findsOneWidget);
+      expect(find.text('Choose your location to see offers for your town.'), findsOneWidget);
+      // ...and a general offer is still shown to everyone.
+      await store.save('promotions', _promo('Everyone offer', 'carousel'));
+      await tester.pump();
+      expect(find.text('Everyone offer'), findsWidgets);
       expect(find.byKey(const ValueKey('no-offers-notice')), findsNothing);
       await tester.pumpWidget(const SizedBox());
       store.dispose();

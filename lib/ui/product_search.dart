@@ -7,6 +7,7 @@ import '../domain/catalog.dart';
 import '../services/geocoding.dart';
 import '../services/location.dart';
 import '../services/location_town.dart';
+import '../services/place_resolver.dart';
 import 'design_tokens.dart';
 import 'details.dart';
 import 'location_picker.dart';
@@ -91,6 +92,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
         district: nearest?.district,
         state: nearest?.state,
       );
+      await completeStoredPlace(store);
       if (mounted) setState(() => locating = false);
     } catch (e) {
       if (mounted) {
@@ -118,6 +120,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       lng: place.longitude,
       town: townForPlace(store, place),
     );
+    await completeStoredPlace(store);
     if (mounted) setState(() => locationError = null);
   }
 

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -23,6 +24,14 @@ const _fontWeightOptions = <String, String>{
   '700': 'Bold',
   '800': 'Extra bold',
 };
+
+/// A stored UTC time shown as the admin's local time (the form's own format,
+/// which is read back as local time and saved as UTC again).
+String _localTime(String iso) {
+  final parsed = DateTime.tryParse(iso);
+  if (parsed == null) return iso;
+  return parsed.toLocal().toIso8601String().split('.').first;
+}
 
 class EntryEditor extends StatefulWidget {
   const EntryEditor({
@@ -96,11 +105,15 @@ class _EntryEditorState extends State<EntryEditor> {
           ? value.entries.map((e) => '${e.key}=${e.value}').join('\n')
           : key == 'images' && value is List
           ? value.join('\n')
+          : (key == 'startsAt' || key == 'endsAt') &&
+                value is String &&
+                value.isNotEmpty
+          ? _localTime(value)
           : value?.toString() ??
                 ({
                       'stock': '10',
                       'order': '0',
-                      'price': '0',
+                      'price': '',
                       'radiusKm': '10',
                       'searchRadiusPresetsKm': '2,5,10,25,50',
                       'searchRadiusDefaultKm': '10',
@@ -235,7 +248,26 @@ class _EntryEditorState extends State<EntryEditor> {
           widget.collection == 'scrollingText' || widget.collection == 'theme'
           ? 'settings'
           : widget.collection;
-      await widget.store.save(collection, Entry(id, data));
+      final original = widget.entry?.data;
+      if (original == null) {
+        await widget.store.save(collection, Entry(id, data));
+      } else {
+        // Editing: write only what this form actually changed, so stock/ratings
+        // changed by orders or reviews while the form was open are not overwritten.
+        await widget.store.updateFields(
+          collection,
+          id,
+          {
+            for (final e in data.entries)
+              if (jsonEncode(e.value) != jsonEncode(original[e.key])) e.key: e.value,
+          },
+          remove: {
+            for (final key in original.keys)
+              if (!data.containsKey(key)) key,
+          },
+          fallback: Entry(id, data),
+        );
+      }
       if (mounted) {
         Navigator.pop(context);
         message(context, 'Saved successfully');
@@ -625,6 +657,14 @@ class _EntryEditorState extends State<EntryEditor> {
           // most of these fields (compareAtPrice, deliveryFee, stopAfter...)
           // zero/blank is the documented "off"/"automatic" state. Latitude
           // and longitude have no such default — 0,0 is a real, wrong place.
+          // A product or service must have a real price: a blank or 0 price would
+          // put a free item on sale.
+          if (key == 'price' && widget.collection == 'products') {
+            final price = num.tryParse(v);
+            if (price == null || !price.isFinite || price <= 0) {
+              return 'Enter a price above 0';
+            }
+          }
           if (v.isEmpty && !['latitude', 'longitude'].contains(key)) {
             return null;
           }
