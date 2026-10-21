@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'admin_frame.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
@@ -41,10 +43,11 @@ class VendorModerationPage extends StatelessWidget {
     amount.dispose(); reason.dispose();
   }
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Vendor approvals and publishing'), actions: [
+  Widget build(BuildContext context) => AdminPageFrame(
+        title: 'Vendor approvals and publishing',
+        actions: [
           TextButton.icon(onPressed: () => _verifyShop(context), icon: const Icon(Icons.location_on), label: const Text('Verify shop')),
-        ]),
+        ],
         body: ListView(padding: const EdgeInsets.all(20), children: [
           Text('Vendor applications', style: Theme.of(context).textTheme.titleLarge),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(

@@ -8,7 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 
 void main() {
-  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0, 1720.0, 1880.0, 1920.0]) {
+  for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0, 1920.0]) {
     testWidgets('admin studio has no overflow at width $width', (
       tester,
     ) async {
@@ -23,35 +23,25 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
 
-      final narrow = width < 1900;
-      // Below the breakpoint the navigation buttons collapse into one menu; above it
-      // they stay a plain row of labelled buttons. Either way nothing may overflow.
-      expect(find.byTooltip('More'), narrow ? findsOneWidget : findsNothing);
-      expect(find.text('Vendors'), narrow ? findsNothing : findsOneWidget);
-      expect(find.text('Field Assistants'), narrow ? findsNothing : findsOneWidget);
-      // Regression check: AI Agent is the newest (7th) nav button — it must
-      // never silently fall off the row at a width the "wide" layout claims
-      // to support (the production build clips RenderFlex overflow with no
-      // visible warning, unlike debug builds, so this has to be asserted).
-      expect(find.text('AI Agent'), narrow ? findsNothing : findsOneWidget);
-      if (narrow) {
-        await tester.tap(find.byTooltip('More'));
-        await tester.pump();
-        expect(find.text('Vendors'), findsOneWidget);
-        expect(find.text('Field Assistants'), findsOneWidget);
-        expect(find.text('AI Agent'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tester.tapAt(const Offset(10, 10)); // dismiss the menu
-        await tester.pump();
-      }
+      // The main tabs, in this order, and nothing else in the tab bar.
+      final labels = tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList();
+      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Settings']);
+      // Insights is the first page you see.
+      expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0);
+      // The top bar has only Search, AI Agent (and Sign out when live), each with a visible text label, and no bare icons.
+      expect(find.widgetWithText(TextButton, 'Search'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'AI Agent'), findsOneWidget);
+      expect(find.descendant(of: find.byType(AppBar), matching: find.byType(IconButton)), findsNothing);
+      expect(find.byTooltip('More'), findsNothing);
 
-      // The Product Image Library is one of the collections this update added to the
-      // generic admin form; open its "Add new" form and the Preview dialog on it. The chip
-      // row scrolls horizontally, so bring it into view first.
-      await tester.ensureVisible(find.text('Product Image Library'));
-      await tester.pump();
-      await tester.tap(find.text('Product Image Library'));
-      await tester.pump();
+      // Settings holds the rest. The Product Image Library is one of the collections of the generic admin form:
+      // open its "Add new" form and the Preview dialog on it.
+      DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7); // the Settings tab (it may be scrolled off a phone's tab bar)
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.byKey(const ValueKey('settings-productImageLibrary')));
+      await tester.tap(find.byKey(const ValueKey('settings-productImageLibrary')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Add new'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));

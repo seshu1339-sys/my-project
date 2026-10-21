@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'admin_frame.dart';
+
 import '../data/store.dart';
 import '../domain/catalog.dart';
 
@@ -138,9 +140,9 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
   }
 
   Widget _statistics() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Row(children: [
+    // A Wrap, not a Row: on a phone the period buttons drop under the title instead of running off the screen.
+    Wrap(alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, runSpacing: 8, spacing: 8, children: [
       Text('Site and ad statistics', style: Theme.of(context).textTheme.titleLarge),
-      const Spacer(),
       SegmentedButton<int>(
         segments: const [ButtonSegment(value: 7, label: Text('7 days')), ButtonSegment(value: 30, label: Text('30 days')), ButtonSegment(value: 90, label: Text('90 days'))],
         selected: {days},
@@ -181,13 +183,14 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
         subtitle: const Text('When ON, a price drop alerts eligible customers by itself. Turn OFF to send only manually.'),
         value: autoOn, onChanged: setAuto,
       ),
-      Semantics(container: true, explicitChildNodes: true, child: Row(children: [
-        Expanded(child: DropdownButtonFormField<String>(
+      // Stacked (not side by side) so it also fits a phone.
+      Semantics(container: true, explicitChildNodes: true, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        DropdownButtonFormField<String>(
           initialValue: productId, isExpanded: true, decoration: const InputDecoration(labelText: 'Product'),
           items: [for (final p in products) DropdownMenuItem(value: p.id, child: Text(p.text('name', p.id), overflow: TextOverflow.ellipsis))],
           onChanged: (v) => setState(() { productId = v; audience = null; }),
-        )),
-        const SizedBox(width: 12),
+        ),
+        const SizedBox(height: 8),
         FilledButton(onPressed: productId == null || loading ? null : loadAudience, child: const Text('Show interested customers')),
       ])),
       if (audience != null) ...[
@@ -300,8 +303,8 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Insights and notifications')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Insights and notifications',
     body: ListenableBuilder(listenable: store, builder: (context, _) => ListView(padding: const EdgeInsets.all(20), children: [
       if (loading) const LinearProgressIndicator(),
       if (error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),

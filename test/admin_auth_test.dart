@@ -20,6 +20,8 @@ class AdminTestStore extends Store {
   String? lastAction;
   String? submittedEmail;
   String? lastCallName;
+  // Every callable that was invoked, in order (the dashboard's Insights page makes its own calls after login).
+  final calls = <String>[];
   Map<String, dynamic>? lastCallData;
   bool failLogin = false, failVerify = false, loggedOut = false;
   // Defaults to an invalid/expired session so every existing test (which
@@ -65,6 +67,7 @@ class AdminTestStore extends Store {
   @override
   Future<Map<String, dynamic>> call(String name, Map<String, dynamic> data) async {
     lastCallName = name;
+    calls.add(name);
     lastCallData = data;
     if (name == 'requestAdminOtp') return requestOtpResult;
     if (name == 'verifyAdminOtp') {
@@ -210,7 +213,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: AdminGate(store: store)));
     await tester.pump(); // let the cached session-check Future resolve
     await tester.pump();
-    expect(store.lastCallName, 'checkAdminSession');
+    expect(store.calls.first, 'checkAdminSession');
+    expect(store.calls, isNot(contains('requestAdminOtp')));
     expect(field('Verification code'), findsNothing);
     expect(field('Password'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);

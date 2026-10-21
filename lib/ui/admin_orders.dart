@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'admin_frame.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
@@ -10,8 +12,8 @@ class AdminOrders extends StatelessWidget {
   const AdminOrders({super.key, required this.store});
   final Store store;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Order requests')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Order requests',
     body: !store.live
         ? const Center(
             child: Text(

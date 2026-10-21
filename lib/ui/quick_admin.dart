@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/quick_items.dart';
+import 'admin_frame.dart';
 import 'moderation_dialogs.dart';
 import 'quick_add.dart';
 
@@ -21,8 +22,8 @@ class QuickAccountsPage extends StatelessWidget {
       stream ?? store.firestore.collection('quickAccounts').snapshots().map((s) => s.docs.map((d) => Entry(d.id, d.data())).toList());
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Quick Add: Staff and Vendors')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Quick Add: Staff and Vendors',
     floatingActionButton: FloatingActionButton.extended(
       key: const ValueKey('quick-account-add'),
       onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => QuickAccountForm(store: store, call: call))),
@@ -460,8 +461,8 @@ class _QuickItemsAdminPageState extends State<QuickItemsAdminPage> {
       widget.stream ?? widget.store.firestore.collection('quickItems').snapshots().map((s) => s.docs.map((d) => Entry(d.id, d.data())).toList());
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Quick Add items')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Quick Add items',
     body: StreamBuilder<List<Entry>>(
       stream: _items(),
       builder: (context, snapshot) {

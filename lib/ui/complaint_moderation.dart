@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'admin_frame.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
@@ -25,8 +27,8 @@ class ComplaintModerationPage extends StatelessWidget {
     resolution.dispose();
   }
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Complaint review')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Complaint review',
     body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: store.firestore.collection('complaints').limit(100).snapshots(),
       builder: (context, snapshot) {

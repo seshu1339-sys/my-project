@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'admin_frame.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
@@ -64,8 +66,8 @@ class FieldModerationPage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Field Assistant approvals')),
+  Widget build(BuildContext context) => AdminPageFrame(
+    title: 'Field Assistant approvals',
     body: ListView(padding: const EdgeInsets.all(20), children: [
       Text('Pending field staff', style: Theme.of(context).textTheme.titleLarge),
       const Text('Anyone who signs into the Field Assistant app appears here first — nothing else is possible until approved.'),

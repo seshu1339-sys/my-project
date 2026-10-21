@@ -7,6 +7,24 @@ import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 import 'package:ecommerce_app/ui/home_section_config.dart';
 
+// The studio opens on Insights; the other pages are tabs, and everything else is a section of the Settings tab.
+Future<void> goTab(WidgetTester tester, int index) async {
+  DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(index);
+  await tester.pumpAndSettle();
+}
+
+Future<void> goSettings(WidgetTester tester, String key) async {
+  await goTab(tester, 7);
+  await tester.tap(find.byKey(ValueKey('settings-$key')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> openPageView(WidgetTester tester) async {
+  await goSettings(tester, 'layout');
+  await tester.tap(find.byKey(const ValueKey('layout-page-view')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('admin can add and persist a category through the form', (
     tester,
@@ -15,8 +33,7 @@ void main() {
     final store = Store();
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    await tester.tap(find.text('Categories'));
-    await tester.pump();
+    await goSettings(tester, 'categories');
     await tester.tap(find.text('Add new'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -54,6 +71,7 @@ void main() {
     final store = Store();
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
+    await goTab(tester, 2); // Products
     await tester.tap(find.text('Add new'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -122,17 +140,7 @@ void main() {
       '',
     );
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    await tester.scrollUntilVisible(
-      find.text('Business profile'),
-      100,
-      scrollable: find
-          .byWidgetPredicate(
-            (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.right,
-          )
-          .first,
-    );
-    await tester.tap(find.text('Business profile'));
-    await tester.pump();
+    await goSettings(tester, 'settings'); // Business Profile
     await tester.tap(find.text('Local Market'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -243,7 +251,7 @@ void main() {
     store.dispose();
   });
 
-  testWidgets('page view lets an admin resize a section without touching the old chip-list nav', (
+  testWidgets('page view (Settings > Layout) lets an admin resize a section', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1024, 2400);
@@ -255,11 +263,7 @@ void main() {
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
     await tester.pump();
-    // The original chip-list navigation is still the default view.
-    expect(find.text('Products & services'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Switch to page view (click a section to edit it)'));
-    await tester.pump();
+    await openPageView(tester);
     final categoriesTitle = find.byWidgetPredicate(
       (w) => w is Text && w.data == 'Categories' && w.style?.fontWeight == FontWeight.bold,
     );
@@ -315,8 +319,7 @@ void main() {
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
     await tester.pump();
-    await tester.tap(find.byTooltip('Switch to page view (click a section to edit it)'));
-    await tester.pump();
+    await openPageView(tester);
 
     final settings = store.entries('settings');
     expect(
