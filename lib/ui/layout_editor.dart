@@ -10,6 +10,7 @@ import 'design_tokens.dart';
 import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
+import 'reset_confirmation.dart';
 import 'text_animation.dart';
 import 'home_section_config.dart';
 import 'page_elements.dart';
@@ -117,7 +118,7 @@ class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
                 label: const Text('Save layout'),
               ),
               OutlinedButton(
-                onPressed: () => formKey.currentState?.save(reset: true),
+                onPressed: () => formKey.currentState?.resetToDefault(),
                 child: const Text('Reset this component to default'),
               ),
             ],
@@ -457,6 +458,48 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     for (final e in controllers.entries)
       if (dimensionFields.containsKey(e.key)) e.key: double.tryParse(e.value.text.trim()) ?? 0,
   };
+
+  /// "Reset this component to default": lists every setting that will change (current -> default), asks, clears them, then reads the
+  /// record back from the database to confirm they are gone and says what changed. Returns whether everything was cleared.
+  Future<bool> resetToDefault() async {
+    final rows = layoutResetRows(saved, widget.component, fields);
+    if (rows.isEmpty) {
+      message(context, 'Nothing to reset: this component already uses its defaults.');
+      return true;
+    }
+    final name = layoutComponents[widget.component] ?? widget.component;
+    final ok = await confirmReset(
+      context,
+      title: 'Reset $name to default?',
+      intro: 'These ${rows.length} ${rows.length == 1 ? 'setting goes' : 'settings go'} back to the default. Anything not listed (behaviour settings, other components) is kept.',
+      rows: rows,
+    );
+    if (!ok || !mounted) return false;
+    setState(() => busy = true);
+    try {
+      final gone = {for (final row in rows) row.key};
+      await widget.store.save('settings', Entry('section_${widget.component}', {...saved.data}..removeWhere((k, _) => gone.contains(k))));
+      final fresh = await widget.store.freshRecord('settings', 'section_${widget.component}');
+      final left = [for (final row in rows) if (fresh != null && fresh.containsKey(row.key)) row];
+      dirty = false;
+      load();
+      widget.onSaved?.call();
+      if (mounted) {
+        await showResetDone(
+          context,
+          title: left.isEmpty ? 'Reset complete' : 'Reset incomplete',
+          rows: [for (final row in rows) if (!left.contains(row)) row],
+          warning: left.isEmpty ? null : 'Could not clear: ${left.map((r) => r.label).join(', ')}. Try again.',
+        );
+      }
+      return left.isEmpty;
+    } catch (e) {
+      if (mounted) message(context, e);
+      return false;
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
   String? _numberValidator(String key, String? value) {
     final text = value?.trim() ?? '';

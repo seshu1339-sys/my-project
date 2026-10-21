@@ -158,8 +158,14 @@ void main() {
           .number('height'),
       96,
     );
+    await tester.ensureVisible(find.text('Reset this component to default'));
     await tester.tap(find.text('Reset this component to default'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('reset-confirm')));
+    await tester.pumpAndSettle();
+    expect(find.text('Reset complete'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('reset-done-ok')));
+    await tester.pumpAndSettle();
     expect(
       store
           .entries('settings')

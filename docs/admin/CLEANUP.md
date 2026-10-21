@@ -54,3 +54,12 @@ New: "Zoom in" entrance (also added to the per-part Entrance animation dropdown)
 - Size: Small / Medium / Large on every component that has size fields: sets the screen scales (85% / normal / 120%), else font
   size, else icon size; colours, text and everything else are never touched. Shown as "Custom sizes" when numbers are typed by hand.
 - Every pixel/scale field is under "Advanced" (closed by default); behaviour pages (speed, direction ...) are not split.
+
+## Step F: "Reset to default" with confirmation
+
+- Every reset (a component's layout, Settings > Animations, a settings record in the editor) first shows a dialog listing each setting as "current -> default" and asks Reset / Cancel. Cancel changes nothing.
+- After a confirmed reset the record is read back from the database; a dialog says "Reset complete" (and lists what changed) or "Reset incomplete" with the settings that could not be cleared.
+- Likely cause of "reset did nothing": leftover stored values the form does not show (e.g. an old width or colour) kept changing the site. The reset now clears those too (marked "not shown in the form"). Behaviour settings (speed, banner count, ...) are kept; they have their own pages.
+- "Nothing to reset" is shown when a component already uses its defaults.
+- New: "Reset animations to default" button on Settings > Animations.
+- Not checkable here: real Firestore read-back and the live site after a reset (needs admin login).

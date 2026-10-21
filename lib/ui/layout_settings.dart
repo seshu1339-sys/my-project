@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../domain/catalog.dart';
 import 'animation_settings.dart';
 import 'home_section_config.dart';
+import 'reset_confirmation.dart';
 import 'shared.dart';
 
 /// Shared by the editor and renderer. Zero dimensions mean automatic sizing.
@@ -300,6 +301,79 @@ String? presetOf(Map<String, String> current, List<String> fields) {
     if (wanted.keys.every(same)) return preset;
   }
   return null;
+}
+
+// Stored layout values that change how a part LOOKS, whether or not this component's form shows them. "Reset to default" clears all of
+// them (not only the ones the form shows), otherwise a hidden leftover (say a width the form no longer offers) keeps changing the site
+// after a "reset". Behaviour settings (speed, direction, how many banners ...) are kept: they have their own pages.
+const _extraVisualKeys = {
+  'backgroundColor', 'textColor', 'borderColor', 'gradientStart', 'gradientEnd', 'searchIconColor', 'micIconColor', 'cameraIconColor',
+  'placeholderColor', 'fontFamily', 'fontStyle', 'fontWeight', 'animation', 'alignment', 'text', 'iconUrl', 'backgroundImage', 'visible',
+  'entranceMs', 'textAnimation', 'headingAnimation',
+};
+
+const _resetLabels = {
+  'backgroundColor': 'Background color',
+  'textColor': 'Text color',
+  'borderColor': 'Border color',
+  'gradientStart': 'Gradient start',
+  'gradientEnd': 'Gradient end',
+  'searchIconColor': 'Search icon color',
+  'micIconColor': 'Mic icon color',
+  'cameraIconColor': 'Camera icon color',
+  'placeholderColor': 'Placeholder text color',
+  'fontFamily': 'Font family',
+  'fontStyle': 'Font style',
+  'fontWeight': 'Font weight',
+  'animation': 'Entrance animation',
+  'alignment': 'Alignment',
+  'text': 'Text content',
+  'iconUrl': 'Icon image',
+  'backgroundImage': 'Background photo',
+  'visible': 'Visible on the site',
+  'entranceMs': 'Entrance speed',
+  'textAnimation': 'Banner text animation',
+  'headingAnimation': 'Heading animation',
+};
+
+/// What "Reset this component to default" will change for the stored record [saved] of [component]: every visual value that is set and
+/// differs from its default, as current -> default. Empty when the component is already at its defaults.
+List<ResetRow> layoutResetRows(Entry saved, String component, List<String> formFields) {
+  final keep = {...?behaviorSettingsFields[component], 'section', 'name'};
+  final rows = <ResetRow>[];
+  for (final e in saved.data.entries) {
+    final key = e.key;
+    if (keep.contains(key)) continue;
+    final visual = dimensionFields.containsKey(key) || _extraVisualKeys.contains(key) || formFields.contains(key);
+    if (!visual) continue;
+    final value = e.value;
+    // already the default: nothing to reset
+    if (value == null || (value is String && value.trim().isEmpty)) continue;
+    if (key == 'visible') {
+      final isOn = value == true || value == 'true';
+      if (isOn == componentVisible(const Entry('', {}), component)) continue;
+    }
+    if ((key == 'animation' && value == 'none') || (key == 'fontStyle' && value == 'normal')) continue;
+    if (dimensionFields.containsKey(key) && value is num && value == 0) continue;
+    if (key.endsWith('Scale') && value is num && value == 1) continue;
+    final String label;
+    final String defaultText;
+    if (dimensionFields.containsKey(key)) {
+      label = dimensionFields[key]!.$1.split(' (').first;
+      defaultText = key.endsWith('Scale') ? '1 (normal)' : key == 'brightness' ? '1 (normal)' : 'automatic';
+    } else {
+      label = _resetLabels[key] ?? key;
+      defaultText = switch (key) {
+        'visible' => componentVisible(const Entry('', {}), component) ? 'shown' : 'hidden',
+        'animation' || 'textAnimation' || 'headingAnimation' => 'none',
+        'alignment' => 'left',
+        'text' || 'iconUrl' || 'backgroundImage' => 'default',
+        _ => 'theme default',
+      };
+    }
+    rows.add(ResetRow(key, label, describeValue(value), defaultText, hidden: !formFields.contains(key)));
+  }
+  return rows;
 }
 
 List<String> componentFields(String component) => [

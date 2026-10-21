@@ -407,6 +407,13 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /// A record read from the server itself (not the local copy), to confirm that a write really reached it. Offline, the local copy.
+  Future<Map<String, dynamic>?> freshRecord(String collection, String id) async {
+    if (!live) return catalog[collection]?.where((e) => e.id == id).firstOrNull?.data;
+    final snapshot = await firestore.collection(collection).doc(id).get(const GetOptions(source: Source.server));
+    return snapshot.data();
+  }
+
   Future<void> delete(String collection, String id) async {
     if (live) {
       await firestore.collection(collection).doc(id).delete();

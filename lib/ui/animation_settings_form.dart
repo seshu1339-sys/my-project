@@ -5,6 +5,7 @@ import '../domain/catalog.dart';
 import 'animation_settings.dart';
 import 'home_rotating_pages.dart';
 import 'layout_settings.dart';
+import 'reset_confirmation.dart';
 import 'shared.dart';
 
 /// Settings -> Animations: switch the website's animations on or off (everywhere, or for one part of the page), choose
@@ -50,6 +51,64 @@ class _AdminAnimationsFormState extends State<AdminAnimationsForm> {
     try {
       await widget.store.save('settings', Entry('animations', {'name': 'Animations', ...values}));
       if (mounted) message(context, 'Animations saved. Open pages update at once; the site picks it up on its next load.');
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  String _labelOf(String key) {
+    if (key == 'enabled') return 'Animations on the website';
+    if (key == 'defaultType') return 'Default animation';
+    if (key == 'defaultSpeed') return 'Default speed';
+    final part = key.split('_').first;
+    final what = switch (key.split('_').last) {
+      'enabled' => 'on/off',
+      'type' => 'animation',
+      'speed' => 'speed',
+      _ => 'how pictures change',
+    };
+    return '${animationParts[part] ?? part}: $what';
+  }
+
+  String _shown(String key, Object? value) {
+    if (key == 'enabled' || key.endsWith('_enabled')) return value == 'false' ? 'Off' : 'On';
+    if (key.endsWith('_type') || key == 'defaultType') return entranceTypes['$value'] ?? '$value';
+    if (key.endsWith('_rotation')) return promoAnimationLabels['$value'] ?? '$value';
+    return describeValue(value);
+  }
+
+  /// "Reset animations to default": lists everything that was chosen (current -> default), asks, clears the record, then reads it back.
+  Future<void> reset() async {
+    final saved = animationsDoc(widget.store.entries('settings')).data;
+    final rows = [
+      for (final e in saved.entries)
+        if (e.key != 'name') ResetRow(e.key, _labelOf(e.key), _shown(e.key, e.value), e.key == 'enabled' || e.key.endsWith('_enabled') ? 'On' : 'as before (not set)'),
+    ];
+    if (rows.isEmpty) {
+      message(context, 'Nothing to reset: animations already use their defaults.');
+      return;
+    }
+    final ok = await confirmReset(
+      context,
+      title: 'Reset animations to default?',
+      intro: 'Every choice below is cleared. Each part of the page goes back to its own animation setting, as before.',
+      rows: rows,
+    );
+    if (!ok || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await widget.store.delete('settings', 'animations');
+      final fresh = await widget.store.freshRecord('settings', 'animations');
+      if (!mounted) return;
+      setState(() => values = {});
+      await showResetDone(
+        context,
+        title: fresh == null ? 'Reset complete' : 'Reset incomplete',
+        rows: fresh == null ? rows : const [],
+        warning: fresh == null ? null : 'The animation settings could not be cleared. Try again.',
+      );
     } catch (e) {
       if (mounted) message(context, e);
     } finally {
@@ -232,6 +291,7 @@ class _AdminAnimationsFormState extends State<AdminAnimationsForm> {
         spacing: 12,
         children: [
           FilledButton(key: const ValueKey('anim-save'), onPressed: busy ? null : save, child: Text(busy ? 'Saving…' : 'Save animations')),
+          OutlinedButton(key: const ValueKey('anim-reset'), onPressed: busy ? null : reset, child: const Text('Reset animations to default')),
         ],
       ),
     ],

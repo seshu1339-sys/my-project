@@ -9,6 +9,7 @@ import 'color_picker_field.dart';
 import '../domain/towns.dart';
 import 'geo_target_picker.dart';
 import 'location_target_field.dart';
+import 'reset_confirmation.dart';
 import 'shared.dart';
 
 // Matches layout_editor.dart's own _kindOf rule for the numbered elements'
@@ -363,11 +364,38 @@ class _EntryEditorState extends State<EntryEditor> {
       return;
     }
     final id = widget.entry!.id;
-    await widget.store.delete('settings', id);
-    if (mounted) {
-      message(context, 'Reset to default');
-      Navigator.pop(context);
+    // Business Profile, Theme and Scrolling Text are single records: resetting deletes the saved record, and every value in it goes back to
+    // its default (empty). That is listed first, and confirmed.
+    final single = const {'settings', 'theme', 'scrollingText'}.contains(widget.collection);
+    if (single) {
+      final rows = [
+        for (final f in fields[widget.collection]!.entries)
+          if (widget.entry!.data[f.key] != null && '${widget.entry!.data[f.key]}'.trim().isNotEmpty)
+            ResetRow(f.key, f.value.split(' (').first, describeValue(widget.entry!.data[f.key]), 'empty (default)'),
+      ];
+      final ok = await confirmReset(
+        context,
+        title: 'Reset ${adminSections[widget.collection] ?? widget.collection} to default?',
+        intro: 'The saved ${adminSections[widget.collection] ?? widget.collection} is cleared: every value below goes back to its default.',
+        rows: rows,
+      );
+      if (!ok || !mounted) return;
     }
+    await widget.store.delete('settings', id);
+    final fresh = single ? await widget.store.freshRecord('settings', id) : null;
+    if (!mounted) return;
+    if (single) {
+      await showResetDone(
+        context,
+        title: fresh == null ? 'Reset complete' : 'Reset incomplete',
+        rows: const [],
+        warning: fresh == null ? 'The saved record was cleared and confirmed. The site uses the defaults now.' : 'The record could not be cleared. Try again.',
+      );
+    } else {
+      message(context, 'Reset to default');
+    }
+    // A form shown inside Settings stays (it reopens empty); a stand-alone form closes.
+    if (mounted && !widget.embedded) Navigator.pop(context);
   }
 
   Widget field(String key, String label) {
