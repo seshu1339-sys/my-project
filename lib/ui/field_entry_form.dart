@@ -34,7 +34,7 @@ List<String> fieldEntryErrors({
     if (!useExistingShop && !between(shopAddress, 5, 500)) 'Enter the shop address.',
     if (!useExistingShop && !RegExp(r'^\d{6}$').hasMatch(shopPincode.trim())) 'Enter a valid six-digit pincode.',
     if (!between(itemName, 2, 120)) 'Enter the item name.',
-    if (price == null || price < 0) 'Enter a valid price.',
+    if (price == null || price <= 0) 'Enter a price above 0.',
     if (stock == null || stock < 0) 'Enter the stock quantity as a whole number.',
     if (!hasPhoto) 'Take or choose a photo of the item.',
     if (!hasLocation) "Capture the shop's GPS location.",
@@ -64,6 +64,8 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
   final itemName = TextEditingController();
   final itemPrice = TextEditingController();
   final itemStock = TextEditingController();
+  // Optional: which category the item belongs to, so it shows under it once approved.
+  String? itemCategoryId;
   late final String submissionId = '${DateTime.now().microsecondsSinceEpoch}';
   // Admin-configurable (settings/business.fieldPhotoLimit), default 2 — a
   // separate setting from vendor's own photo limit, never affecting it.
@@ -151,6 +153,7 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
           'name': itemName.text.trim(),
           'price': double.parse(itemPrice.text.trim()),
           'stock': int.parse(itemStock.text.trim()),
+          if (itemCategoryId != null) 'categoryId': itemCategoryId,
         },
         'submissionId': submissionId,
         'photoCount': photoBytesBySlot.length,
@@ -261,6 +264,17 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
           TextField(controller: itemName, decoration: const InputDecoration(labelText: 'Item name')),
           TextField(controller: itemPrice, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price')),
           TextField(controller: itemStock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock quantity')),
+          DropdownButtonFormField<String>(
+            key: const ValueKey('field-item-category'),
+            initialValue: itemCategoryId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Category (optional)'),
+            items: [
+              for (final c in store.entries('categories').where((c) => c.active))
+                DropdownMenuItem(value: c.id, child: Text(c.text('name', c.id))),
+            ],
+            onChanged: (v) => setState(() => itemCategoryId = v),
+          ),
         ]))),
         const SizedBox(height: 12),
         _photoSection,

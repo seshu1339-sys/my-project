@@ -24,7 +24,8 @@ test('field staff access, suspension and entry submission/review lifecycle', {
     Array.from({length: count}, (_, i) => stagePhoto(`fieldSubmissions/${uid}/${submissionId}_${i + 1}`)),
   );
   const newShop = {name: 'Ramu Stores', address: '12 Market Road', pincode: '560001', latitude: 12.9716, longitude: 77.5946};
-  const item = {name: 'Rice 5kg', price: 250, stock: 40};
+  await db.collection('categories').doc('cat-grocery').set({name: 'Grocery', active: true});
+  const item = {name: 'Rice 5kg', price: 250, stock: 40, categoryId: 'cat-grocery'};
 
   // ---- self-registration requires a name, phone and mandatory staff photo
   const uid = 'staff1';
@@ -107,6 +108,7 @@ test('field staff access, suspension and entry submission/review lifecycle', {
   assert.equal(product.name, 'Rice 5kg');
   assert.equal(product.price, 250);
   assert.equal(product.stock, 40);
+  assert.equal(product.categoryId, 'cat-grocery', 'the staff member\'s category is carried onto the approved product');
   assert.equal(product.shopId, approved.shopId);
   assert.equal(product.createdByStaffUid, uid);
   assert.ok(product.imageUrl.includes(`catalog%2F${approved.productId}_1.jpg`), 'photo 1 becomes the primary imageUrl');

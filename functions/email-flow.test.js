@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const {initializeApp, deleteApp} = require('firebase/app');
 const {getAuth, connectAuthEmulator, createUserWithEmailAndPassword, sendEmailVerification, applyActionCode, reload, getIdTokenResult, sendPasswordResetEmail, confirmPasswordReset, signOut, signInWithEmailAndPassword, deleteUser, sendSignInLinkToEmail, signInWithEmailLink, isSignInWithEmailLink} = require('firebase/auth');
 test('email registration, verification token refresh and password reset', {skip: !process.env.FIREBASE_AUTH_EMULATOR_HOST}, async () => {
-  const project = 'demo-neighbourly';
+  const project = process.env.GCLOUD_PROJECT || 'demo-neighbourly';
   const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
   const app = initializeApp({projectId: project, apiKey: 'emulator-only'}, 'email-flow');
   const auth = getAuth(app);
@@ -35,7 +35,7 @@ test('email registration, verification token refresh and password reset', {skip:
 
 test('passwordless email link verifies ownership and cannot be reused', {skip: !process.env.FIREBASE_AUTH_EMULATOR_HOST}, async () => {
   const host = process.env.FIREBASE_AUTH_EMULATOR_HOST;
-  const project = 'demo-neighbourly';
+  const project = process.env.GCLOUD_PROJECT || 'demo-neighbourly';
   const app = initializeApp({projectId: project, apiKey: 'emulator-only'}, 'passwordless-flow');
   const auth = getAuth(app);
   connectAuthEmulator(auth, 'http://' + host, {disableWarnings: true});

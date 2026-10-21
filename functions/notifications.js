@@ -7,7 +7,8 @@ const {getMessaging} = require('firebase-admin/messaging');
 const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
 const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
-const {flagOff, promotionMatchesLocation} = require('./domain');
+const {flagOff, promotionMatchesLocation, promotionMatchesPlace} = require('./domain');
+const {placeForPincode} = require('./places');
 const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 const hash = value => createHash('sha256').update(value).digest('hex');
@@ -129,6 +130,9 @@ async function fanOutOffer(promotionId, data, eventKey) {
     // Geo-targeted promotions only reach subscribers whose last-known
     // location we have; an untargeted promotion still reaches everyone.
     if (!promotionMatchesLocation(data, {customerPincode: sub.pincode, customerLatitude: sub.latitude, customerLongitude: sub.longitude})) continue;
+    // An offer made for towns/districts/states reaches only subscribers at those places (found
+    // from their saved pincode); a subscriber with no known place gets only general offers.
+    if (!promotionMatchesPlace(data, placeForPincode(sub.pincode))) continue;
     batch.push(subscriber.id);
     if (batch.length >= FAN_OUT) await flush();
   }

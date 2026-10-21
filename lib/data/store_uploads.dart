@@ -65,7 +65,12 @@ extension StoreUploads on Store {
     final image = await _readImage(this, file);
     await FirebaseStorage.instance
         .ref('vendorShopPhotos/$uid/shopPhoto$slot')
-        .putData(image.bytes, SettableMetadata(contentType: image.type));
+        // A slot keeps the same path when its photo is replaced, so customers' browsers
+        // must re-check it instead of showing the old photo from cache for up to an hour.
+        .putData(
+          image.bytes,
+          SettableMetadata(contentType: image.type, cacheControl: 'no-cache'),
+        );
     return image.bytes;
   }
 

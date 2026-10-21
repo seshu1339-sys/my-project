@@ -124,6 +124,7 @@ exports.submitFieldEntry = onCall(options, async request => {
   }
   let itemDetails;
   try { itemDetails = fieldItemDetails(item || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  if (itemDetails.categoryId && !(await db.collection('categories').doc(itemDetails.categoryId).get()).exists) throw new HttpsError('invalid-argument', 'Choose a valid category.');
   const photoPaths = [];
   for (let i = 1; i <= photoCount; i++) {
     const path = `fieldSubmissions/${uid}/${submissionId}_${i}`;
@@ -178,7 +179,7 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
     imageUrls.push(`https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`);
   }
   batch.set(productRef, {
-    name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product',
+    name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product', categoryId: data.item.categoryId || '',
     shopId, imageUrl: imageUrls[0] || '', images: imageUrls.slice(1), active: true,
     createdByStaffUid: data.staffUid, createdByStaffName: data.staffName, createdAt: FieldValue.serverTimestamp(),
   });

@@ -116,6 +116,25 @@ function promotionMatchesLocation(promotion, {customerPincode, customerLatitude,
   }
   return Boolean(customerPincode) && customerPincode === targetPincode;
 }
+// ---- Promotion places (mirrors lib/domain/places.dart + towns.dart): an offer's `locations`
+// lists towns ("Rajahmundry (East Godavari)", or just "Rajahmundry"), whole districts
+// ("district:East Godavari") and whole states ("state:Telangana"). Blank = every place.
+function normPlace(value) { return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' '); }
+function parseLocationList(raw) { return String(raw ?? '').split(/[,\n]/).map(part => part.trim()).filter(Boolean); }
+function locationTokenMatches(token, place = {}) {
+  const wanted = normPlace(token);
+  if (!wanted) return false;
+  if (wanted.startsWith('state:')) return Boolean(place.state) && wanted.slice(6).trim() === normPlace(place.state);
+  if (wanted.startsWith('district:')) return Boolean(place.district) && wanted.slice(9).trim() === normPlace(place.district);
+  if (!place.town) return false;
+  const town = normPlace(place.town);
+  return wanted === town || (Boolean(place.district) && wanted === `${town} (${normPlace(place.district)})`);
+}
+// A promotion with no `locations` reaches everyone; one with places reaches only the people at them.
+function promotionMatchesPlace(promotion, place = {}) {
+  const tokens = parseLocationList(promotion?.locations);
+  return tokens.length === 0 || tokens.some(token => locationTokenMatches(token, place));
+}
 // The admin settings form saves every non-numeric field as text, so a toggle
 // arrives as the string "true"/"false" as often as a real boolean.
 function flagOn(value) { return value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true'); }
@@ -189,14 +208,20 @@ function fieldStaffDetails(data = {}) {
 function fieldItemDetails(data = {}) {
   const name = text(data.name, 2, 120, 'the item name');
   const price = data.price;
-  if (typeof price !== 'number' || !Number.isFinite(price) || price < 0 || price > 10000000) throw Error('price must be a number from 0 to 10000000.');
+  if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 || price > 10000000) throw Error('price must be a number above 0 and up to 10000000.');
   const stock = data.stock;
   if (!Number.isInteger(stock) || stock < 0 || stock > 1000000) throw Error('stock must be a whole number from 0 to 1000000.');
-  return {name, price, stock};
+  // Optional: the category the item belongs to (the function checks it exists), so an approved
+  // item lands in a category instead of in none.
+  const categoryId = data.categoryId;
+  if (categoryId !== undefined && categoryId !== '' && (typeof categoryId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(categoryId))) throw Error('Choose a valid category.');
+  return {name, price, stock, ...(categoryId ? {categoryId} : {})};
 }
 const productChangeFields = {
   price: ['price', 'compareAtPrice', 'prices'],
   stock: ['stock'],
+  // Hide a product from customers (active: false) or show it again; reviewed like any other change.
+  visibility: ['active'],
   product: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'images', 'tags'],
   shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
   newProduct: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'price', 'stock', 'kind'],
@@ -212,6 +237,8 @@ function validateVendorChange(type, changes) {
   if (changes.compareAtPrice !== undefined) money('compareAtPrice');
   if (changes.stock !== undefined && (!Number.isInteger(changes.stock) || changes.stock < 0 || changes.stock > 1000000)) throw Error('stock must be a whole number from 0 to 1000000.');
   if (type === 'stock' && changes.stock === undefined) throw Error('Provide the stock quantity.');
+  if (changes.active !== undefined && typeof changes.active !== 'boolean') throw Error('active must be true or false.');
+  if (type === 'visibility' && changes.active === undefined) throw Error('Say whether to show or hide the product.');
   if (changes.name !== undefined) text(changes.name, 2, 120, 'the name');
   if (changes.description !== undefined && (typeof changes.description !== 'string' || changes.description.length > 2000)) throw Error('Description is too long.');
   if (changes.imageUrl !== undefined && changes.imageUrl !== '' && (typeof changes.imageUrl !== 'string' || !/^https?:\/\//.test(changes.imageUrl) || changes.imageUrl.length > 2000)) throw Error('Image must be an uploaded photo.');
@@ -221,4 +248,4 @@ function validateVendorChange(type, changes) {
 // restores stock exactly once, so reopening one would leave its stock un-reserved.
 const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
 function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails, fieldStaffDetails};
+module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

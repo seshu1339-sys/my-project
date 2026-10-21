@@ -48,8 +48,9 @@ void main() {
 
   test('the item needs a name, a valid price and a whole-number stock', () {
     expect(errors(itemName: 'R'), ['Enter the item name.']);
-    expect(errors(itemPrice: 'abc'), ['Enter a valid price.']);
-    expect(errors(itemPrice: '-5'), ['Enter a valid price.']);
+    expect(errors(itemPrice: 'abc'), ['Enter a price above 0.']);
+    expect(errors(itemPrice: '-5'), ['Enter a price above 0.']);
+    expect(errors(itemPrice: '0'), ['Enter a price above 0.'], reason: 'a free item must not reach the shop');
     expect(errors(itemStock: '1.5'), ['Enter the stock quantity as a whole number.']);
     expect(errors(itemStock: '-1'), ['Enter the stock quantity as a whole number.']);
   });
@@ -66,6 +67,10 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(home: FieldEntryForm(store: store)));
     await tester.pump();
+
+    // The item can be put in a category, so an approved item is not left in none.
+    expect(find.byKey(const ValueKey('field-item-category')), findsOneWidget);
+    expect(find.text('Category (optional)'), findsOneWidget);
 
     // Defaults to an existing-shop dropdown, not the new-shop fields.
     expect(find.text('Choose the shop you are visiting'), findsOneWidget);

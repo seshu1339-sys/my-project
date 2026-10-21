@@ -275,8 +275,18 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
         FilledButton(onPressed: busy ? null : () => run(addProduct), child: const Text('Submit product')),
       ]),
     ]),
-    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: store.firestore.collection('products').where('ownerId', isEqualTo: uid).limit(100).snapshots(),
+    // The vendor's own shop's products (including ones the office added for the shop),
+    // not only the ones the vendor submitted itself.
+    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: store.firestore.collection('vendors').doc(uid).snapshots(),
+      builder: (context, vendorSnapshot) {
+        final shopId = vendorSnapshot.data?.data()?['shopId'];
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: (shopId is String && shopId.isNotEmpty
+              ? store.firestore.collection('products').where('shopId', isEqualTo: shopId)
+              : store.firestore.collection('products').where('ownerId', isEqualTo: uid))
+          .limit(100)
+          .snapshots(),
       builder: (context, snapshot) {
         final docs = snapshot.data?.docs ?? const [];
         return _card('My products and materials', [
@@ -285,8 +295,15 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
             contentPadding: EdgeInsets.zero,
             leading: (doc.data()['imageUrl'] ?? '').toString().isEmpty ? const Icon(Icons.inventory_2_outlined) : SizedBox(width: 44, height: 44, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
             title: Text('${doc.data()['name']}'),
-            subtitle: Text('Price ${doc.data()['price']} • Stock ${doc.data()['stock'] ?? 0}'),
+            subtitle: Text('Price ${doc.data()['price']} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}'),
             trailing: Wrap(children: [
+              IconButton(
+                tooltip: doc.data()['active'] == false ? 'Show on site' : 'Hide from site',
+                icon: Icon(doc.data()['active'] == false ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                onPressed: busy ? null : () => run(() async {
+                  toast(published(await store.submitVendorChange(type: 'visibility', collection: 'products', docId: doc.id, changes: {'active': doc.data()['active'] == false})));
+                }),
+              ),
               IconButton(tooltip: 'Update price', icon: const Icon(Icons.sell_outlined), onPressed: busy ? null : () => run(() async {
                 final n = await askNumber('Update price', 'New price', integer: false, initial: '${doc.data()['price'] ?? ''}');
                 if (n == null) return;
@@ -301,6 +318,8 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
             ]),
           ),
         ]);
+      },
+    );
       },
     ),
     _card('Submit a product or shop change', [
