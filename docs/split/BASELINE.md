@@ -49,3 +49,10 @@ deployed yet (the owner must run `firebase deploy --only functions`). Local comm
   "V"/"S" designs (then: node icons script -> `src/vendor/res`, `src/staff/res`).
 - Checked with aapt2: package names and labels are right. Vendor and staff builds contain no admin route; the customer build
   still contains `/jyothi9` (kept until the owner says to remove it, before the Play Store release).
+
+## Phase 1 emulator test (Android emulator "Medium_Phone", debug APKs of all three flavors installed side by side)
+- Customer: opens the storefront. Vendor: "Vendor studio" sign-in. Staff: "Field Assistant" / "Staff sign-in". Packages and labels correct.
+- Found and fixed a bug that predates this work: `buildAppTheme` scaled the theme font size (live theme has fontSize 12) with
+  `TextTheme.apply(fontSizeFactor:)`, which asserts on styles without a size -> a red error screen in debug builds of the Android
+  customer app (release builds skip the assert and leave those styles alone, which is what `_scaled` now does explicitly, so the
+  look of the live site does not change). Regression test: test/app_theme_test.dart.

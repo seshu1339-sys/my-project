@@ -60,15 +60,15 @@ ThemeData buildAppTheme(Store store, {required bool dark}) {
     (weight) => weight.value == settings.number('fontWeight', 400).round(),
     orElse: () => FontWeight.normal,
   );
-  final textTheme =
-      ThemeData(brightness: dark ? Brightness.dark : Brightness.light)
-          .textTheme
-          .apply(
-            fontFamily: fontFamily.isEmpty ? 'Arial' : fontFamily,
-            bodyColor: text,
-            displayColor: text,
-            fontSizeFactor: fontSize / 14,
-          );
+  final textTheme = _scaled(
+    ThemeData(brightness: dark ? Brightness.dark : Brightness.light).textTheme
+        .apply(
+          fontFamily: fontFamily.isEmpty ? 'Arial' : fontFamily,
+          bodyColor: text,
+          displayColor: text,
+        ),
+    fontSize / 14,
+  );
   return ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
@@ -91,5 +91,31 @@ ThemeData buildAppTheme(Store store, {required bool dark}) {
       backgroundColor: appBar,
       surfaceTintColor: Colors.transparent,
     ),
+  );
+}
+
+/// Scales every text style that has a size. Some platforms' default text themes leave a few sizes
+/// unset, and TextTheme.apply(fontSizeFactor:) asserts on those in debug builds (a red error
+/// screen on Android) while release builds silently leave them alone; this does the same without the assert.
+TextTheme _scaled(TextTheme theme, double factor) {
+  if (factor == 1) return theme;
+  TextStyle? one(TextStyle? style) =>
+      style == null || style.fontSize == null ? style : style.apply(fontSizeFactor: factor);
+  return theme.copyWith(
+    displayLarge: one(theme.displayLarge),
+    displayMedium: one(theme.displayMedium),
+    displaySmall: one(theme.displaySmall),
+    headlineLarge: one(theme.headlineLarge),
+    headlineMedium: one(theme.headlineMedium),
+    headlineSmall: one(theme.headlineSmall),
+    titleLarge: one(theme.titleLarge),
+    titleMedium: one(theme.titleMedium),
+    titleSmall: one(theme.titleSmall),
+    bodyLarge: one(theme.bodyLarge),
+    bodyMedium: one(theme.bodyMedium),
+    bodySmall: one(theme.bodySmall),
+    labelLarge: one(theme.labelLarge),
+    labelMedium: one(theme.labelMedium),
+    labelSmall: one(theme.labelSmall),
   );
 }
