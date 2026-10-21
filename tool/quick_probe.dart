@@ -43,7 +43,6 @@ Future<void> main() async {
     Entry('a', {'name': 'Tomatoes', 'price': 30.0, 'unit': 'per kg', 'categoryName': 'Fresh & Vegetables', 'locationName': 'Rajahmundry', 'status': 'approved', 'startsAt': now.subtract(const Duration(minutes: 5)), 'expiresAt': now.add(const Duration(hours: 2, minutes: 15)), 'durationUnit': 'hours', 'durationValue': 3}),
     Entry('b', {'name': 'Mangoes', 'price': 90.0, 'unit': 'per dozen', 'categoryName': 'Fruits', 'locationName': 'Rajahmundry', 'status': 'pending', 'durationUnit': 'days', 'durationValue': 1}),
   ];
-  Widget page(Widget child) => child;
   final screens = <String, WidgetBuilder>{
     'Vendor: shop not set yet': (c) => Scaffold(appBar: AppBar(title: const Text('V Loca Market')), body: ListView(padding: const EdgeInsets.all(16), children: [QuickAddPanel(store: store, account: _newVendor, env: env, usedToday: 0, dailyLimit: 6)])),
     'Vendor: set shop location': (c) => QuickShopSetupPage(store: store, account: _newVendor, env: env),
