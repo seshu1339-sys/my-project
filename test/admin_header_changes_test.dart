@@ -37,6 +37,11 @@ Future<void> _form(WidgetTester tester, Store store, String component) async {
       ),
     ),
   );
+  // the exact pixel sizes (and their sliders) are under "Advanced"
+  if (find.text('Advanced').evaluate().isNotEmpty) {
+    await tester.tap(find.text('Advanced'));
+    await tester.pumpAndSettle();
+  }
 }
 
 const _bannerLabel = 'Banner text animation (e.g. "Big Savings Everyday")';

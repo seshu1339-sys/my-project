@@ -256,6 +256,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
   Map<String, dynamic> values = {};
   bool busy = false;
   bool dirty = false;
+  final advancedController = ExpansibleController();
   Timer? _debounce;
   int _animationPreviewTick = 0;
   Entry get saved =>
@@ -390,7 +391,21 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
   }
 
   Future<bool> save({bool reset = false}) async {
-    if (!reset && !form.currentState!.validate()) return false;
+    if (!reset) {
+      final conflicts = layoutConflicts(_typedNumbers());
+      if (conflicts.isNotEmpty) {
+        // Show the fields that disagree (they live under Advanced) and say why nothing was saved.
+        advancedController.expand();
+        setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) => form.currentState?.validate());
+        message(context, 'Not saved: ${conflicts.first.message}');
+        return false;
+      }
+      if (!form.currentState!.validate()) {
+        advancedController.expand();
+        return false;
+      }
+    }
     setState(() => busy = true);
     try {
       final data = _collectValues();
@@ -437,6 +452,12 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     }
   }
 
+  /// What is typed now, as numbers (blank / not a number = 0, automatic).
+  Map<String, double> _typedNumbers() => {
+    for (final e in controllers.entries)
+      if (dimensionFields.containsKey(e.key)) e.key: double.tryParse(e.value.text.trim()) ?? 0,
+  };
+
   String? _numberValidator(String key, String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return null;
@@ -461,6 +482,10 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
         }.contains(key) &&
         number != number.round()) {
       return 'Use a whole number';
+    }
+    // Two sizes that cannot both be true ("Width 900, Minimum width 1000") are refused, with the reason.
+    for (final conflict in layoutConflicts(_typedNumbers())) {
+      if (conflict.keys.contains(key)) return conflict.message;
     }
     return null;
   }
@@ -820,26 +845,95 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     }
   }
 
+  /// The pixel sizes and scales: exact numbers for people who want them, kept under "Advanced". The pages that edit a section's
+  /// behaviour (speed, direction ...) pass their own field list and are not split.
+  bool get _splitAdvanced => widget.fieldsOverride == null;
+
+  void _applyPreset(String preset) {
+    for (final e in presetValues(preset, fields).entries) {
+      controllers[e.key]?.text = e.value;
+    }
+    setState(() {});
+    _onFieldChanged();
+  }
+
+  Widget _presets() {
+    final targets = presetValues('medium', fields);
+    if (!_splitAdvanced || targets.isEmpty) return const SizedBox.shrink();
+    final current = presetOf({for (final e in controllers.entries) e.key: e.value.text}, fields);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          const Text('Size', style: TextStyle(fontWeight: FontWeight.bold)),
+          SegmentedButton<String>(
+            key: const ValueKey('size-preset'),
+            emptySelectionAllowed: true,
+            segments: const [
+              ButtonSegment(value: 'small', label: Text('Small')),
+              ButtonSegment(value: 'medium', label: Text('Medium')),
+              ButtonSegment(value: 'large', label: Text('Large')),
+            ],
+            selected: {?current},
+            onSelectionChanged: (s) {
+              if (s.isNotEmpty) _applyPreset(s.first);
+            },
+          ),
+          Text(
+            current == null ? 'Custom sizes (see Advanced)' : 'Fine-tune in Advanced',
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Form(
     key: form,
     child: LayoutBuilder(
-      builder: (context, c) => Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        crossAxisAlignment: WrapCrossAlignment.start,
-        children: [
-          for (final key in fields)
-            SizedBox(
-              width: c.maxWidth >= 800
-                  ? (c.maxWidth - 32) / 3
-                  : c.maxWidth >= 550
-                  ? (c.maxWidth - 16) / 2
-                  : c.maxWidth,
-              child: _fieldWidget(key),
-            ),
-        ],
-      ),
+      builder: (context, c) {
+        final width = c.maxWidth >= 800
+            ? (c.maxWidth - 32) / 3
+            : c.maxWidth >= 550
+            ? (c.maxWidth - 16) / 2
+            : c.maxWidth;
+        Widget wrap(Iterable<String> keys) => Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          children: [for (final key in keys) SizedBox(width: width, child: _fieldWidget(key))],
+        );
+        final advanced = [
+          if (_splitAdvanced)
+            for (final key in fields)
+              if (_kindOf(key) == _FieldKind.number) key,
+        ];
+        final simple = [for (final key in fields) if (!advanced.contains(key)) key];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _presets(),
+            wrap(simple),
+            if (advanced.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ExpansionTile(
+                key: ValueKey('advanced-${widget.component}'),
+                controller: advancedController,
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                title: const Text('Advanced', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Exact sizes in pixels: width, height, minimum and maximum, spacing, scales'),
+                childrenPadding: const EdgeInsets.only(top: 8),
+                children: [wrap(advanced)],
+              ),
+            ],
+          ],
+        );
+      },
     ),
   );
 }

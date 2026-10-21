@@ -233,6 +233,75 @@ const _footerBadgesMainExclusions = {
   'fontSize',
 };
 
+/// A size setting that cannot be honoured together with another one ("Width 900 but Minimum width 1000"): the message and the two
+/// fields to mark. 0 / blank means automatic and is never a conflict.
+typedef LayoutConflict = ({List<String> keys, String message});
+
+String _px(double v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
+
+List<LayoutConflict> layoutConflicts(Map<String, double> values) {
+  double? v(String key) {
+    final value = values[key];
+    return value != null && value > 0 ? value : null;
+  }
+
+  final out = <LayoutConflict>[];
+  for (final axis in const [('Width', 'width'), ('Height', 'height')]) {
+    final name = axis.$1.toLowerCase();
+    final min = v('min${axis.$1}'), max = v('max${axis.$1}');
+    if (min != null && max != null && min > max) {
+      out.add((keys: ['min${axis.$1}', 'max${axis.$1}'], message: 'Minimum $name (${_px(min)} px) is larger than the maximum $name (${_px(max)} px). Lower the minimum or raise the maximum.'));
+    }
+    // the size itself, and (for width) the per-screen sizes
+    final sizes = [axis.$2, if (axis.$1 == 'Width') ...['mobileWidth', 'tabletWidth', 'desktopWidth']];
+    for (final key in sizes) {
+      final size = v(key);
+      if (size == null) continue;
+      final label = key == axis.$2 ? name : (dimensionFields[key]?.$1.split(' (').first.toLowerCase() ?? key);
+      if (min != null && size < min) {
+        out.add((keys: [key, 'min${axis.$1}'], message: 'The $label (${_px(size)} px) is smaller than the minimum $name (${_px(min)} px). Raise the $label or lower the minimum.'));
+      }
+      if (max != null && size > max) {
+        out.add((keys: [key, 'max${axis.$1}'], message: 'The $label (${_px(size)} px) is larger than the maximum $name (${_px(max)} px). Lower the $label or raise the maximum.'));
+      }
+    }
+  }
+  return out;
+}
+
+/// Small / Medium / Large: one choice that sizes a whole component. It sets the screen-size scales when the component has them
+/// (85% / 100% / 120%), else its font size, else its icon size. Medium clears them (the normal size). Colours and text are never touched.
+const layoutPresetNames = ['small', 'medium', 'large'];
+const _scaleKeys = ['mobileScale', 'tabletScale', 'desktopScale'];
+const _presetScale = {'small': 0.85, 'medium': 1.0, 'large': 1.2};
+const _presetFont = {'small': 12.0, 'medium': 0.0, 'large': 18.0};
+const _presetIcon = {'small': 20.0, 'medium': 0.0, 'large': 36.0};
+
+/// The fields a preset would set for a component with these [fields]: field -> text for its box ('' = blank, the normal size).
+Map<String, String> presetValues(String preset, List<String> fields) {
+  String text(double v) => v == 0 ? '' : (v == v.roundToDouble() ? '${v.round()}' : '$v');
+  final scales = [for (final k in _scaleKeys) if (fields.contains(k)) k];
+  if (scales.isNotEmpty) return {for (final k in scales) k: preset == 'medium' ? '' : text(_presetScale[preset]!)};
+  if (fields.contains('fontSize')) return {'fontSize': text(_presetFont[preset]!)};
+  if (fields.contains('iconSize')) return {'iconSize': text(_presetIcon[preset]!)};
+  return const {};
+}
+
+/// Which preset the current values amount to, or null when they are something else (custom sizes).
+String? presetOf(Map<String, String> current, List<String> fields) {
+  for (final preset in layoutPresetNames) {
+    final wanted = presetValues(preset, fields);
+    if (wanted.isEmpty) return null;
+    bool same(String key) {
+      final a = double.tryParse(current[key]?.trim() ?? '') ?? 0, b = double.tryParse(wanted[key]!) ?? 0;
+      return (preset == 'medium' && a == 1.0 && _scaleKeys.contains(key)) || a == b;
+    }
+
+    if (wanted.keys.every(same)) return preset;
+  }
+  return null;
+}
+
 List<String> componentFields(String component) => [
   ...dimensionFields.keys.where(
     (key) =>

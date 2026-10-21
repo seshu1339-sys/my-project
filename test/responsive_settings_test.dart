@@ -133,6 +133,10 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(home: LayoutSettingsPage(store: store)),
     );
+    await tester.ensureVisible(find.text('Advanced'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Advanced'));
+    await tester.pumpAndSettle();
     final field = find.byKey(const ValueKey('search-height'));
     await tester.enterText(field, '99999');
     await tester.ensureVisible(find.text('Save layout'));

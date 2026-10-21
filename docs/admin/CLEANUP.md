@@ -45,3 +45,12 @@ on/off, a type (None / Fade / Slide / Zoom), a speed 1-10 and, for the banner an
 exactly as before (450 ms, own types). Entrances and animated texts are now keyed by their type and speed, so a change replays at once on
 an open page. The admin's forms still read the raw record, so Animations values are never copied into a part's settings.
 New: "Zoom in" entrance (also added to the per-part Entrance animation dropdown).
+
+## Step E -- layout settings (done)
+- Contradictory sizes are refused with the reason: width below its minimum, height below its minimum, a size above its maximum, a
+  minimum above the maximum (also the mobile/tablet/desktop widths). Example: "The width (900 px) is smaller than the minimum width
+  (1000 px). Raise the width or lower the minimum." Saving shows "Not saved: ...", opens Advanced and marks both fields; the Visual
+  Editor's auto-save writes nothing while sizes contradict. Blank / 0 (automatic) never conflicts. (`layoutConflicts` in layout_settings.dart)
+- Size: Small / Medium / Large on every component that has size fields: sets the screen scales (85% / normal / 120%), else font
+  size, else icon size; colours, text and everything else are never touched. Shown as "Custom sizes" when numbers are typed by hand.
+- Every pixel/scale field is under "Advanced" (closed by default); behaviour pages (speed, direction ...) are not split.

@@ -107,7 +107,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'popular'),
       ))));
-      expect(find.byType(SegmentedButton<String>), findsOneWidget);
+      expect(find.byType(SegmentedButton<String>), findsNWidgets(2), reason: 'the Small/Medium/Large preset and the alignment buttons');
       await tester.ensureVisible(find.text('Center'));
       await tester.tap(find.text('Center'));
       await tester.pump();
@@ -139,6 +139,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
+      await tester.tap(find.text('Advanced'));
+      await tester.pumpAndSettle();
       expect(
         find.descendant(of: find.byKey(const ValueKey('categories-height')), matching: find.text('px')),
         findsOneWidget,
@@ -151,6 +153,8 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'logo'),
       ))));
+      await tester.tap(find.text('Advanced'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('logo-width')), findsNothing);
       expect(find.widgetWithText(DropdownButtonFormField<String>, 'Entrance animation'), findsNothing);
       // Height remains — it's the one dimension that's actually wired.
