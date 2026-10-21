@@ -19,3 +19,13 @@ Request of 2026-10-21: simpler admin ("Business studio"), everything in its prop
   no list, no "Add new", saving keeps you on the form. A project that never saved one gets the form empty; the first Save creates it.
 - The Theme record had no name, so its own form refused to save ("Enter a name"): the name field now starts as "Theme", and a nameless
   record shows its section name in lists. (Animations becomes the fourth single-record section in step D.)
+
+## Step C -- lists (done)
+- Technical ids (prod-apple, cat-fruits ...) are gone from every list row; rows show category and shop instead.
+- Products: search box (name, keywords, category, shop), "No shop only", Category, All/Published/Draft, "Clear filters", and the count
+  "N of M products". "Select several" + "Select all N shown" + "Assign shop" sets one shop on all selected products at once
+  (`Store.updateMany`, batched writes live).
+- Order numbers: products, categories, promotions and shops can be dragged into a new order (numbers become 1..n); a banner appears
+  when numbers repeat or skip, with a "Renumber" button. Nothing is renumbered unless you press it or drag. Dragging is off while a
+  search/filter is active (a partial list cannot be reordered safely).
+- Promotions show what they lead to in the title ("Today's Offer — Category: Personal care") and where they sit (Banner / Advertisement ...).

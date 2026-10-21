@@ -381,6 +381,32 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /// Changes some fields of many existing records at once (bulk edits and order numbers): [changes] maps a record id to the
+  /// fields to set. Live, the writes go in batches (each record is written whole or not at all); in the demo, once.
+  Future<void> updateMany(String collection, Map<String, Map<String, dynamic>> changes) async {
+    final todo = {for (final e in changes.entries) if (e.value.isNotEmpty) e.key: e.value};
+    if (todo.isEmpty) return;
+    if (live) {
+      final ids = todo.keys.toList();
+      for (var i = 0; i < ids.length; i += 400) {
+        final batch = firestore.batch();
+        for (final id in ids.skip(i).take(400)) {
+          batch.update(firestore.collection(collection).doc(id), todo[id]!);
+        }
+        await batch.commit();
+      }
+    } else {
+      final list = catalog[collection];
+      if (list == null) return;
+      catalog[collection] = [
+        for (final e in list)
+          if (todo[e.id] case final change?) Entry(e.id, {...e.data, ...change}) else e,
+      ];
+      await _persistDemo();
+      notifyListeners();
+    }
+  }
+
   Future<void> delete(String collection, String id) async {
     if (live) {
       await firestore.collection(collection).doc(id).delete();
