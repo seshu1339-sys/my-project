@@ -56,3 +56,14 @@ deployed yet (the owner must run `firebase deploy --only functions`). Local comm
   `TextTheme.apply(fontSizeFactor:)`, which asserts on styles without a size -> a red error screen in debug builds of the Android
   customer app (release builds skip the assert and leave those styles alone, which is what `_scaled` now does explicitly, so the
   look of the live site does not change). Regression test: test/app_theme_test.dart.
+
+## Phase 2: role security (done on branch split-apps)
+- Vendor and staff launcher icons (approved "V" and "S" designs) are in `android/app/src/{vendor,staff}/res`; logos in `assets/branding/`.
+- `scripts/check-app-isolation.cjs`: after building the three RELEASE APKs it proves each app contains only its own screens
+  (all 28 checks pass): customer has no admin / vendor / staff screens or admin callables; vendor has no staff, admin or
+  customer-offers code; staff has no vendor, admin or offers code. (Debug builds are not tree-shaken, so only release counts.)
+  The customer WEB build still contains the `/jyothi9` admin route (kept until the owner says to remove it).
+- `functions/role-matrix.test.js`: every role (anonymous, customer, vendor, other vendor, staff, other staff, Quick Add staff, Quick
+  Add vendor, admin, a forged admin claim with no OTP session) against every private collection, reads and writes. Passes.
+- Not done / owner's call later: Firebase App Check (needs Play Integrity setup in the console; enforcing it could lock out the
+  live apps, so it is off until the new apps are released); removing `/jyothi9` from the customer web app.
