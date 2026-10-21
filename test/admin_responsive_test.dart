@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/admin.dart';
+import 'package:ecommerce_app/ui/admin_settings.dart';
 
 void main() {
   for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1200.0, 1440.0, 1920.0]) {
@@ -39,7 +40,7 @@ void main() {
       DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7); // the Settings tab (it may be scrolled off a phone's tab bar)
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.byKey(const ValueKey('settings-productImageLibrary')));
+      await tester.scrollUntilVisible(find.byKey(const ValueKey('settings-productImageLibrary')), 120, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
       await tester.tap(find.byKey(const ValueKey('settings-productImageLibrary')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add new'));

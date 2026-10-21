@@ -29,3 +29,19 @@ Request of 2026-10-21: simpler admin ("Business studio"), everything in its prop
   when numbers repeat or skip, with a "Renumber" button. Nothing is renumbered unless you press it or drag. Dragging is off while a
   search/filter is active (a partial list cannot be reordered safely).
 - Promotions show what they lead to in the title ("Today's Offer — Category: Personal care") and where they sit (Banner / Advertisement ...).
+
+## Step D -- Animations (done)
+Why animation changes were not applied (found in the code and the live settings):
+1. `animationSpeed` (the live Search Box and Logo have 200 / 600 saved) only drove the rotating banners; an entrance always took a fixed 450 ms.
+2. An entrance played once, when the section was first built, and never again, so a change made in the admin showed nothing on a page
+   that was already open; it also moved only 24 px.
+3. Banner rotation (`animationType`) is off: `section_promo` has `animation=slide` but no `animationType`.
+4. There was no global control, and entrance animation existed on 11 parts only through 11 separate forms.
+
+What was built: Settings -> Animations (`settings/animations`, `animation_settings_form.dart`): a global on/off, a default type and speed,
+and per part (Header, Ticker, Offers banner, Categories, Popular, Local Services, Fresh strip, Ads, Boxes, Nearby, Page background) an
+on/off, a type (None / Fade / Slide / Zoom), a speed 1-10 and, for the banner and ads, how pictures change. The site reads it through
+`effectiveSectionConfig` (used by `layoutFor`): the part's own settings with the Animations record on top. With no record the site is
+exactly as before (450 ms, own types). Entrances and animated texts are now keyed by their type and speed, so a change replays at once on
+an open page. The admin's forms still read the raw record, so Animations values are never copied into a part's settings.
+New: "Zoom in" entrance (also added to the per-part Entrance animation dropdown).

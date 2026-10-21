@@ -678,6 +678,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
                   value: 'slide',
                   child: Text('Slide + fade in'),
                 ),
+                DropdownMenuItem(value: 'zoom', child: Text('Zoom in')),
               ],
               onChanged: (v) => _setValue(key, v ?? 'none'),
             ),

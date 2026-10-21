@@ -5,7 +5,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
-import 'home_section_config.dart';
+import 'animation_settings.dart';
 import 'shared.dart';
 import 'text_animation.dart';
 
@@ -103,7 +103,7 @@ class HomeTickerSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              animatedText(sectionConfig(settings, 'promo'), 'headingAnimation', Text(
+              animatedText(effectiveSectionConfig(settings, 'promo'), 'headingAnimation', Text(
                 label,
                 maxLines: 1,
                 style:

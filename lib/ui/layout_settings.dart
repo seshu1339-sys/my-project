@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
+import 'animation_settings.dart';
 import 'home_section_config.dart';
 import 'shared.dart';
 
@@ -794,7 +795,8 @@ ComponentLayout layoutFor(
   List<Entry> settings,
   String id,
 ) => ComponentLayout(
-  sectionConfig(settings, id),
+  // the part's own settings with Settings -> Animations applied on top (switched off, a type, a speed)
+  effectiveSectionConfig(settings, id),
   MediaQuery.sizeOf(context).width,
 );
 
@@ -860,17 +862,25 @@ class LayoutSection extends StatelessWidget {
 /// reused for the admin form's own "Preview" button on a tiny demo box.
 Widget applyEntranceAnimation(Entry entry, Widget child) {
   final animation = entry.text('animation', 'none');
-  if (animation != 'fade' && animation != 'slide') return child;
-  return TweenAnimationBuilder<double>(
-    tween: Tween(begin: 0, end: 1),
-    duration: const Duration(milliseconds: 450),
-    curve: Curves.easeOut,
-    builder: (context, t, builtChild) {
-      final faded = Opacity(opacity: t, child: builtChild);
-      return animation == 'slide'
-          ? Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded)
-          : faded;
-    },
-    child: child,
+  if (animation != 'fade' && animation != 'slide' && animation != 'zoom') return child;
+  final millis = entry.number('entranceMs', entranceMillisDefault.toDouble()).round().clamp(150, 3000);
+  // Keyed by what was chosen: when the admin changes the type or the speed, the animation starts over (and the new
+  // choice is seen at once) instead of staying as the one that already finished.
+  return KeyedSubtree(
+    key: ValueKey('entrance-$animation-$millis'),
+    child: TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: millis),
+      curve: Curves.easeOut,
+      builder: (context, t, builtChild) {
+        final faded = Opacity(opacity: t, child: builtChild);
+        return switch (animation) {
+          'slide' => Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded),
+          'zoom' => Transform.scale(scale: .85 + .15 * t, child: faded),
+          _ => faded,
+        };
+      },
+      child: child,
+    ),
   );
 }

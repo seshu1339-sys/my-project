@@ -17,6 +17,7 @@ import 'home_promotions.dart';
 import 'home_quick_category_nav.dart';
 import 'home_ticker_section.dart';
 import 'layout_settings.dart';
+import 'animation_settings.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'services_page.dart';
@@ -329,7 +330,7 @@ class WireframeHome extends StatelessWidget {
                             ? NoOffersNotice(store: store, onLocation: onLocation)
                             : HeroCarousel(
                           entries: offers,
-                          appearance: sectionConfig(settings, 'promo'),
+                          appearance: effectiveSectionConfig(settings, 'promo'),
                           onTap: onPromotion,
                           reverse:
                               offers.isNotEmpty &&

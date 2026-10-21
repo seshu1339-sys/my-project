@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import 'admin_entry_list.dart';
+import 'animation_settings_form.dart';
 import 'admin_frame.dart';
 import 'admin_page_preview.dart';
 import 'field_moderation.dart';
@@ -20,6 +21,7 @@ const _sections = <_SettingsSection>[
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
   _SettingsSection('theme', 'Theme', Icons.palette_outlined, 'Colors and fonts of the whole site'),
+  _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
   _SettingsSection('scrollingText', 'Scrolling Text', Icons.text_rotation_none, 'The moving text banner'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
@@ -43,6 +45,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: FieldModerationPage(store: widget.store)));
       case 'layout':
         return _LayoutMenu(store: widget.store);
+      case 'animations':
+        return AdminAnimationsForm(store: widget.store);
       // One record each: the form opens directly, with no list and no "Add new".
       case 'settings':
       case 'theme':

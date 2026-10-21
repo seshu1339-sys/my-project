@@ -49,7 +49,7 @@ void main() {
   testWidgets('every other setting is in Settings, each in exactly one place', (tester) async {
     await _open(tester, 1200);
     await _tab(tester, 7);
-    for (final key in ['categories', 'fieldAssistants', 'settings', 'theme', 'scrollingText', 'productImageLibrary', 'layout', 'locations']) {
+    for (final key in ['categories', 'fieldAssistants', 'settings', 'theme', 'animations', 'scrollingText', 'productImageLibrary', 'layout', 'locations']) {
       expect(find.byKey(ValueKey('settings-$key')), findsOneWidget, reason: key);
     }
     expect(find.text('Business Profile'), findsOneWidget);

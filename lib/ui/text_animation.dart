@@ -32,7 +32,8 @@ Matrix4 _perspective() => Matrix4.identity()..setEntry(3, 2, 0.001);
 Widget animatedText(Entry entry, String key, Widget child) {
   final type = entry.text(key);
   if (!textAnimationLabels.containsKey(type)) return child;
-  return TextEffect(type: type, child: child);
+  // Keyed by the type: choosing another animation starts it over at once.
+  return TextEffect(key: ValueKey('text-effect-$type'), type: type, child: child);
 }
 
 class TextEffect extends StatefulWidget {
