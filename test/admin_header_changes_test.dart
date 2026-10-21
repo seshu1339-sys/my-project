@@ -193,4 +193,87 @@ void main() {
     expect(tester.getTopLeft(find.text('Big Savings Everyday')).dy, lessThan(before));
     expect(find.text('Plain'), findsOneWidget);
   });
+
+  group('3D text animations', () {
+    const threeD = ['flip3d', 'rotate3d', 'spin', 'flipLeft', 'flipRight', 'cube'];
+
+    test('the six new options are offered alongside the original seven', () {
+      expect(textAnimationLabels.keys, containsAll(['fade', 'slideUp', 'slideLeft', 'slideRight', 'zoom', 'bounce', 'pulse']));
+      expect(textAnimationLabels.keys, containsAll(threeD));
+      expect(textAnimationLabels.length, 13);
+      expect(textAnimationLabels['flip3d'], startsWith('3D Flip'));
+      expect(textAnimationLabels['rotate3d'], startsWith('3D Rotate'));
+      expect(textAnimationLabels['spin'], startsWith('Spin in'));
+      expect(textAnimationLabels['flipLeft'], 'Flip from left');
+      expect(textAnimationLabels['flipRight'], 'Flip from right');
+      expect(textAnimationLabels['cube'], startsWith('Cube rotate'));
+    });
+
+    for (final type in threeD) {
+      testWidgets('$type starts turned away and settles flat; animations stay off when not chosen', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: animatedText(Entry('a', {'textAnimation': type}), 'textAnimation', const Text('Hello')),
+          ),
+        );
+        Matrix4 matrix() => tester
+            .widgetList<Transform>(find.descendant(of: find.byType(TextEffect), matching: find.byType(Transform)))
+            .map((t) => t.transform)
+            .first;
+        final start = matrix();
+        expect(start.isIdentity(), isFalse, reason: 'starts turned');
+        // perspective (Matrix4 setEntry(3, 2, 0.001)) shows up in the bottom row once turned
+        if (type != 'spin') expect([start.entry(3, 0), start.entry(3, 1), start.entry(3, 2)].any((v) => v.abs() > 1e-6), isTrue, reason: 'with perspective');
+        await tester.pump(const Duration(milliseconds: 900));
+        final end = matrix();
+        for (final i in [0, 5, 10]) {
+          expect(end.storage[i], closeTo(1, 1e-6), reason: 'flat at the end ($i)');
+        }
+        if (type != 'spin') expect(end.entry(3, 2), closeTo(0.001, 1e-9), reason: 'perspective kept');
+        for (final i in [1, 2, 4, 6, 8, 9]) {
+          expect(end.storage[i], closeTo(0, 1e-6), reason: 'no tilt at the end ($i)');
+        }
+        expect(find.text('Hello'), findsOneWidget);
+      });
+    }
+
+    testWidgets('an unset or unknown animation adds no effect at all (off by default)', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Column(
+            children: [
+              animatedText(const Entry('a', {}), 'textAnimation', const Text('One')),
+              animatedText(const Entry('b', {'textAnimation': 'none'}), 'textAnimation', const Text('Two')),
+            ],
+          ),
+        ),
+      );
+      expect(find.byType(TextEffect), findsNothing);
+    });
+
+    testWidgets('each new option can be picked in the #15 dropdown and is saved', (tester) async {
+      for (final entry in {
+        'flip3d': '3D Flip (flips in on the horizontal axis)',
+        'rotate3d': '3D Rotate (turns in on the vertical axis)',
+        'spin': 'Spin in (360 degrees while appearing)',
+        'flipLeft': 'Flip from left',
+        'flipRight': 'Flip from right',
+        'cube': 'Cube rotate (turns like a cube face)',
+      }.entries) {
+        final store = await _store();
+        await _form(tester, store, 'promo');
+        final dropdown = find.widgetWithText(DropdownButtonFormField<String>, _bannerLabel);
+        await tester.ensureVisible(dropdown);
+        await tester.pumpAndSettle();
+        await tester.tap(dropdown);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(entry.value).last);
+        await tester.pumpAndSettle();
+        await tester.state<LayoutFieldsFormState>(find.byType(LayoutFieldsForm)).save();
+        expect(store.entries('settings').firstWhere((e) => e.id == 'section_promo').text('textAnimation'), entry.key);
+        await tester.pumpWidget(const SizedBox());
+        store.dispose();
+      }
+    });
+  });
 }

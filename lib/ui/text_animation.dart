@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
@@ -13,7 +15,16 @@ const textAnimationLabels = <String, String>{
   'zoom': 'Zoom in',
   'bounce': 'Bounce in',
   'pulse': 'Pulse (keeps beating)',
+  'flip3d': '3D Flip (flips in on the horizontal axis)',
+  'rotate3d': '3D Rotate (turns in on the vertical axis)',
+  'spin': 'Spin in (360 degrees while appearing)',
+  'flipLeft': 'Flip from left',
+  'flipRight': 'Flip from right',
+  'cube': 'Cube rotate (turns like a cube face)',
 };
+
+// Perspective so the 3D turns look deep rather than flat.
+Matrix4 _perspective() => Matrix4.identity()..setEntry(3, 2, 0.001);
 
 /// Wraps [child] in the animation named by [entry]'s [key] field. Entrance
 /// animations play once when the text appears; 'pulse' repeats. With the OS
@@ -95,6 +106,67 @@ class _TextEffectState extends State<TextEffect>
             child: Transform.translate(
               offset: Offset(0, -28 * (1 - Curves.bounceOut.transform(t))),
               child: child,
+            ),
+          );
+        case 'flip3d':
+          return Opacity(
+            opacity: t,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: _perspective()..rotateX(math.pi / 2 * (1 - t)),
+              child: child,
+            ),
+          );
+        case 'rotate3d':
+          return Opacity(
+            opacity: t,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: _perspective()..rotateY(-math.pi / 2 * (1 - t)),
+              child: child,
+            ),
+          );
+        case 'spin':
+          return Opacity(
+            opacity: t,
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..rotateZ(2 * math.pi * (1 - t))
+                ..scaleByDouble(.3 + .7 * t, .3 + .7 * t, 1, 1),
+              child: child,
+            ),
+          );
+        case 'flipLeft':
+          return Opacity(
+            opacity: t,
+            child: Transform(
+              alignment: Alignment.centerLeft,
+              transform: _perspective()..rotateY(math.pi / 2 * (1 - t)),
+              child: child,
+            ),
+          );
+        case 'flipRight':
+          return Opacity(
+            opacity: t,
+            child: Transform(
+              alignment: Alignment.centerRight,
+              transform: _perspective()..rotateY(-math.pi / 2 * (1 - t)),
+              child: child,
+            ),
+          );
+        case 'cube':
+          // The new face swings in around the shared edge while sliding across,
+          // the way one face of a cube turns into view.
+          return Opacity(
+            opacity: t,
+            child: FractionalTranslation(
+              translation: Offset(1 - t, 0),
+              child: Transform(
+                alignment: Alignment.centerLeft,
+                transform: _perspective()..rotateY(-math.pi / 2 * (1 - t)),
+                child: child,
+              ),
             ),
           );
         case 'pulse':
