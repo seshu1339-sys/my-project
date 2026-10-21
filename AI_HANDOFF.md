@@ -55,6 +55,18 @@ past session; where they conflict with this file, this file is more current.
 
 ## Log (newest first)
 
+### 2026-10-21 — Full audit (customer, admin, vendor, staff) and fixes (COMMITTED locally: e7f2447, bbb139d; NOT deployed, NOT pushed)
+
+Audit method: code + rules + functions review, 5 live sites in real Chrome (0 console/network errors, 55 images all OK), read-only live data audit (`node` script via firebase-tools auth), probe tests that proved 4 bugs before fixing. Fixed:
+
+- **Location rule (top priority)**: an offer/ad aimed at places is shown only to customers at those places. No location chosen -> general offers only (+ prompt when none), pincode-only / legacy customers are resolved to town/district/state from the places directory (`Store.completePlace`, `services/place_resolver.dart`; the directory is fetched for them only when some offer is location-tagged), place-name searches get district/state too, admin preview shows everything (`WireframeHome.showAllLocations`). `promotionsForTown` semantics changed accordingly.
+- **Push notifications** now follow `locations` (`functions/places.js` maps the subscriber's pincode to a place via `functions/data/places.v1.json`, a copy kept identical to `web/data/places.v1.json` by a test). Needs `firebase deploy --only functions`.
+- **Admin**: Visual Editor #14 opened the Business Profile form on the ticker doc (now opens Scrolling Text Settings); `EntryEditor` writes only changed fields via `Store.updateFields` (an open editor used to overwrite stock/ratings changed by orders/reviews); product price must be > 0 (new products no longer start at 0); offer dates shown in local time; list shows promotion location/status and product problems (no shop/photo/category, price 0, out of stock).
+- **Vendor**: hide/show a product (`type: 'visibility'`, backend + button), product list shows the whole shop's products. **Staff**: item category (checked server-side) and price > 0.
+- **Hosting**: `firebase.json` serves html/js/json with `no-cache` (was 1 h, so deploys showed late); replaced shop photos are `no-cache`.
+- Not changed / decisions pending: Firestore rules still let anyone read all promotions/products (hidden ones, other towns') - filtering is client-side; location-wise product availability (grid/checkout do not consider the shop's service area); live data has 44/49 products with no shop (their orders reach no vendor), 7 without photo, 5 services without category.
+- Backend suite 68/68 with Firestore+Storage+Auth emulators (email-flow tests now use the emulator's project); Flutter 314 pass.
+
 ### 2026-10-20 (night) — AP/Telangana places directory: location search, GPS nearest town, district/state targeting (COMMITTED locally, NOT deployed, NOT pushed)
 
 - **Data**: `web/data/places.v1.json` (830 KB, ~200 KB gzip) built by `node scripts/build-places.cjs <pincode.csv>` from India Post's All India Pincode Directory. The official data.gov.in API was rate-limited and the site unreachable, so the CSV came from the GitHub mirror `dropdevrahul/pincodes-india` (a republication of the data.gov.in file; sample pincodes were cross-checked against api.postalpincode.in). Limits of the source: districts are the pre-2022 13 AP districts (no Anakapalli/Kakinada split), many offices share their city's coordinates, and some coordinates were wrong (the script drops outliers per district/pincode, so ~25% of offices have none). Offices are mapped to a "town" (head office of the pincode, nearby head office within 12 km, hand-listed twin head offices such as Buckinghampet -> Vijayawada). Bump the file name (`places.v2.json`) and `PlacesDirectory.fileName` if the format changes: Hosting/.htaccess cache it for a year.
