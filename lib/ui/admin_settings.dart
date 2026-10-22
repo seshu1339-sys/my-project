@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import 'admin_ads.dart';
 import 'admin_entry_list.dart';
 import 'animation_settings_form.dart';
 import 'admin_frame.dart';
@@ -24,6 +25,7 @@ const _sections = <_SettingsSection>[
   _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
   _SettingsSection('scrollingText', 'Scrolling Text', Icons.text_rotation_none, 'The moving text banner'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
+  _SettingsSection('ads', 'Ads', Icons.campaign_outlined, 'Advertisement boxes: settings for all ads, and every ad'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
 ];
@@ -47,6 +49,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return _LayoutMenu(store: widget.store);
       case 'animations':
         return AdminAnimationsForm(store: widget.store);
+      case 'ads':
+        return AdminAdsPage(store: widget.store);
       // One record each: the form opens directly, with no list and no "Add new".
       case 'settings':
       case 'theme':
