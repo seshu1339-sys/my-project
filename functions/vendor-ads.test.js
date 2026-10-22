@@ -153,3 +153,26 @@ test('summaries: daily every day, weekly on Mondays, with the numbers of the per
   await setSummary(db, 'v1', {adId, mode: 'off'});
   assert.equal(await sendSummaries(db, monday), 0);
 });
+
+test('the radius of a vendor ad is centred on the vendor shop and the area limit is respected', emulator, async () => {
+  const db = await setup();
+  await db.collection('vendors').doc('v1').set({status: 'approved', name: 'Ramu', shopId: 'v1', vendorCode: 'VN00001', shopName: 'Ramu Kirana', latitude: 17.667, longitude: 82.612});
+  const sub = async () => (await submitAd(db, 'v1', good(), t0)).submissionId;
+  await assert.rejects(async () => decideAd(db, {submissionId: await sub(), approved: true, radiusKm: 20}), /from the list/);
+  const ok = await decideAd(db, {submissionId: await sub(), approved: true, radiusKm: 25}, t0);
+  const ad = (await db.collection('ads').doc(ok.adId).get()).data();
+  assert.equal(ad.radiusKm, 25);
+  assert.equal(ad.radiusLat, 17.667);
+  assert.equal(ad.radiusLng, 82.612);
+  assert.equal(ad.radiusShopId, 'v1');
+  // no radius: as before
+  const plain = await decideAd(db, {submissionId: await sub(), approved: true}, t0);
+  assert.equal((await db.collection('ads').doc(plain.adId).get()).data().radiusKm, undefined);
+  // the area is already full (limit 1, one radius ad already runs there)
+  await db.collection('settings').doc('adsConfig').set({maxPerArea: 1});
+  await assert.rejects(async () => decideAd(db, {submissionId: await sub(), approved: true, radiusKm: 10}, t0), /already has 1/);
+  await db.collection('settings').doc('adsConfig').delete();
+  // a vendor without a saved shop location cannot get a radius
+  await db.collection('vendors').doc('v1').set({status: 'approved', name: 'Ramu', shopId: 'v1', vendorCode: 'VN00001'});
+  await assert.rejects(async () => decideAd(db, {submissionId: await sub(), approved: true, radiusKm: 10}, t0), /no saved shop location/);
+});

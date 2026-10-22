@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
+import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../domain/radius.dart';
 import 'admin_fields.dart';
 import 'color_picker_field.dart';
 import '../domain/towns.dart';
@@ -121,7 +123,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       'stock': '10',
                       'order': '0',
                       'price': '',
-                      'radiusKm': '10',
+                      'radiusKm': widget.collection == 'promotions' ? '' : '10',
                       'searchRadiusPresetsKm': '2,5,10,25,50',
                       'searchRadiusDefaultKm': '10',
                       'searchRadiusMaxKm': '50',
@@ -173,6 +175,33 @@ class _EntryEditorState extends State<EntryEditor> {
     super.dispose();
   }
 
+  /// The common radius (same rule for Ads and Today's Offers): the radius must be one of the fixed options, the centre is the chosen shop's saved
+  /// location (copied here), and the area may not already be full (Settings > Ads > maximum per area).
+  void _applyRadius(Map<String, dynamic> data) {
+    final km = (data['radiusKm'] as num?)?.toDouble() ?? 0;
+    if (km <= 0) {
+      for (final k in ['radiusKm', 'radiusShopId', 'radiusLat', 'radiusLng']) {
+        data.remove(k);
+      }
+      return;
+    }
+    if (!radiusOptionsKm.contains(km.round())) throw StateError('Choose a radius from the list: 5, 10, 25, 50 or 100 km.');
+    final shop = widget.store.entries('shops').where((s) => s.id == data['radiusShopId']).firstOrNull;
+    if (shop == null) throw StateError('Choose the shop whose location is the centre of the radius.');
+    final lat = shop.number('latitude'), lng = shop.number('longitude');
+    if (lat == 0 && lng == 0) throw StateError('"${shop.text('name')}" has no saved location yet. Add the shop location first.');
+    data['radiusLat'] = lat;
+    data['radiusLng'] = lng;
+    final id = widget.entry?.id ?? '';
+    final same = data['placement']?.toString() ?? '';
+    final others = [
+      for (final p in widget.store.entries('promotions')) if (p.id != id && p.text('placement') == same) p,
+      if (same == 'ad') ...widget.store.entries('ads'),
+    ];
+    final problem = areaFullMessage(Entry(id, data), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
+    if (problem != null) throw StateError(problem);
+  }
+
   Future<void> save() async {
     if (!form.currentState!.validate()) {
       return;
@@ -220,6 +249,7 @@ class _EntryEditorState extends State<EntryEditor> {
           data[field.key] = value;
         }
       }
+      if (widget.collection == 'promotions') _applyRadius(data);
       if (pickedShape != null) {
         data['geoShape'] = pickedShape;
         if (pickedShape == 'rectangle' && pickedRectangle != null) {
@@ -455,6 +485,17 @@ class _EntryEditorState extends State<EntryEditor> {
           child: Text('Platform collected (future)'),
         ),
       ];
+    } else if (widget.collection == 'promotions' && key == 'radiusKm') {
+      options = [
+        const DropdownMenuItem(value: '', child: Text('No radius (as before)')),
+        for (final km in radiusOptionsKm) DropdownMenuItem(value: '$km', child: Text('$km km')),
+      ];
+    } else if (widget.collection == 'promotions' && key == 'radiusShopId') {
+      options = [
+        const DropdownMenuItem(value: '', child: Text('None')),
+        for (final shop in widget.store.entries('shops'))
+          if (shop.number('latitude') != 0 || shop.number('longitude') != 0) DropdownMenuItem(value: shop.id, child: Text(shop.text('name'), overflow: TextOverflow.ellipsis)),
+      ];
     } else if (['categoryId', 'parentId', 'shopId'].contains(key)) {
       options = [
         const DropdownMenuItem(value: '', child: Text('None')),
@@ -526,7 +567,9 @@ class _EntryEditorState extends State<EntryEditor> {
       final uniqueOptions = <String, DropdownMenuItem<String>>{
         for (final option in options) (option.value ?? ''): option,
       }.values.toList();
-      final storedValue = controllers[key]?.text ?? '';
+      var storedValue = controllers[key]?.text ?? '';
+      // A radius saved as 10.0 is the list's "10".
+      if (widget.collection == 'promotions' && key == 'radiusKm') storedValue = (num.tryParse(storedValue) ?? 0) > 0 ? '${num.parse(storedValue).round()}' : '';
       final initialValue = uniqueOptions.any((e) => e.value == storedValue)
           ? storedValue
           : null;

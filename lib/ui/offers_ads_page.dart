@@ -16,7 +16,7 @@ class OffersAdsPage extends StatelessWidget {
     listenable: store,
     builder: (context, _) {
       final config = AdsConfig.from(store.entries('settings'));
-      final live = liveAds(store.entries('ads'), DateTime.now(), town: store.town, district: store.district, state: store.state);
+      final live = liveAds(store.entries('ads'), DateTime.now(), town: store.town, district: store.district, state: store.state, latitude: store.latitude, longitude: store.longitude);
       final width = MediaQuery.sizeOf(context).width;
       final columns = width >= 1100 ? 3 : width >= 700 ? 2 : 1;
       return Scaffold(

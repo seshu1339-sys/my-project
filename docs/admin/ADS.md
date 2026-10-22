@@ -38,3 +38,16 @@ Settings > Ads to bring the existing ad boxes in.
 - Counter documents are single documents per ad / per day, which is fine at this size; a very busy ad would need sharded counters.
 - Views on the "Offers & Ads" page are not counted (taps are); only the home boxes count views.
 - A push notification only reaches a vendor who has notifications on; the message is always in the vendor app's "My Ads".
+
+## Common radius (Ads and Today's Offers)
+One rule for both, in `lib/domain/radius.dart` (customer site and app) and `functions/radius.js` (push notifications, vendor ad approval).
+- Fields on an ad / offer: `radiusKm` (5, 10, 25, 50 or 100, chosen from a list), `radiusShopId` (the shop whose saved location is the centre),
+  `radiusLat` / `radiusLng` (that centre, copied from the shop when saved). Nothing is typed. A radius asked for in between (20 km) is given the next bigger one (25 km).
+- Shown ONLY to customers whose current location is inside the circle; when the customer moves, the list is recalculated. No radius = as before.
+  A radius ad is not shown while the customer's location is unknown.
+- Circles of different shops may overlap: every ad covering the customer is shown, once (same id never twice).
+- `settings/adsConfig.maxPerArea` (Settings > Ads > "Maximum ads or offers over the same area", 0 = no limit): saving or approving an ad / offer is refused when,
+  over any spot of its circle, that many others with a radius already run at the same time. Ads and offers are counted separately (an offer against other offers).
+  Ads or offers without a radius are not part of this count.
+- Vendor ads: the admin picks the radius when approving; the centre is the vendor's registered shop location (`vendors/<id>.latitude/longitude`).
+- The older "Show only near this latitude / pincode / target area" options are unchanged and still apply together with the radius.

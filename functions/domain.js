@@ -1,4 +1,5 @@
 'use strict';
+const {radiusCovers} = require('./radius');
 const {scryptSync, randomBytes, timingSafeEqual} = require('node:crypto');
 function hashPin(pin, salt = randomBytes(32).toString('hex')) {
   return {salt, hash: scryptSync(pin, salt, 64).toString('hex')};
@@ -98,6 +99,8 @@ function pointInPolygon(lat, lng, ring) {
 // byte-for-byte for every promotion saved before this feature existed.
 function promotionMatchesLocation(promotion, {customerPincode, customerLatitude, customerLongitude} = {}) {
   const data = promotion || {};
+  // The common radius (5 / 10 / 25 / 50 / 100 km around a shop, functions/radius.js): only customers inside the circle.
+  if (!radiusCovers(data, customerLatitude, customerLongitude)) return false;
   const targetPincode = toText(data.targetPincode);
   const geoShape = toText(data.geoShape, 'circle');
   const targetLatitude = toNumber(data.targetLatitude);

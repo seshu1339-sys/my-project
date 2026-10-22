@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'radius.dart';
+
 typedef Json = Map<String, dynamic>;
 
 class Entry {
@@ -130,6 +132,8 @@ bool promotionMatchesLocation(
   double? customerLatitude,
   double? customerLongitude,
 }) {
+  // The common radius (5 / 10 / 25 / 50 / 100 km around a shop): shown only to customers inside the circle. Everything below still applies.
+  if (!radiusCovers(promotion, customerLatitude, customerLongitude)) return false;
   final targetPincode = promotion.text('targetPincode');
   final geoShape = promotion.text('geoShape', 'circle');
   final targetLatitude = promotion.number('targetLatitude');

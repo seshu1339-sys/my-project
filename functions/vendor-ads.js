@@ -13,6 +13,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
+const {OPTIONS, areaFullMessage} = require('./radius');
 
 const PLANS = {normal: {rounds: 1, seconds: 5}, silver: {rounds: 2, seconds: 7}, gold: {rounds: 3, seconds: 10}};
 const CONTENT = ['image', 'text', 'imageText'];
@@ -97,6 +98,8 @@ async function submitAd(db, uid, data, now = Date.now()) {
 /// Admin decides. Approving a new ad creates it; approving a change updates the ad on the site only now.
 async function decideAd(db, data, now = Date.now()) {
   const {submissionId, approved, reason = ''} = data || {};
+  const radiusKm = data?.radiusKm === undefined || data?.radiusKm === null || data?.radiusKm === 0 ? 0 : Number(data.radiusKm);
+  if (radiusKm !== 0 && !OPTIONS.includes(radiusKm)) throw Error('Choose a radius from the list: 5, 10, 25, 50 or 100 km.');
   if (typeof submissionId !== 'string' || typeof approved !== 'boolean') throw Error('Provide the ad and the decision.');
   const ref = db.collection('adSubmissions').doc(submissionId);
   const submission = (await ref.get()).data();
@@ -117,10 +120,22 @@ async function decideAd(db, data, now = Date.now()) {
     adId = `vad${now}${Math.floor(Math.random() * 1000)}`;
     const plan = PLANS[submission.package] || PLANS.normal;
     const vendor = (await db.collection('vendors').doc(submission.vendorId).get()).data() || {};
+    const startsAt = new Date(now).toISOString(), endsAt = new Date(now + submission.durationDays * 86400000).toISOString();
+    // The radius is centred on the vendor's registered shop location; the area may not already be full.
+    let circle = {};
+    if (radiusKm) {
+      const lat = Number(vendor.latitude), lng = Number(vendor.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) throw Error('This vendor has no saved shop location, so a radius cannot be set. Approve it without a radius or add the location first.');
+      circle = {radiusKm, radiusShopId: submission.shopId, radiusLat: lat, radiusLng: lng};
+      const max = Math.round(Number((await db.collection('settings').doc('adsConfig').get()).data()?.maxPerArea)) || 0;
+      const others = (await db.collection('ads').get()).docs.map(d => ({id: d.id, ...d.data()}));
+      const full = areaFullMessage({id: adId, startsAt, endsAt, ...circle}, others, max);
+      if (full) throw Error(full);
+    }
     await db.collection('ads').doc(adId).set({
-      ...content, status: 'approved', active: true, vendorId: submission.vendorId, vendorCode: submission.vendorCode, shopName: submission.shopName, shopId: submission.shopId,
+      ...content, ...circle, status: 'approved', active: true, vendorId: submission.vendorId, vendorCode: submission.vendorCode, shopName: submission.shopName, shopId: submission.shopId,
       package: submission.package, rounds: plan.rounds, seconds: plan.seconds, maxPerDay: 0,
-      startsAt: new Date(now).toISOString(), endsAt: new Date(now + submission.durationDays * 86400000).toISOString(),
+      startsAt, endsAt,
       order: Math.floor(now / 1000), source: 'vendor',
     });
     await db.collection('adsPrivate').doc(adId).set({paid: false, contactPerson: vendor.name || '', notes: 'Submitted from the vendor app'}, {merge: true});

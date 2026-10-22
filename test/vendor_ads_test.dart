@@ -143,7 +143,7 @@ void main() {
       _phone(tester);
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: AdminAdsPage(
         store: store,
-        decide: (id, ok, why) async => log.add('decide $id $ok "$why"'),
+        decide: (id, ok, why, km) async => log.add('decide $id $ok "$why" $km'),
         remove: (id, why) async => log.add('remove $id "$why"'),
       ))));
       await tester.pumpAndSettle();
@@ -158,7 +158,7 @@ void main() {
       expect(find.textContaining('Pending approval (1)'), findsWidgets);
       await tester.tap(find.byKey(const ValueKey('approve-s1')));
       await tester.pumpAndSettle();
-      expect(log, ['decide s1 true ""']);
+      expect(log, ['decide s1 true "" 10']);
       // reject needs a reason
       await tester.tap(find.byKey(const ValueKey('reject-s1')));
       await tester.pumpAndSettle();
@@ -173,7 +173,7 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('ad-reason')), 'Blurry picture');
       await tester.tap(find.byKey(const ValueKey('ad-reason-ok')));
       await tester.pumpAndSettle();
-      expect(log.last, 'decide s1 false "Blurry picture"');
+      expect(log.last, 'decide s1 false "Blurry picture" 10');
     });
 
     testWidgets('a change shows the live ad next to the new one', (tester) async {

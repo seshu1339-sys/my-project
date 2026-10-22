@@ -1,4 +1,5 @@
 import 'catalog.dart';
+import 'radius.dart';
 import 'towns.dart';
 
 // ---------------------------------------------------------------------------------------------
@@ -48,6 +49,7 @@ class AdsConfig {
     this.seconds = 5,
     this.pauseOnHover = true,
     this.label = 'Ad',
+    this.maxPerArea = 0,
   });
 
   final int desktopSlots, mobileSlots;
@@ -55,6 +57,8 @@ class AdsConfig {
   final bool fitToScreen, pauseOnHover;
   final String borderColor, animation, label;
   final int animationSpeed, seconds;
+  // The most ads (or offers) with a radius that may run over the same area at the same time; 0 = no limit.
+  final int maxPerArea;
 
   /// How long one change takes, from speed 1 (slow) to 10 (fast).
   Duration get transition => Duration(milliseconds: (1400 - 110 * animationSpeed.clamp(1, 10)).round());
@@ -79,6 +83,7 @@ class AdsConfig {
       animationSpeed: doc.number('animationSpeed', d.animationSpeed.toDouble()).round().clamp(1, 10),
       seconds: doc.number('seconds', d.seconds.toDouble()).round().clamp(2, 120),
       pauseOnHover: doc.text('pauseOnHover', 'true') != 'false',
+      maxPerArea: doc.number('maxPerArea', 0).round().clamp(0, 50),
       label: doc.text('label', d.label).trim().isEmpty ? d.label : doc.text('label', d.label).trim(),
     );
   }
@@ -145,8 +150,12 @@ List<Entry> liveAds(
   String district = '',
   String state = '',
   bool showAll = false,
+  double? latitude,
+  double? longitude,
 }) {
-  final live = ads.where((a) => adLiveNow(a, now)).toList();
+  // Only ads whose circle covers the customer's current location, each ad once; the admin's preview ([showAll]) shows every live ad.
+  final running = ads.where((a) => adLiveNow(a, now)).toList();
+  final live = showAll ? running : coveringCustomer(running, latitude, longitude);
   final local = promotionsForTown(live, town, district: district, state: state, showAll: showAll).entries.toList();
   local.sort((a, b) {
     final pin = (b.text('pinned') == 'true' || b.data['pinned'] == true ? 1 : 0) - (a.text('pinned') == 'true' || a.data['pinned'] == true ? 1 : 0);

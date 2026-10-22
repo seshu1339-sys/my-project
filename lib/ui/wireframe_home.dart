@@ -145,6 +145,8 @@ class WireframeHome extends StatelessWidget {
       district: store.district,
       state: store.state,
       showAll: showAllLocations,
+      latitude: store.latitude,
+      longitude: store.longitude,
     );
     final localServices = localServiceEntries(
       store,

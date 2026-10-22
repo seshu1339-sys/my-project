@@ -50,6 +50,60 @@ void main() {
     store.dispose();
   });
 
+  testWidgets('radius: the home page shows only the ads whose circle covers the customer, and follows a change of location', (tester) async {
+    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    Entry circle(String id, int order, double km, double lat, double lng) =>
+        Entry(id, {'title': id, 'contentType': 'text', 'order': order, 'radiusKm': km, 'radiusLat': lat, 'radiusLng': lng, 'radiusShopId': 's'});
+    final store = await _store([
+      circle('narsipatnam10', 1, 10, 17.667, 82.612),
+      circle('anakapalle10', 2, 10, 17.691, 83.003),
+      circle('wide100', 3, 100, 17.667, 82.612),
+    ]);
+    await store.setLocation('531116', 'Narsipatnam', lat: 17.67, lng: 82.62);
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    List<String> shown() {
+      final pager = tester.widget<AdsPager>(find.byType(AdsPager));
+      return pager.ads.map((a) => a.id).toList()..sort();
+    }
+
+    expect(shown(), ['narsipatnam10', 'wide100']);
+    await store.setLocation('531001', 'Anakapalle', lat: 17.691, lng: 83.003);
+    await tester.pump();
+    expect(shown(), ['anakapalle10', 'wide100'], reason: 'the customer moved: only the ads that cover the new place');
+    await store.setLocation('500001', 'Hyderabad', lat: 17.385, lng: 78.486);
+    await tester.pump();
+    expect(find.byType(AdsPager), findsNothing, reason: 'far from every circle: no ads from this system');
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets("radius: Today's Offers follow the same rule and the same location change", (tester) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store(const []);
+    store.catalog['promotions'] = const [
+      Entry('o1', {'name': 'Offer near Narsipatnam', 'placement': 'carousel', 'order': 1, 'radiusKm': 10, 'radiusLat': 17.667, 'radiusLng': 82.612, 'radiusShopId': 's'}),
+      Entry('o2', {'name': 'Offer near Anakapalle', 'placement': 'carousel', 'order': 2, 'radiusKm': 10, 'radiusLat': 17.691, 'radiusLng': 83.003, 'radiusShopId': 's'}),
+    ];
+    await store.setLocation('531116', 'Narsipatnam', lat: 17.67, lng: 82.62);
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    expect(find.text('Offer near Narsipatnam'), findsWidgets);
+    expect(find.text('Offer near Anakapalle'), findsNothing);
+    await store.setLocation('531001', 'Anakapalle', lat: 17.691, lng: 83.003);
+    await tester.pump();
+    expect(find.text('Offer near Anakapalle'), findsWidgets);
+    expect(find.text('Offer near Narsipatnam'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
   testWidgets('with no live ads the home page keeps its existing ad boxes', (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;

@@ -73,6 +73,8 @@ const fields = <String, Map<String, String>>{
     'target': 'Click action (shops / shop:ID / services / category:ID / product:ID / https://…)',
     'locations':
         'Location — towns this shows in (blank = every town)',
+    'radiusShopId': 'Radius centre — the shop whose saved location is the middle of the circle',
+    'radiusKm': 'Radius (shown only to customers inside this circle)',
     'targetPincode':
         'Show only in this pincode (optional — blank shows everywhere)',
     'targetLatitude':

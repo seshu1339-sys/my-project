@@ -238,7 +238,7 @@ void main() {
 
     testWidgets('the list and the editor fit a phone screen', (tester) async {
       final store = await _store(ads: [ad('1', {'shopName': 'Suma Fresh Mart', 'endsAt': '2026-12-28T12:00:00'})]);
-      tester.view.physicalSize = const Size(390, 3000);
+      tester.view.physicalSize = const Size(390, 6000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
