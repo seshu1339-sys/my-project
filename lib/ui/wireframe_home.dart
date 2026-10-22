@@ -20,6 +20,7 @@ import 'layout_settings.dart';
 import 'animation_settings.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
+import 'photo_library_page.dart';
 import 'services_page.dart';
 import 'home_section_config.dart';
 import 'shared.dart';
@@ -515,6 +516,14 @@ class WireframeHome extends StatelessWidget {
                 wrapSection(
                   'footerBadges',
                   HomeFooterBadges(settings: settings, wrapSection: wrapSection),
+                ),
+                Center(
+                  child: TextButton.icon(
+                    key: const ValueKey('open-photo-library'),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PhotoLibraryPage())),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Photo library'),
+                  ),
                 ),
                 const SizedBox(height: 16),
               ],
