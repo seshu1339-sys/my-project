@@ -5,6 +5,7 @@ const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {normalizeEvent, recordEvent} = require('./analytics');
+const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
 initializeApp();
@@ -109,6 +110,16 @@ exports.trackEvent = onCall({...options, maxInstances: 5}, async request => {
   await rateLimit(`track:${event.visitorId}`, 240, 60 * 1000);
   await recordEvent(db, event);
   return {ok: true};
+});
+// Genuine ad views for the unified Ads system. The device reports what happened in small batches; ad-tracking.js decides what counts
+// (on screen for a second, once per device per 30 minutes, never the vendor's own, admin, staff, bots or test devices).
+exports.trackAdEvents = onCall({...options, maxInstances: 5}, async request => {
+  let batch;
+  try { batch = normalizeAdBatch(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  await rateLimit(`adev:${batch.visitorId}`, 30, 60 * 1000);
+  const uid = request.auth?.uid;
+  const staff = uid ? (await db.collection('fieldStaff').doc(uid).get()).exists || (await db.collection('quickAccounts').doc(uid).get()).exists : false;
+  return recordAdEvents(db, batch, {userAgent: request.rawRequest?.headers?.['user-agent'], auth: request.auth, staffUids: staff ? [uid] : []});
 });
 // Keep legacy callable URLs explicit during migration; never issue PIN tokens.
 const retiredPhoneAuth = onCall(options, async () => {

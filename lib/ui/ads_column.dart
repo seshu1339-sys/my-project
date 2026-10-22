@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../services/ad_tracker.dart';
 import 'ad_box.dart';
 import 'ad_transitions.dart';
 
@@ -71,11 +72,14 @@ typedef AdTap = void Function(Entry ad);
 /// (staggered). Scrolling or dragging over the column switches to a list of every live ad; a few seconds after the last touch it goes
 /// back to the automatic boxes.
 class AdsColumn extends StatefulWidget {
-  const AdsColumn({super.key, required this.ads, required this.config, required this.onTap, this.screenHeight});
+  const AdsColumn({super.key, required this.ads, required this.config, required this.onTap, this.screenHeight, this.tracker, this.town = ''});
   final List<Entry> ads;
   final AdsConfig config;
   final AdTap onTap;
   final double? screenHeight;
+  // Counts genuine views (null = not counted, e.g. the admin's previews); [town] is the customer's town for the reports.
+  final AdsTracker? tracker;
+  final String town;
 
   @override
   State<AdsColumn> createState() => _AdsColumnState();
@@ -147,7 +151,7 @@ class _AdsColumnState extends State<AdsColumn> {
                     if (slot > 0) SizedBox(height: config.gap),
                     SizedBox(
                       height: height,
-                      child: AdSlot(key: ValueKey('ad-slot-$slot'), rotation: rotation, slot: slot, slots: slots, config: config, onTap: widget.onTap),
+                      child: AdSlot(key: ValueKey('ad-slot-$slot'), rotation: rotation, slot: slot, slots: slots, config: config, onTap: widget.onTap, tracker: widget.tracker, town: widget.town),
                     ),
                   ],
                 ],
@@ -160,11 +164,13 @@ class _AdsColumnState extends State<AdsColumn> {
 /// The phone / customer-app version: one ad at a time, swipe left or right (or wait) to change, with dots. It changes with the same
 /// animation as every other ad box.
 class AdsPager extends StatefulWidget {
-  const AdsPager({super.key, required this.ads, required this.config, required this.onTap, this.height});
+  const AdsPager({super.key, required this.ads, required this.config, required this.onTap, this.height, this.tracker, this.town = ''});
   final List<Entry> ads;
   final AdsConfig config;
   final AdTap onTap;
   final double? height;
+  final AdsTracker? tracker;
+  final String town;
   @override
   State<AdsPager> createState() => _AdsPagerState();
 }
@@ -204,7 +210,7 @@ class _AdsPagerState extends State<AdsPager> {
           if (slot > 0) SizedBox(height: config.gap),
           SizedBox(
             height: height,
-            child: AdSlot(key: ValueKey('ad-slot-$slot'), rotation: rotation, slot: slot, slots: slots, config: config, onTap: widget.onTap, swipe: true, mobile: true),
+            child: AdSlot(key: ValueKey('ad-slot-$slot'), rotation: rotation, slot: slot, slots: slots, config: config, onTap: widget.onTap, swipe: true, mobile: true, tracker: widget.tracker, town: widget.town),
           ),
         ],
         const SizedBox(height: 6),
@@ -245,12 +251,16 @@ class AdSlot extends StatefulWidget {
     required this.onTap,
     this.swipe = false,
     this.mobile = false,
+    this.tracker,
+    this.town = '',
   });
   final AdsRotation rotation;
   final int slot, slots;
   final AdsConfig config;
   final AdTap onTap;
   final bool swipe, mobile;
+  final AdsTracker? tracker;
+  final String town;
 
   @override
   State<AdSlot> createState() => _AdSlotState();
@@ -264,10 +274,15 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
   late Entry shown = widget.rotation.current(widget.slot);
   int changes = 0;
   DateTime? _resumeAt;
+  // Counting a genuine view: the ad must be really visible (page in front, app active, at least half of the box on screen).
+  Timer? _watch;
+  int _visibleMs = 0;
+  bool _viewSent = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.tracker != null) _watch = Timer.periodic(const Duration(milliseconds: 500), (_) => _look());
     // Stagger: the first change of slot k comes after (k+1)/slots of the ad's time, so the boxes change one after another.
     final first = adSeconds(shown, widget.config) * 1000 * (widget.slot + 1) / widget.slots;
     _arm(Duration(milliseconds: first.round()));
@@ -276,8 +291,43 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
   @override
   void dispose() {
     _timer?.cancel();
+    _watch?.cancel();
+    if (_viewSent) _finishCurrent();
     controller.dispose();
     super.dispose();
+  }
+
+  bool _isVisible() {
+    if (!mounted) return false;
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state != null && state != AppLifecycleState.resumed) return false;
+    if (ModalRoute.of(context)?.isCurrent == false) return false;
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize || box.size.isEmpty) return false;
+    final rect = box.localToGlobal(Offset.zero) & box.size;
+    final seen = rect.intersect(Offset.zero & MediaQuery.sizeOf(context));
+    return !seen.isEmpty && seen.width * seen.height >= .5 * rect.width * rect.height;
+  }
+
+  void _look() {
+    if (_isVisible()) _visibleMs += 500;
+    if (!_viewSent && _visibleMs >= 1000) {
+      _viewSent = true;
+      widget.tracker?.view(shown.id, town: widget.town);
+    }
+  }
+
+  /// The ad is leaving the box: report the rest of its time on screen, or that it was due but never really seen.
+  void _finishCurrent() {
+    final tracker = widget.tracker;
+    if (tracker == null) return;
+    if (_viewSent) {
+      tracker.time(shown.id, (_visibleMs / 1000).round() - 1, town: widget.town);
+    } else {
+      tracker.miss(shown.id, town: widget.town);
+    }
+    _visibleMs = 0;
+    _viewSent = false;
   }
 
   void _arm(Duration after) {
@@ -299,6 +349,7 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
       _arm(Duration(seconds: adSeconds(shown, widget.config)));
       return;
     }
+    _finishCurrent();
     final next = widget.rotation.current(widget.slot);
     setState(() {
       outgoing = shown;

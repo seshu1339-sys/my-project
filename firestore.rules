@@ -26,6 +26,20 @@ service cloud.firestore {
     match /adsPrivate/{id} {
       allow read, write: if admin();
     }
+    // Ad view counts are written only by functions/ad-tracking.js. The admin reads everything (including the view-by-view log);
+    // a vendor reads the totals of their own ads. adViewGuard and adUniques are internal and never readable.
+    match /adStats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /adStatsDaily/{id} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /adViews/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     // Quick Add Item: accounts are created and switched on/off only by the admin (functions);
     // an account can read its own record. Items are written only by functions. The public sees
     // only APPROVED items (the site also checks the start/end time); owners and the admin see all.

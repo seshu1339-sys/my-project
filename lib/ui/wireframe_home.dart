@@ -23,6 +23,7 @@ import 'responsive_header.dart';
 import 'services_page.dart';
 import '../domain/ads.dart';
 import 'ads_column.dart';
+import '../services/ad_tracker.dart';
 import 'offers_ads_page.dart';
 import 'home_section_config.dart';
 import 'shared.dart';
@@ -213,7 +214,13 @@ class WireframeHome extends StatelessWidget {
     final adLayout = layoutFor(context, settings, 'ads');
     final unifiedAds = adLayout.visible ? liveAdList : const <Entry>[];
     final oldAds = unifiedAds.isEmpty ? ads : const <Entry>[];
-    void openOffersAds() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => OffersAdsPage(store: store, onAd: (ad) => onPromotion(adTarget(ad)))));
+    final adsTracker = AdsTracker.instance;
+    void tapAd(Entry ad) {
+      adsTracker?.tap(ad.id, town: store.town);
+      onPromotion(adTarget(ad));
+    }
+
+    void openOffersAds() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => OffersAdsPage(store: store, onAd: tapAd)));
     final nearby = layoutFor(context, settings, 'nearby');
     final located = store.pincode.isNotEmpty || store.latitude != null;
     final shops = located ? store.nearby() : store.visible('shops');
@@ -323,7 +330,7 @@ class WireframeHome extends StatelessWidget {
                           : Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                AdsColumn(ads: unifiedAds, config: adsConfig, onTap: (ad) => onPromotion(adTarget(ad))),
+                                AdsColumn(ads: unifiedAds, config: adsConfig, onTap: tapAd, tracker: adsTracker, town: store.town),
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(key: const ValueKey('open-offers-ads'), onPressed: openOffersAds, child: const Text('Offers & Ads')),
@@ -346,7 +353,7 @@ class WireframeHome extends StatelessWidget {
                             child: Column(
                               children: [
                                 if (unifiedAds.isNotEmpty) ...[
-                                  AdsPager(ads: unifiedAds, config: adsConfig, onTap: (ad) => onPromotion(adTarget(ad))),
+                                  AdsPager(ads: unifiedAds, config: adsConfig, onTap: tapAd, tracker: adsTracker, town: store.town),
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: TextButton(key: const ValueKey('open-offers-ads'), onPressed: openOffersAds, child: const Text('Offers & Ads')),

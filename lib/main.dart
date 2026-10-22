@@ -62,7 +62,10 @@ Future<void> main() async {
     return;
   }
   // Anonymous visit counting; only the customer app ever starts it.
-  if (live) Analytics.start();
+  if (live) {
+    // Start counting visits, then genuine ad views once the device id exists.
+    unawaited(Analytics.start().then((_) => Analytics.startAdTracker()));
+  }
   runApp(MarketApp(store: store));
   if (live) {
     unawaited(_refreshLocationOnOpen(store));

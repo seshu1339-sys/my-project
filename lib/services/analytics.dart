@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import 'ad_tracker.dart';
 
 /// Anonymous, aggregate-only site and ad analytics for the customer app.
 ///
@@ -22,6 +23,19 @@ class Analytics {
   static const _impressionGap = Duration(minutes: 30);
 
   static bool get enabled => _enabled;
+
+  /// The random device id (empty until [start] has run), also used to count ad views.
+  static String get visitorId => _visitorId;
+
+  /// Starts counting genuine ad views (see AdsTracker): called once Firebase is connected.
+  static void startAdTracker() {
+    if (!_enabled || AdsTracker.instance != null) return;
+    AdsTracker.instance = AdsTracker(
+      visitorId: _visitorId,
+      platform: kIsWeb ? 'web' : 'android',
+      transport: (batch) => FirebaseFunctions.instance.httpsCallable('trackAdEvents').call(batch),
+    );
+  }
 
   /// Call once per app or site open, after Firebase is connected.
   static Future<void> start() async {

@@ -37,6 +37,21 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(anonymous, 'adsPrivate/ad1')));
     await assertFails(getDoc(doc(alice, 'adsPrivate/ad1')));
     await assertFails(setDoc(doc(alice, 'adsPrivate/ad1'), {paid: false}));
+    // View counts: written by functions only; the admin reads all, a vendor only the totals of their own ads.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'adStats/ad1'), {vendorId: 'alice', views: 3});
+      await setDoc(doc(ctx.firestore(), 'adStats/ad9'), {vendorId: 'someone', views: 9});
+      await setDoc(doc(ctx.firestore(), 'adViews/v1'), {adId: 'ad1', town: 'Vizag'});
+    });
+    await assertSucceeds(getDoc(doc(alice, 'adStats/ad1')));
+    await assertFails(getDoc(doc(alice, 'adStats/ad9')));
+    await assertFails(getDoc(doc(anonymous, 'adStats/ad1')));
+    await assertSucceeds(getDoc(doc(admin, 'adStats/ad9')));
+    await assertFails(setDoc(doc(alice, 'adStats/ad1'), {views: 99999}));
+    await assertFails(setDoc(doc(admin, 'adStats/ad1'), {views: 99999}));
+    await assertFails(getDoc(doc(alice, 'adViews/v1')));
+    await assertSucceeds(getDoc(doc(admin, 'adViews/v1')));
+    await assertFails(getDoc(doc(admin, 'adViewGuard/x')));
     await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
     // Language, saved-card display and wishlist are the other fields the client merges onto a profile.
