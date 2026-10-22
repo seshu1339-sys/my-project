@@ -121,3 +121,17 @@ test('every counted view and tap is logged with time, town and device, and the d
   assert.equal(day.devices.android.views, 1);
   assert.equal(day.devices.web.taps, 1);
 });
+
+test('an ad with a daily limit is marked for the rest of the day once the limit is reached', emulator, async () => {
+  const db = await setup();
+  await db.collection('ads').doc('capped').set({title: 'Limited', status: 'approved', vendorId: 'v1', maxPerDay: 2});
+  const view = [{type: 'view', adId: 'capped', seconds: 1}];
+  const device = n => normalizeBatch({visitorId: `visitor-0123456789abcd${n}`, town: 'Vizag', events: view});
+  await recordAdEvents(db, device('01'), ctx(), t0);
+  assert.equal((await db.collection('ads').doc('capped').get()).data().capDay, undefined, 'one view: still allowed');
+  await recordAdEvents(db, device('02'), ctx(), t0 + 1000);
+  assert.equal((await db.collection('ads').doc('capped').get()).data().capDay, '2031-03-05', 'two views: the limit is reached');
+  await db.collection('ads').doc('unlimited').set({title: 'No limit', status: 'approved', vendorId: 'v1', maxPerDay: 0});
+  await recordAdEvents(db, normalizeBatch({visitorId: V, events: [{type: 'view', adId: 'unlimited', seconds: 1}]}), ctx(), t0);
+  assert.equal((await db.collection('ads').doc('unlimited').get()).data().capDay, undefined);
+});

@@ -125,9 +125,16 @@ String adStatus(Entry ad, DateTime now) {
   return 'live';
 }
 
+/// Today's date in India (UTC+5:30), as YYYY-MM-DD: the day the daily limit counts in (the server uses the same day).
+String adDay(DateTime now) => now.toUtc().add(const Duration(hours: 5, minutes: 30)).toIso8601String().substring(0, 10);
+
 /// True when the ad may be on a customer's screen at [now]: approved, switched on, inside its dates, its weekdays and its daily time slots.
 bool adLiveNow(Entry ad, DateTime now) =>
-    adStatus(ad, now) == 'live' && adDays(ad).contains(now.weekday) && _inSlots(adSlots(ad), now);
+    adStatus(ad, now) == 'live' &&
+    adDays(ad).contains(now.weekday) &&
+    _inSlots(adSlots(ad), now) &&
+    // the server marks an ad that reached its "max times per day" with that day; it is hidden for the rest of it
+    ad.text('capDay') != adDay(now);
 
 /// The ads this customer can see now, pinned first, then in the admin's order. Location uses the same rule as offers: ads that list the
 /// customer's town (else the general, all-town ones).

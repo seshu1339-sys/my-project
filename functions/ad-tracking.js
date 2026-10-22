@@ -78,7 +78,7 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
     // the same count, broken down by town and by device (nested maps: set() would take a dotted name literally)
     const split = (name, n) => ({towns: {[tk]: {[name]: inc(n)}}, devices: {[device]: {[name]: inc(n)}}});
     const outcome = await db.runTransaction(async tx => {
-      const [guard, unique] = await Promise.all([tx.get(guardRef), event.type === 'view' ? tx.get(uniqueRef) : Promise.resolve(null)]);
+      const [guard, unique, today] = await Promise.all([tx.get(guardRef), event.type === 'view' ? tx.get(uniqueRef) : Promise.resolve(null), event.type === 'view' ? tx.get(dailyRef) : Promise.resolve(null)]);
       const last = guard.exists ? guard.data().lastAt.toMillis() : 0;
       const stat = (stats, daily) => {
         tx.set(statsRef, {...base, ...stats, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
@@ -92,6 +92,9 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
         stat({views: inc(1), seconds: inc(event.seconds), ...(first ? {unique: inc(1)} : {})},
           {views: inc(1), seconds: inc(event.seconds), ...split('views', 1), ...(first ? {unique: inc(1)} : {})});
         tx.set(db.collection('adViews').doc(), {...base, type: 'view', at: Timestamp.fromMillis(now), day, town: batch.town, device, seconds: event.seconds, visitor: key.slice(0, 12)});
+        // The daily limit: once today's counted views reach it, the ad is marked for the rest of the (Indian) day and the site stops showing it.
+        const limit = Math.round(Number(ad.maxPerDay)) || 0;
+        if (limit > 0 && (today.exists ? Number(today.data().views) || 0 : 0) + 1 >= limit) tx.update(db.collection('ads').doc(event.adId), {capDay: day});
         return 'view';
       }
       if (event.type === 'time') {

@@ -148,7 +148,7 @@ async function setSummary(db, uid, data) {
   if (typeof adId !== 'string' || !['daily', 'weekly', 'off'].includes(mode)) throw Error('Choose daily, weekly or off.');
   const ad = (await db.collection('ads').doc(adId).get()).data();
   if (!ad || ad.vendorId !== uid) throw Error('That ad was not found.');
-  await db.collection('adsPrivate').doc(adId).set({summary: mode}, {merge: true});
+  await db.collection('ads').doc(adId).update({summary: mode});
   return {mode};
 }
 
@@ -166,12 +166,12 @@ async function periodTotals(db, adId, days, now) {
 /// Sends the daily summaries every day and the weekly ones on Mondays (India). Returns how many notices were written.
 async function sendSummaries(db, now = Date.now()) {
   const monday = new Date(now + 19800000).getUTCDay() === 1;
-  const chosen = await db.collection('adsPrivate').where('summary', 'in', monday ? ['daily', 'weekly'] : ['daily']).get();
+  const chosen = await db.collection('ads').where('summary', 'in', monday ? ['daily', 'weekly'] : ['daily']).get();
   let sent = 0;
   for (const doc of chosen.docs) {
-    const ad = (await db.collection('ads').doc(doc.id).get()).data();
-    if (!ad?.vendorId) continue;
-    const weekly = doc.data().summary === 'weekly';
+    const ad = doc.data();
+    if (!ad.vendorId || ad.status === 'rejected') continue;
+    const weekly = ad.summary === 'weekly';
     const t = await periodTotals(db, doc.id, weekly ? 7 : 1, now);
     const body = `${ad.title || 'Your ad'}: ${t.views} views, ${t.unique} people, ${t.taps} taps, ${t.seconds} seconds on screen${t.missed ? `, ${t.missed} missed` : ''}.`;
     await notice(db, ad.vendorId, 'summary', weekly ? 'Your ad this week' : 'Your ad yesterday', body, {adId: doc.id, period: weekly ? 'week' : 'day', ...t});

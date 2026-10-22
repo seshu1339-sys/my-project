@@ -20,8 +20,11 @@ String _label(String label, Object? current) => current == null ? label : '$labe
 
 /// Settings -> Ads: the settings that apply to ALL ads (one form), then the list of ads (add, edit, duplicate, delete, renew, reorder).
 class AdminAdsPage extends StatefulWidget {
-  const AdminAdsPage({super.key, required this.store});
+  const AdminAdsPage({super.key, required this.store, this.decide, this.remove});
   final Store store;
+  // How the admin's decisions reach the server (the functions decideVendorAd / removeVendorAd); replaced in tests.
+  final Future<void> Function(String submissionId, bool approved, String reason)? decide;
+  final Future<void> Function(String adId, String reason)? remove;
   @override
   State<AdminAdsPage> createState() => _AdminAdsPageState();
 }
@@ -58,6 +61,71 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
     if (ok != true) return;
     await store.delete('ads', ad.id);
     await store.delete('adsPrivate', ad.id);
+  }
+
+  /// Asks the admin for a reason the vendor will read. Returns null when cancelled (and, when [required], when left empty).
+  Future<String?> _askReason(String title, {required bool required}) =>
+      showDialog<String>(context: context, builder: (_) => _ReasonDialog(title: title, required: required));
+
+  Future<void> _decide(Entry submission, bool approved) async {
+    var reason = '';
+    if (!approved) {
+      final asked = await _askReason('Reject this ad?', required: true);
+      if (asked == null) return;
+      reason = asked;
+    }
+    try {
+      final decide = widget.decide ?? (id, ok, why) => store.call('decideVendorAd', {'submissionId': id, 'approved': ok, 'reason': why});
+      await decide(submission.id, approved, reason);
+      if (mounted) message(context, approved ? 'Approved. The ad is live now.' : 'Rejected. The vendor has been told why.');
+    } catch (e) {
+      if (mounted) message(context, e);
+    }
+  }
+
+  Future<void> _removeVendorAd(Entry ad) async {
+    final reason = await _askReason('Remove this vendor ad?', required: false);
+    if (reason == null) return;
+    try {
+      final remove = widget.remove ?? (id, why) => store.call('removeVendorAd', {'adId': id, 'reason': why});
+      await remove(ad.id, reason);
+      if (mounted) message(context, 'Removed. The vendor has been told.');
+    } catch (e) {
+      if (mounted) message(context, e);
+    }
+  }
+
+  Widget _pendingCard(Entry s, AdsConfig config) {
+    final current = s.text('adId').isEmpty ? null : store.entries('ads').where((a) => a.id == s.text('adId')).firstOrNull;
+    return Card(
+      key: ValueKey('pending-${s.id}'),
+      color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: .4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.text('kind') == 'change' ? 'Change to a live ad — ${s.text('shopName')} ${s.text('vendorCode')}' : 'New ad — ${s.text('shopName')} ${s.text('vendorCode')}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Plan ${adPackages[s.text('package')] ?? 'Normal'}, ${s.number('durationDays').round()} days'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                if (current != null) Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Live now', style: TextStyle(fontSize: 12)), SizedBox(width: 220, height: 140, child: AdBox(ad: current, config: config))]),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(current != null ? 'Wants to change to' : 'New ad', style: const TextStyle(fontSize: 12)), SizedBox(width: 220, height: 140, child: AdBox(ad: s, config: config))]),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              FilledButton.icon(key: ValueKey('approve-${s.id}'), onPressed: () => _decide(s, true), icon: const Icon(Icons.check), label: const Text('Approve')),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(key: ValueKey('reject-${s.id}'), onPressed: () => _decide(s, false), icon: const Icon(Icons.close), label: const Text('Reject')),
+            ]),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _duplicate(Entry ad) async {
@@ -99,12 +167,18 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => StreamBuilder<List<Entry>>(
+    stream: store.watchEntries('adSubmissions'),
+    builder: (context, submissionsSnapshot) => _body(context, [for (final s in submissionsSnapshot.data ?? const <Entry>[]) if (s.text('status') == 'pending') s]),
+  );
+
+  Widget _body(BuildContext context, List<Entry> pendingSubmissions) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
       final now = DateTime.now();
       final all = sortedByOrder(store.entries('ads'));
-      final shown = filterAds(all, now, status: status, query: search.text);
+      final shown = status == 'pending' ? <Entry>[] : filterAds(all, now, status: status, query: search.text);
+      final adsConfig = AdsConfig.from(store.entries('settings'));
       final canReorder = status == null && search.text.trim().isEmpty;
       final soon = adsEndingSoon(all, now);
       return ListView(
@@ -136,6 +210,12 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
                 ),
               ),
             ),
+          if (pendingSubmissions.isNotEmpty && (status == null || status == 'pending')) ...[
+            Text('Pending approval (${pendingSubmissions.length})', key: const ValueKey('ads-pending-title'), style: Theme.of(context).textTheme.titleLarge),
+            const Text('Vendors sent these. Nothing is shown to customers until you approve it.'),
+            for (final s in pendingSubmissions) _pendingCard(s, adsConfig),
+            const Divider(),
+          ],
           ExpansionTile(
             key: const ValueKey('ads-common-settings'),
             tilePadding: EdgeInsets.zero,
@@ -179,14 +259,16 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
               for (final e in adStatusLabels.entries)
                 ChoiceChip(
                   key: ValueKey('ad-filter-${e.key}'),
-                  label: Text('${e.value} (${all.where((a) => adStatus(a, now) == e.key).length})'),
+                  label: Text('${e.value} (${e.key == 'pending' ? pendingSubmissions.length : all.where((a) => adStatus(a, now) == e.key).length})'),
                   selected: status == e.key,
                   onSelected: (_) => setState(() => status = status == e.key ? null : e.key),
                 ),
             ],
           ),
           const SizedBox(height: 8),
-          if (shown.isEmpty)
+          if (status == 'pending')
+            const SizedBox.shrink()
+          else if (shown.isEmpty)
             const Padding(padding: EdgeInsets.all(24), child: Text('No ads here. Use "Add Ad" to create one.'))
           else if (canReorder)
             ReorderableListView.builder(
@@ -247,19 +329,22 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
                     _edit(ad);
                   case 'duplicate':
                     _duplicate(ad);
+                  case 'remove':
+                    _removeVendorAd(ad);
                   case 'delete':
                     _delete(ad);
                   default:
                     _renew(ad, v);
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
-                PopupMenuItem(value: 'week', child: Text('Renew +1 week')),
-                PopupMenuItem(value: 'month', child: Text('Renew +1 month')),
-                PopupMenuItem(value: 'custom', child: Text('Renew to a date…')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
+                if (ad.text('vendorId').isNotEmpty) const PopupMenuItem(value: 'remove', child: Text('Remove vendor ad…')),
+                const PopupMenuItem(value: 'week', child: Text('Renew +1 week')),
+                const PopupMenuItem(value: 'month', child: Text('Renew +1 month')),
+                const PopupMenuItem(value: 'custom', child: Text('Renew to a date…')),
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
             ),
           ],
@@ -289,6 +374,9 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
   }
 
   AdsConfig get current => AdsConfig.from(widget.store.entries('settings'));
+
+  /// How many test devices are saved right now (shown next to the field).
+  int get _testDeviceCount => ((widget.store.entries('settings').where((e) => e.id == 'adsConfig').firstOrNull?.text('testDevices') ?? '')).split(RegExp(r'[,\s]+')).where((x) => x.isNotEmpty).length;
 
   void _set(String key, Object? value) => setState(() => value == null || '$value'.isEmpty ? values.remove(key) : values[key] = value);
 
@@ -366,6 +454,19 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
                     initialValue: values['label'] as String? ?? '',
                     decoration: InputDecoration(labelText: _label('Label on every ad', c.label), isDense: true, border: const OutlineInputBorder()),
                     onChanged: (v) => v.trim().isEmpty ? values.remove('label') : values['label'] = v.trim(),
+                  ),
+                ),
+                SizedBox(
+                  width: 540,
+                  child: TextFormField(
+                    key: ValueKey('ads-config-testDevices-${values['testDevices']}'),
+                    initialValue: values['testDevices'] as String? ?? '',
+                    decoration: InputDecoration(
+                      labelText: _label('Test devices: views from these device ids are never counted (comma-separated)', _testDeviceCount == 0 ? 'none' : '$_testDeviceCount device(s)'),
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => v.trim().isEmpty ? values.remove('testDevices') : values['testDevices'] = v.trim(),
                   ),
                 ),
                 SizedBox(
@@ -765,4 +866,46 @@ class _AdEditorPageState extends State<AdEditorPage> {
       ),
     );
   }
+}
+
+class _ReasonDialog extends StatefulWidget {
+  const _ReasonDialog({required this.title, required this.required});
+  final String title;
+  final bool required;
+  @override
+  State<_ReasonDialog> createState() => _ReasonDialogState();
+}
+
+class _ReasonDialogState extends State<_ReasonDialog> {
+  final controller = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      key: const ValueKey('ad-reason'),
+      controller: controller,
+      autofocus: true,
+      maxLength: 300,
+      decoration: InputDecoration(labelText: widget.required ? 'Reason (the vendor will see it)' : 'Reason (optional, the vendor will see it)'),
+    ),
+    actions: [
+      TextButton(key: const ValueKey('ad-reason-cancel'), onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      FilledButton(
+        key: const ValueKey('ad-reason-ok'),
+        onPressed: () {
+          final text = controller.text.trim();
+          if (widget.required && text.isEmpty) return;
+          Navigator.pop(context, text);
+        },
+        child: const Text('OK'),
+      ),
+    ],
+  );
 }

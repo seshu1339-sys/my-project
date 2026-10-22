@@ -24,6 +24,15 @@ void main() {
       expect(adStatus(ad('a'), monday), 'live', reason: 'no dates and no status: approved and on');
     });
 
+    test('an ad that reached its daily limit is hidden for the rest of that day only', () {
+      expect(adDay(DateTime.utc(2026, 10, 26, 18, 0)), '2026-10-26');
+      expect(adDay(DateTime.utc(2026, 10, 26, 19, 0)), '2026-10-27', reason: 'it is already the next day in India');
+      final capped = ad('a', {'capDay': adDay(monday)});
+      expect(adLiveNow(capped, monday), isFalse);
+      expect(adLiveNow(capped, monday.add(const Duration(days: 1))), isTrue, reason: 'back tomorrow');
+      expect(adLiveNow(ad('b', {'capDay': '2020-01-01'}), monday), isTrue);
+    });
+
     test('weekdays and daily time slots', () {
       expect(adLiveNow(ad('a', {'days': '1,3'}), monday), isTrue);
       expect(adLiveNow(ad('a', {'days': '2,4'}), monday), isFalse);

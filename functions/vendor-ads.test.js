@@ -134,6 +134,7 @@ test('summaries: daily every day, weekly on Mondays, with the numbers of the per
   await assert.rejects(() => setSummary(db, 'v2', {adId, mode: 'daily'}), /not found/);
   await assert.rejects(() => setSummary(db, 'v1', {adId, mode: 'hourly'}), /daily, weekly or off/);
   await setSummary(db, 'v1', {adId, mode: 'daily'});
+  assert.equal((await db.collection('ads').doc(adId).get()).data().summary, 'daily');
   const tuesday = Date.parse('2031-03-04T03:00:00Z'); // 08:30 India, Tuesday
   const monday = Date.parse('2031-03-03T03:00:00Z');
   await db.collection('adStatsDaily').doc(`${adId}~2031-03-03`).set({views: 12, unique: 7, taps: 2, seconds: 90, missed: 1});

@@ -8,6 +8,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/location.dart';
 import 'quick_add.dart';
+import 'vendor_ads_page.dart';
 
 /// Business features. Only built once the application status is approved; the
 /// server independently refuses every one of these actions for anyone else.
@@ -245,6 +246,14 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
     QuickAddHome(store: store),
     const SizedBox(height: 20),
     _shopPhotosSection(),
+    _card('My Ads', [
+      FilledButton.icon(
+        key: const ValueKey('open-my-ads'),
+        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VendorAdsPage(store: store, uid: uid))),
+        icon: const Icon(Icons.campaign_outlined),
+        label: const Text('Open My Ads'),
+      ),
+    ], note: 'Send an ad for your shop, see if it is live, how many days are left and how many people saw it. Every ad is checked by the administrator before it goes live.'),
     const SizedBox(height: 20),
     _card('Add a product or material', [
       TextField(controller: pName, decoration: const InputDecoration(labelText: 'Product or material name')),
