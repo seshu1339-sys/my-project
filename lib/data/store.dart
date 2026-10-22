@@ -409,6 +409,36 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /// Records of a collection the public catalog does not carry (ad view counts: only the admin and the owning vendor may read them),
+  /// kept up to date live. In demo mode, the local copy once.
+  Stream<List<Entry>> watchEntries(String collection, {String? vendorId}) {
+    if (!live) return Stream.value(entries(collection));
+    Query<Map<String, dynamic>> query = firestore.collection(collection);
+    if (vendorId != null) query = query.where('vendorId', isEqualTo: vendorId);
+    return query.snapshots().map((s) => [for (final d in s.docs) Entry(d.id, d.data())]);
+  }
+
+  /// The per-day ad statistics from day [from] to day [to] (YYYY-MM-DD, India). A vendor passes [vendorId] to get only their own ads.
+  Future<List<Entry>> dailyAdStats(String from, String to, {String? vendorId}) async {
+    if (!live) {
+      return [for (final e in entries('adStatsDaily')) if (e.text('day').compareTo(from) >= 0 && e.text('day').compareTo(to) <= 0 && (vendorId == null || e.text('vendorId') == vendorId)) e];
+    }
+    Query<Map<String, dynamic>> query = firestore.collection('adStatsDaily').where('day', isGreaterThanOrEqualTo: from).where('day', isLessThanOrEqualTo: to);
+    if (vendorId != null) query = query.where('vendorId', isEqualTo: vendorId);
+    final snapshot = await query.get();
+    return [for (final d in snapshot.docs) Entry(d.id, d.data())];
+  }
+
+  /// The newest counted views and taps of one ad (time, town, device), for the admin to check any number.
+  Future<List<Entry>> recentAdViews(String adId, {int limit = 200}) async {
+    if (!live) {
+      final all = entries('adViews').where((e) => e.text('adId') == adId).toList();
+      return all.take(limit).toList();
+    }
+    final snapshot = await firestore.collection('adViews').where('adId', isEqualTo: adId).orderBy('at', descending: true).limit(limit).get();
+    return [for (final d in snapshot.docs) Entry(d.id, d.data())];
+  }
+
   /// A record read from the server itself (not the local copy), to confirm that a write really reached it. Offline, the local copy.
   Future<Map<String, dynamic>?> freshRecord(String collection, String id) async {
     if (!live) return catalog[collection]?.where((e) => e.id == id).firstOrNull?.data;

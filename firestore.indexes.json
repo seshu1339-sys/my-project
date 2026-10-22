@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "adViews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "adId", "order": "ASCENDING"},
+        {"fieldPath": "at", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "adStatsDaily",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "vendorId", "order": "ASCENDING"},
+        {"fieldPath": "day", "order": "ASCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "vendorShopPhotos",
       "queryScope": "COLLECTION",
       "fields": [

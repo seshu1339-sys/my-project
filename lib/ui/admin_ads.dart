@@ -7,6 +7,7 @@ import '../domain/ads_admin.dart';
 import '../domain/catalog.dart';
 import '../domain/towns.dart';
 import 'ad_box.dart';
+import 'admin_ad_reports.dart';
 import 'admin_list_labels.dart';
 import 'ads_column.dart';
 import 'color_picker_field.dart';
@@ -151,6 +152,15 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
                   padding: const EdgeInsets.only(right: 8),
                   child: OutlinedButton.icon(key: const ValueKey('ad-import'), onPressed: _import, icon: const Icon(Icons.download), label: const Text('Copy current ad boxes here')),
                 ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: OutlinedButton.icon(
+                  key: const ValueKey('ad-reports'),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminAdReportsPage(store: store))),
+                  icon: const Icon(Icons.bar_chart),
+                  label: const Text('Reports'),
+                ),
+              ),
               FilledButton.icon(key: const ValueKey('ad-add'), onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('Add Ad')),
             ],
           ),

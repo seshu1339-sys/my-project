@@ -53,6 +53,9 @@ dependencies:
   google_fonts: ^6.2.1
   # Photo -> WebP in the browser (lib/services/image_compress_web.dart)
   web: ^1.1.1
+  # Ads reports: Excel (.xlsx, written by hand with archive) and PDF files (lib/services/report_export.dart)
+  archive: ^4.5.2
+  pdf: ^3.11.3
 
 dev_dependencies:
   flutter_test:
