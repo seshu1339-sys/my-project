@@ -17,6 +17,15 @@ service cloud.firestore {
       allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
       allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
     }
+    // Unified Ads: customers read the ads (what is shown on the site); only the admin writes them directly, vendors go through functions.
+    // adsPrivate holds the admin-only side of an ad (shop contact, amount, paid, notes) and is never readable by the public.
+    match /ads/{id} {
+      allow read: if true;
+      allow write: if admin();
+    }
+    match /adsPrivate/{id} {
+      allow read, write: if admin();
+    }
     // Quick Add Item: accounts are created and switched on/off only by the admin (functions);
     // an account can read its own record. Items are written only by functions. The public sees
     // only APPROVED items (the site also checks the start/end time); owners and the admin see all.

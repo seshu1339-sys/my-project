@@ -69,6 +69,7 @@ class HomeAdRail extends StatefulWidget {
     required this.boxes,
     required this.onPromotion,
     required this.adsLabelLayout,
+    this.unifiedAds,
     this.wrapItem,
     this.wrapSection = _identitySection,
   });
@@ -78,6 +79,8 @@ class HomeAdRail extends StatefulWidget {
   final List<Entry> boxes;
   final ValueChanged<String> onPromotion;
   final ComponentLayout adsLabelLayout;
+  // The unified Ads column (lib/ui/ads_column.dart), shown above the boxes when ads are live; it replaces [ads].
+  final Widget? unifiedAds;
   // Admin Visual Editor hook: when provided, wraps each INDIVIDUAL ad/box
   // (not the rail as a whole) so each one gets its own selection border,
   // ghost outline and 8 resize handles, independent of its neighbors. Null
@@ -185,6 +188,7 @@ class _HomeAdRailState extends State<HomeAdRail> {
   @override
   Widget build(BuildContext context) => Column(
     children: [
+      if (widget.unifiedAds != null) Padding(padding: EdgeInsets.only(bottom: adLayout.gap), child: widget.unifiedAds!),
       // Both ad boxes stacked and always visible (matches the reference
       // design's "Big Savings Everyday" + "Home Services At Your Doorstep"
       // shown together, not one rotating slot).

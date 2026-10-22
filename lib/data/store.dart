@@ -283,6 +283,8 @@ class Store extends ChangeNotifier {
                   notifyListeners();
                 },
                 onError: (Object e) {
+                  // The Ads collection is optional: if it cannot be read (yet) the site simply keeps its existing ad boxes.
+                  if (collection == 'ads') return;
                   error =
                       'Could not load $collection. Check your connection and Firebase permissions.';
                   notifyListeners();

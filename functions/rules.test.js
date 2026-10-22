@@ -28,6 +28,15 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertSucceeds(setDoc(doc(admin, 'products/p1'), {name: 'Test', active: true}));
     await assertSucceeds(getDoc(doc(anonymous, 'products/p1')));
     await assertFails(setDoc(doc(alice, 'products/p1'), {price: 1}));
+    // Unified Ads: everyone reads the ads, only the admin writes them; the admin-only side (adsPrivate) is never public.
+    await assertSucceeds(setDoc(doc(admin, 'ads/ad1'), {title: 'Sale', status: 'approved'}));
+    await assertSucceeds(getDoc(doc(anonymous, 'ads/ad1')));
+    await assertFails(setDoc(doc(alice, 'ads/ad2'), {title: 'Mine'}));
+    await assertFails(setDoc(doc(anonymous, 'ads/ad1'), {title: 'Hacked'}));
+    await assertSucceeds(setDoc(doc(admin, 'adsPrivate/ad1'), {amount: 5000, paid: true}));
+    await assertFails(getDoc(doc(anonymous, 'adsPrivate/ad1')));
+    await assertFails(getDoc(doc(alice, 'adsPrivate/ad1')));
+    await assertFails(setDoc(doc(alice, 'adsPrivate/ad1'), {paid: false}));
     await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
     // Language, saved-card display and wishlist are the other fields the client merges onto a profile.

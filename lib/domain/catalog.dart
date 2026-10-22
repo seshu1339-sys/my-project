@@ -284,6 +284,8 @@ const collections = [
   'vendorShopPhotos',
   // Quick Add Item: the towns staff add items in and customers browse by.
   'locations',
+  // The unified Ads system (lib/domain/ads.dart): one record per ad, readable by everyone, written only by the admin and by functions.
+  'ads',
 ];
 
 Map<String, List<Entry>> demoCatalog() => {

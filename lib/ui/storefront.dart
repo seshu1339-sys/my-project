@@ -132,6 +132,12 @@ class _StorefrontState extends State<Storefront> {
       } else {
         message(context, 'This shop is no longer available.');
       }
+    } else if (target.startsWith('tel:')) {
+      try {
+        await launchUrl(Uri.parse(target));
+      } catch (e) {
+        if (mounted) message(context, 'Could not start the call.');
+      }
     } else if (Uri.tryParse(target)?.scheme == 'https') {
       try {
         final opened = await launchUrl(
