@@ -23,7 +23,12 @@ Future<Store> _open(WidgetTester tester, {bool withoutTheme = false}) async {
 
 Future<void> _section(WidgetTester tester, String key) async {
   await tester.tap(find.byKey(ValueKey('settings-$key')));
-  await tester.pumpAndSettle();
+  // the Scrolling Text page shows the moving line itself, which never stops, so wait a moment instead of for stillness
+  if (key == 'scrollingText') {
+    await tester.pump(const Duration(milliseconds: 600));
+  } else {
+    await tester.pumpAndSettle();
+  }
 }
 
 Future<void> _scrollToSave(WidgetTester tester) => tester.scrollUntilVisible(
@@ -57,8 +62,13 @@ void main() {
     expect(find.byKey(const ValueKey('settings-theme')), findsOneWidget, reason: 'the Settings list is still there');
     expect(store.entries('settings').firstWhere((e) => e.id == 'theme').text('name'), 'Theme', reason: 'the record is never saved without a name');
 
+    // Scrolling Text is now its own page (preview, animation, colours); its full form opens from "All Scrolling Text options".
     await _section(tester, 'scrollingText');
     expect(find.text('Add new'), findsNothing);
+    await tester.ensureVisible(find.byKey(const ValueKey('open-scrolling-all')));
+    await tester.tap(find.byKey(const ValueKey('open-scrolling-all')));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
     await _scrollToSave(tester);
     expect(find.text('Save changes'), findsOneWidget);
     expect(tester.takeException(), isNull);

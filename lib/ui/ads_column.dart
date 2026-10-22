@@ -351,6 +351,16 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
     }
     _finishCurrent();
     final next = widget.rotation.current(widget.slot);
+    if (widget.config.animation == 'none') {
+      // "None": the next ad simply replaces this one.
+      setState(() {
+        outgoing = null;
+        shown = next;
+        changes++;
+      });
+      _arm(Duration(seconds: adSeconds(next, widget.config)));
+      return;
+    }
     setState(() {
       outgoing = shown;
       shown = next;
@@ -400,7 +410,7 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
   String get _typeOfCurrentChange {
     final a = widget.config.animation;
     if (a != 'mix') return a;
-    final keys = adAnimations.keys.toList();
+    final keys = adAnimations.keys.where((k) => k != 'none').toList();
     return keys[(changes - 1) % keys.length];
   }
 }

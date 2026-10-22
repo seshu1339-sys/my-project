@@ -177,7 +177,9 @@ class WireframeHome extends StatelessWidget {
           orElse: () => const Entry('scrollingText', {}),
         );
     final tickerTextValue = noticeTickerText(scrolling, store.language);
-    final notice = scrolling.active && tickerTextValue.isNotEmpty
+    // The Scrolling Text's own animation (Settings > Homepage sections): "Marquee" is the strip's own scrolling, the others play on it as it appears.
+    final scrollingAnimation = effectiveSectionConfig(settings, 'scrollingText');
+    final notice0 = scrolling.active && tickerTextValue.isNotEmpty
         ? Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TickerStrip(
@@ -211,6 +213,7 @@ class WireframeHome extends StatelessWidget {
             ),
           )
         : const SizedBox.shrink();
+    final notice = scrollingAnimation.text('animation') == 'marquee' ? notice0 : applyEntranceAnimation(scrollingAnimation, notice0);
     final page = layoutFor(context, settings, 'background');
     final categoryLayout = layoutFor(context, settings, 'categories');
     final productLayout = layoutFor(context, settings, 'products');

@@ -6,6 +6,7 @@ import '../domain/catalog.dart';
 import 'animation_settings.dart';
 import 'home_section_config.dart';
 import 'reset_confirmation.dart';
+import 'section_animations.dart';
 import 'shared.dart';
 
 /// Shared by the editor and renderer. Zero dimensions mean automatic sizing.
@@ -23,8 +24,8 @@ const layoutComponents = <String, String>{
   'cartIcon': 'Shopping bag icon',
   'menuIcon': 'Menu icon',
   'office': 'Office address & phone',
-  'notice': 'Ticker / notice bar',
-  'promo': 'Banner carousel',
+  'notice': "Today's Offers",
+  'promo': "Today's Offers Box",
   'categories': 'Categories',
   'moreCategoriesTile': '"More Categories" tile',
   'products': 'Product cards',
@@ -32,8 +33,8 @@ const layoutComponents = <String, String>{
   'popularFilterChips': 'Popular Products filter chips',
   'localServices': 'Local Services',
   'adsLabel': '"ADS" label',
-  'ads': 'Advertisement defaults',
-  'boxes': 'Promotional box defaults',
+  'ads': 'Right Side Ads',
+  'boxes': 'Right Side Ads: boxes below the ads',
   'crossSellStrip': 'Fresh Fruits & Vegetables strip',
   'nearby': 'Nearby shops / map',
   'nearbyShopCard': 'Nearby shop card',
@@ -75,7 +76,7 @@ const layoutComponents = <String, String>{
 /// to the wrong place and change nothing). Selecting one shows a button that
 /// opens that editor. Number 14, the scrolling ticker banner, is one.
 const externalLayoutComponents = <String, String>{
-  'tickerMarquee': 'Ticker marquee banner',
+  'tickerMarquee': 'Scrolling Text',
 };
 
 const _footerBadgeKeys = {
@@ -1005,25 +1006,12 @@ class LayoutSection extends StatelessWidget {
 /// reused for the admin form's own "Preview" button on a tiny demo box.
 Widget applyEntranceAnimation(Entry entry, Widget child) {
   final animation = entry.text('animation', 'none');
-  if (animation != 'fade' && animation != 'slide' && animation != 'zoom') return child;
+  if (animation == 'none' || !homeAnimations.containsKey(animation)) return child;
   final millis = entry.number('entranceMs', entranceMillisDefault.toDouble()).round().clamp(150, 3000);
   // Keyed by what was chosen: when the admin changes the type or the speed, the animation starts over (and the new
   // choice is seen at once) instead of staying as the one that already finished.
   return KeyedSubtree(
     key: ValueKey('entrance-$animation-$millis'),
-    child: TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: millis),
-      curve: Curves.easeOut,
-      builder: (context, t, builtChild) {
-        final faded = Opacity(opacity: t, child: builtChild);
-        return switch (animation) {
-          'slide' => Transform.translate(offset: Offset(0, (1 - t) * 24), child: faded),
-          'zoom' => Transform.scale(scale: .85 + .15 * t, child: faded),
-          _ => faded,
-        };
-      },
-      child: child,
-    ),
+    child: SectionAnimation(type: animation, millis: millis, child: child),
   );
 }

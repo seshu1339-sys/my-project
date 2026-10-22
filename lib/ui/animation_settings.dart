@@ -1,5 +1,6 @@
 import '../domain/catalog.dart';
 import 'home_section_config.dart';
+import 'section_animations.dart';
 
 // ---------------------------------------------------------------------------------------------
 // Settings -> Animations: one record (`settings/animations`) that switches the website's animations on or off, as a whole and
@@ -13,15 +14,16 @@ import 'home_section_config.dart';
 
 /// The parts of the page that can animate, in the order the page shows them: layout key -> label.
 const animationParts = <String, String>{
+  'scrollingText': 'Scrolling Text',
   'header': 'Header',
-  'notice': 'Ticker / notice bar',
-  'promo': 'Offers banner (Today\'s Offers)',
+  'notice': 'Today\'s Offers',
+  'promo': 'Today\'s Offers Box',
+  'boxes': 'Right Side Ads: boxes below the ads',
   'categories': 'Categories',
   'popular': 'Popular Products',
   'localServices': 'Local Services',
   'crossSellStrip': 'Fresh Fruits & Vegetables strip',
-  'ads': 'Advertisements',
-  'boxes': 'Promotional boxes',
+  'ads': 'Right Side Ads',
   'nearby': 'Nearby shops',
   'background': 'Page background',
 };
@@ -29,12 +31,8 @@ const animationParts = <String, String>{
 /// Parts whose pictures rotate on their own; they also get a "how it changes" choice.
 const rotatingParts = {'promo', 'ads'};
 
-const entranceTypes = <String, String>{
-  'none': 'None',
-  'fade': 'Fade in',
-  'slide': 'Slide up + fade in',
-  'zoom': 'Zoom in',
-};
+/// Every animation the admin can choose (one list for the whole home page, see section_animations.dart).
+const entranceTypes = homeAnimations;
 
 /// How long one entrance takes for a speed from 1 (slow) to 10 (fast), in milliseconds. Unset keeps the original 450 ms.
 int entranceMillis(int speed) => (1400 - 110 * speed.clamp(1, 10)).round();
@@ -57,7 +55,8 @@ int? _speedOf(Entry doc, String key) {
 Entry effectiveSectionConfig(List<Entry> settings, String section) {
   final raw = sectionConfig(settings, section);
   final doc = animationsDoc(settings);
-  if (doc.data.isEmpty) return raw;
+  // With nothing chosen in Settings > Animations the site is unchanged, except that the four home sections start with their own simple animation.
+  if (doc.data.isEmpty && !homeSectionDefaults.containsKey(section)) return raw;
   final data = {...raw.data};
   final off = doc.text('enabled', 'true') == 'false' || doc.text('${section}_enabled', 'true') == 'false';
   if (off) {
@@ -71,7 +70,7 @@ Entry effectiveSectionConfig(List<Entry> settings, String section) {
   final own = doc.text('${section}_type');
   final inherited = raw.text('animation');
   final fallback = doc.text('defaultType');
-  final type = own.isNotEmpty ? own : (inherited.isNotEmpty ? inherited : fallback);
+  final type = own.isNotEmpty ? own : (inherited.isNotEmpty ? inherited : (fallback.isNotEmpty ? fallback : (homeSectionDefaults[section] ?? '')));
   if (type.isNotEmpty && entranceTypes.containsKey(type)) data['animation'] = type;
   final speed = _speedOf(doc, '${section}_speed') ?? _speedOf(doc, 'defaultSpeed');
   if (speed != null) {

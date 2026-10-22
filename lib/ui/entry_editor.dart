@@ -43,7 +43,10 @@ class EntryEditor extends StatefulWidget {
     required this.collection,
     this.entry,
     this.embedded = false,
+    this.initialPlacement,
   });
+  // A new promotion starts with this placement (carousel, box, ad, ticker); the default is carousel.
+  final String? initialPlacement;
   final Store store;
   final String collection;
   final Entry? entry;
@@ -132,7 +135,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       'supportEmail': 'info@locamarket.in',
                       'websiteUrl': 'https://locamarket.in',
                       'kind': 'product',
-                      'placement': 'carousel',
+                      'placement': widget.initialPlacement ?? 'carousel',
                       'width': '260',
                       'height': '280',
                       'fontSize': '12',

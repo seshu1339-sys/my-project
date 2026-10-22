@@ -8,6 +8,7 @@ import 'package:ecommerce_app/ui/animation_settings.dart';
 import 'package:ecommerce_app/ui/home_rotating_pages.dart';
 import 'package:ecommerce_app/ui/home_section_config.dart';
 import 'package:ecommerce_app/ui/layout_settings.dart';
+import 'package:ecommerce_app/ui/section_animations.dart';
 import 'package:ecommerce_app/ui/text_animation.dart';
 
 List<Entry> _settings(Map<String, dynamic> animations, {Map<String, Map<String, dynamic>> sections = const {}}) => [
@@ -25,12 +26,26 @@ Future<Store> _store() async {
 void main() {
   group('what the website uses', () {
     test('with no Animations record the site is exactly as it was (the part\'s own settings)', () {
-      final settings = _settings({}, sections: {'promo': {'animation': 'slide', 'animationSpeed': 600}});
-      final effective = effectiveSectionConfig(settings, 'promo');
+      final settings = _settings({}, sections: {'categories': {'animation': 'slide', 'animationSpeed': 600}});
+      final effective = effectiveSectionConfig(settings, 'categories');
       expect(effective.text('animation'), 'slide');
       expect(effective.data.containsKey('entranceMs'), isFalse, reason: 'the original 450 ms stays');
-      expect(identical(effective, sectionConfig(settings, 'promo')), isTrue);
+      expect(identical(effective, sectionConfig(settings, 'categories')), isTrue);
       expect(animationsEnabled(settings), isTrue);
+    });
+
+    test('the four home sections start with a simple animation of their own until the admin chooses another', () {
+      expect(homeSectionDefaults, {'scrollingText': 'marquee', 'notice': 'fade', 'promo': 'slideUp', 'boxes': 'fade', 'ads': 'fade'});
+      for (final part in homeSectionDefaults.entries) {
+        expect(effectiveSectionConfig(const [], part.key).text('animation'), part.value, reason: part.key);
+      }
+      // anything the admin chose wins over the start value, including None
+      expect(effectiveSectionConfig(_settings({'promo_type': 'zoomIn'}), 'promo').text('animation'), 'zoomIn');
+      expect(effectiveSectionConfig(_settings({'boxes_type': 'none'}), 'boxes').text('animation'), 'none');
+      expect(effectiveSectionConfig(_settings({}, sections: {'promo': {'animation': 'none'}}), 'promo').text('animation'), 'none');
+      expect(effectiveSectionConfig(_settings({'enabled': 'false'}), 'promo').text('animation'), 'none', reason: 'the global switch still turns it off');
+      // other parts are not given one
+      expect(effectiveSectionConfig(const [], 'categories').text('animation'), '');
     });
 
     test('the global switch turns every animation off, including banner changes and animated texts', () {
@@ -103,9 +118,9 @@ void main() {
       ),
     );
 
-    TweenAnimationBuilder<double>? entrance(WidgetTester tester) {
-      final found = find.byType(TweenAnimationBuilder<double>);
-      return found.evaluate().isEmpty ? null : tester.widget<TweenAnimationBuilder<double>>(found.first);
+    SectionAnimation? entrance(WidgetTester tester) {
+      final found = find.byType(SectionAnimation);
+      return found.evaluate().isEmpty ? null : tester.widget<SectionAnimation>(found.first);
     }
 
     testWidgets('switching a part on, changing its speed and switching it off all show on the open page at once', (tester) async {
@@ -118,13 +133,13 @@ void main() {
       await tester.pump();
       var running = entrance(tester);
       expect(running, isNotNull);
-      expect(running!.duration, Duration(milliseconds: entranceMillis(10)));
+      expect(running!.millis, entranceMillis(10));
       await tester.pumpAndSettle();
 
       await store.save('settings', const Entry('animations', {'categories_type': 'zoom', 'categories_speed': 1}));
       await tester.pump();
       running = entrance(tester);
-      expect(running!.duration, Duration(milliseconds: entranceMillis(1)), reason: 'the new speed is used');
+      expect(running!.millis, entranceMillis(1), reason: 'the new speed is used');
       // the animation starts over: the text is not yet fully visible
       expect(tester.widget<Opacity>(find.ancestor(of: find.text('Categories here'), matching: find.byType(Opacity)).first).opacity, lessThan(1));
       await tester.pumpAndSettle();
@@ -140,8 +155,8 @@ void main() {
       await store.save('settings', const Entry('section_categories', {'animation': 'slide'}));
       await store.save('settings', const Entry('animations', {'popular_type': 'zoom'}));
       await tester.pumpWidget(page(store));
-      final running = tester.widget<TweenAnimationBuilder<double>>(find.byType(TweenAnimationBuilder<double>).first);
-      expect(running.duration, const Duration(milliseconds: 450));
+      final running = tester.widget<SectionAnimation>(find.byType(SectionAnimation).first);
+      expect(running.millis, 450);
     });
 
     testWidgets('zoom in is a real entrance (starts smaller, ends full size)', (tester) async {
@@ -202,7 +217,7 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await pick(find.byKey(const ValueKey('anim-default-type')), 'Fade in');
+      await pick(find.byKey(const ValueKey('anim-default-type')), 'Fade');
       await pick(find.byKey(const ValueKey('anim-default-speed')), '10 (fastest)');
       await tester.ensureVisible(find.byKey(const ValueKey('anim-categories-enabled')));
       await tester.tap(find.byKey(const ValueKey('anim-categories-enabled')));
@@ -240,7 +255,7 @@ void main() {
       await tester.ensureVisible(find.byKey(const ValueKey('anim-preview-play')));
       await tester.tap(find.byKey(const ValueKey('anim-preview-play')));
       await tester.pump(const Duration(milliseconds: 50));
-      expect(find.byType(TweenAnimationBuilder<double>), findsOneWidget);
+      expect(find.byType(SectionAnimation), findsOneWidget);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

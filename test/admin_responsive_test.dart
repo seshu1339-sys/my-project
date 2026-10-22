@@ -41,6 +41,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('settings-productImageLibrary')), 120, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(find.byKey(const ValueKey('settings-productImageLibrary')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-productImageLibrary')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add new'));

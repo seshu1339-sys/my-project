@@ -55,11 +55,11 @@ void main() {
         if ((text.data ?? '').contains(' – ')) text.data!,
     ];
     final i13 = labels.indexWhere((l) => l.startsWith('13 – '));
-    final i14 = labels.indexWhere((l) => l.startsWith('14 – Ticker marquee banner'));
+    final i14 = labels.indexWhere((l) => l.startsWith('14 – Scrolling Text'));
     final i15 = labels.indexWhere((l) => l.startsWith('15 – '));
     expect(i14, greaterThan(i13));
     expect(i15, greaterThan(i14));
-    await tester.tap(find.textContaining('14 – Ticker marquee banner').last);
+    await tester.tap(find.textContaining('14 – Scrolling Text').last);
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('open-scrolling-text-settings')), findsOneWidget);
     expect(find.text('Save layout'), findsNothing, reason: 'nothing to save on this panel');

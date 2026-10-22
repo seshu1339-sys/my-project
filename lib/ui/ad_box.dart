@@ -17,8 +17,8 @@ class AdBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = ad.text('contentType', ad.text('imageUrl').isEmpty ? 'text' : 'image');
     final image = mobile && ad.text('mobileImageUrl').isNotEmpty ? ad.text('mobileImageUrl') : ad.text('imageUrl');
-    final background = colorFromHex(ad.text('backgroundColor'), Theme.of(context).colorScheme.primaryContainer);
-    final textColor = colorFromHex(ad.text('textColor'), Colors.black87);
+    final background = colorFromHex(ad.text('backgroundColor', config.backgroundColor), Theme.of(context).colorScheme.primaryContainer);
+    final textColor = colorFromHex(ad.text('textColor', config.textColor), Colors.black87);
     final showImage = type != 'text' && image.isNotEmpty;
     final showText = type != 'image' || image.isEmpty;
     final overImage = showImage && showText;

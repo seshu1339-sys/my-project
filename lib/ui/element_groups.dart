@@ -54,7 +54,7 @@ final elementGroups = <ElementGroup>[
   ElementGroup(
     15,
     'promo',
-    'Offers banner carousel',
+    "Today's Offers Box",
     collection: 'promotions',
     keyPrefix: 'promo',
     filter: (e) => e.text('placement') == 'carousel',
@@ -69,7 +69,7 @@ final elementGroups = <ElementGroup>[
   ElementGroup(
     23,
     'ads',
-    'Advertisement boxes',
+    'Right Side Ads',
     collection: 'promotions',
     keyPrefix: 'promo',
     filter: (e) => e.text('placement') == 'ad',
@@ -77,7 +77,7 @@ final elementGroups = <ElementGroup>[
   ElementGroup(
     24,
     'boxes',
-    'Promotional boxes',
+    'Right Side Ads: boxes below the ads',
     collection: 'promotions',
     keyPrefix: 'promo',
     filter: (e) => e.text('placement') == 'box',

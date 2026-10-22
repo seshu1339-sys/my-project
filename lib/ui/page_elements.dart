@@ -47,12 +47,12 @@ const pageElements = <PageElement>[
   PageElement(11, 'menuIcon', 'Menu icon'),
   PageElement(12, 'office', 'Office address & phone'),
   // --- Home page, remaining sections (round 2) ---
-  PageElement(13, 'notice', "Today's Best Offers strip"),
-  PageElement(14, 'tickerMarquee', 'Ticker marquee banner'),
+  PageElement(13, 'notice', "Today's Offers"),
+  PageElement(14, 'tickerMarquee', 'Scrolling Text'),
   PageElement(
     15,
     'promo',
-    'Offers banner carousel (group — see 15.1, 15.2, ...)',
+    "Today's Offers Box (group — see 15.1, 15.2, ...)",
   ),
   PageElement(
     16,

@@ -1,4 +1,5 @@
 import 'catalog.dart';
+import 'home_animations.dart';
 import 'radius.dart';
 import 'towns.dart';
 
@@ -14,14 +15,8 @@ import 'towns.dart';
 //   locations (towns, blank = everywhere)   package normal|silver|gold   rounds, seconds, maxPerDay   pinned   order
 // ---------------------------------------------------------------------------------------------
 
-const adAnimations = <String, String>{
-  'fade': 'Fade',
-  'slideUp': 'Slide up',
-  'slideLeft': 'Slide left',
-  'flip': 'Flip',
-  'zoom': 'Zoom',
-  'cube': '3D cube',
-};
+/// The change animations of the Right Side Ads: the one list shared by the whole home page (home_animations.dart).
+const adAnimations = homeAnimations;
 
 const adPackages = <String, String>{'normal': 'Normal', 'silver': 'Silver', 'gold': 'Gold'};
 
@@ -50,6 +45,8 @@ class AdsConfig {
     this.pauseOnHover = true,
     this.label = 'Ad',
     this.maxPerArea = 0,
+    this.backgroundColor = '',
+    this.textColor = '',
   });
 
   final int desktopSlots, mobileSlots;
@@ -59,6 +56,8 @@ class AdsConfig {
   final int animationSpeed, seconds;
   // The most ads (or offers) with a radius that may run over the same area at the same time; 0 = no limit.
   final int maxPerArea;
+  // Colours for ads that have none of their own ('' = the theme's).
+  final String backgroundColor, textColor;
 
   /// How long one change takes, from speed 1 (slow) to 10 (fast).
   Duration get transition => Duration(milliseconds: (1400 - 110 * animationSpeed.clamp(1, 10)).round());
@@ -79,11 +78,13 @@ class AdsConfig {
       borderWidth: doc.number('borderWidth', d.borderWidth).clamp(0, 8).toDouble(),
       borderColor: doc.text('borderColor', d.borderColor),
       shadow: doc.number('shadow', d.shadow).clamp(0, 1).toDouble(),
-      animation: animation == 'mix' || adAnimations.containsKey(animation) ? animation : d.animation,
+      animation: animation == 'mix' || adAnimations.containsKey(animation) || legacyAnimations.containsKey(animation) ? animation : d.animation,
       animationSpeed: doc.number('animationSpeed', d.animationSpeed.toDouble()).round().clamp(1, 10),
       seconds: doc.number('seconds', d.seconds.toDouble()).round().clamp(2, 120),
       pauseOnHover: doc.text('pauseOnHover', 'true') != 'false',
       maxPerArea: doc.number('maxPerArea', 0).round().clamp(0, 50),
+      backgroundColor: doc.text('backgroundColor'),
+      textColor: doc.text('textColor'),
       label: doc.text('label', d.label).trim().isEmpty ? d.label : doc.text('label', d.label).trim(),
     );
   }

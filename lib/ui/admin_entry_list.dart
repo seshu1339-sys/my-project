@@ -48,9 +48,11 @@ class AdminSingleRecord extends StatelessWidget {
 /// and shops) drag-to-reorder and "Renumber". Products also get a search box, filters and bulk "Assign shop". [section] is a
 /// key of `adminSections`.
 class AdminEntryList extends StatefulWidget {
-  const AdminEntryList({super.key, required this.store, required this.section});
+  const AdminEntryList({super.key, required this.store, required this.section, this.placement});
   final Store store;
   final String section;
+  // Promotions only: show just one kind (carousel = Today's Offers Box, box = the boxes below the ads) and start new ones as that kind.
+  final String? placement;
   @override
   State<AdminEntryList> createState() => _AdminEntryListState();
 }
@@ -75,7 +77,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
   bool get _filtered => search.text.trim().isNotEmpty || noShopOnly || categoryId != null || status != 'all';
 
   Future<void> _edit(Entry? entry) => Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => EntryEditor(store: store, collection: section, entry: entry)),
+    MaterialPageRoute<void>(builder: (_) => EntryEditor(store: store, collection: section, entry: entry, initialPlacement: widget.placement)),
   );
 
   Future<void> _remove(Entry entry) async {
@@ -153,6 +155,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
 
   /// The records to show, after the search box and filters (products only).
   List<Entry> _visible(List<Entry> sorted) {
+    if (section == 'promotions' && widget.placement != null) return [for (final p in sorted) if (p.text('placement') == widget.placement) p];
     if (section != 'products') return sorted;
     final categories = {for (final c in store.entries('categories')) c.id: c.text('name', c.id).toLowerCase()};
     final shops = {for (final s in store.entries('shops')) s.id: s.text('name', s.id).toLowerCase()};

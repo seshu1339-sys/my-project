@@ -11,6 +11,7 @@ import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
 import 'layout_current_values.dart';
 import 'layout_settings.dart';
+import 'section_animations.dart';
 import 'reset_confirmation.dart';
 import 'text_animation.dart';
 import 'home_section_config.dart';
@@ -746,14 +747,8 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               decoration: InputDecoration(
                 labelText: _shown(key, 'Entrance animation'),
               ),
-              items: const [
-                DropdownMenuItem(value: 'none', child: Text('None')),
-                DropdownMenuItem(value: 'fade', child: Text('Fade in')),
-                DropdownMenuItem(
-                  value: 'slide',
-                  child: Text('Slide + fade in'),
-                ),
-                DropdownMenuItem(value: 'zoom', child: Text('Zoom in')),
+              items: [
+                for (final e in homeAnimations.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
               ],
               onChanged: (v) => _setValue(key, v ?? 'none'),
             ),
