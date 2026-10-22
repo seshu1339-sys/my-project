@@ -15,6 +15,9 @@ Object.assign(exports, require('./notifications'));
 Object.assign(exports, require('./quick-items'));
 Object.assign(exports, require('./image-webp'));
 Object.assign(exports, require('./vendor-photos'));
+// Vendor ads: submit, admin approve/reject/remove, daily and weekly summaries (functions/vendor-ads.js). Its exports._ads is test-only, so only the callables are re-exported.
+const {submitVendorAd, decideVendorAd, removeVendorAd, setAdSummary, sendAdSummaries} = require('./vendor-ads');
+Object.assign(exports, {submitVendorAd, decideVendorAd, removeVendorAd, setAdSummary, sendAdSummaries});
 Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));

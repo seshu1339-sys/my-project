@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "vendorNotices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "vendorId", "order": "ASCENDING"},
+        {"fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "adSubmissions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "vendorId", "order": "ASCENDING"},
+        {"fieldPath": "submittedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "adViews",
       "queryScope": "COLLECTION",
       "fields": [

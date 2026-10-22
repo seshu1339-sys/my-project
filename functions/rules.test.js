@@ -52,6 +52,20 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(alice, 'adViews/v1')));
     await assertSucceeds(getDoc(doc(admin, 'adViews/v1')));
     await assertFails(getDoc(doc(admin, 'adViewGuard/x')));
+    // Vendor ads: the vendor reads only their own submissions and notices; nobody writes them from a client.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'adSubmissions/s1'), {vendorId: 'alice', status: 'pending'});
+      await setDoc(doc(ctx.firestore(), 'adSubmissions/s2'), {vendorId: 'someone', status: 'pending'});
+      await setDoc(doc(ctx.firestore(), 'vendorNotices/n1'), {vendorId: 'alice', title: 'Approved'});
+    });
+    await assertSucceeds(getDoc(doc(alice, 'adSubmissions/s1')));
+    await assertFails(getDoc(doc(alice, 'adSubmissions/s2')));
+    await assertSucceeds(getDoc(doc(admin, 'adSubmissions/s2')));
+    await assertFails(setDoc(doc(alice, 'adSubmissions/s3'), {vendorId: 'alice', status: 'approved'}));
+    await assertFails(setDoc(doc(alice, 'adSubmissions/s1'), {status: 'approved'}));
+    await assertSucceeds(getDoc(doc(alice, 'vendorNotices/n1')));
+    await assertFails(getDoc(doc(bob, 'vendorNotices/n1')));
+    await assertFails(setDoc(doc(alice, 'vendorNotices/n9'), {vendorId: 'alice'}));
     await assertFails(setDoc(doc(alice, 'users/alice'), {name: 'Alice', admin: true}));
     await assertSucceeds(setDoc(doc(alice, 'users/alice'), {name: 'Alice'}));
     // Language, saved-card display and wishlist are the other fields the client merges onto a profile.

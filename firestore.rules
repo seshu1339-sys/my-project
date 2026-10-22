@@ -36,6 +36,15 @@ service cloud.firestore {
       allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
       allow write: if false;
     }
+    // Vendor ads: a vendor reads their own submissions (pending / approved / rejected) and notices; functions write them.
+    match /adSubmissions/{id} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /vendorNotices/{id} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
     match /adViews/{id} {
       allow read: if admin();
       allow write: if false;
