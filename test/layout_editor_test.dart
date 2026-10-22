@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'label_finder.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/color_picker_field.dart';
 import 'package:ecommerce_app/ui/layout_editor.dart';
@@ -67,9 +68,9 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
-      await tester.ensureVisible(find.widgetWithText(DropdownButtonFormField<String>, 'Font family'));
+      await tester.ensureVisible(labelled(find.byType(DropdownButtonFormField<String>), 'Font family'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Font family'));
+      await tester.tap(labelled(find.byType(DropdownButtonFormField<String>), 'Font family'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Poppins').last);
       await tester.pumpAndSettle();
@@ -87,9 +88,9 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
-      await tester.ensureVisible(find.widgetWithText(DropdownButtonFormField<String>, 'Font style'));
+      await tester.ensureVisible(labelled(find.byType(DropdownButtonFormField<String>), 'Font style'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Font style'));
+      await tester.tap(labelled(find.byType(DropdownButtonFormField<String>), 'Font style'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Italic').last);
       await tester.pumpAndSettle();
@@ -125,7 +126,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
         child: LayoutFieldsForm(store: store, component: 'categories'),
       ))));
-      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Entrance animation'), findsOneWidget);
+      expect(labelled(find.byType(DropdownButtonFormField<String>), 'Entrance animation'), findsOneWidget);
       await tester.ensureVisible(find.text('Preview'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Preview'));
@@ -156,7 +157,7 @@ void main() {
       await tester.tap(find.text('Advanced'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('logo-width')), findsNothing);
-      expect(find.widgetWithText(DropdownButtonFormField<String>, 'Entrance animation'), findsNothing);
+      expect(labelled(find.byType(DropdownButtonFormField<String>), 'Entrance animation'), findsNothing);
       // Height remains — it's the one dimension that's actually wired.
       expect(find.byKey(const ValueKey('logo-height')), findsOneWidget);
       // logo still gets Visible, same as every other component.

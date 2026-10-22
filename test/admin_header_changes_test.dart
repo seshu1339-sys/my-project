@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'label_finder.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
@@ -59,7 +60,7 @@ void main() {
     // an unset setting says so instead of pretending to be at the minimum
     expect(find.text('Current value: not set (default)'), findsWidgets);
     // typing moves the slider and the label
-    await tester.enterText(find.widgetWithText(TextFormField, 'Height (0 = automatic)'), '300');
+    await tester.enterText(labelled(find.byType(TextFormField), 'Height (0 = automatic)'), '300');
     await tester.pump();
     expect(find.text('Current value: 300 px'), findsOneWidget);
     expect(tester.widget<Slider>(find.byKey(const ValueKey('categories-height-slider'))).value, 300);
@@ -88,7 +89,7 @@ void main() {
     final store = await _store();
     await _form(tester, store, 'search');
     for (final label in ['Search icon color', 'Mic icon color', 'Camera icon color', 'Placeholder text color', 'Border color']) {
-      expect(find.widgetWithText(InputDecorator, label), findsOneWidget, reason: label);
+      expect(labelled(find.byType(InputDecorator), label), findsOneWidget, reason: label);
     }
   });
 
@@ -123,7 +124,7 @@ void main() {
   testWidgets('the logo can be changed from Layout Settings with an upload', (tester) async {
     final store = await _store();
     await _form(tester, store, 'logo');
-    expect(find.widgetWithText(TextFormField, 'Icon image URL (optional)'), findsOneWidget);
+    expect(labelled(find.byType(TextFormField), 'Icon image URL (optional)'), findsOneWidget);
     expect(find.text('Upload image'), findsOneWidget);
   });
 
@@ -168,8 +169,8 @@ void main() {
   testWidgets('Option 15 (banner carousel) has animation choices for its texts', (tester) async {
     final store = await _store();
     await _form(tester, store, 'promo');
-    expect(find.widgetWithText(DropdownButtonFormField<String>, _headingLabel), findsOneWidget);
-    final dropdown = find.widgetWithText(DropdownButtonFormField<String>, _bannerLabel);
+    expect(labelled(find.byType(DropdownButtonFormField<String>), _headingLabel), findsOneWidget);
+    final dropdown = labelled(find.byType(DropdownButtonFormField<String>), _bannerLabel);
     expect(dropdown, findsOneWidget);
     await tester.ensureVisible(dropdown);
     await tester.pumpAndSettle();
@@ -267,7 +268,7 @@ void main() {
       }.entries) {
         final store = await _store();
         await _form(tester, store, 'promo');
-        final dropdown = find.widgetWithText(DropdownButtonFormField<String>, _bannerLabel);
+        final dropdown = labelled(find.byType(DropdownButtonFormField<String>), _bannerLabel);
         await tester.ensureVisible(dropdown);
         await tester.pumpAndSettle();
         await tester.tap(dropdown);

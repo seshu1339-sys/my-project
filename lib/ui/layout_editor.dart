@@ -9,6 +9,7 @@ import 'color_picker_field.dart';
 import 'design_tokens.dart';
 import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
+import 'layout_current_values.dart';
 import 'layout_settings.dart';
 import 'reset_confirmation.dart';
 import 'text_animation.dart';
@@ -581,13 +582,19 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
     );
   }
 
+  /// "Label (value now)": the value this field is using right now, from the saved record, so it changes as soon as a save completes.
+  String _shown(String key, String label) => labelWithValue(
+    label,
+    layoutBracketText(widget.component, key, saved, viewport: MediaQuery.sizeOf(context).width),
+  );
+
   Widget _fieldWidget(String key) {
     switch (_kindOf(key)) {
       case _FieldKind.toggle:
         return SwitchListTile.adaptive(
           key: ValueKey('${widget.component}-$key'),
           contentPadding: EdgeInsets.zero,
-          title: Text(_toggleLabels[key]!),
+          title: Text(_shown(key, _toggleLabels[key]!)),
           value: values[key] as bool,
           onChanged: (v) => _setValue(key, v),
         );
@@ -600,7 +607,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
         }.contains(widget.component);
         return ColorPickerField(
           key: ValueKey('${widget.component}-$key'),
-          label: key == 'textColor' && isIconOnly
+          label: _shown(key, key == 'textColor' && isIconOnly
               ? 'Icon color'
               : key == 'textColor' && widget.component == 'search'
               ? 'Typed text color'
@@ -614,7 +621,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
                   'placeholderColor': 'Placeholder text color',
                   'gradientStart': 'Gradient start',
                   'gradientEnd': 'Gradient end',
-                }[key]!,
+                }[key]!),
           value: values[key] as String,
           onChanged: (v) => _setValue(key, v),
         );
@@ -624,7 +631,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           initialValue: (values[key] as String).isEmpty
               ? null
               : values[key] as String,
-          decoration: const InputDecoration(labelText: 'Font family'),
+          decoration: InputDecoration(labelText: _shown(key, 'Font family')),
           hint: const Text('Theme default'),
           items: [
             for (final f in fontFamilyOptions)
@@ -638,7 +645,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           initialValue: (values[key] as String).isEmpty
               ? 'normal'
               : values[key] as String,
-          decoration: const InputDecoration(labelText: 'Font style'),
+          decoration: InputDecoration(labelText: _shown(key, 'Font style')),
           items: const [
             DropdownMenuItem(value: 'normal', child: Text('Normal')),
             DropdownMenuItem(value: 'italic', child: Text('Italic')),
@@ -651,7 +658,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           initialValue: (values[key] as String).isEmpty
               ? null
               : values[key] as String,
-          decoration: const InputDecoration(labelText: 'Font weight'),
+          decoration: InputDecoration(labelText: _shown(key, 'Font weight')),
           hint: const Text('Default'),
           items: const [
             DropdownMenuItem(value: '400', child: Text('Normal')),
@@ -670,7 +677,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               ? (isNotice ? 'rtl' : 'up')
               : values[key] as String,
           decoration: InputDecoration(
-            labelText: isNotice ? 'Direction' : 'Scroll direction',
+            labelText: _shown(key, isNotice ? 'Direction' : 'Scroll direction'),
           ),
           items: isNotice
               ? const [
@@ -690,7 +697,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               ? values[key] as String
               : '',
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Animation type'),
+          decoration: InputDecoration(labelText: _shown(key, 'Animation type')),
           items: [
             const DropdownMenuItem(
               value: '',
@@ -709,9 +716,9 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               : '',
           isExpanded: true,
           decoration: InputDecoration(
-            labelText: key == 'headingAnimation'
+            labelText: _shown(key, key == 'headingAnimation'
                 ? '"Today\'s Offers" heading animation'
-                : 'Banner text animation (e.g. "Big Savings Everyday")',
+                : 'Banner text animation (e.g. "Big Savings Everyday")'),
           ),
           items: [
             const DropdownMenuItem(value: '', child: Text('None')),
@@ -736,8 +743,8 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               initialValue: (values[key] as String).isEmpty
                   ? 'none'
                   : values[key] as String,
-              decoration: const InputDecoration(
-                labelText: 'Entrance animation',
+              decoration: InputDecoration(
+                labelText: _shown(key, 'Entrance animation'),
               ),
               items: const [
                 DropdownMenuItem(value: 'none', child: Text('None')),
@@ -786,8 +793,8 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
             ? 'start'
             : values[key] as String;
         return InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Alignment',
+          decoration: InputDecoration(
+            labelText: _shown(key, 'Alignment'),
             border: InputBorder.none,
           ),
           child: SegmentedButton<String>(
@@ -819,17 +826,19 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           key: ValueKey('${widget.component}-$key'),
           controller: controllers[key],
           decoration: InputDecoration(
-            labelText:
-                dimensionFields[key]?.$1 ??
-                {
-                  'fontFamily': 'Font family',
-                  'iconUrl': 'Icon image URL (optional)',
-                  'backgroundImage':
-                      'Background photo URL (optional — or use Upload below)',
-                  'text': widget.component == 'office'
-                      ? 'Office address and phone (shown exactly as typed)'
-                      : 'Text content (optional — leave blank for the default)',
-                }[key],
+            labelText: _shown(
+              key,
+              dimensionFields[key]?.$1 ??
+                  {
+                    'fontFamily': 'Font family',
+                    'iconUrl': 'Icon image URL (optional)',
+                    'backgroundImage':
+                        'Background photo URL (optional — or use Upload below)',
+                    'text': widget.component == 'office'
+                        ? 'Office address and phone (shown exactly as typed)'
+                        : 'Text content (optional — leave blank for the default)',
+                  }[key]!,
+            ),
             suffixText: isPixel ? 'px' : null,
             alignLabelWithHint: key == 'text' && widget.component == 'office',
             helperText: dimensionFields.containsKey(key)
