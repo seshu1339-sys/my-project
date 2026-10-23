@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../data/store.dart';
 import '../services/strings.dart';
 import 'layout_settings.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 import 'account_auth_form.dart';
 import 'location_picker_dialog.dart';

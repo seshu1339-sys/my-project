@@ -11,6 +11,7 @@ import 'color_picker_field.dart';
 import 'home_ticker_strip.dart';
 import 'layout_editor.dart';
 import 'layout_settings.dart';
+import 'notice_independence.dart';
 import 'section_animations.dart';
 import 'shared.dart';
 
@@ -166,9 +167,24 @@ class _HomeSectionEditorState extends State<HomeSectionEditor> {
 
   String _name(String type) => homeAnimations[type] ?? (type == 'mix' ? 'Mix of all' : legacyAnimations[type] ?? type);
 
+  /// Today's Offers only: stop inheriting from the Scrolling Text (the banner keeps its look).
+  Future<void> _makeIndependent() async {
+    setState(() => busy = true);
+    try {
+      final copied = await makeNoticeIndependent(store);
+      if (mounted) message(context, "Done. Today's Offers now has its own settings ($copied copied from the Scrolling Text); the banner looks the same.");
+    } catch (e) {
+      if (mounted) message(context, e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> _save() async {
     setState(() => busy = true);
     try {
+      // Saving this banner's colours must not be undone (or leaked) by the Scrolling Text: it gets its own settings first.
+      if (part == 'notice') await makeNoticeIndependent(store);
       final record = _colorRecord;
       final changes = <String, dynamic>{for (final k in colorKeys) if (colors[k]!.isNotEmpty) k: colors[k]};
       final remove = {for (final k in colorKeys) if (colors[k]!.isEmpty && record.data.containsKey(k)) k};
@@ -293,6 +309,22 @@ class _HomeSectionEditorState extends State<HomeSectionEditor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (part == 'notice' && !noticeIsIndependent(store.entries('settings')))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Card(
+                    key: const ValueKey('notice-shared'),
+                    color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: .4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('This banner still borrows its label, border and colours from the Scrolling Text, so changing one changes the other.'),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(key: const ValueKey('decouple-notice'), onPressed: busy ? null : _makeIndependent, icon: const Icon(Icons.link_off), label: const Text("Make it independent (it keeps today's look)")),
+                      ]),
+                    ),
+                  ),
+                ),
               Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 const Text('Preview', style: TextStyle(fontWeight: FontWeight.bold)),
                 Text('(${_name(animation)})', key: ValueKey('preview-name-$part')),

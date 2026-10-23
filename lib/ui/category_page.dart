@@ -5,6 +5,7 @@ import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'product_page.dart';
 import 'quick_fresh.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 
 class CategoryPage extends StatelessWidget {

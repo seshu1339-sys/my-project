@@ -41,6 +41,17 @@ bool radiusCovers(Entry e, double? lat, double? lng) {
   return distanceKm(lat, lng, centre.lat, centre.lng) <= e.number('radiusKm');
 }
 
+/// Does this promotion reach the customer? The common radius first (inside the circle, if it has one), then the older pincode / target-area rules
+/// of [promotionMatchesLocation]. The two live apart so the radius rule depends on the catalog and not the other way round.
+bool promotionReaches(
+  Entry promotion, {
+  required String customerPincode,
+  double? customerLatitude,
+  double? customerLongitude,
+}) =>
+    radiusCovers(promotion, customerLatitude, customerLongitude) &&
+    promotionMatchesLocation(promotion, customerPincode: customerPincode, customerLatitude: customerLatitude, customerLongitude: customerLongitude);
+
 /// The ads / offers that cover the customer, each once (an id is never repeated), in their given order.
 List<Entry> coveringCustomer(List<Entry> items, double? lat, double? lng) {
   final seen = <String>{};

@@ -8,7 +8,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/ad_reports.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/services/report_export.dart';
-import 'package:ecommerce_app/ui/admin_ad_reports.dart';
+import 'package:ecommerce_app/ui/ad_reports_page.dart';
 
 Entry day(String ad, String d, Map<String, dynamic> data) => Entry('$ad~$d', {'adId': ad, 'day': d, ...data});
 
@@ -123,7 +123,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(home: AdminAdReportsPage(store: s, today: DateTime(2026, 10, 27))));
+      await tester.pumpWidget(MaterialApp(home: AdReportsPage(store: s, today: DateTime(2026, 10, 27))));
       await tester.pumpAndSettle();
     }
 

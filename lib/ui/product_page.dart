@@ -9,6 +9,7 @@ import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
 import 'reviews.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_page.dart';
 

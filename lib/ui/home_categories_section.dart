@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
-import 'home_widgets.dart';
+import 'home_category_tile.dart';
+import 'home_section_heading.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 

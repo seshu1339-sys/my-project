@@ -66,18 +66,18 @@ void main() {
   group('Today\'s Offers use the same rule', () {
     test('an offer with a radius reaches only customers inside it, on top of the pincode / area rules', () {
       final offer = circle('offer', 10, narsipatnam, {'placement': 'carousel'});
-      bool reaches(double? lat, double? lng, {String pin = ''}) => promotionMatchesLocation(offer, customerPincode: pin, customerLatitude: lat, customerLongitude: lng);
+      bool reaches(double? lat, double? lng, {String pin = ''}) => promotionReaches(offer, customerPincode: pin, customerLatitude: lat, customerLongitude: lng);
       expect(reaches(17.67, 82.62), isTrue);
       expect(reaches(anakapalle.$1, anakapalle.$2), isFalse);
       expect(reaches(null, null), isFalse);
       final withPin = Entry('o2', {...offer.data, 'targetPincode': '531116'});
-      expect(promotionMatchesLocation(withPin, customerPincode: '531116', customerLatitude: 17.67, customerLongitude: 82.62), isTrue);
-      expect(promotionMatchesLocation(withPin, customerPincode: '500001', customerLatitude: 17.67, customerLongitude: 82.62), isFalse, reason: 'both rules apply');
+      expect(promotionReaches(withPin, customerPincode: '531116', customerLatitude: 17.67, customerLongitude: 82.62), isTrue);
+      expect(promotionReaches(withPin, customerPincode: '500001', customerLatitude: 17.67, customerLongitude: 82.62), isFalse, reason: 'both rules apply');
     });
 
     test('offers without a radius behave exactly as before', () {
       const old = Entry('old', {'placement': 'carousel', 'name': 'x'});
-      expect(promotionMatchesLocation(old, customerPincode: '', customerLatitude: null, customerLongitude: null), isTrue);
+      expect(promotionReaches(old, customerPincode: '', customerLatitude: null, customerLongitude: null), isTrue);
     });
   });
 

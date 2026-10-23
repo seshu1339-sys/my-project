@@ -5,36 +5,11 @@ import '../data/store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'quick_add.dart';
 import 'vendor_registration_form.dart';
+
+// The registration checks live with the registration form (a form must not depend on the page that shows it); re-exported for existing callers.
+export 'vendor_registration_form.dart' show vendorApplicationErrors;
 import 'vendor_workspace.dart';
 
-/// Returns every reason the registration must not be submitted yet. Mirrors the
-/// server-side checks in functions/domain.js so nothing incomplete is sent.
-List<String> vendorApplicationErrors({
-  required String ownerName,
-  required String phone,
-  required String shopName,
-  required String shopCategory,
-  required String address,
-  required String pincode,
-  required String description,
-  required bool hasVendorPhoto,
-  required bool hasShopPhoto,
-  required bool hasLocation,
-}) {
-  bool between(String v, int min, int max) => v.trim().length >= min && v.trim().length <= max;
-  return [
-    if (!between(ownerName, 2, 100)) "Enter the owner's full name.",
-    if (!RegExp(r'^\+?[0-9][0-9 -]{6,17}$').hasMatch(phone.trim())) 'Enter a valid contact phone number.',
-    if (!between(shopName, 2, 120)) 'Enter the shop name.',
-    if (!between(shopCategory, 2, 80)) 'Enter the shop category.',
-    if (!between(address, 5, 500)) 'Enter the shop address.',
-    if (!RegExp(r'^\d{6}$').hasMatch(pincode.trim())) 'Enter a valid six-digit pincode.',
-    if (!between(description, 10, 1000)) 'Describe the shop (at least 10 characters).',
-    if (!hasVendorPhoto) 'Upload a clear personal photo of the vendor.',
-    if (!hasShopPhoto) 'Upload a photo of the actual shop.',
-    if (!hasLocation) "Capture the shop's GPS location.",
-  ];
-}
 
 class VendorPage extends StatefulWidget {
   const VendorPage({super.key, required this.store});

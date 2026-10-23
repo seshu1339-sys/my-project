@@ -7,6 +7,7 @@ import '../data/store.dart';
 import 'account_language_field.dart';
 import 'email_link.dart';
 import 'layout_settings.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 
 /// Throws if [value] isn't a plausible email address. Shared by this form

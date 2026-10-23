@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
-import 'home_promotions.dart';
+import 'home_scheduled_promo.dart';
 import 'home_rotating_pages.dart';
 import 'home_section_config.dart';
 import 'layout_settings.dart';

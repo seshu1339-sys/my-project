@@ -12,17 +12,17 @@ String dayText(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.to
 
 /// Settings -> Ads -> Reports: what the server counted for the ads, by date, ad, shop, town and device, with a daily graph,
 /// downloads (Excel, PDF) and a WhatsApp share. The live totals at the top update by themselves as customers see the ads.
-class AdminAdReportsPage extends StatefulWidget {
-  const AdminAdReportsPage({super.key, required this.store, this.vendorId, this.today});
+class AdReportsPage extends StatefulWidget {
+  const AdReportsPage({super.key, required this.store, this.vendorId, this.today});
   final Store store;
   // A vendor passes their own id and sees only their own ads.
   final String? vendorId;
   final DateTime? today;
   @override
-  State<AdminAdReportsPage> createState() => _AdminAdReportsPageState();
+  State<AdReportsPage> createState() => _AdReportsPageState();
 }
 
-class _AdminAdReportsPageState extends State<AdminAdReportsPage> {
+class _AdReportsPageState extends State<AdReportsPage> {
   late DateTime to = widget.today ?? DateTime.now();
   late DateTime from = to.subtract(const Duration(days: 29));
   String adId = '', shop = '', town = '', device = '';

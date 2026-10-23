@@ -5,6 +5,7 @@ import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'layout_settings.dart';
 import 'product_search.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_map.dart';
 import 'shop_page.dart';

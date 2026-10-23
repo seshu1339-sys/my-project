@@ -815,7 +815,7 @@ List<String> allFieldsFor(String component) {
     // Animations for the text inside banners/ads (an offer's title such as
     // "Big Savings Everyday") and for the "Today's Offers" heading.
     if (['promo', 'ads', 'boxes'].contains(component)) 'textAnimation',
-    if (component == 'promo') 'headingAnimation',
+    if (component == 'promo' || component == 'notice') 'headingAnimation',
     // The office address and phone, typed once and shown exactly as typed.
     if (component == 'office') 'text',
     // Lets an admin set a real photo behind the "Today's Best Offers"

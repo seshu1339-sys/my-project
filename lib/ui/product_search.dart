@@ -9,7 +9,7 @@ import '../services/location.dart';
 import '../services/location_town.dart';
 import '../services/place_resolver.dart';
 import 'design_tokens.dart';
-import 'details.dart';
+import 'product_page.dart';
 import 'location_picker.dart';
 import 'shared.dart';
 import 'shop_map.dart';

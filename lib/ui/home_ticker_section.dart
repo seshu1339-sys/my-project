@@ -6,6 +6,7 @@ import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'animation_settings.dart';
+import 'notice_independence.dart';
 import 'shared.dart';
 import 'text_animation.dart';
 
@@ -32,10 +33,11 @@ class HomeTickerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tickerSettings = store
-        .visible('settings')
-        .where((e) => e.id == 'scrollingText')
-        .firstOrNull;
+    // Once independent, the banner reads only its own record; until then it still takes what it lacks from the Scrolling Text (the old behaviour).
+    final independent = noticeIsIndependent(settings);
+    final tickerSettings = independent
+        ? null
+        : store.visible('settings').where((e) => e.id == 'scrollingText').firstOrNull;
     final noticeLayout = layoutFor(context, settings, 'notice');
     final ticker = Entry('notice', {
       ...?tickerSettings?.data,
@@ -103,7 +105,7 @@ class HomeTickerSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              animatedText(effectiveSectionConfig(settings, 'promo'), 'headingAnimation', Text(
+              animatedText(effectiveSectionConfig(settings, independent ? 'notice' : 'promo'), 'headingAnimation', Text(
                 label,
                 maxLines: 1,
                 style:

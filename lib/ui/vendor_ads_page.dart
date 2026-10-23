@@ -7,7 +7,7 @@ import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/catalog.dart';
 import 'ad_box.dart';
-import 'admin_ad_reports.dart';
+import 'ad_reports_page.dart';
 import 'ads_column.dart';
 import 'shared.dart';
 
@@ -109,7 +109,7 @@ class _VendorAdsPageState extends State<VendorAdsPage> {
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     key: const ValueKey('my-ad-report'),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminAdReportsPage(store: store, vendorId: widget.uid))),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdReportsPage(store: store, vendorId: widget.uid))),
                     icon: const Icon(Icons.bar_chart),
                     label: const Text('Daily numbers'),
                   ),

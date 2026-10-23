@@ -23,6 +23,7 @@ import 'responsive_header.dart';
 import 'photo_library_page.dart';
 import 'services_page.dart';
 import '../domain/ads.dart';
+import '../domain/radius.dart';
 import 'ads_column.dart';
 import '../services/ad_tracker.dart';
 import 'offers_ads_page.dart';
@@ -116,7 +117,7 @@ class WireframeHome extends StatelessWidget {
     final promotions = store
         .visible('promotions')
         .where(
-          (e) => promotionMatchesLocation(
+          (e) => promotionReaches(
             e,
             customerPincode: store.pincode,
             customerLatitude: store.latitude,

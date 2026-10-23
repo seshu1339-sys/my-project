@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
-import 'home_widgets.dart';
+import 'home_product_grid.dart';
+import 'home_product_tile.dart';
+import 'home_section_heading.dart';
 import 'layout_settings.dart';
 import 'home_section_config.dart';
 

@@ -5,6 +5,7 @@ import '../services/strings.dart';
 import 'account.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 
 class CartPage extends StatefulWidget {

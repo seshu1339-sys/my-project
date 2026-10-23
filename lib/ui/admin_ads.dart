@@ -8,7 +8,7 @@ import '../domain/radius.dart';
 import '../domain/catalog.dart';
 import '../domain/towns.dart';
 import 'ad_box.dart';
-import 'admin_ad_reports.dart';
+import 'ad_reports_page.dart';
 import 'admin_list_labels.dart';
 import 'ads_column.dart';
 import 'color_picker_field.dart';
@@ -255,7 +255,7 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
                 padding: const EdgeInsets.only(right: 8),
                 child: OutlinedButton.icon(
                   key: const ValueKey('ad-reports'),
-                  onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminAdReportsPage(store: store))),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdReportsPage(store: store))),
                   icon: const Icon(Icons.bar_chart),
                   label: const Text('Reports'),
                 ),
@@ -384,12 +384,14 @@ class AdsConfigForm extends StatefulWidget {
 
 class _AdsConfigFormState extends State<AdsConfigForm> {
   late Map<String, dynamic> values;
+  late Map<String, dynamic> loaded; // what the record held when this form opened: Save writes only what THIS form changed
   bool busy = false;
 
   @override
   void initState() {
     super.initState();
     values = {...widget.store.entries('settings').where((e) => e.id == 'adsConfig').firstOrNull?.data ?? const {}}..remove('name');
+    loaded = {...values};
   }
 
   AdsConfig get current => AdsConfig.from(widget.store.entries('settings'));
@@ -420,7 +422,11 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
   Future<void> _save() async {
     setState(() => busy = true);
     try {
-      await widget.store.save('settings', Entry('adsConfig', {'name': 'Ads settings', ...values}));
+      // Only what was changed here is written, so the animation or colours set meanwhile on the Right Side Ads page are not undone.
+      final changes = {for (final e in values.entries) if ('${loaded[e.key]}' != '${e.value}' || !loaded.containsKey(e.key)) e.key: e.value};
+      final removed = {for (final k in loaded.keys) if (!values.containsKey(k)) k};
+      await widget.store.updateFields('settings', 'adsConfig', changes, remove: removed, fallback: Entry('adsConfig', {'name': 'Ads settings', ...values}));
+      loaded = {...values};
       if (mounted) message(context, 'Ads settings saved. They apply to every ad.');
     } catch (e) {
       if (mounted) message(context, e);

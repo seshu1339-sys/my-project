@@ -20,6 +20,7 @@ class AdminAnimationsForm extends StatefulWidget {
 
 class _AdminAnimationsFormState extends State<AdminAnimationsForm> {
   late Map<String, dynamic> values; // only what the admin set; a missing key means "as before"
+  late Map<String, dynamic> loaded; // what the record held when this page opened: Save writes only what THIS page changed
   bool busy = false;
   int previewRun = 0;
   String previewType = 'fade';
@@ -29,6 +30,7 @@ class _AdminAnimationsFormState extends State<AdminAnimationsForm> {
   void initState() {
     super.initState();
     values = {...animationsDoc(widget.store.entries('settings')).data}..remove('name');
+    loaded = {...values};
   }
 
   String text(String key, [String fallback = '']) {
@@ -49,7 +51,12 @@ class _AdminAnimationsFormState extends State<AdminAnimationsForm> {
   Future<void> save() async {
     setState(() => busy = true);
     try {
-      await widget.store.save('settings', Entry('animations', {'name': 'Animations', ...values}));
+      // Only the choices changed on this page are written, so a choice made meanwhile on another page (Today's Offers, Right Side Ads ...)
+      // that shares this record is not undone by saving here.
+      final changes = {for (final e in values.entries) if ('${loaded[e.key]}' != '${e.value}' || !loaded.containsKey(e.key)) e.key: e.value};
+      final removed = {for (final k in loaded.keys) if (!values.containsKey(k)) k};
+      await widget.store.updateFields('settings', 'animations', changes, remove: removed, fallback: Entry('animations', {'name': 'Animations', ...values}));
+      loaded = {...values};
       if (mounted) message(context, 'Animations saved. Open pages update at once; the site picks it up on its next load.');
     } catch (e) {
       if (mounted) message(context, e);

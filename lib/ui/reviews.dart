@@ -6,6 +6,7 @@ import '../services/strings.dart';
 import '../data/store.dart';
 import 'account.dart';
 import 'layout_settings.dart';
+import 'page_widgets.dart';
 import 'shared.dart';
 
 class Reviews extends StatefulWidget {
