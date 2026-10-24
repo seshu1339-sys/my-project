@@ -76,3 +76,11 @@ category-icons/
 
 # Per-flavor Android Firebase configs (never committed)
 android/app/src/*/google-services.json
+
+# Play Console upload keys (keep them outside the project; this is a safety net)
+play-service-account*.json
+*-service-account*.json
+fastlane/report.xml
+
+# Play upload tool and service-account keys
+e-commerce-app-*.json

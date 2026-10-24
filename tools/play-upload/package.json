@@ -1,0 +1,9 @@
+{
+  "name": "play-upload",
+  "private": true,
+  "type": "module",
+  "description": "Builds a signed AAB for one flavor and uploads it to a Google Play track.",
+  "dependencies": {
+    "google-auth-library": "^9.15.1"
+  }
+}
