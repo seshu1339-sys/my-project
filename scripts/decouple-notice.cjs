@@ -28,7 +28,8 @@ const KEYS = ['backgroundColor', 'backgroundImage', 'borderColor', 'borderWidth'
   if (!process.argv.includes('--apply')) { console.log('Nothing written. Run again with --apply to do it.'); return; }
   const fields = {...copy, independent: {booleanValue: true}};
   if (!notice) fields.section = {stringValue: 'notice'};
-  await api.patch(`${base}/section_notice`, {fields}, {queryParams: {'updateMask.fieldPaths': Object.keys(fields)}});
+  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${encodeURIComponent(k)}`).join('&');
+  await api.patch(`${base}/section_notice?${mask}`, {fields});
   const after = await read('section_notice');
   console.log('Done. independent =', after.independent?.booleanValue, '| fields now:', Object.keys(after).length);
 })().catch(e => { console.error(e.message); process.exitCode = 1; });
