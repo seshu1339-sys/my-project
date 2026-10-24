@@ -34,4 +34,19 @@ void main() {
     expect(rewrites.firstWhere((r) => r['source'] == '/privacy-policy')['destination'], '/privacy-policy.html');
     expect(sources.last, '**');
   });
+
+  test('the delete-data page for the Play Console exists, needs no sign-in, and is served before the app catch-all', () {
+    final page = File('web/delete-account.html').readAsStringSync();
+    expect(page, contains('Delete my account'));
+    expect(page, contains('info@locamarket.in'));
+    expect(page, contains('30 days'));
+    expect(page, contains('What we delete'));
+    expect(page, contains('What we may keep'));
+    expect(page.toLowerCase(), isNot(contains('<form')));
+    expect(html, contains('/delete-account'), reason: 'the policy links to it');
+    final config = jsonDecode(File('firebase.json').readAsStringSync()) as Map<String, dynamic>;
+    final customer = (config['hosting'] as List).cast<Map<String, dynamic>>().firstWhere((h) => h['target'] == 'customer');
+    final sources = [for (final r in (customer['rewrites'] as List).cast<Map<String, dynamic>>()) r['source']];
+    expect(sources.indexOf('/delete-account'), lessThan(sources.indexOf('**')));
+  });
 }
