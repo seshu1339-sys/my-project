@@ -109,7 +109,6 @@ class SectionDescriptor {
 /// Its own show/hide still works via Section Customization as before.
 const reorderableHomeSections = [
   SectionDescriptor('promo', 'promotions', 'Promotions (banner carousel)', Icons.local_offer_outlined),
-  SectionDescriptor('categories', 'categories', 'Categories', Icons.grid_view_outlined),
   SectionDescriptor('popular', 'products', 'Products & services', Icons.shopping_bag_outlined),
   SectionDescriptor('localServices', 'products', 'Local Services', Icons.home_repair_service_outlined),
 ];

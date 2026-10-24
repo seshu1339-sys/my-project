@@ -728,11 +728,11 @@ class _EntryEditorState extends State<EntryEditor> {
             : null,
       ),
       minLines:
-          ['description', 'prices', 'images', 'translations'].contains(key)
+          ['description', 'headerContact', 'prices', 'images', 'translations'].contains(key)
           ? 3
           : 1,
       maxLines:
-          ['description', 'prices', 'images', 'translations'].contains(key)
+          ['description', 'headerContact', 'prices', 'images', 'translations'].contains(key)
           ? 5
           : 1,
       keyboardType: numeric.contains(key)
@@ -900,7 +900,7 @@ class _EntryEditorState extends State<EntryEditor> {
                           }
                         },
                   icon: const Icon(Icons.upload),
-                  label: const Text('Upload image'),
+                  label: Text(widget.collection == 'settings' ? 'Upload logo (JPG or PNG)' : 'Upload image'),
                 ),
               Row(
                 children: [

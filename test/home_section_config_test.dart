@@ -30,9 +30,9 @@ void main() {
       expect(sectionOrder(settings, 'categories'), 5.0);
     });
 
-    test('reorderableHomeSections lists exactly the 4 reorderable sections', () {
+    test('reorderableHomeSections lists exactly the 3 reorderable sections (Categories was removed from the home page)', () {
       expect(reorderableHomeSections.map((d) => d.key).toList(),
-          ['promo', 'categories', 'popular', 'localServices']);
+          ['promo', 'popular', 'localServices']);
     });
 
     test('adjustSectionField/adjustSectionHeight write through to a bare Store', () async {
@@ -59,7 +59,7 @@ void main() {
       await reorderHomeSections(store, oldIndex, 0);
       expect(
         sectionOrder(store.entries('settings'), 'localServices'),
-        lessThan(sectionOrder(store.entries('settings'), 'categories')),
+        lessThan(sectionOrder(store.entries('settings'), 'promo')),
       );
       store.dispose();
     });

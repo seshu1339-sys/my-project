@@ -57,7 +57,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.bySemanticsLabel('App logo'), findsOneWidget);
-      expect(find.text('Categories'), findsWidgets);
+      expect(find.text('Browse your everyday essentials'), findsNothing);
       expect(find.byTooltip('Voice search'), findsOneWidget);
       expect(find.byTooltip('Camera search'), findsOneWidget);
       expect(tester.takeException(), isNull);

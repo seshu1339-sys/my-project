@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import 'admin_home_sections.dart';
+import 'admin_right_boxes.dart';
 import 'admin_entry_list.dart';
 import 'animation_settings_form.dart';
 import 'admin_frame.dart';
@@ -27,6 +28,7 @@ const _sections = <_SettingsSection>[
   _SettingsSection('homeOffers', "Today's Offers", Icons.campaign_outlined, "The banner that names your town's offers, with the price chips"),
   _SettingsSection('homePromo', "Today's Offers Box", Icons.view_carousel_outlined, 'The row of coloured offer boxes'),
   _SettingsSection('ads', 'Right Side Ads', Icons.campaign_outlined, 'The boxes on the right: animation, colours, every ad'),
+  _SettingsSection('rightBoxes', 'Right Side Ad Boxes', Icons.view_agenda_outlined, 'Photo boxes down the right side: add, remove, photo, link'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
@@ -59,6 +61,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminHomeSectionPage(store: widget.store, part: 'promo');
       case 'ads':
         return AdminHomeSectionPage(store: widget.store, part: 'ads');
+      case 'rightBoxes':
+        return AdminRightBoxesPage(store: widget.store);
       // One record each: the form opens directly, with no list and no "Add new".
       case 'settings':
       case 'theme':

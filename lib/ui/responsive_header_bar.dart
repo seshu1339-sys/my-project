@@ -158,6 +158,8 @@ class ResponsiveHeader extends StatelessWidget {
     final settings = store.entries('settings');
     final header = layoutFor(context, settings, 'header');
     final logo = layoutFor(context, settings, 'logo');
+    // An uploaded logo (Business profile > Upload logo) takes the place of the icon + name text: it is shown wider, on its own.
+    final hasLogoImage = (logo.entry.text('iconUrl').isNotEmpty ? logo.entry.text('iconUrl') : store.business.text('imageUrl')).isNotEmpty;
     final servicesLayout = layoutFor(context, settings, 'services');
     final servicesIconUrl = servicesLayout.entry.text('iconUrl');
     final servicesIconColor = servicesLayout.entry.text('textColor').isEmpty
@@ -180,6 +182,8 @@ class ResponsiveHeader extends StatelessWidget {
     final cartLayout = layoutFor(context, settings, 'cartIcon');
     final menuLayout = layoutFor(context, settings, 'menuIcon');
     final officeLayout = layoutFor(context, settings, 'office');
+    // What the admin types in Business profile > "Header contact box" (address, phone, email, anything) wins over the older layout text.
+    final contactText = store.business.text('headerContact').trim().isNotEmpty ? store.business.text('headerContact').trim() : officeLayout.entry.text('text');
     return LayoutSection(
       layout: header,
       child: Padding(
@@ -221,8 +225,8 @@ class ResponsiveHeader extends StatelessWidget {
                       Semantics(
                         label: 'App logo',
                         child: SizedBox(
-                          height: logo.height(36, floor: 28),
-                          width: logo.height(36, floor: 28),
+                          height: hasLogoImage ? logo.height(44, floor: 36) : logo.height(36, floor: 28),
+                          width: hasLogoImage ? 150 : logo.height(36, floor: 28),
                           child: (logo.entry.text('iconUrl').isNotEmpty
                                       ? logo.entry.text('iconUrl')
                                       : store.business.text('imageUrl'))
@@ -242,6 +246,7 @@ class ResponsiveHeader extends StatelessWidget {
                                       ? logo.entry.text('iconUrl')
                                       : store.business.text('imageUrl'),
                                   fit: BoxFit.contain,
+                                  alignment: Alignment.centerLeft,
                                   errorBuilder: (_, error, stack) => const Icon(
                                     Icons.storefront_rounded,
                                     size: 32,
@@ -250,8 +255,8 @@ class ResponsiveHeader extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    ConstrainedBox(
+                    if (!hasLogoImage) const SizedBox(width: 6),
+                    if (!hasLogoImage) ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 180),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,7 +724,7 @@ class ResponsiveHeader extends StatelessWidget {
                               : AppTokens.radiusLg,
                         ),
                         side: officeLayout.entry.text('borderColor').isEmpty
-                            ? BorderSide.none
+                            ? (contactText.isEmpty ? BorderSide.none : BorderSide(color: AppTokens.textMuted.withValues(alpha: .45)))
                             : BorderSide(
                                 color: colorFromHex(
                                   officeLayout.entry.text('borderColor'),
@@ -752,13 +757,13 @@ class ResponsiveHeader extends StatelessWidget {
                                     48,
                                   ),
                                 )
-                              : const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 4,
+                              : EdgeInsets.symmetric(
+                                  horizontal: contactText.isEmpty ? 4 : 10,
+                                  vertical: contactText.isEmpty ? 4 : 6,
                                 ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: officeLayout.entry.text('text').isEmpty
+                              maxWidth: contactText.isEmpty
                                   ? 220
                                   : 360,
                             ),
@@ -768,9 +773,9 @@ class ResponsiveHeader extends StatelessWidget {
                               children: [
                                 // The admin's own text (Layout Settings -> Office
                                 // address & phone) wins and is shown exactly as typed.
-                                if (officeLayout.entry.text('text').isNotEmpty)
+                                if (contactText.isNotEmpty)
                                   Text(
-                                    officeLayout.entry.text('text'),
+                                    contactText,
                                     textAlign: TextAlign.right,
                                     style:
                                         sectionTextStyle(

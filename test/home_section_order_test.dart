@@ -8,9 +8,7 @@ import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
 
 void main() {
-  testWidgets('Categories renders above Popular Products by default', (
-    tester,
-  ) async {
+  testWidgets('the Categories section and the All Categories button are gone from the home page', (tester) async {
     tester.view.physicalSize = const Size(1024, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -20,17 +18,15 @@ void main() {
     await store.init();
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
-    final categoriesY = tester.getTopLeft(find.text('Categories')).dy;
-    final popularY = tester.getTopLeft(find.text('Popular Products')).dy;
-    expect(categoriesY, lessThan(popularY));
+    expect(find.text('Browse your everyday essentials'), findsNothing);
+    expect(find.text('All Categories'), findsNothing);
+    expect(find.text('Popular Products'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
 
-  testWidgets('an admin-set order on section_popular moves it above Categories', (
-    tester,
-  ) async {
+  testWidgets('an admin-set order on section_popular moves it below Local Services', (tester) async {
     tester.view.physicalSize = const Size(1024, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -39,12 +35,12 @@ void main() {
     final store = Store();
     await store.init();
     store.catalog.putIfAbsent('settings', () => []);
-    store.catalog['settings']!.add(const Entry('section_popular', {'order': 5}));
+    store.catalog['settings']!.add(const Entry('section_popular', {'order': 50}));
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
-    final categoriesY = tester.getTopLeft(find.text('Categories')).dy;
     final popularY = tester.getTopLeft(find.text('Popular Products')).dy;
-    expect(popularY, lessThan(categoriesY));
+    final servicesY = tester.getTopLeft(find.text('Local Services')).dy;
+    expect(servicesY, lessThan(popularY));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();

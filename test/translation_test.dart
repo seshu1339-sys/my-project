@@ -15,13 +15,13 @@ void main() {
     await store.init();
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
-    expect(find.text('Categories'), findsWidgets);
-    expect(find.text('వర్గాలు'), findsNothing);
+    expect(find.text('Popular Products'), findsWidgets);
+    expect(find.text('ప్రజాదరణ పొందిన ఉత్పత్తులు'), findsNothing);
 
     await store.setLanguage('te');
     await tester.pump();
 
-    expect(find.text('వర్గాలు'), findsWidgets);
+    expect(find.text('Popular Products'), findsNothing);
     expect(find.text('జనాదరణ పొందిన ఉత్పత్తులు'), findsNothing); // sanity: wrong string never matches
     expect(find.text('ప్రజాదరణ పొందిన ఉత్పత్తులు'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -43,7 +43,7 @@ void main() {
     await store.setLanguage('as');
     await tester.pump();
 
-    expect(find.text('Categories'), findsWidgets);
+    expect(find.text('Popular Products'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();

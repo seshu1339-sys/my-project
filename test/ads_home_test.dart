@@ -18,67 +18,22 @@ Future<Store> _store(List<Entry> ads) async {
 }
 
 void main() {
-  testWidgets('desktop home: live ads appear in the unified column, with an Offers & Ads link', (tester) async {
-    tester.view.physicalSize = const Size(1440, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final store = await _store([for (var i = 1; i <= 4; i++) _ad('u$i', i)]);
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    expect(find.byType(AdsColumn), findsOneWidget);
-    expect(find.byType(AdBox), findsNWidgets(3));
-    await tester.ensureVisible(find.byKey(const ValueKey('open-offers-ads')));
-    await tester.tap(find.byKey(const ValueKey('open-offers-ads')));
-    await tester.pumpAndSettle();
-    expect(find.text('Offers & Ads'), findsWidgets);
-    expect(find.byType(AdBox), findsNWidgets(4), reason: 'the page lists every live ad');
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('phone home: one ad at a time with dots', (tester) async {
-    tester.view.physicalSize = const Size(390, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final store = await _store([for (var i = 1; i <= 3; i++) _ad('u$i', i)]);
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    expect(find.byType(AdsPager), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('radius: the home page shows only the ads whose circle covers the customer, and follows a change of location', (tester) async {
-    tester.view.physicalSize = const Size(390, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    Entry circle(String id, int order, double km, double lat, double lng) =>
-        Entry(id, {'title': id, 'contentType': 'text', 'order': order, 'radiusKm': km, 'radiusLat': lat, 'radiusLng': lng, 'radiusShopId': 's'});
-    final store = await _store([
-      circle('narsipatnam10', 1, 10, 17.667, 82.612),
-      circle('anakapalle10', 2, 10, 17.691, 83.003),
-      circle('wide100', 3, 100, 17.667, 82.612),
-    ]);
-    await store.setLocation('531116', 'Narsipatnam', lat: 17.67, lng: 82.62);
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    List<String> shown() {
-      final pager = tester.widget<AdsPager>(find.byType(AdsPager));
-      return pager.ads.map((a) => a.id).toList()..sort();
+  testWidgets('the home page no longer builds the old ads column or pager (the Right Side Ad Boxes replaced them)', (tester) async {
+    for (final width in [1440.0, 390.0]) {
+      tester.view.physicalSize = Size(width, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final store = await _store([for (var i = 1; i <= 4; i++) _ad('u$i', i)]);
+      await tester.pumpWidget(MarketApp(store: store));
+      await tester.pump();
+      expect(find.byType(AdsColumn), findsNothing, reason: 'width $width');
+      expect(find.byType(AdsPager), findsNothing, reason: 'width $width');
+      expect(find.byType(AdBox), findsNothing, reason: 'width $width');
+      expect(find.byKey(const ValueKey('open-offers-ads')), findsNothing, reason: 'customers see only the photo boxes');
+      await tester.pumpWidget(const SizedBox());
+      store.dispose();
     }
-
-    expect(shown(), ['narsipatnam10', 'wide100']);
-    await store.setLocation('531001', 'Anakapalle', lat: 17.691, lng: 83.003);
-    await tester.pump();
-    expect(shown(), ['anakapalle10', 'wide100'], reason: 'the customer moved: only the ads that cover the new place');
-    await store.setLocation('500001', 'Hyderabad', lat: 17.385, lng: 78.486);
-    await tester.pump();
-    expect(find.byType(AdsPager), findsNothing, reason: 'far from every circle: no ads from this system');
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
   });
 
   testWidgets("radius: Today's Offers follow the same rule and the same location change", (tester) async {

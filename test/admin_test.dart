@@ -264,42 +264,42 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
     await tester.pump();
     await openPageView(tester);
-    final categoriesTitle = find.byWidgetPredicate(
-      (w) => w is Text && w.data == 'Categories' && w.style?.fontWeight == FontWeight.bold,
+    final sectionTitle = find.byWidgetPredicate(
+      (w) => w is Text && w.data == 'Products & services' && w.style?.fontWeight == FontWeight.bold,
     );
-    expect(categoriesTitle, findsOneWidget);
+    expect(sectionTitle, findsOneWidget);
     expect(
-      sectionConfig(store.entries('settings'), 'categories').number('height', 0),
+      sectionConfig(store.entries('settings'), 'popular').number('height', 0),
       0,
     );
 
-    final categoriesCard = find.ancestor(of: categoriesTitle, matching: find.byType(Card));
+    final sectionCard = find.ancestor(of: sectionTitle, matching: find.byType(Card));
     final increase = find.descendant(
-      of: categoriesCard,
+      of: sectionCard,
       matching: find.byIcon(Icons.add_circle_outline),
     );
     await tester.tap(increase);
     await tester.pump();
     expect(
-      sectionConfig(store.entries('settings'), 'categories').number('height', 0),
+      sectionConfig(store.entries('settings'), 'popular').number('height', 0),
       240,
     );
 
     await tester.tap(increase);
     await tester.pump();
     expect(
-      sectionConfig(store.entries('settings'), 'categories').number('height', 0),
+      sectionConfig(store.entries('settings'), 'popular').number('height', 0),
       280,
     );
 
     final reset = find.descendant(
-      of: categoriesCard,
+      of: sectionCard,
       matching: find.byIcon(Icons.settings_backup_restore),
     );
     await tester.tap(reset);
     await tester.pump();
     expect(
-      sectionConfig(store.entries('settings'), 'categories').number('height', 0),
+      sectionConfig(store.entries('settings'), 'popular').number('height', 0),
       0,
     );
     expect(tester.takeException(), isNull);

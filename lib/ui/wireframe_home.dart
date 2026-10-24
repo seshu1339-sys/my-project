@@ -5,8 +5,6 @@ import '../domain/catalog.dart';
 import '../domain/towns.dart';
 import '../services/search.dart';
 import '../services/strings.dart';
-import 'home_ad_rail.dart';
-import 'home_categories_section.dart';
 import 'home_category_product_strip.dart';
 import 'home_footer_badges.dart';
 import 'home_no_offers.dart';
@@ -14,7 +12,6 @@ import 'home_local_services_section.dart';
 import 'home_nearby_section.dart';
 import 'home_popular_section.dart';
 import 'home_promotions.dart';
-import 'home_quick_category_nav.dart';
 import 'home_ticker_section.dart';
 import 'layout_settings.dart';
 import 'animation_settings.dart';
@@ -22,12 +19,10 @@ import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
 import 'services_page.dart';
-import '../domain/ads.dart';
 import '../domain/radius.dart';
-import 'ads_column.dart';
-import '../services/ad_tracker.dart';
-import 'offers_ads_page.dart';
 import 'home_section_config.dart';
+import '../domain/right_boxes.dart';
+import 'right_ad_boxes.dart';
 import 'shared.dart';
 
 /// The customer homepage composition root. Computes the shared data each
@@ -136,20 +131,6 @@ class WireframeHome extends StatelessWidget {
     );
     final offersForTown = forTown('carousel');
     final offers = offersForTown.entries;
-    final ads = forTown('ad').entries;
-    final boxes = forTown('box').entries;
-    // The unified Ads system: when at least one ad is live for this customer it replaces the old ad boxes; with none, the old ones show as before.
-    final adsConfig = AdsConfig.from(settings);
-    final liveAdList = liveAds(
-      store.entries('ads'),
-      DateTime.now(),
-      town: store.town,
-      district: store.district,
-      state: store.state,
-      showAll: showAllLocations,
-      latitude: store.latitude,
-      longitude: store.longitude,
-    );
     final localServices = localServiceEntries(
       store,
       searchService,
@@ -216,18 +197,8 @@ class WireframeHome extends StatelessWidget {
         : const SizedBox.shrink();
     final notice = scrollingAnimation.text('animation') == 'marquee' ? notice0 : applyEntranceAnimation(scrollingAnimation, notice0);
     final page = layoutFor(context, settings, 'background');
-    final categoryLayout = layoutFor(context, settings, 'categories');
     final productLayout = layoutFor(context, settings, 'products');
     final adLayout = layoutFor(context, settings, 'ads');
-    final unifiedAds = adLayout.visible ? liveAdList : const <Entry>[];
-    final oldAds = unifiedAds.isEmpty ? ads : const <Entry>[];
-    final adsTracker = AdsTracker.instance;
-    void tapAd(Entry ad) {
-      adsTracker?.tap(ad.id, town: store.town);
-      onPromotion(adTarget(ad));
-    }
-
-    void openOffersAds() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => OffersAdsPage(store: store, onAd: tapAd)));
     final nearby = layoutFor(context, settings, 'nearby');
     final located = store.pincode.isNotEmpty || store.latitude != null;
     final shops = located ? store.nearby() : store.visible('shops');
@@ -311,71 +282,14 @@ class WireframeHome extends StatelessWidget {
                 wrapSection('tickerMarquee', notice),
                 LayoutBuilder(
                   builder: (context, c) {
-                    final boxLayout = layoutFor(context, settings, 'boxes');
                     final railWidth = adLayout.width(
                       c.maxWidth * .28,
                       fallback: (c.maxWidth * .22).clamp(230, 380),
                     );
-                    final railHasContent =
-                        unifiedAds.isNotEmpty ||
-                        (adLayout.visible && oldAds.isNotEmpty) ||
-                        (boxLayout.visible && boxes.isNotEmpty);
-                    final wide = c.maxWidth >= 1100 && railHasContent;
-                    final merged = mergedPromoEntries(
-                      ads: adLayout.visible ? oldAds : const [],
-                      adAppearance: adLayout.entry,
-                      boxes: boxLayout.visible ? boxes : const [],
-                      boxAppearance: boxLayout.entry,
-                    );
-                    final rail = HomeAdRail(
-                      adLayout: adLayout,
-                      boxLayout: boxLayout,
-                      ads: oldAds,
-                      boxes: boxes,
-                      unifiedAds: unifiedAds.isEmpty
-                          ? null
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AdsColumn(ads: unifiedAds, config: adsConfig, onTap: tapAd, tracker: adsTracker, town: store.town),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(key: const ValueKey('open-offers-ads'), onPressed: openOffersAds, child: const Text('Offers & Ads')),
-                                ),
-                              ],
-                            ),
-                      onPromotion: onPromotion,
-                      adsLabelLayout: layoutFor(context, settings, 'adsLabel'),
-                      wrapItem: wrapPromoItem,
-                      wrapSection: wrapSection,
-                    );
-                    // Mobile/tablet never hide these ads — they're shown as a
-                    // compact, auto-rotating, swipeable carousel instead of
-                    // the desktop's vertical stack, reusing the exact same
-                    // merged entries and the same ScheduledPromo widget (so
-                    // every per-ad admin control keeps working identically).
-                    final carousel = !wide && railHasContent
-                        ? Padding(
-                            padding: EdgeInsets.only(bottom: page.gap),
-                            child: Column(
-                              children: [
-                                if (unifiedAds.isNotEmpty) ...[
-                                  AdsPager(ads: unifiedAds, config: adsConfig, onTap: tapAd, tracker: adsTracker, town: store.town),
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton(key: const ValueKey('open-offers-ads'), onPressed: openOffersAds, child: const Text('Offers & Ads')),
-                                  ),
-                                ],
-                                if (merged.isNotEmpty)
-                                  ScheduledPromoCarousel(
-                                    entries: merged,
-                                    appearance: adLayout.entry,
-                                    onTap: onPromotion,
-                                  ),
-                              ],
-                            ),
-                          )
-                        : null;
+                    // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
+                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion);
+                    final hasRightBoxes = liveRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
+                    final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
@@ -394,19 +308,6 @@ class WireframeHome extends StatelessWidget {
                               ? 600
                               : offers.first.number('speed', 600),
                         ),
-                      ),
-                      'categories': HomeCategoriesSection(
-                        categoryLayout: categoryLayout,
-                        categories: categories,
-                        categoriesKey: categoriesKey,
-                        onCategory: onCategory,
-                        moreTileLayout: layoutFor(
-                          context,
-                          settings,
-                          'moreCategoriesTile',
-                        ),
-                        wrapSection: wrapSection,
-                        wrapCategoryItem: wrapCategoryItem,
                       ),
                       'popular': HomePopularSection(
                         store: store,
@@ -442,9 +343,8 @@ class WireframeHome extends StatelessWidget {
                     // ticker itself now lives outside `main` entirely (fixed
                     // beside the "All Categories" button), so "right after
                     // the ticker" is simply "first".
-                    const promoInsertAt = 0;
-                    final categoriesIndex = orderedSectionKeys.indexWhere(
-                      (d) => d.key == 'categories',
+                    final crossSellIndex = orderedSectionKeys.indexWhere(
+                      (d) => d.key == 'promo',
                     );
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,21 +374,6 @@ class WireframeHome extends StatelessWidget {
                               // instead, so shrinking or growing this button
                               // automatically gives the ticker's Expanded
                               // whatever space is left over.
-                              AllCategoriesButton(
-                                onTap: () {
-                                  final ctx = categoriesKey.currentContext;
-                                  if (ctx != null) {
-                                    Scrollable.ensureVisible(
-                                      ctx,
-                                      duration: const Duration(
-                                        milliseconds: 350,
-                                      ),
-                                      curve: Curves.easeOut,
-                                    );
-                                  }
-                                },
-                              ),
-                              const SizedBox(width: 10),
                               Expanded(
                                 child: wrapSection('notice', tickerSection),
                               ),
@@ -503,8 +388,7 @@ class WireframeHome extends StatelessWidget {
                             descriptor.key,
                             reorderedSections[descriptor.key]!,
                           ),
-                          if (carousel != null && i == promoInsertAt) carousel,
-                          if (i == categoriesIndex)
+                          if (i == crossSellIndex)
                             wrapSection(
                               'crossSellStrip',
                               HomeCategoryProductStrip(
@@ -561,10 +445,10 @@ class WireframeHome extends StatelessWidget {
                               // box/resize handles span every stacked ad/box
                               // at once, which read as them overlapping and
                               // made it impossible to resize just one.
-                              SizedBox(width: railWidth, child: rail),
+                              SizedBox(width: railWidth, child: rightBoxes),
                             ],
                           )
-                        : main;
+                        : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [main, if (hasRightBoxes) Padding(padding: const EdgeInsets.only(top: 12), child: rightBoxes)]);
                   },
                 ),
                 wrapSection(

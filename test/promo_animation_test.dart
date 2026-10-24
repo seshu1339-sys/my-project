@@ -256,88 +256,20 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       store.dispose();
     });
-
-    testWidgets('the ads on the real page: $type', (tester) async {
-      tester.view.physicalSize = const Size(1400, 1800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await storeWith({
-        'section_ads': {
-          'section': 'ads',
-          'animationType': type,
-          'animationMs': 1500,
-          'animationSpeed': 8,
-        },
-      });
-      await tester.pumpWidget(MarketApp(store: store));
-      await tester.pump();
-      final viewport = find.byKey(const ValueKey('ads-viewport'));
-      expect(viewport, findsOneWidget, reason: 'the animated ad rail is used');
-      final before = tester.getSize(viewport);
-      expect(find.text('A helping hand, nearby.'), findsWidgets);
-      // A carousel shows the next box peeking beside the centre one.
-      if (type != 'carousel') {
-        expect(find.text('Secure payments.'), findsNothing);
-      }
-      await tester.pump(const Duration(milliseconds: 1500));
-      for (var i = 0; i < 4; i++) {
-        await tester.pump(const Duration(milliseconds: 120));
-        expect(tester.getSize(viewport), before,
-            reason: '$type changed the ads box size');
-      }
-      await tester.pump(const Duration(milliseconds: 800));
-      expect(find.text('Secure payments.'), findsWidgets);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
   }
 
-  testWidgets('ads with very different amounts of text are exactly as wide', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1400, 1800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final store = await storeWith({});
-    store.catalog['promotions']!.removeWhere((e) => e.text('placement') == 'ad');
-    await store.save('promotions', const Entry('short', {'name': 'Hi', 'placement': 'ad', 'order': 0, 'active': true}));
-    await store.save('promotions', const Entry('long', {
-      'name': 'Big Savings Everyday on everything you need',
-      'description': 'A much longer line of supporting text that wraps over several lines of the box.',
-      'placement': 'ad',
-      'order': 1,
-      'active': true,
-    }));
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    final sizes = [
-      for (final e in find.byType(PromoCard).evaluate())
-        tester.getSize(find.byWidget(e.widget)),
-    ];
-    expect(sizes.length, greaterThanOrEqualTo(2));
-    expect(sizes.map((s) => s.width).toSet(), hasLength(1), reason: 'ad widths: $sizes');
-    // The two ads (a promotional box below them has its own height).
-    expect(sizes.take(2).map((s) => s.height).toSet(), hasLength(1), reason: 'ad heights: $sizes');
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('offers and ads keep separate animation settings', (tester) async {
+  testWidgets('the old ads rail is gone from the page, the offers keep their own animation', (tester) async {
     tester.view.physicalSize = const Size(1400, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = await storeWith({
       'section_promo': {'section': 'promo', 'animationType': 'fade', 'animationMs': 1500},
-      'section_ads': {'section': 'ads', 'animationType': 'cube', 'animationMs': 1500},
     });
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
     expect(find.byKey(const ValueKey('offers-rotation-fade')), findsOneWidget);
-    expect(find.byKey(const ValueKey('ads-rotation-cube-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ads-viewport')), findsNothing);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });

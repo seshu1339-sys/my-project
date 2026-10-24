@@ -165,9 +165,6 @@ void main() {
       expect(find.text("Today's Narsipatnam Offers"), findsOneWidget);
       expect(find.text('Narsipatnam special'), findsWidgets);
       expect(find.text('Anakapalle special'), findsNothing);
-      expect(find.text('Narsipatnam ad'), findsWidgets);
-      expect(find.text('Anakapalle ad'), findsNothing);
-      expect(find.text('Everyone ad'), findsNothing);
 
       // Changing the location changes the name and the offers at once.
       await store.setLocation('', '', town: 'Anakapalle');
@@ -176,14 +173,12 @@ void main() {
       expect(find.text("Today's Narsipatnam Offers"), findsNothing);
       expect(find.text('Anakapalle special'), findsWidgets);
       expect(find.text('Narsipatnam special'), findsNothing);
-      expect(find.text('Anakapalle ad'), findsWidgets);
       expect(find.text('Narsipatnam ad'), findsNothing);
 
       // A town with no offers of its own falls back to the general ones.
       await store.setLocation('', '', town: 'Visakhapatnam');
       await tester.pump();
       expect(find.text("Today's Visakhapatnam Offers"), findsOneWidget);
-      expect(find.text('Everyone ad'), findsWidgets);
       expect(find.text('Narsipatnam ad'), findsNothing);
       // ...and with no general offers either, a message, never empty boxes.
       expect(find.byKey(const ValueKey('no-offers-notice')), findsOneWidget);
