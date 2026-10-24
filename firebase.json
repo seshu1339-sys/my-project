@@ -31,7 +31,11 @@
           "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]
         }
       ],
-      "rewrites": [{"source": "**", "destination": "/index.html"}]
+      "rewrites": [
+        {"source": "/privacy-policy", "destination": "/privacy-policy.html"},
+        {"source": "/privacy-policy/", "destination": "/privacy-policy.html"},
+        {"source": "**", "destination": "/index.html"}
+      ]
     },
     {
       "target": "admin",
