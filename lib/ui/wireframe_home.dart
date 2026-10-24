@@ -288,7 +288,7 @@ class WireframeHome extends StatelessWidget {
                     );
                     // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
                     final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion);
-                    final hasRightBoxes = liveRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
+                    final hasRightBoxes = shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(

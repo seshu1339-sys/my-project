@@ -8,7 +8,6 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/ui/home_rotating_pages.dart';
-import 'package:ecommerce_app/ui/home_promo_card.dart';
 
 const _types = [
   'slide',

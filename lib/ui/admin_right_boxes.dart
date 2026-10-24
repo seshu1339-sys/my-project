@@ -94,7 +94,7 @@ class _AdminRightBoxesPageState extends State<AdminRightBoxesPage> {
           const SizedBox(height: 4),
           const Text(
             'The boxes down the right side of the home page, top to bottom. Every box is the same size. '
-            'Customers see only the photo (no number). A box with no photo stays hidden.',
+            'Customers see only the photo (no number). A box with no photo shows as a light grey "ఇక్కడ మీ ప్రకటన" box of the same size.',
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -163,7 +163,7 @@ class _BoxCard extends StatelessWidget {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: box.imageUrl.isEmpty
-                      ? const Center(child: Text('No photo\n(hidden on the site)', textAlign: TextAlign.center))
+                      ? const Center(child: Text('No photo\n(shows "your ad here")', textAlign: TextAlign.center))
                       : Image.network(box.imageUrl, fit: BoxFit.cover, errorBuilder: (_, error, stack) => const Center(child: Text('Photo not found'))),
                 ),
                 ConstrainedBox(

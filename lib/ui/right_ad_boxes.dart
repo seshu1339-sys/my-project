@@ -13,7 +13,7 @@ class RightAdBoxes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final boxes = liveRightBoxes(rightBoxesRecord(settings));
+    final boxes = shownRightBoxes(rightBoxesRecord(settings));
     if (boxes.isEmpty) return const SizedBox.shrink();
     return Column(
       key: const ValueKey('right-ad-boxes'),
@@ -26,18 +26,20 @@ class RightAdBoxes extends StatelessWidget {
               height: rightBoxHeight,
               width: double.infinity,
               child: Material(
-                color: box.color.isEmpty ? Colors.white : colorFromHex(box.color, Colors.white),
+                color: box.imageUrl.isEmpty ? const Color(0xFFE5E7EB) : box.color.isEmpty ? Colors.white : colorFromHex(box.color, Colors.white),
                 borderRadius: BorderRadius.circular(16),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                   onTap: box.hasTarget ? () => onTarget(box.target) : null,
-                  child: Image.network(
-                    box.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: rightBoxHeight,
-                    errorBuilder: (_, error, stack) => const SizedBox.shrink(),
-                  ),
+                  child: box.imageUrl.isEmpty
+                      ? const _Placeholder()
+                      : Image.network(
+                          box.imageUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: rightBoxHeight,
+                          errorBuilder: (_, error, stack) => const _Placeholder(),
+                        ),
                 ),
               ),
             ),
@@ -45,4 +47,19 @@ class RightAdBoxes extends StatelessWidget {
       ],
     );
   }
+}
+
+class _Placeholder extends StatelessWidget {
+  const _Placeholder();
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: Padding(
+      padding: EdgeInsets.all(16),
+      child: Text(
+        rightBoxPlaceholder,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF6B7280)),
+      ),
+    ),
+  );
 }

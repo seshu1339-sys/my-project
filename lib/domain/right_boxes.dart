@@ -5,7 +5,8 @@ import 'catalog.dart';
 //   box<n>Image    the box's JPG/PNG photo (a box with no photo is not shown to customers)
 //   box<n>Target   optional link: category:<id> | shop:<id> | product:<id>
 //   box<n>Color    optional background colour (#RRGGBB) behind the photo
-// The numbers exist only in the admin panel; customers see the photos, in number order.
+// The numbers exist only in the admin panel; customers see the boxes in number order. A box with no photo shows as a light grey
+// "your ad here" placeholder of the same size.
 
 const rightBoxesDoc = 'rightAdBoxes';
 const defaultRightBoxCount = 15;
@@ -31,8 +32,11 @@ int rightBoxCount(Entry record) => record.number('count', defaultRightBoxCount.t
 RightBox rightBoxAt(Entry record, int number) =>
     RightBox(number, record.text('box${number}Image'), record.text('box${number}Target'), record.text('box${number}Color'));
 
-/// The boxes customers see: only those with a photo, in number order.
-List<RightBox> liveRightBoxes(Entry record) => [
-  for (var n = 1; n <= rightBoxCount(record); n++)
-    if (rightBoxAt(record, n).imageUrl.isNotEmpty) rightBoxAt(record, n),
-];
+/// Every box customers see, in number order: the ones with a photo, and the empty ones as placeholders.
+List<RightBox> shownRightBoxes(Entry record) => [for (var n = 1; n <= rightBoxCount(record); n++) rightBoxAt(record, n)];
+
+/// Only the boxes that have a photo.
+List<RightBox> liveRightBoxes(Entry record) => [for (final box in shownRightBoxes(record)) if (box.imageUrl.isNotEmpty) box];
+
+/// The text on an empty box.
+const rightBoxPlaceholder = 'ఇక్కడ మీ ప్రకటన';

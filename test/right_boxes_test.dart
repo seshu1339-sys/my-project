@@ -25,8 +25,9 @@ void main() {
       expect(rightBoxCount(const Entry(rightBoxesDoc, {'count': 9999})), maxRightBoxCount);
     });
 
-    test('customers get only the boxes that have a photo, in box-number order', () {
+    test('customers get every box in box-number order; the ones with a photo are the live ones', () {
       const record = Entry(rightBoxesDoc, {'count': 5, 'box1Image': 'a.jpg', 'box3Image': 'c.jpg', 'box5Image': 'e.jpg', 'box7Image': 'beyond-the-count.jpg'});
+      expect(shownRightBoxes(record).map((b) => b.number), [1, 2, 3, 4, 5]);
       expect(liveRightBoxes(record).map((b) => b.number), [1, 3, 5]);
     });
 
@@ -37,7 +38,7 @@ void main() {
     });
   });
 
-  testWidgets('every box is exactly the same size and shows no number or label', (tester) async {
+  testWidgets('every box, with or without a photo, is exactly the same size and shows no number or label', (tester) async {
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -46,15 +47,15 @@ void main() {
       const Entry(rightBoxesDoc, {'box1Image': 'http://x/a.jpg', 'box1Color': '#FFEEAA', 'box2Image': 'http://x/b.jpg', 'box4Image': 'http://x/d.jpg'}),
     ];
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: RightAdBoxes(settings: settings, onTarget: (_) {})))));
-    final sizes = [for (final n in [1, 2, 4]) tester.getSize(find.byKey(ValueKey('right-box-$n')))];
-    expect(find.byKey(const ValueKey('right-box-3')), findsNothing, reason: 'a box with no photo is hidden');
+    final sizes = [for (final n in [1, 2, 3, 4]) tester.getSize(find.byKey(ValueKey('right-box-$n')))];
+    expect(find.text(rightBoxPlaceholder), findsNWidgets(12), reason: 'the 12 boxes of the 15 without a photo say "your ad here"');
     expect(sizes.toSet(), hasLength(1), reason: 'sizes: $sizes');
     expect(sizes.first.height, rightBoxHeight);
     expect(find.textContaining('Right Side Ad Box'), findsNothing);
     expect(find.textContaining('Box 1'), findsNothing);
   });
 
-  testWidgets('the home page shows the boxes on desktop and on a phone, and nothing when no box has a photo', (tester) async {
+  testWidgets('the home page shows the boxes on desktop and on a phone, empty ones as "your ad here"', (tester) async {
     for (final width in [1440.0, 390.0]) {
       tester.view.physicalSize = Size(width, 1000);
       tester.view.devicePixelRatio = 1;
@@ -63,7 +64,8 @@ void main() {
       final empty = await _store();
       await tester.pumpWidget(MarketApp(store: empty));
       await tester.pump();
-      expect(find.byKey(const ValueKey('right-ad-boxes')), findsNothing, reason: 'width $width, no photos');
+      expect(find.byKey(const ValueKey('right-ad-boxes')), findsOneWidget, reason: 'width $width, no photos: placeholders');
+      expect(find.text(rightBoxPlaceholder), findsWidgets);
       await tester.pumpWidget(const SizedBox());
       empty.dispose();
 
