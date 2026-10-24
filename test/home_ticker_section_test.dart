@@ -44,9 +44,9 @@ void main() {
       expect(label.style?.fontSize, 20.0, reason: 'label must use the admin-set font size, not a hardcoded 13');
       expect(label.style?.fontWeight, FontWeight.w700);
 
-      final container = tester.widget<Container>(find.byType(Container).first);
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.border, isNotNull, reason: 'borderColor/borderWidth must actually draw a border');
+      // the strip draws the border, once (the outer section box leaves it to the strip)
+      final bordered = tester.widgetList<Container>(find.byType(Container)).where((c) => c.decoration is BoxDecoration && (c.decoration as BoxDecoration).border != null);
+      expect(bordered.length, 1, reason: 'borderColor/borderWidth must actually draw a border, and only one');
     },
   );
 }

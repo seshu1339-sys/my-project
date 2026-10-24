@@ -84,6 +84,47 @@ void main() {
     });
   });
 
+  testWidgets("Today's Offers draws its border once, so owning a border colour does not make the banner taller", (tester) async {
+    Future<(double, int)> measure(Store store) async {
+      tester.view.physicalSize = const Size(1200, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: store,
+            builder: (context, _) => HomeTickerSection(
+              store: store,
+              settings: store.entries('settings'),
+              promotions: const [],
+              products: const [Entry('p1', {'name': 'Apple', 'price': 25, 'compareAtPrice': 30})],
+              onProduct: (_) {},
+            ),
+          ),
+        ),
+      ));
+      await tester.pump(const Duration(seconds: 1));
+      final height = tester.getSize(find.byType(HomeTickerSection)).height;
+      final bordered = tester.widgetList<DecoratedBox>(find.byType(DecoratedBox)).where((d) {
+        final decoration = d.decoration;
+        return decoration is BoxDecoration && decoration.border != null;
+      }).length;
+      await tester.pumpWidget(const SizedBox());
+      return (height, bordered);
+    }
+
+    // before: the border colour comes from the Scrolling Text; after: the banner owns it
+    final before = await _store([const Entry('scrollingText', {'borderColor': '#E0A400'}), const Entry('section_notice', {'section': 'notice', 'borderWidth': '8'})]);
+    final a = await measure(before);
+    final after = await _store([const Entry('scrollingText', {'borderColor': '#E0A400'}), const Entry('section_notice', {'section': 'notice', 'borderWidth': '8'})]);
+    await makeNoticeIndependent(after);
+    expect(after.entries('settings').firstWhere((e) => e.id == 'section_notice').text('borderColor'), '#E0A400');
+    final b = await measure(after);
+    expect(b.$2, 1, reason: 'one border');
+    expect(b.$1, a.$1, reason: 'same height before and after making it independent');
+  });
+
   group('a settings page never undoes what another page saved in the same record', () {
     testWidgets('Animations: a choice made meanwhile on another page survives saving here', (tester) async {
       final store = await _store([const Entry('animations', {'name': 'Animations', 'promo_type': 'zoom'})]);

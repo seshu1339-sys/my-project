@@ -70,8 +70,14 @@ class HomeTickerSection extends StatelessWidget {
         .take(8)
         .toList();
     if (chips.isEmpty || !noticeLayout.visible) return const SizedBox.shrink();
+    // The strip below draws its own border. The outer section box must not draw it a second time (that made the banner 16 px taller once its
+    // own record held a border colour), so the border keys are left out of the outer box only.
+    final outer = ComponentLayout(
+      Entry(noticeLayout.entry.id, {...noticeLayout.entry.data}..remove('borderColor')..remove('borderWidth')),
+      noticeLayout.viewport,
+    );
     return LayoutSection(
-      layout: noticeLayout,
+      layout: outer,
       child: Container(
         width: double.infinity,
         // entryDecoration (not a hand-rolled BoxDecoration) so this strip
