@@ -77,4 +77,14 @@ void main() {
       );
     },
   );
+
+  test("comparing a saved value with a form value never throws on non-JSON values (editing a promotion with a start date)", () {
+    final saved = DateTime.utc(2026, 10, 24, 5, 30);
+    expect(sameFieldValue(saved, saved.toIso8601String()), isTrue);
+    expect(sameFieldValue(saved, "2026-10-25T00:00:00.000Z"), isFalse);
+    expect(sameFieldValue(Object(), "x"), isFalse);
+    expect(sameFieldValue("a", "a"), isTrue);
+    expect(sameFieldValue({"k": 1}, {"k": 1}), isTrue);
+    expect(sameFieldValue(["a"], ["b"]), isFalse);
+  });
 }

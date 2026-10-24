@@ -20,6 +20,14 @@ import 'shared.dart';
 // and the Scrolling Text Settings' color fields (textColor/backgroundColor/
 // borderColor) get it as well, instead of just the numbered elements.
 bool _isColorField(String key) => key.endsWith('Color');
+
+/// Whether a saved value and the form's value are the same, to write only what the form changed. A saved record can hold values
+/// that are not plain JSON (a Firestore Timestamp, a GeoPoint, a DateTime): those are compared by their text instead of failing
+/// with "Converting object to an encodable object failed".
+bool sameFieldValue(Object? a, Object? b) {
+  Object? plain(Object? o) => o is DateTime ? o.toUtc().toIso8601String() : o.toString();
+  return jsonEncode(a, toEncodable: plain) == jsonEncode(b, toEncodable: plain);
+}
 const _fontWeightOptions = <String, String>{
   '400': 'Normal',
   '500': 'Medium',
@@ -303,7 +311,7 @@ class _EntryEditorState extends State<EntryEditor> {
           id,
           {
             for (final e in data.entries)
-              if (jsonEncode(e.value) != jsonEncode(original[e.key])) e.key: e.value,
+              if (!sameFieldValue(e.value, original[e.key])) e.key: e.value,
           },
           remove: {
             for (final key in original.keys)
