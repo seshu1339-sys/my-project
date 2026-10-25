@@ -100,6 +100,9 @@ class StaffAdditionsView extends StatelessWidget {
           if (provider) Text('${a.text('serviceName')} • ₹${a.data['hourlyRate'] ?? ''} per hour'),
           Text([if (code.isNotEmpty) '${provider ? 'Provider' : 'Vendor'} ID: $code', if ('${person['phone'] ?? ''}'.isNotEmpty) 'Phone: ${person['phone']}'].join(' • ')),
           Text(stateOf(a), key: ValueKey('staff-addition-state-${a.id}')),
+          // Auto-approve was on, but the Google check found something, so it waits for the administrator.
+          if (a.text('status') == 'pending')
+            for (final problem in a.data['autoApproveHeld'] as List? ?? const []) Text('• $problem', style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 13)),
           if (live)
             for (final item in items)
               ListTile(

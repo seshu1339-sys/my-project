@@ -15,8 +15,9 @@
 // Approved, a provider is listed in services (prov-<id>, like a provider who registered themselves: the town and an approximate
 // location only) with the work photos, and gets a providers/<id> record.
 // Trusted staff: the admin can switch on auto-approve for a staff member (fieldStaff/<uid>.autoApprove, off by default; only the
-// admin, setStaffAutoApprove). What such a staff member adds goes live at once, without the admin (autoApproved: true on the addition,
-// so the admin can still see it in the staff report).
+// admin, setStaffAutoApprove). What such a staff member adds is still Google-checked first, every photo (functions/photo-check.js),
+// and goes live without the admin only when every photo passes: not online as it is, not used before, and the check could run.
+// Otherwise it waits for the admin with the reasons (autoApproveHeld). Live ones carry autoApproved: true for the staff report.
 // Approved: the vendor record, its shop (with the photos, the address and the phone) and its items go live (vendors/<id>,
 // shops/<id>, products) with public copies of the photos; the private originals are removed. The items follow the vendor rules:
 // at most the vendor's item limit (2 unless the admin allows more), and each price lasts 24 hours (vendor-prices.js), after which the
@@ -129,7 +130,7 @@ async function verifyPhoto(path, label) {
   if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', `${label[0].toUpperCase()}${label.slice(1)} is not a valid photo.`);
 }
 
-exports.submitStaffVendor = onCall({...options, timeoutSeconds: 120}, async request => {
+exports.submitStaffVendor = onCall({...options, timeoutSeconds: 300}, async request => {
   const uid = requireUser(request);
   const staff = await requireActiveStaff(uid);
   const additionId = request.data?.additionId;
@@ -174,7 +175,7 @@ exports.submitStaffVendor = onCall({...options, timeoutSeconds: 120}, async requ
   return {status: 'pending', additionId, vendorCode};
 });
 
-exports.submitStaffProvider = onCall({...options, timeoutSeconds: 120}, async request => {
+exports.submitStaffProvider = onCall({...options, timeoutSeconds: 300}, async request => {
   const uid = requireUser(request);
   const staff = await requireActiveStaff(uid);
   const additionId = request.data?.additionId;
@@ -295,9 +296,30 @@ async function removePrivatePhotos(addition) {
   await Promise.all(photosOf(addition).map(path => bucket.file(path).delete({ignoreNotFound: true})));
 }
 
-/// A trusted staff member's addition goes live at once (no admin, so no Google check either).
+/// Why a photo check result keeps an auto-approved addition for the admin, or '' when the photo passed. A picture that is only
+/// similar to others online passes (a tomato looks like other tomatoes); the same picture online, the same photo used before, or a
+/// check that could not run does not.
+function autoApproveProblem(result) {
+  const label = result.label || 'a photo';
+  if (result.online === 'limit' || result.online === 'error') return `${label}: the Google check could not run${result.note ? ` (${result.note})` : ''}`;
+  if (result.online === 'full') return `${label}: this picture is online`;
+  if ((result.duplicates || []).length) return `${label}: the same photo was used before`;
+  return '';
+}
+
+/// A trusted staff member's addition: every photo is checked with Google; when all pass it goes live at once, otherwise it waits for
+/// the admin with the reasons.
 async function autoApprove(ref, staffUid) {
   const addition = (await ref.get()).data();
+  const problems = [];
+  for (const path of photosOf(addition)) {
+    const problem = autoApproveProblem(await _photoCheck.checkPhotoAt(path, `auto:${staffUid}`));
+    if (problem) problems.push(problem);
+  }
+  if (problems.length) {
+    await ref.update({autoApproveHeld: problems, autoApproveCheckedAt: FieldValue.serverTimestamp()});
+    return {status: 'pending', held: problems};
+  }
   const out = addition.kind === 'provider' ? await publishStaffProvider(ref, addition, `auto:${staffUid}`) : await publishStaffVendor(ref, addition, `auto:${staffUid}`);
   await ref.update({autoApproved: true});
   await removePrivatePhotos(addition);
@@ -360,4 +382,4 @@ exports.renewStaffVendorPrice = onCall(options, async request => {
   return {price};
 });
 
-exports._staffAdditions = {staffVendorDetails, staffProviderDetails, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS, MIN_WORK_PHOTOS, MAX_WORK_PHOTOS};
+exports._staffAdditions = {staffVendorDetails, staffProviderDetails, autoApproveProblem, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS, MIN_WORK_PHOTOS, MAX_WORK_PHOTOS};

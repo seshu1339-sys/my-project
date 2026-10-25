@@ -159,6 +159,16 @@ class _AdditionCardState extends State<_AdditionCard> {
                 ]),
                 Text('${provider ? 'Provider' : 'Vendor'} ID: $code • Phone: ${person['phone'] ?? ''}'),
                 Text('Added by ${a.text('staffName', 'staff')}${a.text('staffCode').isEmpty ? '' : ' (${a.text('staffCode')})'}${added.isEmpty ? '' : ' on $added'}'),
+                // This staff member has auto-approve, but the Google check found something, so it waits for you.
+                if ((a.data['autoApproveHeld'] as List? ?? const []).isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Not auto-approved, the Google check found:\n${(a.data['autoApproveHeld'] as List).map((p) => '• $p').join('\n')}',
+                      key: ValueKey('staff-review-held-${a.id}'),
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
                 if (provider) Text('Charge: ₹${a.data['hourlyRate'] ?? ''} per hour'),
                 if ('${person['ownerName'] ?? ''}'.isNotEmpty) Text('Owner: ${person['ownerName']}'),
                 if ('${person['shopCategory'] ?? ''}'.isNotEmpty) Text('Category: ${person['shopCategory']}'),

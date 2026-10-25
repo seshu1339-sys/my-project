@@ -30,6 +30,7 @@ const _vendor = Entry('add1', {
 const _provider = Entry('add2', {
   'kind': 'provider', 'status': 'pending', 'staffName': 'Kiran Kumar', 'providerCode': 'SRV-NRPM-116-208', 'serviceName': 'Plumber', 'hourlyRate': 250,
   'provider': {'name': 'Suresh Kumar', 'phone': '9876522222'}, 'photoPaths': ['staffAdditions/s1/add2/work_1', 'staffAdditions/s1/add2/work_2'],
+  'autoApproveHeld': ['work photo 1: the same photo was used before'],
   'submittedAt': '2026-10-25T10:00:00.000',
 });
 
@@ -76,6 +77,7 @@ void main() {
     expect(find.text('Item 1: Tomato • ₹30 for 1 kg'), findsOneWidget);
     expect(find.text('Suresh Kumar • Plumber'), findsOneWidget);
     expect(find.text('Charge: ₹250 per hour'), findsOneWidget);
+    expect(find.text('Not auto-approved, the Google check found:\n• work photo 1: the same photo was used before'), findsOneWidget);
     expect(find.text('0 of 5 photos checked with Google'), findsOneWidget);
     FilledButton approve() => tester.widget<FilledButton>(find.byKey(const ValueKey('staff-approve-add1')));
     expect(approve().onPressed, isNull, reason: 'not before every photo is checked');

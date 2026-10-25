@@ -15,6 +15,14 @@ const vendor = {name: 'Lakshmi Kirana', phone: '9876543210', ownerName: 'Lakshmi
 const items = [{libraryItemId: 'lib-tomato', unitType: 'kg', quantity: 1, price: 30, photoCount: 2}];
 const ok = {vendor, latitude: 17.668, longitude: 82.612, items};
 
+test('what keeps an auto-approved addition for the admin', () => {
+  assert.equal(_staffAdditions.autoApproveProblem({label: 'vendor photo 1', online: 'none', duplicates: []}), '');
+  assert.equal(_staffAdditions.autoApproveProblem({label: 'item 1 photo 1', online: 'partial', duplicates: []}), '', 'similar pictures online are fine');
+  assert.equal(_staffAdditions.autoApproveProblem({label: 'vendor photo 2', online: 'full'}), 'vendor photo 2: this picture is online');
+  assert.equal(_staffAdditions.autoApproveProblem({label: 'vendor photo 3', online: 'none', duplicates: [{path: 'x'}]}), 'vendor photo 3: the same photo was used before');
+  assert.equal(_staffAdditions.autoApproveProblem({label: 'work photo 1', online: 'limit', note: 'used up'}), 'work photo 1: the Google check could not run (used up)');
+});
+
 test('a vendor a staff member adds needs a name, a phone, the staff GPS, and 1-2 library items with 2-3 photos each', () => {
   const details = _staffAdditions.staffVendorDetails(ok);
   assert.equal(details.vendor.name, 'Lakshmi Kirana');
@@ -143,7 +151,8 @@ test('trusted staff: with auto-approve on (only the admin switches it), what the
   await db.collection('services').doc('type-plumber').set({kind: 'serviceType', typeId: 'plumber', name: 'Plumber', active: true});
   await db.collection('fieldStaff').doc('trusted').set({status: 'active', name: 'Ravi', staffCode: 'STF-NRPM-116-111'});
   await db.collection('fieldStaff').doc('waiting').set({status: 'pending'});
-  const photo = path => bucket.file(path).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
+  // every photo different (the same photo twice would be held as "used before")
+  const photo = path => bucket.file(path).save(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.from(`${path}${Date.now()}`)]), {metadata: {contentType: 'image/jpeg'}});
   const stage = async (id, names) => { for (const name of names) await photo(`staffAdditions/trusted/${id}/${name}`); };
 
   // ---- only the admin switches it, and only for active staff; it is off until then
@@ -153,7 +162,7 @@ test('trusted staff: with auto-approve on (only the admin switches it), what the
   await stage('autoAdd0001', ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']);
   assert.equal((await fns.submitStaffVendor.run({...as('trusted'), data: {additionId: 'autoAdd0001', ...ok}})).status, 'pending', 'off by default');
 
-  // ---- on: a vendor and a provider go live at once, marked as auto-approved
+  // ---- on: every photo is Google-checked, all pass, so a vendor and a provider go live at once, marked as auto-approved
   assert.deepEqual(await fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'trusted', enabled: true}}), {autoApprove: true});
   assert.equal((await db.collection('fieldStaff').doc('trusted').get()).data().autoApproveBy, 'admin1');
   await stage('autoAdd0002', ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']);
@@ -163,11 +172,29 @@ test('trusted staff: with auto-approve on (only the admin switches it), what the
   assert.equal((await db.collection('products').where('additionId', '==', 'autoAdd0002').get()).size, 1);
   const addition = (await db.collection('staffAdditions').doc('autoAdd0002').get()).data();
   assert.deepEqual([addition.status, addition.autoApproved, addition.decidedBy], ['approved', true, 'auto:trusted']);
+  assert.deepEqual(await _photoCheck.uncheckedPhotos([...addition.photoPaths, ...addition.items[0].photoPaths]), [], 'every photo was checked with Google');
+  assert.equal((await db.collection('photoChecks').doc('staffAdditions~trusted~autoAdd0002~vendor_1').get()).data().checkedBy, 'auto:trusted');
   assert.equal((await bucket.file('staffAdditions/trusted/autoAdd0002/vendor_1').exists())[0], false);
   await stage('autoAdd0003', ['work_1', 'work_2']);
   const providerOut = await fns.submitStaffProvider.run({...as('trusted'), data: {additionId: 'autoAdd0003', provider: {name: 'Suresh Kumar', phone: '9876543210', pincode: '531116'}, latitude: 17.668, longitude: 82.612, serviceTypeId: 'type-plumber', hourlyRate: 250, photoCount: 2}});
   assert.deepEqual([providerOut.status, providerOut.listingId], ['approved', 'prov-autoAdd0003']);
   assert.equal((await db.collection('services').doc('prov-autoAdd0003').get()).data().active, true);
+
+  // ---- a photo that is online as it is: it waits for the admin, with the reason
+  _photoCheck.setWebDetection(async () => ({fullMatchingImages: [{url: 'https://stock.example/x.jpg'}]}));
+  await stage('autoAdd0005', ['work_1', 'work_2']);
+  const held = await fns.submitStaffProvider.run({...as('trusted'), data: {additionId: 'autoAdd0005', provider: {name: 'Mahesh', phone: '9876543210', pincode: '531116'}, latitude: 17.668, longitude: 82.612, serviceTypeId: 'type-plumber', hourlyRate: 300, photoCount: 2}});
+  assert.equal(held.status, 'pending');
+  assert.deepEqual(held.held, ['work photo 1: this picture is online', 'work photo 2: this picture is online']);
+  assert.deepEqual((await db.collection('staffAdditions').doc('autoAdd0005').get()).data().autoApproveHeld, held.held);
+  assert.equal((await db.collection('services').doc('prov-autoAdd0005').get()).exists, false);
+  // ---- Google not reachable: the photos are not checked, so it waits too
+  _photoCheck.setWebDetection(async () => { throw Error('Cloud Vision API is disabled'); });
+  await stage('autoAdd0006', ['work_1', 'work_2']);
+  const down = await fns.submitStaffProvider.run({...as('trusted'), data: {additionId: 'autoAdd0006', provider: {name: 'Naresh', phone: '9876543210', pincode: '531116'}, latitude: 17.668, longitude: 82.612, serviceTypeId: 'type-plumber', hourlyRate: 300, photoCount: 2}});
+  assert.equal(down.status, 'pending');
+  assert.match(down.held[0], /work photo 1: the Google check could not run \(Cloud Vision API is disabled\)/);
+  _photoCheck.setWebDetection(async () => ({}));
 
   // ---- off again: it waits for the admin
   await fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'trusted', enabled: false}});

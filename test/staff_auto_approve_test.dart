@@ -19,7 +19,7 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(find.text('Auto-approve for Kiran Kumar?'), findsOneWidget);
-    expect(find.textContaining('without the Google check'), findsOneWidget);
+    expect(find.textContaining('once every photo passes the Google check. If a photo is found online, was used before, or cannot be checked, it waits for you.'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(changes, isEmpty);
@@ -33,7 +33,7 @@ void main() {
 
   testWidgets('turning it off needs no question', (tester) async {
     final changes = await show(tester, value: true);
-    expect(find.text('On: vendors and services they add go live at once.'), findsOneWidget);
+    expect(find.text('On: what they add goes live once every photo passes the Google check.'), findsOneWidget);
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(changes, [false]);

@@ -154,7 +154,7 @@ void main() {
           child: StaffAdditionsView(
             now: now,
             additions: const [
-              Entry('a1', {'status': 'pending', 'vendorCode': 'VEN-NRPM-116-321', 'vendor': {'name': 'Lakshmi Kirana', 'phone': '9876543210'}, 'submittedAt': '2026-10-26T09:00'}),
+              Entry('a1', {'status': 'pending', 'vendorCode': 'VEN-NRPM-116-321', 'vendor': {'name': 'Lakshmi Kirana', 'phone': '9876543210'}, 'submittedAt': '2026-10-26T09:00', 'autoApproveHeld': ['vendor photo 2: this picture is online']}),
               Entry('a2', {'status': 'approved', 'vendorCode': 'VEN-NRPM-116-400', 'vendor': {'name': 'Ravi Fruits', 'phone': '9876500000'}, 'submittedAt': '2026-10-25T09:00'}),
               Entry('a3', {'status': 'rejected', 'decisionReason': 'Photos are blurred', 'vendor': {'name': 'Anil Stores'}, 'submittedAt': '2026-10-24T09:00'}),
             ],
@@ -169,6 +169,7 @@ void main() {
     ));
     expect(find.text('3 added by you • 1 price to renew'), findsOneWidget);
     expect(find.text('Waiting for the administrator'), findsOneWidget);
+    expect(find.text('• vendor photo 2: this picture is online'), findsOneWidget, reason: 'auto-approve on, but the Google check found something');
     expect(find.text('Vendor ID: VEN-NRPM-116-321 • Phone: 9876543210'), findsOneWidget);
     expect(find.text('Live'), findsOneWidget);
     expect(find.text('Not approved: Photos are blurred'), findsOneWidget);

@@ -38,7 +38,7 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
           return Padding(padding: const EdgeInsets.only(top: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (code != null) Text('Staff ID: $code', style: Theme.of(context).textTheme.bodyMedium),
             // Trusted staff (the admin switched it on): what they add goes live at once.
-            if (auto) Text('Auto-approve is on: what you add goes live at once.', key: const ValueKey('staff-auto-approve-on'), style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
+            if (auto) Text('Auto-approve is on: what you add goes live once every photo passes the Google check.', key: const ValueKey('staff-auto-approve-on'), style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
           ]));
         },
       ),

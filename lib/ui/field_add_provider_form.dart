@@ -175,7 +175,12 @@ class _FieldAddProviderFormState extends State<FieldAddProviderForm> {
         context: context,
         builder: (dialog) => AlertDialog(
           title: Text(result['status'] == 'approved' ? 'Live now' : 'Sent for approval'),
-          content: Text('${name.text.trim()} ($serviceName) ${result['status'] == 'approved' ? 'is live: your additions are approved automatically.' : 'is waiting for the administrator. Nothing is live until it is approved.'}${result['providerCode'] == null ? '' : '\n\nProvider ID: ${result['providerCode']}'}'),
+          content: Text(
+            '${name.text.trim()} ($serviceName) ${result['status'] == 'approved' ? 'is live: every photo passed the Google check.' : 'is waiting for the administrator. Nothing is live until it is approved.'}'
+            // auto-approve on, but the Google check found something: it waits for the admin
+            '${result['held'] is List ? '\n\nThe Google check found:\n${(result['held'] as List).map((p) => '• $p').join('\n')}' : ''}'
+            '${result['providerCode'] == null ? '' : '\n\nProvider ID: ${result['providerCode']}'}',
+          ),
           actions: [FilledButton(onPressed: () => Navigator.pop(dialog), child: const Text('OK'))],
         ),
       );
