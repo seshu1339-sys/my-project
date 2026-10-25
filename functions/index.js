@@ -143,8 +143,11 @@ exports.placeOrder = onCall(options, async request => {
   const businessRef = db.collection('settings').doc('business');
   return db.runTransaction(async tx => {
     if ((await tx.get(orderRef)).exists) return {orderId};
-    const refs = items.map(i => db.collection('products').doc(i.productId));
-    const [businessSnapshot, ...snapshots] = await tx.getAll(businessRef, ...refs);
+    // An item is a product, or a service (services live in their own collection).
+    const productRefs = items.map(i => db.collection('products').doc(i.productId));
+    const serviceRefs = items.map(i => db.collection('services').doc(i.productId));
+    const [businessSnapshot, ...found] = await tx.getAll(businessRef, ...productRefs, ...serviceRefs);
+    const snapshots = items.map((_, i) => (found[i].exists ? found[i] : found[items.length + i]));
     let result;
     try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data()); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
     const business = businessSnapshot.data() || {};
@@ -153,7 +156,7 @@ exports.placeOrder = onCall(options, async request => {
     if (typeof paymentMethod !== 'string' || methods[paymentMethod] !== true) throw new HttpsError('failed-precondition', 'This payment method is not currently available.');
     const paymentStatus = paymentMethod === 'platform_collected' ? 'pending_platform_collection' : paymentMethod === 'cash_on_delivery' ? 'pending_cash_on_delivery' : 'pending_vendor_direct';
     tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), status: 'submitted', paymentMethod, paymentStatus, createdAt: FieldValue.serverTimestamp()});
-    refs.forEach((ref, i) => tx.update(ref, {stock: snapshots[i].data().stock - items[i].quantity}));
+    snapshots.forEach((snapshot, i) => tx.update(snapshot.ref, {stock: snapshot.data().stock - items[i].quantity}));
     return {orderId};
   });
 });
@@ -244,8 +247,10 @@ exports.approveVendor = onCall(options, async request => {
 async function setVendorCatalogVisibility(vendorId, shopId, hide) {
   const found = new Map();
   const add = snapshot => snapshot.docs.forEach(doc => found.set(doc.ref.path, doc));
-  add(await db.collection('products').where('ownerId', '==', vendorId).get());
-  if (typeof shopId === 'string' && shopId) add(await db.collection('products').where('shopId', '==', shopId).get());
+  for (const name of ['products', 'services']) {
+    add(await db.collection(name).where('ownerId', '==', vendorId).get());
+    if (typeof shopId === 'string' && shopId) add(await db.collection(name).where('shopId', '==', shopId).get());
+  }
   add(await db.collection('shops').where('ownerId', '==', vendorId).get());
   let batch = db.batch(), pending = 0, changed = 0;
   for (const doc of found.values()) {
@@ -314,8 +319,10 @@ exports.submitVendorChange = onCall(options, async request => {
   const uid = requireUser(request);
   const {type, collection, docId, changes} = request.data || {};
   const isNew = type === 'newProduct';
-  const allowedCollection = type === 'shop' ? 'shops' : 'products';
-  if (collection !== allowedCollection || (!isNew && (typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)))) throw new HttpsError('invalid-argument', 'Invalid change target.');
+  // A shop change targets shops. A new item goes to services when its kind is 'service', else to products; a change to an existing
+  // item says which of the two it lives in.
+  const allowedCollections = type === 'shop' ? ['shops'] : isNew ? [changes?.kind === 'service' ? 'services' : 'products'] : ['products', 'services'];
+  if (!allowedCollections.includes(collection) || (!isNew && (typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)))) throw new HttpsError('invalid-argument', 'Invalid change target.');
   const safeChanges = publicChangeFields(type, changes);
   // Business features unlock only once the office/admin has approved the vendor.
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
@@ -452,10 +459,10 @@ exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{ord
   await db.runTransaction(async tx => {
     const fresh = (await tx.get(orderRef)).data();
     if (!fresh || fresh.status !== 'cancelled' || fresh.stockRestored) return;
-    const refs = after.lines.map(line => db.collection('products').doc(line.productId));
+    const refs = after.lines.flatMap(line => [db.collection('products').doc(line.productId), db.collection('services').doc(line.productId)]);
     const snapshots = refs.length ? await tx.getAll(...refs) : [];
     snapshots.forEach((snapshot, i) => {
-      if (snapshot.exists) tx.update(snapshot.ref, {stock: FieldValue.increment(after.lines[i].quantity)});
+      if (snapshot.exists) tx.update(snapshot.ref, {stock: FieldValue.increment(after.lines[Math.floor(i / 2)].quantity)});
     });
     tx.update(orderRef, {stockRestored: true});
   });

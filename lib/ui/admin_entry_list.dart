@@ -22,7 +22,7 @@ String _promotionAreaLabel(Entry promotion) {
 }
 
 /// The collections whose records have an order number the site follows; their lists can be dragged into a new order.
-const _orderedSections = {'products', 'categories', 'promotions', 'shops'};
+const _orderedSections = {'products', 'services', 'categories', 'promotions', 'shops'};
 
 /// A setting that exists once (Business Profile, Theme, Scrolling Text): its form, straight away. A project that has never saved it
 /// gets the same form, empty, and the first Save creates it.
@@ -199,6 +199,9 @@ class _AdminEntryListState extends State<AdminEntryList> {
           order,
           if (problems.isNotEmpty) '⚠ ${problems.join(', ')}',
         ].join(' • ');
+      case 'services':
+        final shopName = store.entries('shops').where((s) => s.id == e.text('shopId')).firstOrNull?.text('name');
+        return [state, e.text('kind') == 'serviceType' ? 'Service type' : 'Service listing', ?shopName, order].join(' • ');
       default:
         return '$state • $order';
     }
@@ -307,7 +310,8 @@ class _AdminEntryListState extends State<AdminEntryList> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
-      final all = sortedByOrder(store.entries(section));
+      // Services have their own list (the Services tab); a service record still sitting in products is not shown in Products.
+      final all = sortedByOrder([for (final e in store.entries(section)) if (section != 'products' || e.text('kind') != 'service') e]);
       final shown = _visible(all);
       final reorderable = _orderedSections.contains(section) && !_filtered && !selecting;
       final untidy = _orderedSections.contains(section) && hasUntidyOrder(all);

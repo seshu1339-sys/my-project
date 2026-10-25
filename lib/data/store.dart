@@ -34,7 +34,8 @@ class Store extends ChangeNotifier {
   /// many times. A quick re-open of the same product is not counted again.
   Future<void> trackItemView(Entry entry) async {
     final uid = user?.uid;
-    if (!live || uid == null) return;
+    // Services are not products: they have no viewer records.
+    if (!live || uid == null || entry.text('kind') == 'service') return;
     final now = DateTime.now();
     final last = _lastViewCounted['$uid:${entry.id}'];
     if (last != null && now.difference(last) < const Duration(seconds: 30)) return;
@@ -150,11 +151,9 @@ class Store extends ChangeNotifier {
     return shop?.text('town') ?? '';
   }
 
-  /// Visible products and services for the customer's chosen town: items of other towns are hidden.
-  /// Nothing is hidden while no town is chosen, and an item with no known town shows everywhere.
-  /// [all] (the admin preview) ignores the town.
-  List<Entry> visibleProducts({bool all = false}) {
-    final items = visible('products');
+  /// [items] of the customer's chosen town: items of other towns are hidden. Nothing is hidden while no town is chosen,
+  /// and an item with no known town shows everywhere. [all] (the admin preview) ignores the town.
+  List<Entry> _inTown(List<Entry> items, bool all) {
     if (all || town.isEmpty) return items;
     final mine = town.trim().toLowerCase();
     return items.where((p) {
@@ -163,12 +162,29 @@ class Store extends ChangeNotifier {
     }).toList();
   }
 
+  /// Visible products for the customer's chosen town. Services are not products: they live in their own collection
+  /// (see [visibleServices]), and a service record that is still in products is never listed here.
+  List<Entry> visibleProducts({bool all = false}) =>
+      _inTown(visible('products').where((e) => e.text('kind') != 'service').toList(), all);
+
+  /// Visible service listings (the services collection, without the service-type records) for the chosen town.
+  List<Entry> visibleServices({bool all = false}) =>
+      _inTown(visible('services').where((e) => e.text('kind') != 'serviceType').toList(), all);
+
+  /// The fixed service types (Plumber, Electrician, ...) stored in the services collection, in their own order.
+  List<Entry> serviceTypes() => visible('services').where((e) => e.text('kind') == 'serviceType').toList();
+
   Entry? product(String id) =>
       entries('products').where((e) => e.id == id).firstOrNull;
+  Entry? service(String id) =>
+      entries('services').where((e) => e.id == id && e.text('kind') != 'serviceType').firstOrNull;
+
+  /// A product or a service by id (the bag, the wishlist and links hold either).
+  Entry? item(String id) => product(id) ?? service(id);
   double get total => cart.entries.fold(
     0,
     (subtotal, line) =>
-        subtotal + (product(line.key)?.price(pincode) ?? 0) * line.value,
+        subtotal + (item(line.key)?.price(pincode) ?? 0) * line.value,
   );
   // Client-side estimate for display only; placeOrder recomputes this
   // authoritatively from settings/business at checkout time.

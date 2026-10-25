@@ -118,7 +118,7 @@ class _StorefrontState extends State<Storefront> {
     } else if (target.startsWith('category:')) {
       openCategory(target.substring(9));
     } else if (target.startsWith('product:')) {
-      final p = store.product(target.substring(8));
+      final p = store.item(target.substring(8));
       if (p != null) {
         open(ProductPage(store: store, entry: p));
       } else {

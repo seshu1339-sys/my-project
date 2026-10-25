@@ -107,7 +107,7 @@ void main() {
       expect(find.textContaining('Local Bakery'), findsOneWidget);
       expect(find.textContaining('• No shop •'), findsNWidgets(2), reason: 'Banana and Soap; a service needs no shop');
       expect(find.byKey(const ValueKey('list-count')), findsOneWidget);
-      expect(tester.widget<Text>(find.byKey(const ValueKey('list-count'))).data, '5 products');
+      expect(tester.widget<Text>(find.byKey(const ValueKey('list-count'))).data, '4 products'); // the service record in products is not listed here
     });
 
     testWidgets('search, "No shop only", category and Published/Draft narrow the list, and clearing restores it', (tester) async {
@@ -118,7 +118,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Banana'), findsOneWidget);
       expect(find.text('Apple'), findsNothing);
-      expect(count(), '1 of 5 products');
+      expect(count(), '1 of 4 products');
       await tester.enterText(find.byKey(const ValueKey('product-search')), 'bakery'); // finds by shop name too
       await tester.pumpAndSettle();
       expect(find.text('Apple'), findsOneWidget);
@@ -131,7 +131,7 @@ void main() {
       expect(find.text('Soap'), findsOneWidget);
       expect(find.text('Apple'), findsNothing);
       expect(find.text('Plumber'), findsNothing, reason: 'a service does not need a shop');
-      expect(count(), '2 of 5 products');
+      expect(count(), '2 of 4 products');
       await tester.tap(find.byKey(const ValueKey('filter-no-shop')));
       await tester.pumpAndSettle();
 
@@ -140,19 +140,19 @@ void main() {
       await tester.tap(find.text('Vegetables').last);
       await tester.pumpAndSettle();
       expect(find.text('Carrot'), findsOneWidget);
-      expect(count(), '1 of 5 products');
+      expect(count(), '1 of 4 products');
       await tester.tap(find.text('Clear filters'));
       await tester.pumpAndSettle();
-      expect(count(), '5 products');
+      expect(count(), '4 products');
 
       await tester.tap(find.text('Draft'));
       await tester.pumpAndSettle();
       expect(find.text('Carrot'), findsOneWidget);
-      expect(count(), '1 of 5 products');
+      expect(count(), '1 of 4 products');
       await tester.tap(find.text('Published'));
       await tester.pumpAndSettle();
       expect(find.text('Carrot'), findsNothing);
-      expect(count(), '4 of 5 products');
+      expect(count(), '3 of 4 products');
       await tester.enterText(find.byKey(const ValueKey('product-search')), 'zzz');
       await tester.pumpAndSettle();
       expect(find.text('Nothing matches. Clear the search or filters.'), findsOneWidget);
@@ -193,8 +193,8 @@ void main() {
       expect(find.byKey(const ValueKey('untidy-order')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('renumber')));
       await tester.pumpAndSettle();
-      final orders = store.entries('products').map((e) => e.number('order').toInt()).toList()..sort();
-      expect(orders, [1, 2, 3, 4, 5]);
+      final orders = store.entries('products').where((e) => e.text('kind') != 'service').map((e) => e.number('order').toInt()).toList()..sort();
+      expect(orders, [1, 2, 3, 4]);
       expect(find.byKey(const ValueKey('untidy-order')), findsNothing);
     });
 

@@ -261,6 +261,8 @@ class _EntryEditorState extends State<EntryEditor> {
         }
       }
       if (widget.collection == 'promotions') _applyRadius(data);
+      // A record of the services collection is a service listing unless it is one of the fixed service types.
+      if (widget.collection == 'services' && data['kind'] == null) data['kind'] = 'service';
       if (pickedShape != null) {
         data['geoShape'] = pickedShape;
         if (pickedShape == 'rectangle' && pickedRectangle != null) {
@@ -545,7 +547,7 @@ class _EntryEditorState extends State<EntryEditor> {
         key == 'playback') {
       options =
           (key == 'kind'
-                  ? ['product', 'service']
+                  ? ['product']
                   : key == 'placement'
                   ? ['carousel', 'ticker', 'ad', 'box']
                   : key == 'mode'

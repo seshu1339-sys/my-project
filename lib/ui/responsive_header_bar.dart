@@ -70,7 +70,7 @@ class ResponsiveHeader extends StatelessWidget {
                   shrinkWrap: true,
                   children: [
                     for (final id in store.wishlist)
-                      if (store.product(id) case final entry?)
+                      if (store.item(id) case final entry?)
                         ListTile(
                           title: Text(entry.text('name')),
                           subtitle: Text(money(entry.price(store.pincode))),

@@ -21,6 +21,7 @@ class _SettingsSection {
 /// Everything that is not a daily task lives here, in one place: each setting appears once, in one section.
 final _sections = <_SettingsSection>[
   _SettingsSection('categories', 'Categories', Icons.category_outlined, 'The product categories customers browse'),
+  _SettingsSection('services', 'Services', Icons.home_repair_service_outlined, 'Service listings and the service types (their own collection)'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
   _SettingsSection('theme', 'Theme', Icons.palette_outlined, 'Colors and fonts of the whole site'),

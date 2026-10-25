@@ -137,7 +137,7 @@ class AdminPagePreview extends StatelessWidget {
       final ticker = settings.where((e) => e.id == 'scrollingText').firstOrNull;
       final categories = store.entries('categories');
       final products = store.entries('products');
-      final services = products.where((p) => p.text('kind') == 'service').toList();
+      final services = store.visibleServices(all: true);
       final promotions = store.entries('promotions');
       final shops = store.entries('shops');
       final orderedKeys = [...reorderableHomeSections]..sort((a, b) => sectionOrder(settings, a.key).compareTo(sectionOrder(settings, b.key)));

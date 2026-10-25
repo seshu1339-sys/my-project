@@ -18,6 +18,7 @@ class VendorAddProductSection extends StatefulWidget {
 class _VendorAddProductSectionState extends State<VendorAddProductSection> with VendorSectionState {
   final name = TextEditingController(), price = TextEditingController(), stock = TextEditingController(), unit = TextEditingController(), description = TextEditingController();
   String? categoryId, imageUrl;
+  bool isService = false;
   Uint8List? imageBytes;
   Store get store => widget.store;
   String get uid => widget.uid;
@@ -36,8 +37,9 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     if (name.text.trim().length < 2) throw StateError('Enter the product or material name.');
     if (p == null || p < 0) throw StateError('Enter a valid price.');
     if (s == null || s < 0) throw StateError('Enter the stock quantity as a whole number.');
-    final status = await store.submitVendorChange(type: 'newProduct', collection: 'products', docId: '', changes: {
+    final status = await store.submitVendorChange(type: 'newProduct', collection: isService ? 'services' : 'products', docId: '', changes: {
       'name': name.text.trim(), 'price': p, 'stock': s,
+      if (isService) 'kind': 'service',
       if (unit.text.trim().isNotEmpty) 'unit': unit.text.trim(),
       if (description.text.trim().isNotEmpty) 'description': description.text.trim(),
       if (categoryId != null) 'categoryId': categoryId,
@@ -61,6 +63,13 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     TextField(controller: stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock quantity')),
     TextField(controller: unit, decoration: const InputDecoration(labelText: 'Unit (for example kg, bag, each)')),
     TextField(controller: description, maxLines: 2, decoration: const InputDecoration(labelText: 'Product description')),
+    SwitchListTile(
+      key: const ValueKey('vendor-is-service'),
+      contentPadding: EdgeInsets.zero,
+      value: isService,
+      onChanged: (v) => setState(() => isService = v),
+      title: const Text('This is a service (not a product)'),
+    ),
     DropdownButtonFormField<String>(
       initialValue: categoryId,
       isExpanded: true,
@@ -128,19 +137,19 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
   Store get store => widget.store;
   String get uid => widget.uid;
 
-  Future<void> _changePhoto(String productId) async {
+  Future<void> _changePhoto(String collection, String productId) async {
     if (vendorLibraryEnforced(store)) {
       final chosen = await pickLibraryImage(context, store);
       if (chosen == null) return;
       await run(() async {
-        toast(vendorPublished(await store.submitVendorChange(type: 'product', collection: 'products', docId: productId, changes: {'imageUrl': chosen.text('imageUrl')})));
+        toast(vendorPublished(await store.submitVendorChange(type: 'product', collection: collection, docId: productId, changes: {'imageUrl': chosen.text('imageUrl')})));
       });
     } else {
       await run(() async {
         final file = await vendorPickImage();
         if (file == null) return;
         final url = await store.upload(file, folder: 'vendorProducts/$uid');
-        toast(vendorPublished(await store.submitVendorChange(type: 'product', collection: 'products', docId: productId, changes: {'imageUrl': url})));
+        toast(vendorPublished(await store.submitVendorChange(type: 'product', collection: collection, docId: productId, changes: {'imageUrl': url})));
       });
     }
   }
@@ -150,17 +159,23 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
     stream: store.firestore.collection('vendors').doc(uid).snapshots(),
     builder: (context, vendorSnapshot) {
       final shopId = vendorSnapshot.data?.data()?['shopId'];
+      Query<Map<String, dynamic>> mine(String collection) => (shopId is String && shopId.isNotEmpty
+          ? store.firestore.collection(collection).where('shopId', isEqualTo: shopId)
+          : store.firestore.collection(collection).where('ownerId', isEqualTo: uid)).limit(100);
+      // Products and services are two collections; both are listed, each edited in its own.
       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: (shopId is String && shopId.isNotEmpty
-                ? store.firestore.collection('products').where('shopId', isEqualTo: shopId)
-                : store.firestore.collection('products').where('ownerId', isEqualTo: uid))
-            .limit(100)
-            .snapshots(),
-        builder: (context, snapshot) {
-          final docs = snapshot.data?.docs ?? const [];
+        stream: mine('products').snapshots(),
+        builder: (context, productsSnapshot) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: mine('services').snapshots(),
+        builder: (context, servicesSnapshot) {
+          final docs = [
+            for (final doc in productsSnapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) ('products', doc),
+            for (final doc in servicesSnapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              if (doc.data()['kind'] != 'serviceType') ('services', doc),
+          ];
           return vendorCard('My products and materials', [
             if (docs.isEmpty) const Text('No published products yet. Submitted products appear here once published.'),
-            for (final doc in docs)
+            for (final (collection, doc) in docs)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: (doc.data()['imageUrl'] ?? '').toString().isEmpty
@@ -175,7 +190,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     onPressed: busy
                         ? null
                         : () => run(() async {
-                            toast(vendorPublished(await store.submitVendorChange(type: 'visibility', collection: 'products', docId: doc.id, changes: {'active': doc.data()['active'] == false})));
+                            toast(vendorPublished(await store.submitVendorChange(type: 'visibility', collection: collection, docId: doc.id, changes: {'active': doc.data()['active'] == false})));
                           }),
                   ),
                   IconButton(
@@ -186,7 +201,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                         : () => run(() async {
                             final n = await askVendorNumber(context, 'Update price', 'New price', integer: false, initial: '${doc.data()['price'] ?? ''}');
                             if (n == null) return;
-                            toast(vendorPublished(await store.submitVendorChange(type: 'price', collection: 'products', docId: doc.id, changes: {'price': n.toDouble()})));
+                            toast(vendorPublished(await store.submitVendorChange(type: 'price', collection: collection, docId: doc.id, changes: {'price': n.toDouble()})));
                           }),
                   ),
                   IconButton(
@@ -197,14 +212,15 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                         : () => run(() async {
                             final n = await askVendorNumber(context, 'Update stock', 'Stock quantity', integer: true, initial: '${doc.data()['stock'] ?? 0}');
                             if (n == null) return;
-                            toast(vendorPublished(await store.submitVendorChange(type: 'stock', collection: 'products', docId: doc.id, changes: {'stock': n.toInt()})));
+                            toast(vendorPublished(await store.submitVendorChange(type: 'stock', collection: collection, docId: doc.id, changes: {'stock': n.toInt()})));
                           }),
                   ),
-                  IconButton(tooltip: 'Change photo', icon: const Icon(Icons.add_photo_alternate_outlined), onPressed: busy ? null : () => _changePhoto(doc.id)),
+                  IconButton(tooltip: 'Change photo', icon: const Icon(Icons.add_photo_alternate_outlined), onPressed: busy ? null : () => _changePhoto(collection, doc.id)),
                 ]),
               ),
           ]);
         },
+        ),
       );
     },
   );

@@ -4,7 +4,8 @@
 /// label schema and the collection → nav-label map, so either can be updated
 /// without touching the form-rendering or navigation code.
 const adminSections = <String, String>{
-  'products': 'Products & services',
+  'products': 'Products',
+  'services': 'Services',
   'categories': 'Categories',
   'shops': 'Shops',
   'promotions': 'Promotions',
@@ -26,6 +27,23 @@ const fields = <String, Map<String, String>>{
     'compareAtPrice': 'Original price for discount badge (optional)',
     'unit': 'Unit, e.g. each / per visit',
     'stock': 'Available quantity / booking slots',
+    'imageUrl': 'Main image URL',
+    'images': 'Additional image URLs (one per line)',
+    'tags': 'Search keywords',
+    'prices': 'Pincode prices (one per line: 560001=249)',
+    'order': 'Display order',
+  },
+  // Services: their own collection. kind is not a field here: a listing is always 'service' (the editor sets it), a service type is
+  // 'serviceType'.
+  'services': {
+    'name': 'Name',
+    'description': 'Description',
+    'categoryId': 'Category',
+    'shopId': 'Shop',
+    'price': 'Base price (₹)',
+    'compareAtPrice': 'Original price for discount badge (optional)',
+    'unit': 'Unit, e.g. per visit / per trip',
+    'stock': 'Available booking slots',
     'imageUrl': 'Main image URL',
     'images': 'Additional image URLs (one per line)',
     'tags': 'Search keywords',

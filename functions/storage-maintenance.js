@@ -83,9 +83,12 @@ async function sweepOrphanShopPhotos(now) {
 // Same idea for vendorProducts/: an object no product's imageUrl points to, past the grace period.
 async function sweepOrphanVendorProducts(now) {
   const referenced = new Set();
-  for await (const doc of pages(db.collection('products').orderBy('__name__'))) {
-    const path = pathFromDownloadUrl(doc.data().imageUrl);
-    if (path) referenced.add(path);
+  // Products and services both point at vendorProducts/ photos.
+  for (const name of ['products', 'services']) {
+    for await (const doc of pages(db.collection(name).orderBy('__name__'))) {
+      const path = pathFromDownloadUrl(doc.data().imageUrl);
+      if (path) referenced.add(path);
+    }
   }
   const cutoff = now - ORPHAN_GRACE_MS;
   const [files] = await getStorage().bucket().getFiles({prefix: 'vendorProducts/'});

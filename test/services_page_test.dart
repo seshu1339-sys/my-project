@@ -21,7 +21,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
-    store.catalog['products'] = [];
+    store.catalog['services'] = [];
     return store;
   }
 
@@ -100,7 +100,7 @@ void main() {
       useTallViewport(tester);
       final store = await openStore();
       await store.save(
-        'products',
+        'services',
         const Entry('s1', {
           'name': 'Quick Electrician Visit',
           'kind': 'service',
@@ -108,7 +108,7 @@ void main() {
         }),
       );
       await store.save(
-        'products',
+        'services',
         const Entry('s2', {
           'name': 'Home Plumbing Fix',
           'kind': 'service',
@@ -149,7 +149,7 @@ void main() {
       expect(find.text('No matching services available.'), findsOneWidget);
 
       await store.save(
-        'products',
+        'services',
         const Entry('s3', {
           'name': 'Custom Carpenter Work',
           'kind': 'service',
@@ -166,7 +166,7 @@ void main() {
     'categoryServiceListings matches a vendor\'s own wording via shared word stem, not just exact substring',
     () async {
       final store = Store();
-      store.catalog['products'] = [
+      store.catalog['services'] = [
         const Entry('s1', {'name': 'Plumbing visit', 'kind': 'service'}),
         const Entry('s2', {'name': 'Quick Carpentry', 'kind': 'service'}),
         const Entry('s3', {'name': 'Car wash', 'kind': 'service'}),

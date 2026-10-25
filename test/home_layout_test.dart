@@ -98,6 +98,7 @@ void main() {
     final store = Store();
     await store.init();
     store.catalog['products'] = [];
+    store.catalog['services'] = [];
     await tester.pumpWidget(MarketApp(store: store));
     expect(find.byType(HomeProductTile), findsNothing);
     expect(

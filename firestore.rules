@@ -14,8 +14,8 @@ service cloud.firestore {
     function admin() { return signedIn() && request.auth.token.admin == true && adminSessionValid(); }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
-      allow read: if collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
-      allow write: if admin() && collection in ['products', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
+      allow read: if collection in ['products', 'services', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
+      allow write: if admin() && collection in ['products', 'services', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
     }
     // Unified Ads: customers read the ads (what is shown on the site); only the admin writes them directly, vendors go through functions.
     // adsPrivate holds the admin-only side of an ad (shop contact, amount, paid, notes) and is never readable by the public.

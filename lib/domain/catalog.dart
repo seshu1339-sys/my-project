@@ -274,8 +274,78 @@ bool promotionShapesOverlap(Entry a, Entry b) {
   return false;
 }
 
+// The demo items: the first [_demoProductCount] are products, the rest are services.
+const _demoProductCount = 4;
+const _demoItems = <(String, String, double, String)>[
+      (
+        'Farm-fresh vegetable box',
+        'c0',
+        249,
+        'A colourful selection of seasonal vegetables. Packed fresh by your local shop.',
+      ),
+      (
+        'Everyday ceramic mug',
+        'c1',
+        349,
+        'A warm companion for your morning coffee. 350 ml ceramic mug.',
+      ),
+      (
+        'Wireless headphones',
+        'c2',
+        1499,
+        'Comfortable everyday listening with a rechargeable battery.',
+      ),
+      (
+        'Organic pantry essentials',
+        'c4',
+        599,
+        'Stock your kitchen with a thoughtful selection of daily essentials.',
+      ),
+      (
+        'Plumbing visit',
+        'c3',
+        299,
+        'Book an inspection. Materials and additional work quoted separately.',
+      ),
+      (
+        'Electrician visit',
+        'c3',
+        349,
+        'Local electrical inspection and service consultation.',
+      ),
+      (
+        'Mason consultation',
+        'c3',
+        499,
+        'Discuss repairs and renovation with a local professional.',
+      ),
+      (
+        'Labour assistance',
+        'c3',
+        699,
+        'Daily assistance. Confirm scope and duration with the provider.',
+      ),
+];
+
+Entry _demoEntry(int i, (String, String, double, String) item) => Entry('p$i', {
+  'name': item.$1,
+  'categoryId': item.$2,
+  'price': item.$3,
+  'description': item.$4,
+  'kind': i >= _demoProductCount ? 'service' : 'product',
+  'shopId': i >= _demoProductCount ? 's2' : 's1',
+  'stock': 30,
+  'order': i,
+  'active': true,
+  'imageUrl': '',
+  'prices': {'560001': item.$3},
+  'unit': i >= _demoProductCount ? 'per visit' : 'each',
+});
+
 const collections = [
   'products',
+  // Services (and the service types) have their own collection; they are not in products.
+  'services',
   'categories',
   'shops',
   'promotions',
@@ -347,70 +417,13 @@ Map<String, List<Entry>> demoCatalog() => {
     }),
   ],
   'products': [
-    for (final (i, item) in <(String, String, double, String)>[
-      (
-        'Farm-fresh vegetable box',
-        'c0',
-        249,
-        'A colourful selection of seasonal vegetables. Packed fresh by your local shop.',
-      ),
-      (
-        'Everyday ceramic mug',
-        'c1',
-        349,
-        'A warm companion for your morning coffee. 350 ml ceramic mug.',
-      ),
-      (
-        'Wireless headphones',
-        'c2',
-        1499,
-        'Comfortable everyday listening with a rechargeable battery.',
-      ),
-      (
-        'Organic pantry essentials',
-        'c4',
-        599,
-        'Stock your kitchen with a thoughtful selection of daily essentials.',
-      ),
-      (
-        'Plumbing visit',
-        'c3',
-        299,
-        'Book an inspection. Materials and additional work quoted separately.',
-      ),
-      (
-        'Electrician visit',
-        'c3',
-        349,
-        'Local electrical inspection and service consultation.',
-      ),
-      (
-        'Mason consultation',
-        'c3',
-        499,
-        'Discuss repairs and renovation with a local professional.',
-      ),
-      (
-        'Labour assistance',
-        'c3',
-        699,
-        'Daily assistance. Confirm scope and duration with the provider.',
-      ),
-    ].indexed)
-      Entry('p$i', {
-        'name': item.$1,
-        'categoryId': item.$2,
-        'price': item.$3,
-        'description': item.$4,
-        'kind': i >= 4 ? 'service' : 'product',
-        'shopId': i >= 4 ? 's2' : 's1',
-        'stock': 30,
-        'order': i,
-        'active': true,
-        'imageUrl': '',
-        'prices': {'560001': item.$3},
-        'unit': i >= 4 ? 'per visit' : 'each',
-      }),
+    for (final (i, item) in _demoItems.indexed)
+      if (i < _demoProductCount) _demoEntry(i, item),
+  ],
+  // Services live in their own collection (not in products).
+  'services': [
+    for (final (i, item) in _demoItems.indexed)
+      if (i >= _demoProductCount) _demoEntry(i, item),
   ],
   'promotions': [
     const Entry('welcome', {

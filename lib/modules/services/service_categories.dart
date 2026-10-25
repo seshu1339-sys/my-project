@@ -2,10 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart' show rootBundle;
 
-/// One of the fixed service-worker types (Plumber, Electrician, ...) from
-/// assets/services/services_list.json -- distinct from a vendor's own
-/// service *listing* in the Firestore `products` collection (kind:
-/// 'service'); this is just the fixed browse-by-type list's own data.
+import '../../domain/catalog.dart';
+
+/// One of the fixed service-worker types (Plumber, Electrician, ...). They are records of the Firestore `services` collection
+/// (kind: 'serviceType'); assets/services/services_list.json is the built-in copy used when the collection has none. Distinct from a
+/// vendor's own service *listing* (kind: 'service', also in `services`).
 class ServiceCategory {
   const ServiceCategory({
     required this.id,
@@ -17,6 +18,14 @@ class ServiceCategory {
   final String displayName;
   final String imageFileName;
   final int displayOrder;
+
+  /// A service-type record of the services collection.
+  factory ServiceCategory.fromEntry(Entry type) => ServiceCategory(
+    id: type.text('typeId', type.id.startsWith('type-') ? type.id.substring(5) : type.id),
+    displayName: type.text('name', type.id),
+    imageFileName: type.text('imageFileName'),
+    displayOrder: type.number('order').round(),
+  );
 }
 
 Future<List<ServiceCategory>>? _cache;

@@ -43,6 +43,7 @@ line in that list; the others keep working.
 | Module | Route | Data | Home box | Admin section |
 |---|---|---|---|---|
 | Transport | /transport | its own collection `transport` (empty; nothing stored yet) | teal box, opens a page that says "త్వరలో వస్తుంది" | Settings > Transport (empty for now) |
-| Services | /services | the A-Z service types are the module's own file (assets/services/services_list.json); the service listings are still the records of kind "service" in the shared `products` collection (vendors and Quick Add create them there) | orange box, opens the Services page | (uses the existing product pages) |
+| Services | /services | its own collection `services`: the service listings (kind `service`) and the 30 service types (kind `serviceType`). Never in `products`. | orange box, opens the Services page | Settings > Services (own list and form) |
 
-Not done yet: moving the service listings into a `services` collection of their own (a data migration plus vendor and Quick Add changes).
+Who writes services: the admin (Settings > Services), vendors ("This is a service" in My products; the `submitVendorChange` function saves a new item with kind `service` in `services`), and `placeOrder` / stock restore read services as well as products. Quick Add and the field-assistant approval still create products only (they have no service option).
+Migration of the old data: `scripts/migrate-services-to-collection.cjs` (dry run, `--apply` copies, `--delete-originals` removes the old copies from products).

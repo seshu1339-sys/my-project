@@ -18,8 +18,7 @@ List<Entry> localServiceEntries(
   SmartSearch searchService, [
   String query = '',
 ]) => searchService
-    .text(store.visibleProducts(), query, store.visible('categories'))
-    .where((entry) => entry.text('kind') == 'service')
+    .text(store.visibleServices(), query, store.visible('categories'))
     .toList();
 
 /// True when [a] and [b] share at least a 4-5 character prefix -- a vendor
@@ -46,8 +45,7 @@ bool _sharesWordStem(String a, String b) {
 List<Entry> categoryServiceListings(Store store, ServiceCategory category) {
   final roots = category.id.split('_').where((w) => w.length >= 4).toList();
   if (roots.isEmpty) roots.add(category.id);
-  return store.visibleProducts().where((entry) {
-    if (entry.text('kind') != 'service') return false;
+  return store.visibleServices().where((entry) {
     final words = '${entry.text('name')} ${entry.text('description')} ${entry.text('tags')}'
         .toLowerCase()
         .split(RegExp(r'[^a-z]+'))
@@ -101,7 +99,11 @@ class _ServicesPageState extends State<ServicesPage> {
         body: FutureBuilder<List<ServiceCategory>>(
           future: _categories,
           builder: (context, snapshot) {
-            final categories = snapshot.data;
+            // The service types come from the services collection; the built-in file is the fallback when it has none.
+            final stored = widget.store.serviceTypes();
+            final categories = stored.isNotEmpty
+                ? [for (final type in stored) ServiceCategory.fromEntry(type)]
+                : snapshot.data;
             if (categories == null) {
               return const Center(child: CircularProgressIndicator());
             }

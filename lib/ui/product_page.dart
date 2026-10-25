@@ -35,7 +35,7 @@ class _ProductPageState extends State<ProductPage> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
-      final p = store.product(entry.id) ?? entry;
+      final p = store.item(entry.id) ?? entry;
       final shop = store
           .visible('shops')
           .where((s) => s.id == p.text('shopId'))
@@ -352,7 +352,8 @@ class _ProductPageState extends State<ProductPage> {
                       ),
                     ),
                 ],
-                Reviews(store: store, productId: p.id),
+                // Reviews belong to purchased products; a service is booked through its shop, so it has none.
+                if (p.text('kind') != 'service') Reviews(store: store, productId: p.id),
               ],
             ),
           ),

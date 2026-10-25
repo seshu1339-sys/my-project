@@ -110,7 +110,7 @@ class _CartPageState extends State<CartPage> {
                 for (final line in widget.store.cart.entries)
                   Builder(
                     builder: (context) {
-                      final p = widget.store.product(line.key);
+                      final p = widget.store.item(line.key);
                       if (p == null) {
                         return ListTile(
                           title: Text('Item no longer available'.tr(context)),

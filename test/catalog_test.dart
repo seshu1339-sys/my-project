@@ -34,7 +34,7 @@ void main() {
     expect(distanceKm(0, 0, 0, 1), closeTo(111.195, .01));
     expect(
       const SmartSearch()
-          .text(demoCatalog()['products']!, 'local electrical')
+          .text(demoCatalog()['services']!, 'local electrical')
           .single
           .id,
       'p5',
