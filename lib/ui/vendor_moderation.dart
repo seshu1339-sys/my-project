@@ -135,7 +135,7 @@ class VendorModerationPage extends StatelessWidget {
     final data = doc.data();
     return Card(child: ExpansionTile(
       title: Text(data['name']?.toString() ?? doc.id),
-      subtitle: Text('Vendor ID: ${doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}'),
+      subtitle: Text('Vendor ID: ${data['vendorCode'] ?? doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}'),
       children: [
         // The two mandatory photos are stored separately; both are shown for review.
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 16, runSpacing: 12, children: [
@@ -184,7 +184,7 @@ class VendorModerationPage extends StatelessWidget {
     final exclusives = data['specialCategoryExclusives'] == true;
     return Card(child: ListTile(
       title: Text(name),
-      subtitle: Text('Vendor ID: ${doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'
+      subtitle: Text('Vendor ID: ${data['vendorCode'] ?? doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'
           '${exclusives ? ' • Exclusives up to ${data['exclusivesMaxDurationDays']} day(s)' : ''}'),
       trailing: Wrap(spacing: 8, children: [
         if (data['latitude'] is num && data['longitude'] is num)

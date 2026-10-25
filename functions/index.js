@@ -1,4 +1,5 @@
 'use strict';
+const {vendorCodeFor} = require('./vendor-id');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
@@ -210,13 +211,15 @@ exports.registerVendor = onCall(options, async request => {
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
   const photos = await requireApplicationPhotos(uid);
+  // The Vendor ID (VEN-NRPM-116-325, functions/vendor-id.js): made once, kept on a resubmission while the pincode still fits it.
+  const vendorCode = await vendorCodeFor(db, {pincode: details.pincode, existing: existing.exists ? existing.data().vendorCode : '', owner: uid});
   await applicationRef.set({
-    vendorId: uid, ...details, ...photos, email: request.auth.token.email || null,
+    vendorId: uid, ...details, ...photos, vendorCode, email: request.auth.token.email || null,
     status: 'pending', submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
-  return {status: 'pending'};
+  return {status: 'pending', vendorCode};
 });
 exports.approveVendor = onCall(options, async request => {
   await requireAdmin(request);
@@ -236,7 +239,7 @@ exports.approveVendor = onCall(options, async request => {
   batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
   if (approved && !fee.required) {
     const vendorRef = db.collection('vendors').doc(vendorId);
-    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   }
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
@@ -301,7 +304,7 @@ exports.confirmVendorFeePayment = onCall(options, async request => {
   batch.set(applicationRef, {status: paid ? 'approved' : 'payment_required', feePaymentStatus: paid ? 'paid' : 'rejected', paymentDecisionAt: FieldValue.serverTimestamp()}, {merge: true});
   if (paid) {
     const data = application.data();
-    batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
   }
   await batch.commit();
   return {status: paid ? 'approved' : 'payment_required'};

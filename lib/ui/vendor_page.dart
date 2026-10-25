@@ -114,6 +114,7 @@ class _VendorPageState extends State<VendorPage> {
       const Text('Business features (adding products or materials, product photos, prices, stock and orders) stay locked until your application is approved.', textAlign: TextAlign.center),
       const SizedBox(height: 20),
       Card(child: ListTile(title: Text('${application['name']}'), subtitle: Text('${application['ownerName'] ?? ''} • ${application['shopCategory'] ?? ''}\n${application['address'] ?? ''} ${application['pincode'] ?? ''}'))),
+      if ('${application['vendorCode'] ?? ''}'.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Your Vendor ID: ${application['vendorCode']}', key: const ValueKey('pending-vendor-id'), style: const TextStyle(fontWeight: FontWeight.bold))),
     ]),
   ))));
 

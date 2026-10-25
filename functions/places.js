@@ -115,4 +115,12 @@ function findPlace({town, district, pincode}) {
   return load().find(place => place.pincode === String(pincode || '').trim() && wanted(place.town) === wanted(town) && wanted(place.district) === wanted(district)) || null;
 }
 
-module.exports = {placeForPincode, locationStamp, filledCoordinates, nearestPlace, findPlace, kmBetween};
+/// Every post-office name (and its town) filed under a pincode, e.g. 533401 -> Tuni, Ammajipeta, Paltheru, ...
+function officesForPincode(pincode) {
+  const pin = String(pincode || '').trim();
+  const names = new Set();
+  for (const place of load()) if (place.pincode === pin) { names.add(place.name); names.add(place.town); }
+  return [...names];
+}
+
+module.exports = {placeForPincode, locationStamp, filledCoordinates, nearestPlace, findPlace, kmBetween, officesForPincode};

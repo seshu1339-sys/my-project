@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/modules.dart';
+import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
 import 'admin_entry_list.dart';
@@ -23,6 +24,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('categories', 'Categories', Icons.category_outlined, 'The product categories customers browse'),
   _SettingsSection('services', 'Services', Icons.home_repair_service_outlined, 'Service listings and the service types (their own collection)'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
+  _SettingsSection('cityCodes', 'City codes', Icons.pin_outlined, 'Four-letter town codes in vendor IDs (VEN-NRPM-116-325)'),
   _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
   _SettingsSection('theme', 'Theme', Icons.palette_outlined, 'Colors and fonts of the whole site'),
   _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
@@ -66,6 +68,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminHomeSectionPage(store: widget.store, part: 'promo');
       case 'ads':
         return AdminHomeSectionPage(store: widget.store, part: 'ads');
+      case 'cityCodes':
+        return AdminCityCodesPage(store: widget.store);
       case 'rightBoxes':
         return AdminRightBoxesPage(store: widget.store);
       // One record each: the form opens directly, with no list and no "Add new".

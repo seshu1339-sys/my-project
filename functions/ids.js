@@ -12,6 +12,7 @@ const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
+const {vendorCodeFor, VENDOR_CODE} = require('./vendor-id');
 const db = getFirestore();
 const triggerOptions = {region: 'asia-south1', maxInstances: 5};
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -48,15 +49,32 @@ async function assignCodeIfMissing(docRef, field, kind, prefix, width, separator
   });
 }
 
-// Vendor ("VN00001") and staff ("STF00001") codes are completely independent,
-// separately-counted serial sequences — one never influences the other, and
-// neither shares its counter with the pre-existing shop code below.
-exports.assignVendorCode = onDocumentCreated({...triggerOptions, document: 'vendors/{uid}'}, event => assignCodeIfMissing(event.data.ref, 'vendorCode', 'vendor', 'VN', 5, ''));
+// The vendor ID (VEN-NRPM-116-325, see vendor-id.js) is made when the vendor applies and copied onto the vendor record at approval.
+// A vendor record that still has none gets one here, from its application's pincode (also written back to the application).
+async function ensureVendorCode(vendorRef, uid) {
+  const snapshot = await vendorRef.get();
+  if (!snapshot.exists) return null;
+  if (snapshot.data().vendorCode) return snapshot.data().vendorCode;
+  const applicationRef = db.collection('vendorApplications').doc(uid);
+  const application = await applicationRef.get();
+  const fromApplication = application.data()?.vendorCode;
+  const code = VENDOR_CODE.test(fromApplication || '') ? fromApplication : await vendorCodeFor(db, {pincode: application.data()?.pincode || snapshot.data().pincode || '', existing: '', owner: uid});
+  return db.runTransaction(async tx => {
+    const fresh = await tx.get(vendorRef);
+    if (!fresh.exists) return null;
+    if (fresh.data().vendorCode) return fresh.data().vendorCode;
+    tx.set(vendorRef, {vendorCode: code}, {merge: true});
+    if (application.exists && fromApplication !== code) tx.set(applicationRef, {vendorCode: code}, {merge: true});
+    return code;
+  });
+}
+
+// Staff ("STF00001") and shop ("SH-000001") codes are independent serial sequences.
+exports.assignVendorCode = onDocumentCreated({...triggerOptions, document: 'vendors/{uid}'}, event => ensureVendorCode(event.data.ref, event.params.uid));
 exports.assignStaffCode = onDocumentCreated({...triggerOptions, document: 'fieldStaff/{uid}'}, event => assignCodeIfMissing(event.data.ref, 'staffCode', 'staff', 'STF', 5, ''));
 exports.assignShopCode = onDocumentCreated({...triggerOptions, document: 'shops/{id}'}, event => assignCodeIfMissing(event.data.ref, 'shopCode', 'shop', 'SH', 6));
 
 const BACKFILL_JOBS = [
-  ['vendors', 'vendorCode', 'vendor', 'VN', 5, ''],
   ['fieldStaff', 'staffCode', 'staff', 'STF', 5, ''],
   ['shops', 'shopCode', 'shop', 'SH', 6, '-'],
 ];
@@ -65,7 +83,10 @@ const BACKFILL_JOBS = [
 // call more than once: assignCodeIfMissing no-ops for any document that already has its code.
 exports.backfillSequentialIds = onCall(options, async request => {
   await requireAdmin(request);
-  const result = {};
+  const result = {vendors: 0};
+  for (const doc of (await db.collection('vendors').get()).docs) {
+    if (!doc.data().vendorCode) { await ensureVendorCode(doc.ref, doc.id); result.vendors++; }
+  }
   for (const [collection, field, kind, prefix, width, separator] of BACKFILL_JOBS) {
     let assigned = 0, last = null;
     for (;;) {
