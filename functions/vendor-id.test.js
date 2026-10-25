@@ -8,6 +8,9 @@ test('city codes: the built-in table, a pincode listed by the admin, a post-offi
   assert.equal(vendorCodePrefix('533101'), 'VEN-RAJH-101', 'Rajahmundry');
   // Tuni's offices are filed under another town in the directory; the office name still finds it
   assert.equal(vendorCodePrefix('533401'), 'VEN-TUNI-401', 'Tuni');
+  // Narsipatnam's other pincode: its office is "Krishna Bazar (Narsipatnam)"
+  assert.equal(vendorCodePrefix('531118'), 'VEN-NRPM-118', 'Krishna Bazar (Narsipatnam)');
+  assert.equal(autoCityCode('Krishna Bazar (Narsipatnam)'), 'NARS', 'the town in brackets');
   assert.deepEqual(cityCodeFor('531001'), {code: 'ANAK', town: 'Anakapalle', auto: true}, 'not in the table: four letters, marked auto');
   assert.equal(autoCityCode('Rly'), 'RLYX');
   assert.equal(vendorCodePrefix('999999'), 'VEN-XXXX-999', 'a pincode outside the directory');

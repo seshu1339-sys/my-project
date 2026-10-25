@@ -138,7 +138,7 @@ class _EntryEditorState extends State<EntryEditor> {
                       'searchRadiusPresetsKm': '2,5,10,25,50',
                       'searchRadiusDefaultKm': '10',
                       'searchRadiusMaxKm': '50',
-                      'vendorPhotoLimit': '2',
+                      'vendorPhotoLimit': '3',
                       'fieldPhotoLimit': '2',
                       'supportEmail': 'info@locamarket.in',
                       'websiteUrl': 'https://locamarket.in',

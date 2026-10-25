@@ -152,7 +152,7 @@ const fields = <String, Map<String, String>>{
     'searchRadiusPresetsKm': 'Product search radius presets, km (comma-separated, e.g. 2,5,10,25,50)',
     'searchRadiusDefaultKm': 'Default product search radius (km)',
     'searchRadiusMaxKm': 'Maximum product search radius (km)',
-    'vendorPhotoLimit': 'Vendor shop photo limit (1-9, default 2)',
+    'vendorPhotoLimit': 'Vendor shop photo limit (1-9, default 3; photo 1 is the shop, required)',
     'fieldPhotoLimit': 'Field Assistant item photo limit (1-9, default 2)',
     'deliveryFee': 'Delivery / service fee (₹, 0 = none)',
     'freeDeliveryAbove':

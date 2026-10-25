@@ -15,6 +15,7 @@ test('approved vendor and staff products carry their shop\'s place', {skip: !pro
   // ---- vendor: pending first, then approved
   const vendor = {auth: {uid: 'plV', token: {email_verified: true}}};
   await db.collection('vendors').doc('plV').set({vendorId: 'plV', name: 'Raj Store', shopId: 'plShop', status: 'approved', verified: true});
+  await db.collection('vendorShopPhotos').doc('plV_1').set({vendorId: 'plV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('shops').doc('plShop').set({name: 'Raj Store', address: 'Main Road', pincode: '533101', latitude: 16.99, longitude: 81.78, ownerId: 'plV', active: true});
   const sub = await fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {name: 'Rice 25kg', price: 1200, stock: 10}}});
   assert.equal(sub.status, 'pending');

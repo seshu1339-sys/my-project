@@ -16,6 +16,7 @@ extension StoreVendorActions on Store {
     required String description,
     required double latitude,
     required double longitude,
+    String gpsAddress = '',
   }) async {
     final result = await call('registerVendor', {
       'ownerName': ownerName,
@@ -27,6 +28,7 @@ extension StoreVendorActions on Store {
       'description': description,
       'latitude': latitude,
       'longitude': longitude,
+      if (gpsAddress.trim().isNotEmpty) 'gpsAddress': gpsAddress.trim(),
     });
     return result['status'] as String;
   }

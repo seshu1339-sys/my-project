@@ -13,6 +13,46 @@ class NominatimPlace {
   final double latitude, longitude;
 }
 
+/// A street address worked out from a GPS point (reverse geocoding).
+class ReverseAddress {
+  const ReverseAddress({required this.text, this.pincode = '', this.town = ''});
+
+  /// e.g. "Main Road, Krishna Bazar, Narsipatnam, 531116"
+  final String text;
+
+  /// The six-digit postcode, or '' when OpenStreetMap does not know it.
+  final String pincode;
+  final String town;
+}
+
+/// The readable address of a Nominatim reverse result: house number and road, the area, the town and the postcode (only the parts
+/// that are there). Falls back to the full display name.
+ReverseAddress? reverseAddressFromJson(Object? decoded) {
+  if (decoded is! Map) return null;
+  final address = decoded['address'];
+  String part(List<String> keys) {
+    if (address is! Map) return '';
+    for (final key in keys) {
+      final value = address[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return '';
+  }
+
+  final postcode = part(const ['postcode']).replaceAll(' ', '');
+  final pincode = RegExp(r'^\d{6}$').hasMatch(postcode) ? postcode : '';
+  final town = part(const ['city', 'town', 'village', 'municipality']);
+  final street = [part(const ['house_number']), part(const ['road', 'pedestrian', 'footway'])].where((p) => p.isNotEmpty).join(' ');
+  final parts = <String>[];
+  for (final p in [street, part(const ['neighbourhood', 'suburb', 'quarter', 'hamlet']), town, pincode]) {
+    if (p.isNotEmpty && !parts.contains(p)) parts.add(p);
+  }
+  final display = decoded['display_name'];
+  final text = parts.length >= 2 ? parts.join(', ') : (display is String ? display.trim() : parts.join(', '));
+  if (text.isEmpty) return null;
+  return ReverseAddress(text: text, pincode: pincode, town: town);
+}
+
 /// Free place-name search via OpenStreetMap's Nominatim API — no API key,
 /// matching the app's existing OpenStreetMap/flutter_map tile stack instead
 /// of a paid geocoding service. Client is injectable for tests.
@@ -57,6 +97,24 @@ class NominatimGeocoder {
       }
     } catch (_) {}
     return '';
+  }
+
+  /// The street address at a point (for a vendor's shop or a provider's house), or null when it cannot be worked out. Never throws.
+  Future<ReverseAddress?> reverseAddress(double latitude, double longitude) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'format': 'jsonv2',
+        'lat': '$latitude',
+        'lon': '$longitude',
+        'zoom': '18',
+        'addressdetails': '1',
+      });
+      final response = await _client.get(uri, headers: {'User-Agent': _userAgent});
+      if (response.statusCode != 200) return null;
+      return reverseAddressFromJson(jsonDecode(response.body));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<List<NominatimPlace>> search(String query) async {

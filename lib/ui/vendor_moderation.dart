@@ -88,7 +88,7 @@ class VendorModerationPage extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text('Pending shop photos', style: Theme.of(context).textTheme.titleLarge),
-          Text('Each vendor may upload up to ${store.business.number('vendorPhotoLimit', 2).round().clamp(1, 9)} shop photos. A photo stays hidden from customers until approved here, and is deleted automatically if left unreviewed for 15 days.'),
+          Text('Each vendor may upload up to ${store.business.number('vendorPhotoLimit', 3).round().clamp(1, 9)} shop photos. A photo stays hidden from customers until approved here, and is deleted automatically if left unreviewed for 15 days.'),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorShopPhotos').where('status', isEqualTo: 'pending').limit(100).snapshots(),
             builder: (context, snapshot) => Column(children: [

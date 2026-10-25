@@ -330,6 +330,11 @@ exports.submitVendorChange = onCall(options, async request => {
   // Business features unlock only once the office/admin has approved the vendor.
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can use business features.');
+  // Photo 1 (the shop itself) is required before a vendor adds items; it may still be waiting for the admin.
+  if (isNew) {
+    const shopPhoto = (await db.collection('vendorShopPhotos').doc(`${uid}_1`).get()).data();
+    if (!shopPhoto || !['pending', 'approved'].includes(shopPhoto.status)) throw new HttpsError('failed-precondition', 'Add photo 1, a photo of your shop, first: it is required before you add items.');
+  }
   // When the admin has turned on the Product Image Library, a regular product's main photo must
   // come from an approved library entry — off by default so existing free uploads keep working
   // until the admin has actually populated the library.

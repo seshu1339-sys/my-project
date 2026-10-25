@@ -6,6 +6,7 @@ import 'package:ecommerce_app/ui/vendor.dart';
 class _RecordingStore extends Store {
   _RecordingStore() : super(live: true);
   int registrations = 0;
+  String lastGpsAddress = '', lastAddress = '', lastPincode = '';
   // Not a real override — registerVendor is a StoreVendorActions extension
   // method (store_vendor_actions.dart), not an instance method on Store, so
   // there's nothing in the superclass to override. Declaring the same-named
@@ -22,8 +23,12 @@ class _RecordingStore extends Store {
     required String description,
     required double latitude,
     required double longitude,
+    String gpsAddress = '',
   }) async {
     registrations++;
+    lastGpsAddress = gpsAddress;
+    lastAddress = address;
+    lastPincode = pincode;
     return 'pending';
   }
 }

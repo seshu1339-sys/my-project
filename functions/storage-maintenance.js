@@ -71,7 +71,7 @@ async function sweepOrphanShopPhotos(now) {
   for (const file of files) {
     const created = Date.parse(file.metadata?.timeCreated || '');
     if (!Number.isFinite(created) || created > cutoff) continue;
-    // Matches any configured slot number (vendorPhotoLimit, default 2), not just 1-2.
+    // Matches any configured slot number (vendorPhotoLimit, default 3), not just 1-2.
     const match = file.name.match(/^vendorShopPhotos\/([^/]+)\/shopPhoto([1-9])$/);
     if (!match) continue;
     const [, uid, slot] = match;

@@ -565,11 +565,11 @@ void main() {
     store.dispose();
   });
 
-  testWidgets('vendor and field-staff photo limits default to 2 and save independently of each other', (tester) async {
+  testWidgets('vendor photo limit defaults to 3, field-staff to 2, and they save independently of each other', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
-    const vendorLabel = 'Vendor shop photo limit (1-9, default 2)';
+    const vendorLabel = 'Vendor shop photo limit (1-9, default 3; photo 1 is the shop, required)';
     const fieldLabel = 'Field Assistant item photo limit (1-9, default 2)';
     // A real underlying page beneath EntryEditor (like AdminPage in the real
     // app) so a successful save's Navigator.pop() returns to it instead of
@@ -593,7 +593,7 @@ void main() {
     // the app's existing (previously hardcoded) vendor shop-photo behavior.
     await tester.scrollUntilVisible(find.text(vendorLabel), 300, scrollable: formScrollable);
     await tester.pump();
-    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, vendorLabel)).controller!.text, '2');
+    expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, vendorLabel)).controller!.text, '3');
     expect(tester.widget<TextFormField>(find.widgetWithText(TextFormField, fieldLabel)).controller!.text, '2');
 
     // Changing only the vendor limit must never touch the field-staff one.

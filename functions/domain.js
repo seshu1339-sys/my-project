@@ -177,6 +177,8 @@ function vendorApplication(data = {}) {
     name: text(data.name, 2, 120, 'the shop name'), shopCategory: text(data.shopCategory, 2, 80, 'the shop category'),
     address: text(data.address, 5, 500, 'the shop address'), pincode, description: text(data.description, 10, 1000, 'a shop description'),
     latitude: data.latitude, longitude: data.longitude,
+    // The address the app worked out from the GPS (the vendor may have corrected the typed one); shown to the admin.
+    ...(typeof data.gpsAddress === 'string' && data.gpsAddress.trim() ? {gpsAddress: data.gpsAddress.trim().replace(/\s+/g, ' ').slice(0, 500)} : {}),
   };
 }
 // Field Assistant: a staff member's on-site shop details (only required when

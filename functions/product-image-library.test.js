@@ -8,6 +8,7 @@ test('Product Image Library enforcement is a feature toggle, off by default', {s
   const vendor = {auth: {uid: 'libV', token: {email_verified: true}}};
   const submitNew = imageUrl => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {name: 'Some item', price: 10, imageUrl}}});
   await db.collection('vendors').doc('libV').set({vendorId: 'libV', name: 'Lib Vendor', shopId: 'libShop', status: 'approved'});
+  await db.collection('vendorShopPhotos').doc('libV_1').set({vendorId: 'libV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('productImageLibrary').doc('approvedImg').set({name: 'Approved lamp', imageUrl: 'https://example.test/approved.jpg', active: true, order: 0});
   await db.collection('productImageLibrary').doc('disabledImg').set({name: 'Disabled lamp', imageUrl: 'https://example.test/disabled.jpg', active: false, order: 1});
 

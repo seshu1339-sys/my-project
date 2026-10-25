@@ -25,11 +25,11 @@ class _VendorShopPhotosSectionState extends State<VendorShopPhotosSection> with 
       final bySlot = <int, Map<String, dynamic>>{
         for (final doc in snapshot.data?.docs ?? const []) (doc.data()['slot'] as num).toInt(): doc.data(),
       };
-      // Admin-configurable (settings/business.vendorPhotoLimit), default 2 — the limit this app has always had.
-      final limit = store.business.number('vendorPhotoLimit', 2).round().clamp(1, 9);
+      // Admin-configurable (settings/business.vendorPhotoLimit), default 3: photo 1 is the shop (required), 2-3 the vendor's choice.
+      final limit = store.business.number('vendorPhotoLimit', 3).round().clamp(1, 9);
       return vendorCard('Shop photos', [
         Wrap(spacing: 16, runSpacing: 12, children: [for (var slot = 1; slot <= limit; slot++) _slot(slot, bySlot[slot])]),
-      ], note: 'Up to $limit photo${limit == 1 ? '' : 's'} of your shop. Each stays pending until the administrator approves it, and is hidden from customers until then.');
+      ], note: 'Photo 1 must be a photo of your shop: it is required before you can add items. ${limit > 1 ? 'The other ${limit == 2 ? 'photo is' : 'photos are'} your choice. ' : ''}Each stays pending until the administrator approves it, and is hidden from customers until then.');
     },
   );
 
@@ -52,6 +52,7 @@ class _VendorShopPhotosSectionState extends State<VendorShopPhotosSection> with 
                 ),
         ),
         const SizedBox(height: 4),
+        Text(slot == 1 ? 'Photo 1: your shop (required)' : 'Photo $slot: your choice', key: ValueKey('shop-photo-label-$slot'), style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(switch (status) {
           'pending' => 'Pending admin review',
           'approved' => 'Approved',

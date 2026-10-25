@@ -41,7 +41,7 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/vendors/$(uid))
         && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
     }
-    // Up to settings/business.vendorPhotoLimit shop photos per vendor (default 2), fixed
+    // Up to settings/business.vendorPhotoLimit shop photos per vendor (default 3), fixed
     // filenames shopPhoto1..shopPhoto9. The actual configured limit is enforced by
     // submitShopPhoto/reviewShopPhoto (functions/vendor-photos.js); this rule only fixes a
     // generous ceiling, since reading a dynamic admin setting here would need an extra

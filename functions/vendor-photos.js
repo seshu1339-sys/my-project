@@ -1,6 +1,6 @@
 'use strict';
-// Up to settings/business.vendorPhotoLimit shop photos per approved vendor (default 2, the
-// limit this app has always had). Each stays 'pending' until the admin approves or rejects it;
+// Up to settings/business.vendorPhotoLimit shop photos per approved vendor (default 3: photo 1 is the
+// shop itself and is required before the vendor can add items; photos 2-3 are the vendor's choice). Each stays 'pending' until the admin approves or rejects it;
 // a scheduled cleanup (functions/storage-maintenance.js) deletes anything still pending after
 // 15 days. Mirrors the existing vendorApplications photo-approval shape.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
@@ -21,14 +21,13 @@ async function requireAdmin(request) {
 }
 const slotFile = slot => `shopPhoto${slot}`;
 const photoDocId = (uid, slot) => `${uid}_${slot}`;
-// Configurable, admin-set max shop photos per vendor — defaults to 2 (the
-// limit this app has always had). Deliberately not shared with Field
+// Configurable, admin-set max shop photos per vendor — defaults to 3. Deliberately not shared with Field
 // Assistant's own equivalent in field-assistant.js: the two are independent
 // settings and must never affect each other.
 async function vendorPhotoLimit() {
   const business = (await db.collection('settings').doc('business').get()).data() || {};
   const limit = Number(business.vendorPhotoLimit);
-  return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 2;
+  return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 3;
 }
 async function verifyUploadedImage(path) {
   const file = getStorage().bucket().file(path);

@@ -25,15 +25,22 @@ function cityCodeRows(settings = {}) {
   return valid.length ? valid : DEFAULT_CITY_CODES;
 }
 
-/// Four letters from a town name when the table has no code for it (e.g. Anakapalle -> ANAK), padded with X.
+/// Four letters from a town name when the table has no code for it (e.g. Anakapalle -> ANAK), padded with X. For an office named
+/// like "Krishna Bazar (Narsipatnam)" the town in brackets is used.
 function autoCityCode(town) {
-  const letters = String(town || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const bracket = String(town || '').match(/\(([^)]+)\)/);
+  const letters = String(bracket ? bracket[1] : town || '').toUpperCase().replace(/[^A-Z]/g, '');
   return (letters + 'XXXX').slice(0, 4);
 }
 
+/// Whether a place name contains a town name as whole words: "Krishna Bazar (Narsipatnam)" contains "Narsipatnam".
+const words = value => ` ${clean(value).replace(/[^a-z0-9]+/g, ' ').trim()} `;
+const containsTown = (name, town) => words(town).trim() !== '' && words(name).includes(words(town));
+
 /// The city code for a pincode: a table row that lists the pincode, else the row named like the pincode's town, else a row named
-/// like any post office of that pincode (Tuni's offices are filed under another town in the directory), else four letters of the
-/// pincode's town ({auto: true}, so the admin can see it is not from the table).
+/// like any post office of that pincode (Tuni's offices are filed under another town in the directory), else a row whose town is part
+/// of the pincode's town or office names ("Krishna Bazar (Narsipatnam)"), else four letters of the pincode's town ({auto: true}, so
+/// the admin can see it is not from the table).
 function cityCodeFor(pincode, rows = DEFAULT_CITY_CODES) {
   const pin = String(pincode || '').trim();
   const byPin = rows.find(row => pincodeList(row.pincodes).includes(pin));
@@ -44,6 +51,9 @@ function cityCodeFor(pincode, rows = DEFAULT_CITY_CODES) {
   const offices = officesForPincode(pin).map(clean);
   const byOffice = rows.find(row => offices.includes(clean(row.town)));
   if (byOffice) return {code: byOffice.code, town: byOffice.town, auto: false};
+  const names = [town, ...officesForPincode(pin)];
+  const byPart = rows.find(row => names.some(name => containsTown(name, row.town)));
+  if (byPart) return {code: byPart.code, town: byPart.town, auto: false};
   return {code: autoCityCode(town || 'XXXX'), town, auto: true};
 }
 

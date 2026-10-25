@@ -56,8 +56,16 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     toast(vendorPublished(status));
   }
 
+  // Photo 1 (the shop itself) is required before items can be added; it may still be waiting for the admin.
   @override
-  Widget build(BuildContext context) => vendorCard('Add a product or material', [
+  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('vendorShopPhotos').doc('${uid}_1').snapshots(),
+    builder: (context, photo) => _form(context, shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status'])),
+  );
+
+  Widget _form(BuildContext context, {required bool shopPhotoReady}) => vendorCard('Add a product or material', [
+    if (!shopPhotoReady)
+      Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
     TextField(controller: name, decoration: const InputDecoration(labelText: 'Product or material name')),
     TextField(controller: price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price')),
     TextField(controller: stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock quantity')),
@@ -118,7 +126,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           icon: const Icon(Icons.upload),
           label: const Text('Upload product photo'),
         ),
-      FilledButton(onPressed: busy ? null : () => run(_add), child: const Text('Submit product')),
+      FilledButton(onPressed: busy || !shopPhotoReady ? null : () => run(_add), child: const Text('Submit product')),
     ]),
   ]);
 }

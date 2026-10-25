@@ -11,6 +11,7 @@ test('a vendor service is saved in services (not products); a product still goes
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const vendor = {auth: {uid: 'svcV', token: {email_verified: true}}};
   await db.collection('vendors').doc('svcV').set({vendorId: 'svcV', name: 'Fix It', shopId: 'svcShop', status: 'approved', verified: true});
+  await db.collection('vendorShopPhotos').doc('svcV_1').set({vendorId: 'svcV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('shops').doc('svcShop').set({name: 'Fix It', address: 'Main Road', pincode: '533101', ownerId: 'svcV', active: true});
 
   const service = await fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'services', docId: '', changes: {name: 'AC servicing', price: 500, stock: 20, kind: 'service'}}});
