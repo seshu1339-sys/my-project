@@ -9,6 +9,7 @@ import 'vendor_section_kit.dart';
 import 'vendor_section_orders.dart';
 import 'vendor_section_products.dart';
 import 'vendor_section_requests.dart';
+import 'vendor_section_shop_ad.dart';
 import 'vendor_section_shop_photos.dart';
 
 /// Business features. Only built once the application status is approved; the
@@ -37,6 +38,7 @@ class VendorWorkspace extends StatelessWidget {
     QuickAddHome(store: store),
     const SizedBox(height: 20),
     VendorShopPhotosSection(store: store, uid: uid),
+    VendorShopAdSection(store: store, uid: uid),
     VendorMyAdsCard(store: store, uid: uid),
     const SizedBox(height: 20),
     VendorAddProductSection(store: store, uid: uid),

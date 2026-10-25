@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../domain/ad_reports.dart';
 import '../domain/catalog.dart';
+import '../domain/right_boxes.dart';
 import '../services/file_download.dart';
 import '../services/report_export.dart';
 import 'shared.dart';
@@ -54,7 +55,7 @@ class _AdReportsPageState extends State<AdReportsPage> {
   }
 
   List<Entry> get ads => [for (final a in store.entries('ads')) if (widget.vendorId == null || a.text('vendorId') == widget.vendorId) a];
-  String titleOf(String id) => ads.where((a) => a.id == id).map((a) => a.text('title', a.text('name'))).firstOrNull ?? id;
+  String titleOf(String id) => ads.where((a) => a.id == id).map((a) => a.text('title', a.text('name'))).firstOrNull ?? rightBoxAdTitle(id) ?? id;
 
   Set<String>? get adFilter {
     if (adId.isNotEmpty) return {adId};

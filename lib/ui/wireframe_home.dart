@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/towns.dart';
+import '../services/ad_tracker.dart';
 import '../services/search.dart';
 import '../services/strings.dart';
 import 'home_category_product_strip.dart';
@@ -288,7 +289,8 @@ class WireframeHome extends StatelessWidget {
                       fallback: (c.maxWidth * .22).clamp(230, 380),
                     );
                     // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
-                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion);
+                    // A box with a vendor's shop ad counts its views (only in the customer app, which has the tracker).
+                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town);
                     final hasRightBoxes = shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final orderedSectionKeys = [...reorderableHomeSections]

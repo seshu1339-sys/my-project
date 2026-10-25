@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/shop_ads.dart';
 import '../domain/vendor_items.dart';
 import 'moderation_dialogs.dart';
 import 'shop_map.dart';
@@ -134,6 +135,12 @@ class VendorDetailPage extends StatelessWidget {
                   Text('Status: ${suspended ? 'Suspended' : vendor['status']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                   if (suspended && (vendor['suspensionReason'] ?? '').toString().trim().isNotEmpty)
                     Padding(padding: const EdgeInsets.only(top: 4), child: Text('Reason: ${vendor['suspensionReason']}')),
+                  // "Ad for your shop" ticked in the vendor app: the ad is arranged in Settings > Right Side Ad Boxes.
+                  if (vendor['adInterest'] == true)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text('Wants an ad for their shop${shopAdTime(vendor['adInterestAt']) == null ? '' : ' (ticked ${shopAdDate(shopAdTime(vendor['adInterestAt']))})'}. Link a box to them in Settings > Right Side Ad Boxes.', key: const ValueKey('vendor-wants-ad')),
+                    ),
                   const SizedBox(height: 12),
                   OverflowBar(children: [
                     suspended

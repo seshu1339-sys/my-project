@@ -52,6 +52,18 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(alice, 'adViews/v1')));
     await assertSucceeds(getDoc(doc(admin, 'adViews/v1')));
     await assertFails(getDoc(doc(admin, 'adViewGuard/x')));
+    // Shop ads in the Right Side Ad Boxes: the vendor reads only their own; the admin reads all; nobody writes them from a client.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'rightBoxAds/rbox-1-a'), {vendorId: 'alice', box: 1, status: 'live'});
+      await setDoc(doc(ctx.firestore(), 'rightBoxAds/rbox-2-b'), {vendorId: 'someone', box: 2, status: 'live'});
+    });
+    await assertSucceeds(getDoc(doc(alice, 'rightBoxAds/rbox-1-a')));
+    await assertFails(getDoc(doc(alice, 'rightBoxAds/rbox-2-b')));
+    await assertFails(getDoc(doc(anonymous, 'rightBoxAds/rbox-1-a')));
+    await assertSucceeds(getDoc(doc(admin, 'rightBoxAds/rbox-2-b')));
+    await assertFails(setDoc(doc(alice, 'rightBoxAds/rbox-1-a'), {status: 'live', box: 9}));
+    await assertFails(setDoc(doc(admin, 'rightBoxAds/rbox-3-c'), {vendorId: 'alice', status: 'live'}));
+    await assertFails(updateDoc(doc(alice, 'vendors/alice'), {adInterest: true}));
     // Vendor ads: the vendor reads only their own submissions and notices; nobody writes them from a client.
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), 'adSubmissions/s1'), {vendorId: 'alice', status: 'pending'});

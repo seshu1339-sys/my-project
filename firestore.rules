@@ -49,6 +49,12 @@ service cloud.firestore {
       allow read: if admin();
       allow write: if false;
     }
+    // Shop ads in the Right Side Ad Boxes (functions/shop-ads.js): the admin reads all, a vendor reads their own (when it started,
+    // which box, live or ended); written only by functions. The public settings carry only the ad id.
+    match /rightBoxAds/{id} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
     // Quick Add Item: accounts are created and switched on/off only by the admin (functions);
     // an account can read its own record. Items are written only by functions. The public sees
     // only APPROVED items (the site also checks the start/end time); owners and the admin see all.

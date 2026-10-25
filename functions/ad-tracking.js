@@ -13,6 +13,9 @@
 //
 // Every counted view / tap is written to adViews (time, town, device) so the admin can check any number later. Totals live in
 // adStats/<ad> (what the vendor app and admin watch live) and per day in adStatsDaily/<ad>~<day>.
+//
+// A shop ad in a Right Side Ad Box (functions/shop-ads.js) is counted the same way: its id starts with "rbox-" and it is a
+// rightBoxAds record (counted while it is live) instead of an ads one; its totals carry kind 'rightBox' and the box number.
 const {createHash} = require('node:crypto');
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
 
@@ -63,9 +66,10 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
   const config = (await db.collection('settings').doc('adsConfig').get()).data() || {};
   const day = dayKey(now), tk = townKey(batch.town), device = batch.platform;
   for (const event of batch.events) {
-    const adSnap = await db.collection('ads').doc(event.adId).get();
+    const rightBox = event.adId.startsWith('rbox-');
+    const adSnap = await db.collection(rightBox ? 'rightBoxAds' : 'ads').doc(event.adId).get();
     const ad = adSnap.data();
-    if (!adSnap.exists || (ad.status && ad.status !== 'approved')) { result.ignored++; continue; }
+    if (!adSnap.exists || (rightBox ? ad.status !== 'live' : ad.status && ad.status !== 'approved')) { result.ignored++; continue; }
     const why = ignoredBecause({userAgent: context.userAgent, auth: context.auth, ad, config, visitorId: batch.visitorId, staffUids: context.staffUids});
     if (why) { result.ignored++; result.reason = why; continue; }
     const key = hash(`${event.adId}|${batch.visitorId}`);
@@ -73,7 +77,7 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
     const uniqueRef = db.collection('adUniques').doc(key);
     const statsRef = db.collection('adStats').doc(event.adId);
     const dailyRef = db.collection('adStatsDaily').doc(`${event.adId}~${day}`);
-    const base = {adId: event.adId, vendorId: ad.vendorId || null, shopId: ad.shopId || null};
+    const base = {adId: event.adId, vendorId: ad.vendorId || null, shopId: ad.shopId || null, ...(rightBox ? {kind: 'rightBox', box: ad.box || null} : {})};
     const inc = n => FieldValue.increment(n);
     // the same count, broken down by town and by device (nested maps: set() would take a dotted name literally)
     const split = (name, n) => ({towns: {[tk]: {[name]: inc(n)}}, devices: {[device]: {[name]: inc(n)}}});
@@ -94,7 +98,7 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
         tx.set(db.collection('adViews').doc(), {...base, type: 'view', at: Timestamp.fromMillis(now), day, town: batch.town, device, seconds: event.seconds, visitor: key.slice(0, 12)});
         // The daily limit: once today's counted views reach it, the ad is marked for the rest of the (Indian) day and the site stops showing it.
         const limit = Math.round(Number(ad.maxPerDay)) || 0;
-        if (limit > 0 && (today.exists ? Number(today.data().views) || 0 : 0) + 1 >= limit) tx.update(db.collection('ads').doc(event.adId), {capDay: day});
+        if (!rightBox && limit > 0 && (today.exists ? Number(today.data().views) || 0 : 0) + 1 >= limit) tx.update(db.collection('ads').doc(event.adId), {capDay: day});
         return 'view';
       }
       if (event.type === 'time') {

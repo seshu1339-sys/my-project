@@ -62,6 +62,9 @@ extension StoreVendorActions on Store {
   /// An approved provider's new charge per hour (shown at once on the listing).
   Future<void> updateProviderRate(double hourlyRate) => call('updateProviderRate', {'hourlyRate': hourlyRate});
 
+  /// The vendor's "I want an ad for my shop" tick (functions/shop-ads.js); the office then arranges the ad.
+  Future<void> setAdInterest(bool interested) => call('setAdInterest', {'interested': interested});
+
   Future<String> updateVendorOrder(String orderId, String status) async {
     final result = await call('updateVendorOrder', {'orderId': orderId, 'status': status});
     return result['status'] as String;

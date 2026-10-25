@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../services/ad_tracker.dart';
+import 'ad_visibility.dart';
 import 'ad_box.dart';
 import 'ad_transitions.dart';
 
@@ -297,17 +298,7 @@ class _AdSlotState extends State<AdSlot> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  bool _isVisible() {
-    if (!mounted) return false;
-    final state = WidgetsBinding.instance.lifecycleState;
-    if (state != null && state != AppLifecycleState.resumed) return false;
-    if (ModalRoute.of(context)?.isCurrent == false) return false;
-    final box = context.findRenderObject();
-    if (box is! RenderBox || !box.attached || !box.hasSize || box.size.isEmpty) return false;
-    final rect = box.localToGlobal(Offset.zero) & box.size;
-    final seen = rect.intersect(Offset.zero & MediaQuery.sizeOf(context));
-    return !seen.isEmpty && seen.width * seen.height >= .5 * rect.width * rect.height;
-  }
+  bool _isVisible() => mounted && adMostlyOnScreen(context);
 
   void _look() {
     if (_isVisible()) _visibleMs += 500;
