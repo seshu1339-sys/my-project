@@ -33,8 +33,13 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         stream: store.firestore.collection('fieldStaff').doc(uid).snapshots(),
         builder: (context, snapshot) {
           final code = snapshot.data?.data()?['staffCode'] as String?;
-          if (code == null) return const SizedBox.shrink();
-          return Padding(padding: const EdgeInsets.only(top: 4), child: Text('Staff ID: $code', style: Theme.of(context).textTheme.bodyMedium));
+          final auto = snapshot.data?.data()?['autoApprove'] == true;
+          if (code == null && !auto) return const SizedBox.shrink();
+          return Padding(padding: const EdgeInsets.only(top: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (code != null) Text('Staff ID: $code', style: Theme.of(context).textTheme.bodyMedium),
+            // Trusted staff (the admin switched it on): what they add goes live at once.
+            if (auto) Text('Auto-approve is on: what you add goes live at once.', key: const ValueKey('staff-auto-approve-on'), style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
+          ]));
         },
       ),
       const SizedBox(height: 8),

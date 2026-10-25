@@ -35,8 +35,8 @@ Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
 const {setAdInterest, assignRightBoxVendor} = require('./shop-ads');
 Object.assign(exports, {setAdInterest, assignRightBoxVendor});
 // Staff "Add": field staff add vendors and service providers for people without an account; the admin approves (only the callables are exported).
-const {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice} = require('./staff-additions');
-Object.assign(exports, {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice});
+const {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove} = require('./staff-additions');
+Object.assign(exports, {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove});
 // The admin's "Google check" of a photo under review: Cloud Vision web detection and the same-photo check (only the callable is exported).
 const {checkPhoto} = require('./photo-check');
 exports.checkPhoto = checkPhoto;

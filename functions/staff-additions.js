@@ -14,6 +14,9 @@
 // (the admin's service type), hourlyRate, photoPaths (2-3 photos of their work: work_1..3) and providerCode (SRV-NRPM-116-001).
 // Approved, a provider is listed in services (prov-<id>, like a provider who registered themselves: the town and an approximate
 // location only) with the work photos, and gets a providers/<id> record.
+// Trusted staff: the admin can switch on auto-approve for a staff member (fieldStaff/<uid>.autoApprove, off by default; only the
+// admin, setStaffAutoApprove). What such a staff member adds goes live at once, without the admin (autoApproved: true on the addition,
+// so the admin can still see it in the staff report).
 // Approved: the vendor record, its shop (with the photos, the address and the phone) and its items go live (vendors/<id>,
 // shops/<id>, products) with public copies of the photos; the private originals are removed. The items follow the vendor rules:
 // at most the vendor's item limit (2 unless the admin allows more), and each price lasts 24 hours (vendor-prices.js), after which the
@@ -167,6 +170,7 @@ exports.submitStaffVendor = onCall({...options, timeoutSeconds: 120}, async requ
     vendor: details.vendor, ...locationStamp({pincode: details.vendor.pincode, latitude: details.latitude, longitude: details.longitude}),
     photoPaths, items, vendorCode, submittedAt: FieldValue.serverTimestamp(),
   });
+  if (staff.autoApprove === true) return {...(await autoApprove(ref, uid)), additionId, vendorCode};
   return {status: 'pending', additionId, vendorCode};
 });
 
@@ -199,6 +203,7 @@ exports.submitStaffProvider = onCall({...options, timeoutSeconds: 120}, async re
     ...locationStamp({pincode: details.provider.pincode, latitude: details.latitude, longitude: details.longitude}),
     photoPaths, providerCode, submittedAt: FieldValue.serverTimestamp(),
   });
+  if (staff.autoApprove === true) return {...(await autoApprove(ref, uid)), additionId, providerCode};
   return {status: 'pending', additionId, providerCode};
 });
 
@@ -289,6 +294,28 @@ async function removePrivatePhotos(addition) {
   const bucket = getStorage().bucket();
   await Promise.all(photosOf(addition).map(path => bucket.file(path).delete({ignoreNotFound: true})));
 }
+
+/// A trusted staff member's addition goes live at once (no admin, so no Google check either).
+async function autoApprove(ref, staffUid) {
+  const addition = (await ref.get()).data();
+  const out = addition.kind === 'provider' ? await publishStaffProvider(ref, addition, `auto:${staffUid}`) : await publishStaffVendor(ref, addition, `auto:${staffUid}`);
+  await ref.update({autoApproved: true});
+  await removePrivatePhotos(addition);
+  return {status: 'approved', autoApproved: true, ...out};
+}
+
+// Admin: switch auto-approve on or off for one staff member (off by default). On: what they add goes live without the admin.
+exports.setStaffAutoApprove = onCall(options, async request => {
+  await requireAdmin(request);
+  const {staffUid, enabled} = request.data || {};
+  if (typeof staffUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(staffUid) || typeof enabled !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the staff member and on or off.');
+  const ref = db.collection('fieldStaff').doc(staffUid);
+  const staff = (await ref.get()).data();
+  if (!staff) throw new HttpsError('not-found', 'Field staff member not found.');
+  if (enabled && staff.status !== 'active') throw new HttpsError('failed-precondition', 'Only an active staff member can have auto-approve.');
+  await ref.set({autoApprove: enabled, autoApproveAt: FieldValue.serverTimestamp(), autoApproveBy: request.auth.uid}, {merge: true});
+  return {autoApprove: enabled};
+});
 
 // Admin: approve (the vendor goes live) or reject (with a reason the staff member sees) a staff addition.
 exports.reviewStaffAddition = onCall({...options, timeoutSeconds: 120}, async request => {

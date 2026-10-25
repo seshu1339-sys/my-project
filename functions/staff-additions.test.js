@@ -130,6 +130,52 @@ test('staff add a vendor (pending), the admin approves: the vendor, its shop and
   assert.equal((await bucket.file(`${folder('addition0002')}/vendor_1`).exists())[0], false);
 });
 
+test('trusted staff: with auto-approve on (only the admin switches it), what they add goes live at once; off again, it waits', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_STORAGE_EMULATOR_HOST}, async () => {
+  const {getFirestore, Timestamp} = require('firebase-admin/firestore');
+  const {getStorage} = require('firebase-admin/storage');
+  const fns = require('./index');
+  const db = getFirestore();
+  const bucket = getStorage().bucket();
+  const as = uid => ({auth: {uid, token: {email_verified: true}}});
+  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+  await db.collection('productImageLibrary').doc('lib-tomato').set({name: 'Tomato', categoryId: 'cat-vegetables', active: true});
+  await db.collection('services').doc('type-plumber').set({kind: 'serviceType', typeId: 'plumber', name: 'Plumber', active: true});
+  await db.collection('fieldStaff').doc('trusted').set({status: 'active', name: 'Ravi', staffCode: 'STF-NRPM-116-111'});
+  await db.collection('fieldStaff').doc('waiting').set({status: 'pending'});
+  const photo = path => bucket.file(path).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
+  const stage = async (id, names) => { for (const name of names) await photo(`staffAdditions/trusted/${id}/${name}`); };
+
+  // ---- only the admin switches it, and only for active staff; it is off until then
+  await assert.rejects(() => fns.setStaffAutoApprove.run({...as('trusted'), data: {staffUid: 'trusted', enabled: true}}), /Administrator/);
+  await assert.rejects(() => fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'waiting', enabled: true}}), /active/);
+  await assert.rejects(() => fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'nobody', enabled: true}}), /not found/);
+  await stage('autoAdd0001', ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']);
+  assert.equal((await fns.submitStaffVendor.run({...as('trusted'), data: {additionId: 'autoAdd0001', ...ok}})).status, 'pending', 'off by default');
+
+  // ---- on: a vendor and a provider go live at once, marked as auto-approved
+  assert.deepEqual(await fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'trusted', enabled: true}}), {autoApprove: true});
+  assert.equal((await db.collection('fieldStaff').doc('trusted').get()).data().autoApproveBy, 'admin1');
+  await stage('autoAdd0002', ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']);
+  const vendorOut = await fns.submitStaffVendor.run({...as('trusted'), data: {additionId: 'autoAdd0002', ...ok}});
+  assert.deepEqual([vendorOut.status, vendorOut.autoApproved, vendorOut.vendorId], ['approved', true, 'autoAdd0002']);
+  assert.equal((await db.collection('vendors').doc('autoAdd0002').get()).data().status, 'approved');
+  assert.equal((await db.collection('products').where('additionId', '==', 'autoAdd0002').get()).size, 1);
+  const addition = (await db.collection('staffAdditions').doc('autoAdd0002').get()).data();
+  assert.deepEqual([addition.status, addition.autoApproved, addition.decidedBy], ['approved', true, 'auto:trusted']);
+  assert.equal((await bucket.file('staffAdditions/trusted/autoAdd0002/vendor_1').exists())[0], false);
+  await stage('autoAdd0003', ['work_1', 'work_2']);
+  const providerOut = await fns.submitStaffProvider.run({...as('trusted'), data: {additionId: 'autoAdd0003', provider: {name: 'Suresh Kumar', phone: '9876543210', pincode: '531116'}, latitude: 17.668, longitude: 82.612, serviceTypeId: 'type-plumber', hourlyRate: 250, photoCount: 2}});
+  assert.deepEqual([providerOut.status, providerOut.listingId], ['approved', 'prov-autoAdd0003']);
+  assert.equal((await db.collection('services').doc('prov-autoAdd0003').get()).data().active, true);
+
+  // ---- off again: it waits for the admin
+  await fns.setStaffAutoApprove.run({...admin, data: {staffUid: 'trusted', enabled: false}});
+  await stage('autoAdd0004', ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']);
+  assert.equal((await fns.submitStaffVendor.run({...as('trusted'), data: {additionId: 'autoAdd0004', ...ok}})).status, 'pending');
+  assert.equal((await db.collection('vendors').doc('autoAdd0004').get()).exists, false);
+});
+
 test('staff add a service provider (pending, with the SRV ID); approved, the provider is listed under the service with the work photos', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_STORAGE_EMULATOR_HOST}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const {getStorage} = require('firebase-admin/storage');

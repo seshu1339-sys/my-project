@@ -8,6 +8,7 @@ import '../domain/catalog.dart';
 import 'admin_staff_additions.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
+import 'staff_auto_approve_switch.dart';
 import 'shop_map.dart';
 
 /// Field Assistant approvals — a separate admin tool from Vendor moderation,
@@ -146,14 +147,24 @@ class FieldModerationPage extends StatelessWidget {
     final status = data['status']?.toString() ?? '';
     final suspended = status == 'suspended';
     final reason = data['decisionReason']?.toString() ?? '';
-    return Card(child: ListTile(
-      title: Text(name),
-      subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
-      isThreeLine: details.isNotEmpty,
-      trailing: suspended
-          ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
-          : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
-    ));
+    return Card(child: Column(children: [
+      ListTile(
+        title: Text(name),
+        subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
+        isThreeLine: details.isNotEmpty,
+        trailing: suspended
+            ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
+            : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
+      ),
+      // Trusted staff: what they add goes live without approval (off by default).
+      if (!suspended)
+        StaffAutoApproveSwitch(
+          key: ValueKey('auto-approve-${doc.id}'),
+          staffName: name,
+          value: data['autoApprove'] == true,
+          onChanged: (enabled) => store.call('setStaffAutoApprove', {'staffUid': doc.id, 'enabled': enabled}),
+        ),
+    ]));
   }
 
   Widget _submissionTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {

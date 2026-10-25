@@ -5,6 +5,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
 import 'shop_map.dart';
+import 'staff_auto_approve_switch.dart';
 
 /// One field-staff member's full admin profile, reached from the unified
 /// admin search (admin_search.dart). Consolidates the same per-staff controls
@@ -102,6 +103,12 @@ class StaffDetailPage extends StatelessWidget {
             suspended
                 ? FilledButton(onPressed: () => _setSuspension(context, name, suspend: false), child: const Text('Reinstate'))
                 : FilledButton.tonal(onPressed: () => _setSuspension(context, name, suspend: true), child: const Text('Suspend')),
+            if (status == 'active')
+              StaffAutoApproveSwitch(
+                staffName: name,
+                value: data['autoApprove'] == true,
+                onChanged: (enabled) => store.call('setStaffAutoApprove', {'staffUid': staffUid, 'enabled': enabled}),
+              ),
           ]))),
         ]);
         },

@@ -174,8 +174,8 @@ class _FieldAddProviderFormState extends State<FieldAddProviderForm> {
       await showDialog<void>(
         context: context,
         builder: (dialog) => AlertDialog(
-          title: const Text('Sent for approval'),
-          content: Text('${name.text.trim()} ($serviceName) is waiting for the administrator. Nothing is live until it is approved.${result['providerCode'] == null ? '' : '\n\nProvider ID: ${result['providerCode']}'}'),
+          title: Text(result['status'] == 'approved' ? 'Live now' : 'Sent for approval'),
+          content: Text('${name.text.trim()} ($serviceName) ${result['status'] == 'approved' ? 'is live: your additions are approved automatically.' : 'is waiting for the administrator. Nothing is live until it is approved.'}${result['providerCode'] == null ? '' : '\n\nProvider ID: ${result['providerCode']}'}'),
           actions: [FilledButton(onPressed: () => Navigator.pop(dialog), child: const Text('OK'))],
         ),
       );
