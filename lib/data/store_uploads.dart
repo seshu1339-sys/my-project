@@ -111,6 +111,16 @@ extension StoreUploads on Store {
         .ref('fieldSubmissions/$uid/${submissionId}_$index')
         .putData(image.bytes, SettableMetadata(contentType: image.type));
   }
+
+  /// One photo of something a staff member adds (Staff > Add), private until the admin approves:
+  /// staffAdditions/$uid/$additionId/$name, where [name] is vendor_1..3 or `item<i>_<n>` (functions/staff-additions.js checks them).
+  Future<Uint8List> uploadStaffAdditionPhoto(String additionId, String name, XFile file) async {
+    final uid = user?.uid;
+    if (uid == null) throw StateError('Sign in first.');
+    final image = await _readImage(this, file);
+    await FirebaseStorage.instance.ref('staffAdditions/$uid/$additionId/$name').putData(image.bytes, SettableMetadata(contentType: image.type));
+    return image.bytes;
+  }
 }
 
 // A plain top-level helper, not an extension method, because it only needs

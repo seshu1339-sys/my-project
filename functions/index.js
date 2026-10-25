@@ -34,6 +34,9 @@ Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
 // Shop ads in the Right Side Ad Boxes, arranged offline: the vendor's "Ad for your shop" tick and the admin linking a box to a vendor.
 const {setAdInterest, assignRightBoxVendor} = require('./shop-ads');
 Object.assign(exports, {setAdInterest, assignRightBoxVendor});
+// Staff "Add": field staff add vendors for people without an account; the admin approves (only the callables are exported).
+const {submitStaffVendor, reviewStaffAddition, renewStaffVendorPrice} = require('./staff-additions');
+Object.assign(exports, {submitStaffVendor, reviewStaffAddition, renewStaffVendorPrice});
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js

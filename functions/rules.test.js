@@ -64,6 +64,16 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(alice, 'rightBoxAds/rbox-1-a'), {status: 'live', box: 9}));
     await assertFails(setDoc(doc(admin, 'rightBoxAds/rbox-3-c'), {vendorId: 'alice', status: 'live'}));
     await assertFails(updateDoc(doc(alice, 'vendors/alice'), {adInterest: true}));
+    // Staff additions: a staff member reads only their own; the admin reads all; nobody writes them from a client.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'staffAdditions/a1'), {staffUid: 'alice', kind: 'vendor', status: 'pending'});
+      await setDoc(doc(ctx.firestore(), 'staffAdditions/a2'), {staffUid: 'bob', kind: 'vendor', status: 'pending'});
+    });
+    await assertSucceeds(getDoc(doc(alice, 'staffAdditions/a1')));
+    await assertFails(getDoc(doc(alice, 'staffAdditions/a2')));
+    await assertFails(getDoc(doc(anonymous, 'staffAdditions/a1')));
+    await assertSucceeds(getDoc(doc(admin, 'staffAdditions/a2')));
+    await assertFails(setDoc(doc(alice, 'staffAdditions/a1'), {staffUid: 'alice', status: 'approved'}));
     // Vendor ads: the vendor reads only their own submissions and notices; nobody writes them from a client.
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), 'adSubmissions/s1'), {vendorId: 'alice', status: 'pending'});

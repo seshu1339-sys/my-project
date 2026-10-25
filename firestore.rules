@@ -55,6 +55,11 @@ service cloud.firestore {
       allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
       allow write: if false;
     }
+    // Staff "Add" (functions/staff-additions.js): the admin reads every addition, a staff member their own; written only by functions.
+    match /staffAdditions/{id} {
+      allow read: if admin() || (signedIn() && resource.data.staffUid == request.auth.uid);
+      allow write: if false;
+    }
     // Quick Add Item: accounts are created and switched on/off only by the admin (functions);
     // an account can read its own record. Items are written only by functions. The public sees
     // only APPROVED items (the site also checks the start/end time); owners and the admin see all.

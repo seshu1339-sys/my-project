@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_add_page.dart';
+import 'field_add_vendor_form.dart';
+import 'field_my_additions.dart';
 import 'field_entry_form.dart';
 import 'quick_add.dart';
 
@@ -42,13 +44,15 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
         onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
           store: store,
-          vendorForm: (_) => const _ComingNext(title: 'Add a vendor'),
+          vendorForm: (_) => FieldAddVendorForm(store: store),
           serviceForm: (_, type) => _ComingNext(title: 'Add a ${type.text('name', 'service')}'),
         ))),
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Add', style: TextStyle(fontSize: 18)),
       ),
       const SizedBox(height: 16),
+      FieldMyAdditions(store: store, uid: uid),
+      const SizedBox(height: 24),
       const Text('Capture an item at a vendor shop. Nothing you submit is visible to customers until an administrator approves it.'),
       const SizedBox(height: 16),
       FilledButton.icon(
@@ -96,7 +100,7 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
   }
 }
 
-/// Until the forms for adding a vendor and a service provider are built (the next steps), what opens from Add.
+/// Until the form for adding a service provider is built (the next step), what opens from Add > Services.
 class _ComingNext extends StatelessWidget {
   const _ComingNext({required this.title});
   final String title;
