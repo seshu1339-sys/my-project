@@ -75,3 +75,21 @@ test('counts by day and key, the shop owner\'s and the staff member\'s own numbe
   const interest = (await db.collection('usageDaily').doc(`${dayKey()}~ad_interest`).get()).data();
   assert.equal(interest.keys[shortKey('uVendorAd')].label, 'Ravi Stores');
 });
+
+test('the people report says who an account is: email, name and kind', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST}, async () => {
+  const {getFirestore} = require('firebase-admin/firestore');
+  const {getAuth} = require('firebase-admin/auth');
+  const {_usageAdmin} = require('./usage-admin');
+  const db = getFirestore();
+  for (const [uid, email] of [['labCustomer', 'cust@example.test'], ['labStaff', 'staff@example.test']]) {
+    try { await getAuth().deleteUser(uid); } catch (_) { /* not there */ }
+    await getAuth().createUser({uid, email, displayName: uid === 'labStaff' ? 'Kiran' : undefined});
+  }
+  await db.collection('fieldStaff').doc('labStaff').set({status: 'active'});
+  const labels = await _usageAdmin.labelsFor(['labCustomer', 'labStaff', 'labGone']);
+  assert.deepEqual([labels.labCustomer.email, labels.labCustomer.kind], ['cust@example.test', 'customer']);
+  assert.deepEqual([labels.labStaff.name, labels.labStaff.kind], ['Kiran', 'staff']);
+  assert.equal(labels.labGone.missing, true);
+  const fns = require('./index');
+  await assert.rejects(() => fns.accountLabels.run({auth: {uid: 'x', token: {email_verified: true}}, data: {uids: ['labCustomer']}}), /Administrator/);
+});

@@ -5,6 +5,7 @@ import 'admin_frame.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'admin_analytics.dart';
 
 /// Site and ad statistics, plus the price-drop alert audience and controls.
 /// Reads the aggregates written by the trackEvent function and the interest
@@ -309,6 +310,9 @@ class _AdminInsightsPageState extends State<AdminInsightsPage> {
       if (loading) const LinearProgressIndicator(),
       if (error != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
       if (notice != null) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text(notice!)),
+      // The full Analytics (reports, people, notifications, inactive accounts, setup check) opens from here.
+      if (store.live) AnalyticsEntryCard(store: store),
+      if (store.live) const SizedBox(height: 16),
       _statistics(),
       const Divider(height: 40),
       _alerts(),
