@@ -44,6 +44,9 @@ exports.checkPhoto = checkPhoto;
 // Analytics reports: who the people in the per-person report are (only the callable is exported).
 const {accountLabels} = require('./usage-admin');
 exports.accountLabels = accountLabels;
+// The admin's push notification centre: send to all / a town / one person, opens, audience (only the callables are exported).
+const {sendPushNotification, trackPushOpen, pushAudience, pushNotOpened} = require('./push-center');
+Object.assign(exports, {sendPushNotification, trackPushOpen, pushAudience, pushNotOpened});
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js

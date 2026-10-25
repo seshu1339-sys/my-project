@@ -25,10 +25,14 @@ async function* pages(query) {
 // that would be sent is recorded in _pushDryRun instead, so targeting and
 // duplicate suppression can still be verified end to end.
 async function deliver(uid, eventKey, tokens, notification, data) {
+  // The admin's push centre counts the automatic notifications per type and day (push-center.js).
+  const {_pushCenter} = require('./push-center');
   if (process.env.PUSH_DRY_RUN === 'true') {
     await db.collection('_pushDryRun').add({uid, eventKey, notification, data, tokenCount: tokens.size, createdAt: FieldValue.serverTimestamp()});
+    await _pushCenter.countAutomaticSent(data?.type, tokens.size);
     return;
   }
+  let delivered = 0;
   for (let i = 0; i < tokens.size; i += 500) {
     const batch = tokens.docs.slice(i, i + 500);
     const result = await getMessaging().sendEachForMulticast({
@@ -42,7 +46,9 @@ async function deliver(uid, eventKey, tokens, notification, data) {
       if (['messaging/registration-token-not-registered', 'messaging/invalid-registration-token'].includes(code)) await batch[j].ref.delete();
     }
     if (result.failureCount) console.warn('Some push deliveries failed', {failureCount: result.failureCount});
+    delivered += result.successCount;
   }
+  await _pushCenter.countAutomaticSent(data?.type, delivered);
 }
 /// Returns 'sent', 'duplicate', 'not-subscribed' or 'no-token'. [reclaimAfterMs]
 /// lets the very same alert be sent again once that much time has passed.
@@ -107,6 +113,8 @@ exports.notifyOrderStatus = onDocumentUpdated({document: 'orders/{orderId}', reg
   const before = event.data.before.data(), after = event.data.after.data();
   const body = orderStatusCopy[after.status];
   if (!body || before.status === after.status || !after.userId) return;
+  // The admin can switch order-update notifications off (push centre); on unless switched off.
+  if (flagOff(((await db.collection('settings').doc('business').get()).data() || {}).orderStatusNotificationsEnabled)) return;
   await send(after.userId, event.id, {title: 'Order update', body}, {
     type: 'orderStatus', orderId: event.params.orderId, status: after.status,
   });
@@ -178,6 +186,8 @@ async function announceLocationOffers(uid, subscriber, now = Date.now()) {
   const place = placeForPincode(subscriber.pincode);
   if (!place) return 'no-place';
   if (flagOff(((await db.collection('settings').doc('business').get()).data() || {}).offerNotificationsEnabled)) return 'disabled';
+  // "Offers in your town" when a customer's place changes has its own switch in the push centre.
+  if (flagOff(((await db.collection('settings').doc('business').get()).data() || {}).locationOfferNotificationsEnabled)) return 'disabled';
   const promotions = [];
   for await (const doc of pages(db.collection('promotions').orderBy('__name__'))) promotions.push({id: doc.id, data: doc.data()});
   const offers = locationOffers(promotions, place, subscriber, now);

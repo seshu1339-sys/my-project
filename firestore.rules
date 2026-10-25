@@ -84,6 +84,19 @@ service cloud.firestore {
       allow read: if admin();
       allow write: if false;
     }
+    // The push notification centre (functions/push-center.js): admin only; written only by functions.
+    match /pushLog/{nid} {
+      allow read: if admin();
+      allow write: if false;
+      match /recipients/{uid} {
+        allow read: if admin();
+        allow write: if false;
+      }
+    }
+    match /pushTypeDaily/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     match /usageOwnerDaily/{id} {
       allow read: if admin() || (signedIn() && resource.data.ownerId == request.auth.uid);
       allow write: if false;

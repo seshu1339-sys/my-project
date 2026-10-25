@@ -16,6 +16,7 @@ import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/usage_start.dart';
+import 'services/push_opens.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
 import 'services/location.dart';
@@ -69,6 +70,8 @@ Future<void> main() async {
     // Start counting visits, then genuine ad views once the device id exists.
     unawaited(Analytics.start().then((_) => Analytics.startAdTracker()));
     unawaited(startUsage(app: 'customer'));
+    // The website opened from a notification (?nid=...): counted as opened.
+    unawaited(reportWebPushOpen());
   }
   runApp(MarketApp(store: store));
   if (live) {
@@ -142,6 +145,8 @@ Future<void> _refreshLocationOnOpen(Store store) async {
 }
 
 Future<void> _openAlert(Store store, RemoteMessage message) async {
+  // Counted for the admin's push centre: which notification (or which kind) was opened.
+  unawaited(reportPushOpen(nid: message.data['nid'], type: message.data['type'], title: message.notification?.title ?? ''));
   final id = message.data['productId'];
   if (id == null) {
     _navigator.currentState?.popUntil((route) => route.isFirst);

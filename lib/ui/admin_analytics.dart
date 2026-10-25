@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import 'admin_analytics_people.dart';
 import 'admin_analytics_reports.dart';
+import 'admin_push_center.dart';
 import 'screen_view.dart';
 
 /// One part of the Analytics page: its tab and what it shows. Each part is its own file, so a part can be added or removed alone.
@@ -17,6 +18,7 @@ class AnalyticsSection {
 final analyticsSections = <AnalyticsSection>[
   AnalyticsSection('Reports', Icons.insights_outlined, (store) => AnalyticsReportsView(store: store)),
   AnalyticsSection('People', Icons.people_outline, (store) => AnalyticsPeopleView(store: store)),
+  AnalyticsSection('Push notifications', Icons.notifications_active_outlined, (store) => PushCenterView(store: store)),
 ];
 
 /// Admin > Insights > Analytics: what people do in the apps (reports with Excel, each person's use), and the parts added with it.
