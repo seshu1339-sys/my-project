@@ -21,6 +21,19 @@ test('a vendor a staff member adds needs a name, a phone, the staff GPS, and 1-2
   assert.throws(() => _staffAdditions.staffVendorDetails({...ok, items: [{...items[0], price: 0}]}), /price/);
 });
 
+test('a service provider a staff member adds needs a name, a phone, the staff GPS, the service, the charge per hour and 2-3 work photos', () => {
+  const okProvider = {provider: {name: 'Suresh Kumar', phone: '9876543210', pincode: '531116'}, latitude: 17.668, longitude: 82.612, serviceTypeId: 'type-plumber', hourlyRate: 250, photoCount: 2};
+  const details = _staffAdditions.staffProviderDetails(okProvider);
+  assert.equal(details.provider.address, '', 'optional');
+  assert.equal(_staffAdditions.staffProviderDetails({...okProvider, hourlyRate: 199.999}).hourlyRate, 200);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, provider: {...okProvider.provider, name: 'S'}}), /provider's name/);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, provider: {...okProvider.provider, phone: ''}}), /phone/);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, longitude: undefined}), /location/);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, serviceTypeId: ''}), /service/);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, hourlyRate: 0}), /per hour/);
+  assert.throws(() => _staffAdditions.staffProviderDetails({...okProvider, photoCount: 1}), /2 or 3 photos of their work/);
+});
+
 test('staff add a vendor (pending), the admin approves: the vendor, its shop and its items go live with the photos; the staff member renews prices', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_STORAGE_EMULATOR_HOST}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const {getStorage} = require('firebase-admin/storage');
@@ -101,4 +114,45 @@ test('staff add a vendor (pending), the admin approves: the vendor, its shop and
   assert.deepEqual([rejected.status, rejected.decisionReason], ['rejected', 'Photos are blurred']);
   assert.equal((await db.collection('vendors').doc('addition0002').get()).exists, false);
   assert.equal((await bucket.file(`${folder('addition0002')}/vendor_1`).exists())[0], false);
+});
+
+test('staff add a service provider (pending, with the SRV ID); approved, the provider is listed under the service with the work photos', {skip: !process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_STORAGE_EMULATOR_HOST}, async () => {
+  const {getFirestore, Timestamp} = require('firebase-admin/firestore');
+  const {getStorage} = require('firebase-admin/storage');
+  const fns = require('./index');
+  const db = getFirestore();
+  const bucket = getStorage().bucket();
+  const as = uid => ({auth: {uid, token: {email_verified: true}}});
+  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
+  await db.collection('services').doc('type-plumber').set({kind: 'serviceType', typeId: 'plumber', name: 'Plumber', active: true});
+  await db.collection('fieldStaff').doc('provStaff').set({status: 'active', name: 'Kiran Kumar', staffCode: 'STF-NRPM-116-482'});
+  const photo = path => bucket.file(path).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
+  const data = {additionId: 'provAdd0001', provider: {name: 'Suresh Kumar', phone: '9876543210', address: 'Gandhi Nagar, Narsipatnam', pincode: '531116'}, latitude: 17.6685, longitude: 82.6126, serviceTypeId: 'type-plumber', hourlyRate: 250, photoCount: 2};
+  const submit = (extra = {}) => fns.submitStaffProvider.run({...as('provStaff'), data: {...data, ...extra}});
+
+  await assert.rejects(() => submit(), /photo 1 of their work/);
+  await photo('staffAdditions/provStaff/provAdd0001/work_1');
+  await photo('staffAdditions/provStaff/provAdd0001/work_2');
+  await assert.rejects(() => submit({serviceTypeId: 'type-astronaut'}), /service from the list/);
+  const out = await submit();
+  assert.equal(out.status, 'pending');
+  assert.match(out.providerCode, /^SRV-NRPM-116-\d{3}$/);
+  const pending = (await db.collection('staffAdditions').doc('provAdd0001').get()).data();
+  assert.deepEqual([pending.kind, pending.serviceName, pending.serviceTypeKey, pending.hourlyRate, pending.staffCode, pending.town], ['provider', 'Plumber', 'plumber', 250, 'STF-NRPM-116-482', 'Narsipatnam']);
+  assert.equal((await db.collection('services').doc('prov-provAdd0001').get()).exists, false, 'nothing is live before the admin approves');
+
+  const approved = await fns.reviewStaffAddition.run({...admin, data: {additionId: 'provAdd0001', approved: true}});
+  assert.deepEqual(approved, {status: 'approved', providerId: 'provAdd0001', listingId: 'prov-provAdd0001'});
+  const listing = (await db.collection('services').doc('prov-provAdd0001').get()).data();
+  assert.deepEqual([listing.kind, listing.typeId, listing.name, listing.price, listing.unit, listing.phone, listing.whatsapp, listing.providerCode, listing.active],
+    ['service', 'plumber', 'Suresh Kumar', 250, 'per hour', '9876543210', '919876543210', out.providerCode, true]);
+  assert.deepEqual([listing.latitude, listing.longitude, listing.town], [17.67, 82.61, 'Narsipatnam'], 'only an approximate location');
+  assert.equal(listing.address, undefined, 'the address is never public');
+  assert.match(listing.imageUrl, /catalog%2Fstaffprovider_provAdd0001_1\.jpg/);
+  assert.equal(listing.images.length, 1);
+  assert.equal((await db.collection('products').doc('prov-provAdd0001').get()).exists, false, 'services, never products');
+  const record = (await db.collection('providers').doc('provAdd0001').get()).data();
+  assert.deepEqual([record.status, record.providerCode, record.noLogin, record.addedByStaffUid], ['approved', out.providerCode, true, 'provStaff']);
+  assert.equal((await bucket.file('staffAdditions/provStaff/provAdd0001/work_1').exists())[0], false);
 });

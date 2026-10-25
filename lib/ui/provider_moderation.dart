@@ -57,6 +57,7 @@ class ProviderModerationPage extends StatelessWidget {
         children: [
           ApplicationPhoto(label: 'Photo', path: data['photoPath']?.toString(), height: 160, width: 200),
           const SizedBox(height: 8),
+          if ('${data['providerCode'] ?? ''}'.isNotEmpty) Text('Provider ID: ${data['providerCode']}'),
           Text('Mobile: ${data['phone'] ?? ''}'),
           if ('${data['email'] ?? ''}'.isNotEmpty) Text('Email: ${data['email']}'),
           Text('House address: ${data['address'] ?? ''} ${data['pincode'] ?? ''}'),

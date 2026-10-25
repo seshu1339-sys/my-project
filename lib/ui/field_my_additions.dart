@@ -6,8 +6,8 @@ import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'text_prompt_dialog.dart';
 
-/// "My vendors" in the staff app: everything this staff member added (Staff > Add), with its state (waiting for the admin, live, or
-/// not approved and why) and the Vendor ID. A live vendor's items show their price; a price lasts 24 hours, so the staff member who
+/// "My vendors and services" in the staff app: everything this staff member added (Staff > Add), with its state (waiting for the admin,
+/// live, or not approved and why) and its ID (Vendor ID, or Provider ID for a service provider). A live vendor's items show their price; a price lasts 24 hours, so the staff member who
 /// added the vendor enters a new one when it runs out (functions/staff-additions.js renewStaffVendorPrice).
 class FieldMyAdditions extends StatelessWidget {
   const FieldMyAdditions({super.key, required this.store, required this.uid});
@@ -72,7 +72,7 @@ class StaffAdditionsView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('My vendors', style: Theme.of(context).textTheme.titleLarge),
+        Text('My vendors and services', style: Theme.of(context).textTheme.titleLarge),
         Text('${additions.length} added by you${expiredCount == 0 ? '' : ' • $expiredCount price${expiredCount == 1 ? '' : 's'} to renew'}', key: const ValueKey('staff-additions-count')),
         if (failed) const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Your vendors could not load.')),
         if (!failed && additions.isEmpty) const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Nobody added yet. Tap Add above.')),
@@ -82,7 +82,9 @@ class StaffAdditionsView extends StatelessWidget {
   }
 
   Widget _card(BuildContext context, Entry a) {
-    final vendor = Map<String, dynamic>.from(a.data['vendor'] as Map? ?? const {});
+    final provider = a.text('kind') == 'provider';
+    final person = Map<String, dynamic>.from((provider ? a.data['provider'] : a.data['vendor']) as Map? ?? const {});
+    final code = provider ? a.text('providerCode') : a.text('vendorCode');
     final live = a.text('status') == 'approved';
     final items = [for (final p in products) if (p.text('ownerId') == a.id) p];
     return Card(
@@ -91,11 +93,12 @@ class StaffAdditionsView extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Icon(live ? Icons.storefront : a.text('status') == 'rejected' ? Icons.cancel_outlined : Icons.hourglass_top),
+            Icon(live ? (provider ? Icons.home_repair_service : Icons.storefront) : a.text('status') == 'rejected' ? Icons.cancel_outlined : Icons.hourglass_top),
             const SizedBox(width: 8),
-            Expanded(child: Text('${vendor['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold))),
+            Expanded(child: Text('${person['name'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
-          Text([if (a.text('vendorCode').isNotEmpty) 'Vendor ID: ${a.text('vendorCode')}', if ('${vendor['phone'] ?? ''}'.isNotEmpty) 'Phone: ${vendor['phone']}'].join(' • ')),
+          if (provider) Text('${a.text('serviceName')} • ₹${a.data['hourlyRate'] ?? ''} per hour'),
+          Text([if (code.isNotEmpty) '${provider ? 'Provider' : 'Vendor'} ID: $code', if ('${person['phone'] ?? ''}'.isNotEmpty) 'Phone: ${person['phone']}'].join(' • ')),
           Text(stateOf(a), key: ValueKey('staff-addition-state-${a.id}')),
           if (live)
             for (final item in items)

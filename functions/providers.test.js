@@ -34,8 +34,11 @@ test('a service provider registers (separately from vendors), the admin approves
   await assert.rejects(() => register('provA'), /photo/);
   await photo('provA');
   await assert.rejects(() => register('provA', {...ok, serviceTypeId: 'type-astronaut'}), /service from the list/);
-  assert.deepEqual(await register('provA'), {status: 'pending'});
+  const registered = await register('provA');
+  assert.equal(registered.status, 'pending');
+  assert.match(registered.providerCode, /^SRV-NRPM-116-\d{3}$/, 'the Provider ID, like the Vendor ID');
   const app = (await db.collection('providerApplications').doc('provA').get()).data();
+  assert.equal(app.providerCode, registered.providerCode);
   assert.equal(app.serviceName, 'Plumber');
   assert.equal(app.hourlyRate, 250);
   await assert.rejects(() => register('provA'), /already under review/);
@@ -58,6 +61,8 @@ test('a service provider registers (separately from vendors), the admin approves
   assert.equal(listing.typeId, 'plumber', 'listed under the Plumber type');
   assert.equal(listing.name, 'Suresh Kumar');
   assert.equal(listing.price, 250);
+  assert.equal(listing.providerCode, registered.providerCode);
+  assert.equal((await db.collection('providers').doc('provA').get()).data().providerCode, registered.providerCode);
   assert.equal(listing.unit, 'per hour');
   assert.equal(listing.phone, '9876543210');
   assert.equal(listing.whatsapp, '919876543210');

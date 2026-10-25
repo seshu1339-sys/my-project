@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_add_page.dart';
+import 'field_add_provider_form.dart';
 import 'field_add_vendor_form.dart';
 import 'field_my_additions.dart';
 import 'field_entry_form.dart';
@@ -45,7 +46,7 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
           store: store,
           vendorForm: (_) => FieldAddVendorForm(store: store),
-          serviceForm: (_, type) => _ComingNext(title: 'Add a ${type.text('name', 'service')}'),
+          serviceForm: (_, type) => FieldAddProviderForm(store: store, serviceType: type),
         ))),
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Add', style: TextStyle(fontSize: 18)),
@@ -98,15 +99,4 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
       isThreeLine: true,
     ));
   }
-}
-
-/// Until the form for adding a service provider is built (the next step), what opens from Add > Services.
-class _ComingNext extends StatelessWidget {
-  const _ComingNext({required this.title});
-  final String title;
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(title)),
-    body: const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('This form comes in the next step.', textAlign: TextAlign.center))),
-  );
 }

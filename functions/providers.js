@@ -9,6 +9,7 @@ const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {accountKinds, otherAccountMessage} = require('./accounts');
+const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -77,13 +78,15 @@ exports.registerProvider = onCall(options, async request => {
   if (!exists) throw new HttpsError('failed-precondition', 'Upload your photo before submitting.');
   const [metadata] = await file.getMetadata();
   if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', 'Upload your photo before submitting.');
+  // The Provider ID (SRV-NRPM-116-001, functions/vendor-id.js): made once, kept on a resubmission while the pincode still fits it.
+  const providerCode = await accountCodeFor(db, 'SRV', {pincode: details.pincode, existing: existing.exists ? existing.data().providerCode : '', owner: uid});
   await ref.set({
     providerId: uid, ...details, serviceName: String(type.name || ''), serviceTypeKey: String(type.typeId || details.serviceTypeId.replace(/^type-/, '')),
-    photoPath: file.name, email: request.auth.token.email || null, status: 'pending',
+    photoPath: file.name, email: request.auth.token.email || null, status: 'pending', providerCode,
     submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     decisionReason: FieldValue.delete(), decidedAt: FieldValue.delete(),
   }, {merge: true});
-  return {status: 'pending'};
+  return {status: 'pending', providerCode};
 });
 
 exports.approveProvider = onCall(options, async request => {
@@ -107,6 +110,8 @@ exports.approveProvider = onCall(options, async request => {
   const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
   const listingId = `prov-${providerId}`;
   const digits = String(data.phone || '').replace(/[^0-9]/g, '');
+  // Applications from before the Provider ID get one now.
+  const providerCode = data.providerCode || await accountCodeFor(db, 'SRV', {pincode: data.pincode, existing: '', owner: providerId});
   const batch = db.batch();
   batch.set(db.collection('services').doc(listingId), {
     kind: 'service', providerId, ownerId: providerId, name: data.name, typeId: data.serviceTypeKey, serviceName: data.serviceName,
@@ -115,12 +120,12 @@ exports.approveProvider = onCall(options, async request => {
     // The listing is public: the town and an approximate location (about 1 km) only, never the house address or the exact GPS.
     stock: 0, phone: data.phone, whatsapp: digits.length === 10 ? `91${digits}` : digits, imageUrl,
     ...locationStamp({pincode: data.pincode, latitude: approximate(data.latitude), longitude: approximate(data.longitude)}),
-    active: true, order: 1000, createdAt: FieldValue.serverTimestamp(),
+    providerCode, active: true, order: 1000, createdAt: FieldValue.serverTimestamp(),
   });
   batch.set(db.collection('providers').doc(providerId), {
-    providerId, name: data.name, status: 'approved', listingId, serviceTypeId: data.serviceTypeId, approvedAt: FieldValue.serverTimestamp(),
+    providerId, name: data.name, status: 'approved', listingId, serviceTypeId: data.serviceTypeId, providerCode, approvedAt: FieldValue.serverTimestamp(),
   }, {merge: true});
-  batch.set(ref, {status: 'approved', listingId, decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+  batch.set(ref, {status: 'approved', listingId, providerCode, decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
   await batch.commit();
   return {status: 'approved', listingId};
 });

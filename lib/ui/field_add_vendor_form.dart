@@ -221,7 +221,7 @@ class _FieldAddVendorFormState extends State<FieldAddVendorForm> {
           actions: [FilledButton(onPressed: () => Navigator.pop(dialog), child: const Text('OK'))],
         ),
       );
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (mounted) toast(e);
     } finally {
@@ -374,7 +374,7 @@ class _FieldAddVendorFormState extends State<FieldAddVendorForm> {
                 ]),
                 const SizedBox(height: 16),
                 Text('Items the vendor sells (up to $defaultVendorItemLimit)', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('Choose from the items the admin has added, with the quantity and the price. A price stays for $vendorPriceValidHours hours; then you enter a new one in My vendors.'),
+                Text('Choose from the items the admin has added, with the quantity and the price. A price stays for $vendorPriceValidHours hours; then you enter a new one in My vendors and services.'),
                 for (final (i, item) in items.indexed) _itemCard(i, item),
                 if (items.length < defaultVendorItemLimit)
                   OutlinedButton.icon(key: const ValueKey('staff-item-add'), onPressed: busy ? null : () => setState(() => items.add(StaffItemDraft())), icon: const Icon(Icons.add), label: const Text('Add another item')),

@@ -1,8 +1,8 @@
 'use strict';
-// Staff "Add": approved field staff add vendors (and service providers, T4) for people who have no account of their own.
-// The staff member is at the place: their GPS is the vendor's location (nothing is added without it). Everything waits for the
-// admin as staffAdditions/<id>:
-//   kind          'vendor'
+// Staff "Add": approved field staff add vendors and service providers for people who have no account of their own.
+// The staff member is at the place: their GPS is the vendor's (or provider's) location (nothing is added without it). Everything waits
+// for the admin as staffAdditions/<id>:
+//   kind          'vendor' or 'provider'
 //   status        pending | approved | rejected
 //   staffUid, staffCode, staffName   who added it (the admin report counts these)
 //   vendor        name, phone, ownerName, shopCategory, address, pincode, description, gpsAddress
@@ -10,6 +10,10 @@
 //   photoPaths    the vendor's 3 photos (private: staffAdditions/<staffUid>/<id>/vendor_1..3)
 //   items         1 to 2 items from the admin's library (libraryItemId, name, unitType, quantity, unit, price) with 2-3 photos each
 //   vendorCode    the Vendor ID it gets (VEN-NRPM-116-001), reserved when it is added
+// A provider addition has instead: provider (name, phone, address, pincode, gpsAddress), serviceTypeId / serviceName / serviceTypeKey
+// (the admin's service type), hourlyRate, photoPaths (2-3 photos of their work: work_1..3) and providerCode (SRV-NRPM-116-001).
+// Approved, a provider is listed in services (prov-<id>, like a provider who registered themselves: the town and an approximate
+// location only) with the work photos, and gets a providers/<id> record.
 // Approved: the vendor record, its shop (with the photos, the address and the phone) and its items go live (vendors/<id>,
 // shops/<id>, products) with public copies of the photos; the private originals are removed. The items follow the vendor rules:
 // at most the vendor's item limit (2 unless the admin allows more), and each price lasts 24 hours (vendor-prices.js), after which the
@@ -27,6 +31,8 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 const VENDOR_PHOTOS = 3;
 const MIN_ITEM_PHOTOS = 2, MAX_ITEM_PHOTOS = 3;
+// Photos of a service provider's work.
+const MIN_WORK_PHOTOS = 2, MAX_WORK_PHOTOS = 3;
 // A new item starts with this many in stock, like a vendor's own (index.js DEFAULT_VENDOR_ITEM_STOCK).
 const ITEM_STOCK = 99;
 
@@ -88,6 +94,27 @@ function staffVendorDetails(data = {}) {
   };
 }
 
+/// The checked details of a service provider a staff member adds. Throws Error(message).
+function staffProviderDetails(data = {}) {
+  const provider = data.provider || {};
+  const phone = typeof provider.phone === 'string' ? provider.phone.trim() : '';
+  if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error("Provide the provider's phone number.");
+  const pincode = typeof provider.pincode === 'string' ? provider.pincode.trim() : '';
+  if (!/^\d{6}$/.test(pincode)) throw Error('Provide a valid six-digit pincode.');
+  if (!validCoordinate(data.latitude) || !validCoordinate(data.longitude)) throw Error('Turn on your location and capture it: the provider is added at your location.');
+  if (typeof data.serviceTypeId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(data.serviceTypeId)) throw Error('Choose the service from the list.');
+  const rate = data.hourlyRate;
+  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0 || rate > 100000) throw Error('Enter the charge per hour (more than 0).');
+  if (!Number.isInteger(data.photoCount) || data.photoCount < MIN_WORK_PHOTOS || data.photoCount > MAX_WORK_PHOTOS) throw Error(`Add ${MIN_WORK_PHOTOS} or ${MAX_WORK_PHOTOS} photos of their work.`);
+  return {
+    provider: {
+      name: words(provider.name, 2, 100, "the provider's name"), phone, address: words(provider.address, 0, 500, 'The address'), pincode,
+      ...(typeof data.gpsAddress === 'string' && data.gpsAddress.trim() ? {gpsAddress: data.gpsAddress.trim().replace(/\s+/g, ' ').slice(0, 500)} : {}),
+    },
+    latitude: data.latitude, longitude: data.longitude, serviceTypeId: data.serviceTypeId, hourlyRate: Math.round(rate * 100) / 100, photoCount: data.photoCount,
+  };
+}
+
 const photoFolder = (staffUid, additionId) => `staffAdditions/${staffUid}/${additionId}`;
 
 async function verifyPhoto(path, label) {
@@ -142,6 +169,38 @@ exports.submitStaffVendor = onCall({...options, timeoutSeconds: 120}, async requ
   return {status: 'pending', additionId, vendorCode};
 });
 
+exports.submitStaffProvider = onCall({...options, timeoutSeconds: 120}, async request => {
+  const uid = requireUser(request);
+  const staff = await requireActiveStaff(uid);
+  const additionId = request.data?.additionId;
+  if (typeof additionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(additionId)) throw new HttpsError('invalid-argument', 'Invalid addition id.');
+  const ref = db.collection('staffAdditions').doc(additionId);
+  const existing = (await ref.get()).data();
+  if (existing) {
+    if (existing.staffUid !== uid) throw new HttpsError('already-exists', 'Invalid addition id.');
+    return {status: existing.status, additionId, providerCode: existing.providerCode};
+  }
+  let details;
+  try { details = staffProviderDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
+  if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose the service from the list.');
+  const folder = photoFolder(uid, additionId);
+  const photoPaths = [];
+  for (let n = 1; n <= details.photoCount; n++) {
+    await verifyPhoto(`${folder}/work_${n}`, `photo ${n} of their work`);
+    photoPaths.push(`${folder}/work_${n}`);
+  }
+  const providerCode = await accountCodeFor(db, 'SRV', {pincode: details.provider.pincode, existing: '', owner: additionId});
+  await ref.set({
+    kind: 'provider', status: 'pending', staffUid: uid, staffCode: staff.staffCode || '', staffName: staff.name || '',
+    provider: details.provider, serviceTypeId: details.serviceTypeId, serviceName: String(type.name || ''),
+    serviceTypeKey: String(type.typeId || details.serviceTypeId.replace(/^type-/, '')), hourlyRate: details.hourlyRate,
+    ...locationStamp({pincode: details.provider.pincode, latitude: details.latitude, longitude: details.longitude}),
+    photoPaths, providerCode, submittedAt: FieldValue.serverTimestamp(),
+  });
+  return {status: 'pending', additionId, providerCode};
+});
+
 const publicUrl = (bucket, path) => `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`;
 
 /// Puts an approved vendor addition live: public copies of the photos, the vendor record, the shop and the items. Returns the ids.
@@ -187,6 +246,40 @@ async function publishStaffVendor(ref, addition, decidedBy) {
   return {vendorId: id, productIds};
 }
 
+// Two decimals of a degree: about 1 km, like a provider who registered themselves (providers.js).
+const approximate = value => Math.round(value * 100) / 100;
+
+/// Puts an approved provider addition live: the listing in services (with public copies of the work photos) and the provider record.
+async function publishStaffProvider(ref, addition, decidedBy) {
+  const id = ref.id;
+  const bucket = getStorage().bucket();
+  const photos = [];
+  for (const [i, path] of addition.photoPaths.entries()) {
+    const to = `catalog/staffprovider_${id}_${i + 1}.jpg`;
+    await bucket.file(path).copy(bucket.file(to));
+    photos.push(publicUrl(bucket, to));
+  }
+  const listingId = `prov-${id}`;
+  const digits = String(addition.provider.phone || '').replace(/[^0-9]/g, '');
+  const added = {addedByStaffUid: addition.staffUid, addedByStaffCode: addition.staffCode || '', additionId: id};
+  const batch = db.batch();
+  batch.set(db.collection('services').doc(listingId), {
+    kind: 'service', providerId: id, ownerId: id, name: addition.provider.name, typeId: addition.serviceTypeKey, serviceName: addition.serviceName,
+    description: `${addition.serviceName} • ₹${addition.hourlyRate} per hour`, price: addition.hourlyRate, unit: 'per hour',
+    // Booked by calling the provider; the town and an approximate location only, never the exact place.
+    stock: 0, phone: addition.provider.phone, whatsapp: digits.length === 10 ? `91${digits}` : digits, imageUrl: photos[0] || '', images: photos.slice(1),
+    ...locationStamp({pincode: addition.provider.pincode, latitude: approximate(addition.latitude), longitude: approximate(addition.longitude)}),
+    providerCode: addition.providerCode, active: true, order: 1000, ...added, createdAt: FieldValue.serverTimestamp(),
+  });
+  batch.set(db.collection('providers').doc(id), {
+    providerId: id, name: addition.provider.name, phone: addition.provider.phone, status: 'approved', listingId, serviceTypeId: addition.serviceTypeId,
+    providerCode: addition.providerCode, noLogin: true, ...added, approvedAt: FieldValue.serverTimestamp(),
+  }, {merge: true});
+  batch.update(ref, {status: 'approved', providerId: id, listingId, decidedAt: FieldValue.serverTimestamp(), decidedBy});
+  await batch.commit();
+  return {providerId: id, listingId};
+}
+
 /// Removes the private originals of an addition once it is decided (the live copies are in catalog/).
 async function removePrivatePhotos(addition) {
   const bucket = getStorage().bucket();
@@ -210,8 +303,8 @@ exports.reviewStaffAddition = onCall({...options, timeoutSeconds: 120}, async re
     await removePrivatePhotos(addition);
     return {status: 'rejected'};
   }
-  if (addition.kind !== 'vendor') throw new HttpsError('failed-precondition', 'Unknown kind of addition.');
-  const out = await publishStaffVendor(ref, addition, request.auth.uid);
+  if (!['vendor', 'provider'].includes(addition.kind)) throw new HttpsError('failed-precondition', 'Unknown kind of addition.');
+  const out = addition.kind === 'provider' ? await publishStaffProvider(ref, addition, request.auth.uid) : await publishStaffVendor(ref, addition, request.auth.uid);
   await removePrivatePhotos(addition);
   return {status: 'approved', ...out};
 });
@@ -233,4 +326,4 @@ exports.renewStaffVendorPrice = onCall(options, async request => {
   return {price};
 });
 
-exports._staffAdditions = {staffVendorDetails, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS};
+exports._staffAdditions = {staffVendorDetails, staffProviderDetails, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS, MIN_WORK_PHOTOS, MAX_WORK_PHOTOS};

@@ -77,6 +77,8 @@ class ProviderStatusView extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
+                if ('${application['providerCode'] ?? ''}'.isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Provider ID: ${application['providerCode']}', key: const ValueKey('provider-code'))),
                 Card(
                   child: ListTile(
                     title: Text('${application['name'] ?? ''}'),
