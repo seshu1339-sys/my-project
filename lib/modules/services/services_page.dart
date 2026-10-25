@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../data/store.dart';
-import '../domain/catalog.dart';
-import '../services/search.dart';
-import '../services/strings.dart';
-import 'details.dart';
-import 'layout_settings.dart';
+import '../../data/store.dart';
+import '../../domain/catalog.dart';
+import '../../services/search.dart';
+import '../../services/strings.dart';
+import '../../ui/details.dart';
+import '../../ui/layout_settings.dart';
 import 'service_categories.dart';
-import 'shared.dart';
+import '../../ui/shared.dart';
 
 /// Every visible service-kind product/service entry matching [query] (a
 /// blank query matches everything). Shared by [ServicesPage] and the

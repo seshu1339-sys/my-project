@@ -7,7 +7,7 @@ import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/ui/home_promotions.dart';
 import 'package:ecommerce_app/ui/layout_editor.dart';
 import 'package:ecommerce_app/ui/layout_settings.dart';
-import 'package:ecommerce_app/ui/services_page.dart';
+import 'package:ecommerce_app/modules/services/services_page.dart';
 
 void main() {
   for (final width in [320.0, 768.0, 1440.0, 2560.0]) {

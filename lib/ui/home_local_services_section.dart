@@ -11,7 +11,7 @@ import 'home_section_config.dart';
 
 /// The "Local Services" homepage section — a preview grid over the exact
 /// same service-kind entries `ServicesPage` lists (see
-/// `localServiceEntries` in services_page.dart), reusing the same product
+/// `localServiceEntries` in modules/services/services_page.dart), reusing the same product
 /// card widgets as Popular Products. "View all" opens the full ServicesPage.
 class HomeLocalServicesSection extends StatelessWidget {
   const HomeLocalServicesSection({

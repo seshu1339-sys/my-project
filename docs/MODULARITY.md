@@ -32,3 +32,17 @@ Check the boundaries any time: `node scripts/module-graph.cjs` (what each app ca
 - Settings pages that edit the same record (Animations, Right Side Ads, Layout) are two views of one value; each saves only its own changes.
 - ui/responsive_header_bar.dart (one 700-line build, each element reading its own layout key) is the largest remaining monolith; its elements are
   independent in settings but not yet separate widgets.
+
+## Home modules (lib/modules/)
+Transport and Services are two modules. Each has its own folder (`lib/modules/transport/`, `lib/modules/services/`), its own route name
+(`/transport`, `/services`) and its own data. They do not import each other, nor Shops, Promotions, vendor, Quick Add, admin or ads files
+(`test/module_independence_test.dart` fails if they do). The home page boxes under Today's Offers (`ui/home_module_boxes.dart`) and the
+Settings sections of the admin panel only read the list in `lib/modules/modules.dart`: removing or changing one module is its folder plus one
+line in that list; the others keep working.
+
+| Module | Route | Data | Home box | Admin section |
+|---|---|---|---|---|
+| Transport | /transport | its own collection `transport` (empty; nothing stored yet) | teal box, opens a page that says "త్వరలో వస్తుంది" | Settings > Transport (empty for now) |
+| Services | /services | the A-Z service types are the module's own file (assets/services/services_list.json); the service listings are still the records of kind "service" in the shared `products` collection (vendors and Quick Add create them there) | orange box, opens the Services page | (uses the existing product pages) |
+
+Not done yet: moving the service listings into a `services` collection of their own (a data migration plus vendor and Quick Add changes).

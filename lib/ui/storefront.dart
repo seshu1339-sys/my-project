@@ -12,7 +12,7 @@ import 'details.dart';
 import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
-import 'services_page.dart';
+import '../modules/services/services_module.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
@@ -114,7 +114,7 @@ class _StorefrontState extends State<Storefront> {
     if (target == 'shops') {
       open(ShopsPage(store: store));
     } else if (target == 'services') {
-      open(ServicesPage(store: store));
+      openServices(context, store);
     } else if (target.startsWith('category:')) {
       openCategory(target.substring(9));
     } else if (target.startsWith('product:')) {
@@ -256,7 +256,7 @@ class _StorefrontState extends State<Storefront> {
           onSearch: () => setState(() {}),
           onLocation: location,
           onAssistedSearch: assistedSearch,
-          onServices: () => open(ServicesPage(store: store)),
+          onServices: () => openServices(context, store),
           onAccount: () => open(AccountPage(store: store)),
           onCart: () => open(CartPage(store: store)),
           onProduct: (entry) => open(ProductPage(store: store, entry: entry)),

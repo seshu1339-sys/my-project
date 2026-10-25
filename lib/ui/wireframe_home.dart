@@ -18,10 +18,10 @@ import 'animation_settings.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
-import 'services_page.dart';
+import '../modules/services/services_page.dart';
 import '../domain/radius.dart';
 import 'home_section_config.dart';
-import 'home_service_boxes.dart';
+import 'home_module_boxes.dart';
 import '../domain/right_boxes.dart';
 import 'right_ad_boxes.dart';
 import 'shared.dart';
@@ -390,7 +390,7 @@ class WireframeHome extends StatelessWidget {
                             reorderedSections[descriptor.key]!,
                           ),
                           // Transport and Services: two big boxes under the Today's Offers cards.
-                          if (i == crossSellIndex) HomeServiceBoxes(onServices: onServices),
+                          if (i == crossSellIndex) HomeModuleBoxes(store: store),
                           if (i == crossSellIndex)
                             wrapSection(
                               'crossSellStrip',

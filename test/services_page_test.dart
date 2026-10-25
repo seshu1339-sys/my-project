@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
-import 'package:ecommerce_app/ui/service_categories.dart';
-import 'package:ecommerce_app/ui/services_page.dart';
+import 'package:ecommerce_app/modules/services/service_categories.dart';
+import 'package:ecommerce_app/modules/services/services_page.dart';
 
 void main() {
   // The real bundled photos decode during these tests (a plain `pump()`

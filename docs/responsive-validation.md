@@ -17,7 +17,7 @@ Existing Firebase initialization/configuration, backend functions/rules, price/s
 | `lib/ui/layout_settings.dart` (new) | Shared constraints, breakpoints and component control definitions |
 | `lib/ui/layout_editor.dart` (new) | Grouped persistent settings, validation, independent reset |
 | `lib/ui/responsive_header.dart` (new) | Responsive header/search, language/account/location/admin actions, office reveal and contact actions |
-| `lib/ui/services_page.dart` (new) | Searchable service catalog using existing products and detail screens |
+| `lib/modules/services/services_page.dart` (new; moved from lib/ui) | Searchable service catalog using existing products and detail screens |
 | `lib/ui/wireframe_home.dart` | Adapted the active homepage composition and removed fixed page width |
 | `lib/ui/storefront.dart` | Connected existing navigation/scroll keys, service and promotion routes |
 | `lib/ui/home_widgets.dart` | Adaptive category/product sizing and safe text/card layout |

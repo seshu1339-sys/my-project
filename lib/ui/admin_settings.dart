@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../modules/modules.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
 import 'admin_entry_list.dart';
@@ -18,7 +19,7 @@ class _SettingsSection {
 }
 
 /// Everything that is not a daily task lives here, in one place: each setting appears once, in one section.
-const _sections = <_SettingsSection>[
+final _sections = <_SettingsSection>[
   _SettingsSection('categories', 'Categories', Icons.category_outlined, 'The product categories customers browse'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
@@ -32,6 +33,9 @@ const _sections = <_SettingsSection>[
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
+  // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/modules.dart.
+  for (final module in homeModules)
+    if (module.admin != null) _SettingsSection('module-${module.id}', module.title, module.icon, module.adminHint),
 ];
 
 /// The Settings tab: a list of sections on the left (a plain list on a phone) and the chosen section beside it.
@@ -68,6 +72,10 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       case 'theme':
         return AdminSingleRecord(store: widget.store, section: key);
       default:
+        if (key.startsWith('module-')) {
+          final module = homeModules.where((m) => 'module-${m.id}' == key).firstOrNull;
+          if (module?.admin != null) return module!.admin!(widget.store);
+        }
         return AdminEntryList(store: widget.store, section: key);
     }
   }

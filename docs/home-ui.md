@@ -24,7 +24,7 @@ Open **Business admin → UI Customization / Layout Settings** (the customizatio
 - `responsive_header.dart`: logo, account/location/language/admin actions, independent search, Services and office contact reveal.
 - `wireframe_home.dart`: responsive composition, ticker translation, category/product grids, nearby map and promotion rails.
 - `home_widgets.dart`, `home_promotions.dart`, `home_hero_slide.dart`: existing reusable widgets extended for dimensions, safe content and independent animation clocks.
-- `services_page.dart`: searchable services using existing products/providers and product details.
+- `modules/services/services_page.dart`: searchable services using existing products/providers and product details.
 - `shared.dart`: full-quality aspect-preserving images, safe numbers and transparent backgrounds.
 
 Product details, variants, cart, checkout, reviews, account/orders, pricing, GPS/pincode filtering, Firebase initialization, backend functions and security configuration are retained. Empty live collections display honest empty states rather than purchasable sample records. Sample data remains available in the existing explicit demo mode.

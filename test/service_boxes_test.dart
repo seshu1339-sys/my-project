@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/main.dart';
-import 'package:ecommerce_app/ui/services_page.dart';
+import 'package:ecommerce_app/modules/services/services_page.dart';
 
 void main() {
   for (final width in [1440.0, 390.0]) {

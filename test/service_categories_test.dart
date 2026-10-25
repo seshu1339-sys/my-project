@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ecommerce_app/ui/service_categories.dart';
+import 'package:ecommerce_app/modules/services/service_categories.dart';
 
 void main() {
   testWidgets(
