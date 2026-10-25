@@ -9,6 +9,7 @@ import 'admin_staff_additions.dart';
 import 'admin_staff_report.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
+import 'screen_view.dart';
 import 'staff_auto_approve_switch.dart';
 import 'shop_map.dart';
 
@@ -83,7 +84,7 @@ class FieldModerationPage extends StatelessWidget {
             title: const Text('Vendors and services added by staff'),
             subtitle: Text(snapshot.hasError ? 'Could not load.' : '${snapshot.data?.size ?? 0} waiting for approval'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StaffAdditionsReviewPage(store: store))),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ScreenView('admin_staff_additions', child: StaffAdditionsReviewPage(store: store)))),
           ),
         ),
       ),
@@ -95,7 +96,7 @@ class FieldModerationPage extends StatelessWidget {
           title: const Text('Staff report'),
           subtitle: const Text("Every staff member's ID and phone, how many they added, and each one's ID and phone"),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StaffReportPage(store: store))),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ScreenView('admin_staff_report', child: StaffReportPage(store: store)))),
         ),
       ),
       const SizedBox(height: 16),

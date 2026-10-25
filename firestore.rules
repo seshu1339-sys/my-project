@@ -97,6 +97,15 @@ service cloud.firestore {
       allow read: if admin();
       allow write: if false;
     }
+    // Inactive accounts (functions/inactive-accounts.js): what the sweep did and each account's disabled / deleted state; admin only.
+    match /inactiveSweeps/{day} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /accountStates/{uid} {
+      allow read: if admin();
+      allow write: if false;
+    }
     match /usageOwnerDaily/{id} {
       allow read: if admin() || (signedIn() && resource.data.ownerId == request.auth.uid);
       allow write: if false;

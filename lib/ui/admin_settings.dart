@@ -11,6 +11,7 @@ import 'admin_frame.dart';
 import 'admin_page_preview.dart';
 import 'field_moderation.dart';
 import 'layout_editor.dart';
+import 'screen_view.dart';
 import 'visual_editor.dart';
 
 class _SettingsSection {
@@ -70,7 +71,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       case 'cityCodes':
         return AdminCityCodesPage(store: widget.store);
       case 'rightBoxes':
-        return AdminRightBoxesPage(store: widget.store);
+        return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: widget.store));
       // One record each: the form opens directly, with no list and no "Add new".
       case 'settings':
       case 'theme':

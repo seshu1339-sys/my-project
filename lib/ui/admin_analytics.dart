@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import 'admin_analytics_people.dart';
 import 'admin_analytics_reports.dart';
+import 'admin_inactive_accounts.dart';
 import 'admin_push_center.dart';
 import 'screen_view.dart';
 
@@ -18,7 +19,8 @@ class AnalyticsSection {
 final analyticsSections = <AnalyticsSection>[
   AnalyticsSection('Reports', Icons.insights_outlined, (store) => AnalyticsReportsView(store: store)),
   AnalyticsSection('People', Icons.people_outline, (store) => AnalyticsPeopleView(store: store)),
-  AnalyticsSection('Push notifications', Icons.notifications_active_outlined, (store) => PushCenterView(store: store)),
+  AnalyticsSection('Push notifications', Icons.notifications_active_outlined, (store) => ScreenView('admin_push_center', child: PushCenterView(store: store))),
+  AnalyticsSection('Inactive accounts', Icons.person_off_outlined, (store) => ScreenView('admin_inactive_accounts', child: InactiveAccountsView(store: store))),
 ];
 
 /// Admin > Insights > Analytics: what people do in the apps (reports with Excel, each person's use), and the parts added with it.

@@ -47,6 +47,9 @@ exports.accountLabels = accountLabels;
 // The admin's push notification centre: send to all / a town / one person, opens, audience (only the callables are exported).
 const {sendPushNotification, trackPushOpen, pushAudience, pushNotOpened} = require('./push-center');
 Object.assign(exports, {sendPushNotification, trackPushOpen, pushAudience, pushNotOpened});
+// Inactive accounts: the list, disable / enable, delete a customer, and the daily sweep (off until the admin switches it on).
+const {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts} = require('./inactive-accounts');
+Object.assign(exports, {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts});
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js
