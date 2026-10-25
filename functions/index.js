@@ -8,7 +8,7 @@ const {getStorage} = require('firebase-admin/storage');
 const {normalizeEvent, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields} = require('./domain');
+const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
@@ -318,13 +318,25 @@ exports.verifyVendorShop = onCall(options, async request => {
   await db.collection('shops').doc(shopId).set({ownerId: vendorId, verified: true, latitude, longitude, radiusKm}, {merge: true});
   return {verified: true};
 });
+// A new vendor item starts with this many in stock (the vendor can change it in My products).
+const DEFAULT_VENDOR_ITEM_STOCK = 99;
+// Admin: how many items a vendor may have (default 2; items the admin hid count too).
+exports.setVendorItemLimit = onCall(options, async request => {
+  await requireAdmin(request);
+  const {vendorId, itemLimit} = request.data || {};
+  if (typeof vendorId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(vendorId) || !Number.isInteger(itemLimit) || itemLimit < 0 || itemLimit > 100) throw new HttpsError('invalid-argument', 'Provide the vendor and a number of items from 0 to 100.');
+  const ref = db.collection('vendors').doc(vendorId);
+  if (!(await ref.get()).exists) throw new HttpsError('not-found', 'Vendor not found.');
+  await ref.set({itemLimit, itemLimitUpdatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  return {itemLimit};
+});
 exports.submitVendorChange = onCall(options, async request => {
   const uid = requireUser(request);
   const {type, collection, docId, changes} = request.data || {};
   const isNew = type === 'newProduct';
-  // A shop change targets shops. A new item goes to services when its kind is 'service', else to products; a change to an existing
-  // item says which of the two it lives in.
-  const allowedCollections = type === 'shop' ? ['shops'] : isNew ? [changes?.kind === 'service' ? 'services' : 'products'] : ['products', 'services'];
+  // A shop change targets shops. A new vendor item is a product (services are offered from a separate service-provider account);
+  // a change to an existing item says which collection it lives in.
+  const allowedCollections = type === 'shop' ? ['shops'] : isNew ? ['products'] : ['products', 'services'];
   if (!allowedCollections.includes(collection) || (!isNew && (typeof docId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)))) throw new HttpsError('invalid-argument', 'Invalid change target.');
   const safeChanges = publicChangeFields(type, changes);
   // Business features unlock only once the office/admin has approved the vendor.
@@ -346,9 +358,17 @@ exports.submitVendorChange = onCall(options, async request => {
   const target = db.collection(collection).doc(targetId);
   let oldValue = {}, newValue = safeChanges;
   if (isNew) {
+    // The item is one the admin put in the library: its name, photo and category come from there, never from the vendor.
+    const libraryItem = (await db.collection('productImageLibrary').doc(safeChanges.libraryItemId).get()).data();
+    if (!libraryItem || libraryItem.active === false) throw new HttpsError('failed-precondition', 'Choose an item from the list.');
     // The product carries its shop's place (pincode, town, district, state, GPS) so it shows where it is.
     const shopPlace = vendor.shopId ? locationStamp((await db.collection('shops').doc(vendor.shopId).get()).data() || {}) : {};
-    newValue = {...safeChanges, kind: safeChanges.kind || 'product', stock: safeChanges.stock ?? 0, shopId: vendor.shopId, ...shopPlace, active: true};
+    newValue = {
+      name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
+      libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
+      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price,
+      kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: true,
+    };
   } else {
     const current = await target.get();
     const data = current.data();
@@ -357,9 +377,21 @@ exports.submitVendorChange = onCall(options, async request => {
     if (!mine) throw new HttpsError('not-found', 'Public item not found.');
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
   }
-  const autoPublish = flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
+  // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
+  // map and list; other changes follow the admin's policy (autoPublishVendorChanges).
+  const autoPublish = isNew || type === 'price' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
   const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId: targetId, oldValue, newValue, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
-  if (autoPublish) {
+  if (isNew) {
+    // Only [vendorItemLimit] items per vendor (items the admin hid count too). Counted and saved in one transaction, so two quick
+    // saves can never go over the limit.
+    const limit = vendorItemLimit(vendor);
+    await db.runTransaction(async tx => {
+      const mine = await tx.get(db.collection('products').where('ownerId', '==', uid));
+      if (mine.size >= limit) throw new HttpsError('resource-exhausted', `You can have ${limit} item${limit === 1 ? '' : 's'}. Ask the admin for permission to add more.`);
+      tx.set(target, {...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()});
+      tx.set(db.collection('vendorChanges').doc(), change);
+    });
+  } else if (autoPublish) {
     await target.set({...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     await db.collection('vendorChanges').add(change);
   } else await db.collection('vendorChanges').add(change);

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/vendor_items.dart';
 import 'moderation_dialogs.dart';
 import 'shop_map.dart';
 
@@ -142,6 +143,8 @@ class VendorDetailPage extends StatelessWidget {
                       child: Text(exclusives ? 'Exclusives: on (up to ${vendor['exclusivesMaxDurationDays']}d)' : 'Exclusives: off'),
                     ),
                   ]),
+                  const SizedBox(height: 16),
+                  VendorItemsAdminCard(store: store, vendorUid: vendorUid, itemLimit: vendorItemLimit(vendor)),
                   if (vendor['latitude'] is num && vendor['longitude'] is num) Padding(padding: const EdgeInsets.only(top: 16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Verified shop location', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
@@ -157,5 +160,74 @@ class VendorDetailPage extends StatelessWidget {
         ),
       ),
     ),
+  );
+}
+
+/// The vendor's own items, live or hidden, with a switch to hide or show each, and how many items the vendor may have (2 unless the
+/// admin allows more; items hidden here still count).
+class VendorItemsAdminCard extends StatelessWidget {
+  const VendorItemsAdminCard({super.key, required this.store, required this.vendorUid, required this.itemLimit});
+  final Store store;
+  final String vendorUid;
+  final int itemLimit;
+
+  Future<void> _changeLimit(BuildContext context) async {
+    final controller = TextEditingController(text: '$itemLimit');
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Items this vendor may have'),
+        content: TextField(
+          key: const ValueKey('vendor-item-limit-field'),
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Number of items (0-100)', helperText: 'Items you hide still count.'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialog, int.tryParse(controller.text.trim())), child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || !context.mounted) return;
+    try {
+      await store.call('setVendorItemLimit', {'vendorId': vendorUid, 'itemLimit': value});
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('This vendor may now have $value item${value == 1 ? '' : 's'}.')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('products').where('ownerId', isEqualTo: vendorUid).snapshots(),
+    builder: (context, snapshot) {
+      final items = snapshot.data?.docs ?? const [];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Items: ${items.length} of $itemLimit allowed', style: const TextStyle(fontWeight: FontWeight.bold))),
+              OutlinedButton(key: const ValueKey('vendor-item-limit'), onPressed: () => _changeLimit(context), child: const Text('Change limit')),
+            ],
+          ),
+          if (items.isEmpty) const Text('No items yet.'),
+          for (final doc in items)
+            SwitchListTile(
+              key: ValueKey('vendor-item-${doc.id}'),
+              contentPadding: EdgeInsets.zero,
+              secondary: '${doc.data()['imageUrl'] ?? ''}'.isEmpty
+                  ? const Icon(Icons.inventory_2_outlined)
+                  : SizedBox(width: 40, height: 40, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
+              title: Text('${doc.data()['name'] ?? doc.id}'),
+              subtitle: Text('₹${doc.data()['price']} for ${doc.data()['unit'] ?? ''} • ${doc.data()['active'] == false ? 'Hidden' : 'Live'}'),
+              value: doc.data()['active'] != false,
+              onChanged: (live) => store.updateFields('products', doc.id, {'active': live}),
+            ),
+        ],
+      );
+    },
   );
 }

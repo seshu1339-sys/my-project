@@ -1,134 +1,215 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
+import '../domain/vendor_items.dart';
 import 'vendor_section_kit.dart';
 
-/// "Add a product or material": its own form, its own photo, its own busy flag.
+/// "Add an item": the vendor picks a category, then one of the admin's items (photo and name come with it, nothing is typed), the
+/// quantity (1-10 kg or 1-10 pieces) and the price for that quantity. Saved items go live at once at the vendor's location. A vendor
+/// has [vendorItemLimit] items (2 unless the admin allows more; hidden items count): "Add another item" shows only below the limit.
+/// Photo 1 of the shop is required first. Its own state and busy flag.
 class VendorAddProductSection extends StatefulWidget {
-  const VendorAddProductSection({super.key, required this.store, required this.uid});
+  const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview});
   final Store store;
   final String uid;
+
+  /// For tests: (items the vendor has, items allowed, photo 1 ready) instead of reading them from Firestore.
+  final (int, int, bool)? preview;
   @override
   State<VendorAddProductSection> createState() => _VendorAddProductSectionState();
 }
 
 class _VendorAddProductSectionState extends State<VendorAddProductSection> with VendorSectionState {
-  final name = TextEditingController(), price = TextEditingController(), stock = TextEditingController(), unit = TextEditingController(), description = TextEditingController();
-  String? categoryId, imageUrl;
-  bool isService = false;
-  Uint8List? imageBytes;
+  final price = TextEditingController();
+  String? categoryId;
+  Entry? item;
+  String unitType = 'kg';
+  int quantity = 1;
+  // The form opens by itself while the vendor has no item yet; afterwards "Add another item" opens it.
+  bool? adding;
   Store get store => widget.store;
   String get uid => widget.uid;
 
   @override
   void dispose() {
-    for (final c in [name, price, stock, unit, description]) {
-      c.dispose();
-    }
+    price.dispose();
     super.dispose();
   }
 
-  Future<void> _add() async {
-    final p = double.tryParse(price.text.trim());
-    final s = int.tryParse(stock.text.trim());
-    if (name.text.trim().length < 2) throw StateError('Enter the product or material name.');
-    if (p == null || p < 0) throw StateError('Enter a valid price.');
-    if (s == null || s < 0) throw StateError('Enter the stock quantity as a whole number.');
-    final status = await store.submitVendorChange(type: 'newProduct', collection: isService ? 'services' : 'products', docId: '', changes: {
-      'name': name.text.trim(), 'price': p, 'stock': s,
-      if (isService) 'kind': 'service',
-      if (unit.text.trim().isNotEmpty) 'unit': unit.text.trim(),
-      if (description.text.trim().isNotEmpty) 'description': description.text.trim(),
-      if (categoryId != null) 'categoryId': categoryId,
-      if (imageUrl != null) 'imageUrl': imageUrl,
-    });
-    for (final c in [name, price, stock, unit, description]) {
-      c.clear();
-    }
-    setState(() {
-      imageUrl = null;
-      imageBytes = null;
-      categoryId = null;
-    });
-    toast(vendorPublished(status));
+  void _reset() {
+    price.clear();
+    categoryId = null;
+    item = null;
+    unitType = 'kg';
+    quantity = 1;
   }
 
-  // Photo 1 (the shop itself) is required before items can be added; it may still be waiting for the admin.
-  @override
-  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-    stream: store.firestore.collection('vendorShopPhotos').doc('${uid}_1').snapshots(),
-    builder: (context, photo) => _form(context, shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status'])),
-  );
+  Future<void> _save() async {
+    final chosen = item;
+    if (chosen == null) throw StateError('Choose an item.');
+    final p = double.tryParse(price.text.trim());
+    if (p == null || p <= 0) throw StateError('Enter the price for ${vendorItemUnit(unitType, quantity)}.');
+    await store.submitVendorChange(type: 'newProduct', collection: 'products', docId: '', changes: {
+      'libraryItemId': chosen.id, 'unitType': unitType, 'quantity': quantity, 'price': p,
+    });
+    setState(() {
+      _reset();
+      adding = false;
+    });
+    toast('Saved. Your item is live at your shop\'s location.');
+  }
 
-  Widget _form(BuildContext context, {required bool shopPhotoReady}) => vendorCard('Add a product or material', [
-    if (!shopPhotoReady)
-      Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
-    TextField(controller: name, decoration: const InputDecoration(labelText: 'Product or material name')),
-    TextField(controller: price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price')),
-    TextField(controller: stock, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Stock quantity')),
-    TextField(controller: unit, decoration: const InputDecoration(labelText: 'Unit (for example kg, bag, each)')),
-    TextField(controller: description, maxLines: 2, decoration: const InputDecoration(labelText: 'Product description')),
-    SwitchListTile(
-      key: const ValueKey('vendor-is-service'),
-      contentPadding: EdgeInsets.zero,
-      value: isService,
-      onChanged: (v) => setState(() => isService = v),
-      title: const Text('This is a service (not a product)'),
-    ),
-    DropdownButtonFormField<String>(
-      initialValue: categoryId,
-      isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Category'),
-      items: [for (final c in store.entries('categories')) DropdownMenuItem(value: c.id, child: Text(c.text('name')))],
-      onChanged: (v) => setState(() => categoryId = v),
-    ),
-    const SizedBox(height: 8),
-    if (imageBytes != null)
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(imageBytes!, height: 120, fit: BoxFit.cover))
-    else if (imageUrl != null)
-      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(imageUrl!, height: 120, fit: BoxFit.cover)),
-    Wrap(spacing: 8, children: [
-      if (vendorLibraryEnforced(store))
-        OutlinedButton.icon(
-          onPressed: busy
-              ? null
-              : () async {
-                  final chosen = await pickLibraryImage(context, store);
-                  if (chosen != null && mounted) {
-                    setState(() {
-                      imageUrl = chosen.text('imageUrl');
-                      imageBytes = null;
-                    });
-                  }
-                },
-          icon: const Icon(Icons.photo_library_outlined),
-          label: const Text('Choose from image library'),
-        )
-      else
-        OutlinedButton.icon(
-          onPressed: busy
-              ? null
-              : () => run(() async {
-                  final file = await vendorPickImage();
-                  if (file == null) return;
-                  final bytes = await file.readAsBytes();
-                  final url = await store.upload(file, folder: 'vendorProducts/$uid');
-                  if (mounted) {
-                    setState(() {
-                      imageUrl = url;
-                      imageBytes = bytes;
-                    });
-                  }
-                }),
-          icon: const Icon(Icons.upload),
-          label: const Text('Upload product photo'),
+  @override
+  Widget build(BuildContext context) {
+    final preview = widget.preview;
+    if (preview != null) return _card(context, itemCount: preview.$1, itemLimit: preview.$2, shopPhotoReady: preview.$3);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: store.firestore.collection('vendors').doc(uid).snapshots(),
+      builder: (context, vendor) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: store.firestore.collection('products').where('ownerId', isEqualTo: uid).snapshots(),
+        builder: (context, mine) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          // Photo 1 (the shop itself) is required before items can be added; it may still be waiting for the admin.
+          stream: store.firestore.collection('vendorShopPhotos').doc('${uid}_1').snapshots(),
+          builder: (context, photo) => _card(
+            context,
+            itemCount: mine.data?.size ?? 0,
+            itemLimit: vendorItemLimit(vendor.data?.data()),
+            shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status']),
+          ),
         ),
-      FilledButton(onPressed: busy || !shopPhotoReady ? null : () => run(_add), child: const Text('Submit product')),
-    ]),
-  ]);
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context, {required int itemCount, required int itemLimit, required bool shopPhotoReady}) {
+    final full = itemCount >= itemLimit;
+    final open = !full && (adding ?? itemCount == 0);
+    final library = store.entries('productImageLibrary');
+    final categories = libraryCategories(library, store.visible('categories'));
+    final items = categoryId == null ? const <Entry>[] : libraryItemsIn(library, categoryId!);
+    final error = TextStyle(color: Theme.of(context).colorScheme.error);
+    return vendorCard('Add an item', [
+      Text('Items: $itemCount of $itemLimit', key: const ValueKey('vendor-item-count'), style: const TextStyle(fontWeight: FontWeight.bold)),
+      if (!shopPhotoReady) Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: error),
+      if (full)
+        Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, your limit. Ask the admin for permission to add more.', key: const ValueKey('vendor-item-limit-reached'))
+      else if (!open)
+        FilledButton.icon(
+          key: const ValueKey('vendor-add-another'),
+          onPressed: busy || !shopPhotoReady ? null : () => setState(() => adding = true),
+          icon: const Icon(Icons.add),
+          label: Text(itemCount == 0 ? 'Add an item' : 'Add another item'),
+        )
+      else ...[
+        DropdownButtonFormField<String>(
+          key: ValueKey('vendor-item-category-$categoryId'),
+          initialValue: categoryId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Category'),
+          items: [for (final c in categories) DropdownMenuItem(value: c.$1, child: Text(c.$2))],
+          onChanged: (v) => setState(() {
+            categoryId = v;
+            item = null;
+          }),
+        ),
+        if (categories.isEmpty) const Text('The admin has not added any items yet. Please check again later.'),
+        if (categoryId != null) ...[
+          const SizedBox(height: 8),
+          const Text('Choose your item:'),
+          if (items.isEmpty) const Text('No items in this category yet.'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final e in items)
+                _LibraryItemTile(
+                  key: ValueKey('vendor-library-item-${e.id}'),
+                  item: e,
+                  selected: item?.id == e.id,
+                  onTap: () => setState(() => item = e),
+                ),
+            ],
+          ),
+        ],
+        if (item != null) ...[
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            key: const ValueKey('vendor-item-unit'),
+            segments: const [ButtonSegment(value: 'kg', label: Text('Kg')), ButtonSegment(value: 'pcs', label: Text('Pieces'))],
+            selected: {unitType},
+            onSelectionChanged: (v) => setState(() => unitType = v.first),
+          ),
+          DropdownButtonFormField<int>(
+            key: ValueKey('vendor-item-quantity-$unitType'),
+            initialValue: quantity,
+            decoration: InputDecoration(labelText: unitType == 'kg' ? 'Quantity (kg)' : 'Quantity (pieces)'),
+            items: [for (final q in vendorItemQuantities) DropdownMenuItem(value: q, child: Text(vendorItemUnit(unitType, q)))],
+            onChanged: (v) => setState(() => quantity = v ?? 1),
+          ),
+          TextField(
+            key: const ValueKey('vendor-item-price'),
+            controller: price,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(labelText: 'Price for ${vendorItemUnit(unitType, quantity)} (₹)', hintText: 'e.g. 50'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            key: const ValueKey('vendor-item-save'),
+            onPressed: busy || !shopPhotoReady ? null : () => run(_save),
+            child: const Text('Save'),
+          ),
+        ],
+        if (itemCount > 0)
+          TextButton(
+            onPressed: () => setState(() {
+              _reset();
+              adding = false;
+            }),
+            child: const Text('Cancel'),
+          ),
+      ],
+    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it.');
+  }
+}
+
+class _LibraryItemTile extends StatelessWidget {
+  const _LibraryItemTile({super.key, required this.item, required this.selected, required this.onTap});
+  final Entry item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 104,
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: selected ? color : Colors.black12, width: selected ? 2.5 : 1),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 64,
+              width: 88,
+              child: item.text('imageUrl').isEmpty
+                  ? const Icon(Icons.image_outlined)
+                  : Image.network(item.text('imageUrl'), fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined)),
+            ),
+            const SizedBox(height: 4),
+            Text(item.text('name'), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            if (selected) Icon(Icons.check_circle, color: color, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// "My products and materials": the vendor's own shop's products (including ones the office added for the shop), with hide / price / stock /
@@ -190,7 +271,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     ? const Icon(Icons.inventory_2_outlined)
                     : SizedBox(width: 44, height: 44, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
                 title: Text('${doc.data()['name']}'),
-                subtitle: Text('Price ${doc.data()['price']} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}'),
+                subtitle: Text('₹${doc.data()['price']}${'${doc.data()['unit'] ?? ''}'.isEmpty ? '' : ' for ${doc.data()['unit']}'} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}'),
                 trailing: Wrap(children: [
                   IconButton(
                     tooltip: doc.data()['active'] == false ? 'Show on site' : 'Hide from site',
@@ -207,7 +288,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     onPressed: busy
                         ? null
                         : () => run(() async {
-                            final n = await askVendorNumber(context, 'Update price', 'New price', integer: false, initial: '${doc.data()['price'] ?? ''}');
+                            final n = await askVendorNumber(context, 'Update price', '${doc.data()['unit'] ?? ''}'.isEmpty ? 'New price' : 'New price for ${doc.data()['unit']}', integer: false, initial: '${doc.data()['price'] ?? ''}');
                             if (n == null) return;
                             toast(vendorPublished(await store.submitVendorChange(type: 'price', collection: collection, docId: doc.id, changes: {'price': n.toDouble()})));
                           }),

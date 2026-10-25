@@ -84,10 +84,15 @@ test('vendor application requires every detail and rejects malformed ones', () =
   assert.doesNotThrow(() => vendorApplication({...ok, latitude: -33.87, longitude: 151.21})); // Sydney: valid, far away
 });
 test('vendor product changes validate prices, stock, images and new-product essentials', () => {
-  assert.doesNotThrow(() => validateVendorChange('newProduct', {name: 'Cement bag', price: 380, stock: 40, unit: 'bag', kind: 'product', imageUrl: 'https://example.test/a.jpg'}));
-  assert.throws(() => validateVendorChange('newProduct', {name: 'Cement bag'}));                 // price required
-  assert.throws(() => validateVendorChange('newProduct', {price: 10}));                          // name required
-  assert.throws(() => validateVendorChange('newProduct', {name: 'X Y', price: 10, kind: 'weapon'}));
+  // a new vendor item: an admin library item, Kg or Pieces, 1-10, and a price above zero for that quantity
+  assert.doesNotThrow(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 2, price: 50}));
+  assert.doesNotThrow(() => validateVendorChange('newProduct', {libraryItemId: 'lib-soap', unitType: 'pcs', quantity: 10, price: 120}));
+  assert.throws(() => validateVendorChange('newProduct', {unitType: 'kg', quantity: 2, price: 50}), /item from the list/);
+  assert.throws(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'litre', quantity: 2, price: 50}), /Kg or Pieces/);
+  assert.throws(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 11, price: 50}), /1 to 10/);
+  assert.throws(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 0, price: 50}), /1 to 10/);
+  assert.throws(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 1.5, price: 50}), /1 to 10/);
+  assert.throws(() => validateVendorChange('newProduct', {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 2, price: 0}), /price/);
   assert.throws(() => validateVendorChange('price', {price: -1}));
   assert.throws(() => validateVendorChange('price', {price: '10'}));
   assert.doesNotThrow(() => validateVendorChange('price', {prices: {'560001': 12}}));

@@ -60,6 +60,7 @@ const fields = <String, Map<String, String>>{
   },
   'productImageLibrary': {
     'name': 'Item name',
+    'categoryId': 'Category (vendors choose items by category)',
     'imageUrl': 'Image',
     'tags': 'Search keywords (optional)',
     'order': 'Display order',

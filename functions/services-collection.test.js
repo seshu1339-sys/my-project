@@ -1,9 +1,9 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-// Services have their own collection: a vendor's new service is saved there, a service can be ordered, and cancelling its order
-// gives its stock back.
-test('a vendor service is saved in services (not products); a product still goes to products; wrong collection is refused', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+// Services have their own collection: a vendor's new item is always a product, an existing service is changed in services, a service
+// can be ordered, and cancelling its order gives its stock back.
+test('a vendor\'s new item is a product; an existing vendor service is changed in services; wrong collections are refused', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
@@ -14,23 +14,17 @@ test('a vendor service is saved in services (not products); a product still goes
   await db.collection('vendorShopPhotos').doc('svcV_1').set({vendorId: 'svcV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('shops').doc('svcShop').set({name: 'Fix It', address: 'Main Road', pincode: '533101', ownerId: 'svcV', active: true});
 
-  const service = await fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'services', docId: '', changes: {name: 'AC servicing', price: 500, stock: 20, kind: 'service'}}});
-  assert.equal(service.status, 'pending');
-  const change = (await db.collection('vendorChanges').where('docId', '==', service.docId).get()).docs[0];
-  assert.equal(change.data().collection, 'services');
-  await fns.reviewVendorChange.run({...admin, data: {changeId: change.id, approved: true}});
-  const saved = (await db.collection('services').doc(service.docId).get()).data();
-  assert.equal(saved.kind, 'service');
-  assert.equal(saved.shopId, 'svcShop');
-  assert.equal(saved.active, true);
-  assert.equal((await db.collection('products').doc(service.docId).get()).exists, false, 'not in products');
+  // an existing service of this vendor (made before services moved to their own accounts)
+  await db.collection('services').doc('svc-ac').set({name: 'AC servicing', kind: 'service', price: 500, stock: 20, shopId: 'svcShop', ownerId: 'svcV', active: true});
+  const service = {docId: 'svc-ac'};
 
-  const product = await fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {name: 'Rice bag', price: 900, stock: 5}}});
+  await db.collection('productImageLibrary').doc('lib-rice').set({name: 'Sona Masoori Rice', imageUrl: 'https://example.test/rice.jpg', categoryId: 'cat-rice', active: true, order: 1});
+  const product = await fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 5, price: 280}}});
   assert.equal((await db.collection('vendorChanges').where('docId', '==', product.docId).get()).docs[0].data().collection, 'products');
 
-  // a service must go to services, a product to products
-  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {name: 'Wrong place', price: 10, stock: 1, kind: 'service'}}}), /Invalid change target/);
-  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'services', docId: '', changes: {name: 'Wrong place', price: 10, stock: 1}}}), /Invalid change target/);
+  // a new item is never a service, and never goes to services
+  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'services', docId: '', changes: {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 1, price: 10}}}), /Invalid change target/);
+  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {libraryItemId: 'lib-rice', unitType: 'kg', quantity: 1, price: 10, kind: 'service'}}}), /Unsupported public change field/);
 
   // an existing service can be changed (price) through its own collection
   const price = await fns.submitVendorChange.run({...vendor, data: {type: 'price', collection: 'services', docId: service.docId, changes: {price: 450}}});

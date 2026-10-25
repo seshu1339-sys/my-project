@@ -229,14 +229,19 @@ const productChangeFields = {
   visibility: ['active'],
   product: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'images', 'tags'],
   shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
-  newProduct: ['name', 'description', 'categoryId', 'unit', 'imageUrl', 'price', 'stock', 'kind'],
+  // A new vendor item: an item from the admin's library (its name, photo and category come from there, never typed), the quantity
+  // (1-10 kg or 1-10 pieces) and the price for that quantity.
+  newProduct: ['libraryItemId', 'unitType', 'quantity', 'price'],
 };
 // Validates the values a vendor proposes for a public change. Throws Error(message).
 function validateVendorChange(type, changes) {
   const money = key => { const v = changes[key]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 10000000) throw Error(`${key} must be a number from 0 to 10000000.`); };
   if (type === 'newProduct') {
-    text(changes.name, 2, 120, 'the product name'); money('price');
-    if (changes.kind !== undefined && !['product', 'service'].includes(changes.kind)) throw Error('Choose product or service.');
+    if (typeof changes.libraryItemId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.libraryItemId)) throw Error('Choose an item from the list.');
+    if (!['kg', 'pcs'].includes(changes.unitType)) throw Error('Choose Kg or Pieces.');
+    if (!Number.isInteger(changes.quantity) || changes.quantity < 1 || changes.quantity > 10) throw Error('Choose a quantity from 1 to 10.');
+    money('price');
+    if (!(changes.price > 0)) throw Error('Enter the price for that quantity.');
   }
   if (changes.price !== undefined) money('price');
   if (changes.compareAtPrice !== undefined) money('compareAtPrice');
@@ -253,4 +258,14 @@ function validateVendorChange(type, changes) {
 // restores stock exactly once, so reopening one would leave its stock un-reserved.
 const orderTransitions = {submitted: ['confirmed', 'cancelled'], confirmed: ['fulfilled', 'cancelled']};
 function orderTransitionAllowed(from, to) { return (orderTransitions[from] || []).includes(to); }
-module.exports = {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};
+/// How a vendor item's quantity reads on the site: "2 kg", "1 pc", "5 pcs".
+function vendorItemUnit(unitType, quantity) {
+  return unitType === 'kg' ? `${quantity} kg` : `${quantity} ${quantity === 1 ? 'pc' : 'pcs'}`;
+}
+// Items a vendor may have (items the admin hid count too) unless the admin allows more for that vendor (vendors/{uid}.itemLimit).
+const DEFAULT_VENDOR_ITEM_LIMIT = 2;
+function vendorItemLimit(vendor = {}) {
+  const limit = vendor.itemLimit;
+  return typeof limit === 'number' && Number.isInteger(limit) && limit >= 0 && limit <= 100 ? limit : DEFAULT_VENDOR_ITEM_LIMIT;
+}
+module.exports = {vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

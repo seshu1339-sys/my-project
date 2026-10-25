@@ -44,7 +44,7 @@ test('admin can suspend and reinstate a vendor; access and catalog follow', {ski
   await assert.rejects(() => suspend({vendorId: 'susV', suspended: true, reason: 'again'}), /approved vendor/);   // not twice
 
   // ---- the vendor is locked out of every business function
-  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {name: 'New thing', price: 5}}}), /approved/);
+  await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {libraryItemId: 'lib-any', unitType: 'kg', quantity: 1, price: 5}}}), /approved/);
   await assert.rejects(() => fns.submitVendorChange.run({...vendor, data: {type: 'price', collection: 'products', docId: 'susOwned', changes: {price: 3}}}), /approved/);
   await db.collection('orders').doc('susOrder').set({userId: 'c', shopIds: ['susShop'], status: 'submitted', lines: [], total: 1});
   await assert.rejects(() => fns.updateVendorOrder.run({...vendor, data: {orderId: 'susOrder', status: 'confirmed'}}), /cannot update/);

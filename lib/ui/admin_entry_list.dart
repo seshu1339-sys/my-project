@@ -63,6 +63,8 @@ class _AdminEntryListState extends State<AdminEntryList> {
 
   final search = TextEditingController();
   bool noShopOnly = false;
+  // Products: only the items vendors added themselves (they have an owner).
+  bool vendorItemsOnly = false;
   String? categoryId;
   String status = 'all'; // all | published | draft
   bool selecting = false;
@@ -74,7 +76,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
     super.dispose();
   }
 
-  bool get _filtered => search.text.trim().isNotEmpty || noShopOnly || categoryId != null || status != 'all';
+  bool get _filtered => search.text.trim().isNotEmpty || noShopOnly || vendorItemsOnly || categoryId != null || status != 'all';
 
   Future<void> _edit(Entry? entry) => Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => EntryEditor(store: store, collection: section, entry: entry, initialPlacement: widget.placement)),
@@ -169,6 +171,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
                 (categories[p.text('categoryId')] ?? '').contains(q) ||
                 (shops[p.text('shopId')] ?? '').contains(q)) &&
             (!noShopOnly || productProblems(p, shopIds: shopIds).contains('No shop')) &&
+            (!vendorItemsOnly || p.text('ownerId').isNotEmpty) &&
             (categoryId == null || p.text('categoryId') == categoryId) &&
             (status == 'all' || (status == 'published') == p.active))
           p,
@@ -242,6 +245,12 @@ class _AdminEntryListState extends State<AdminEntryList> {
           selected: noShopOnly,
           onSelected: (v) => setState(() => noShopOnly = v),
         ),
+        FilterChip(
+          key: const ValueKey('filter-vendor-items'),
+          label: const Text('Vendor items'),
+          selected: vendorItemsOnly,
+          onSelected: (v) => setState(() => vendorItemsOnly = v),
+        ),
         SizedBox(
           width: 200,
           child: DropdownButtonFormField<String?>(
@@ -271,6 +280,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
             onPressed: () => setState(() {
               search.clear();
               noShopOnly = false;
+              vendorItemsOnly = false;
               categoryId = null;
               status = 'all';
             }),
