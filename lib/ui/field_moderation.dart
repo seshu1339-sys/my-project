@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'admin_staff_additions.dart';
+import 'admin_staff_report.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
 import 'staff_auto_approve_switch.dart';
@@ -84,6 +85,17 @@ class FieldModerationPage extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StaffAdditionsReviewPage(store: store))),
           ),
+        ),
+      ),
+      // Who added how many vendors and service providers, with each one's ID and phone.
+      Card(
+        child: ListTile(
+          key: const ValueKey('open-staff-report'),
+          leading: const Icon(Icons.leaderboard_outlined),
+          title: const Text('Staff report'),
+          subtitle: const Text("Every staff member's ID and phone, how many they added, and each one's ID and phone"),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StaffReportPage(store: store))),
         ),
       ),
       const SizedBox(height: 16),
