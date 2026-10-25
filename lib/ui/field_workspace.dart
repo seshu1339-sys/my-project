@@ -6,6 +6,7 @@ import 'field_add_page.dart';
 import 'field_add_provider_form.dart';
 import 'field_add_vendor_form.dart';
 import 'field_my_additions.dart';
+import 'my_numbers_card.dart';
 import 'field_entry_form.dart';
 import 'quick_add.dart';
 import 'screen_view.dart';
@@ -63,6 +64,9 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Add', style: TextStyle(fontSize: 18)),
       ),
+      const SizedBox(height: 16),
+      // How many this staff member added, and the calls and directions to the vendors they added (Analytics).
+      MyNumbersCard(store: store, ownerId: uid, events: const ['staff_added', 'shop_call', 'shop_whatsapp', 'shop_directions', 'price_changed']),
       const SizedBox(height: 16),
       FieldMyAdditions(store: store, uid: uid),
       const SizedBox(height: 24),

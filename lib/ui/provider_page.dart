@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import 'my_numbers_card.dart';
 import 'provider_registration_form.dart';
 import 'text_prompt_dialog.dart';
 import 'screen_view.dart';
@@ -34,7 +35,19 @@ class ServiceProviderPage extends StatelessWidget {
           final status = application?['status'];
           if (application == null || status == 'rejected') return ProviderRegistrationForm(store: store, email: user.email ?? '', previous: application);
           if (status == 'pending') return ProviderStatusView(application: application);
-          return ProviderStatusView(application: application, onChangeRate: (rate) => store.updateProviderRate(rate));
+          // Live: the provider's own numbers (calls and WhatsApp from customers) under the status.
+          return ListView(children: [
+            ProviderStatusView(application: application, onChangeRate: (rate) => store.updateProviderRate(rate)),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: MyNumbersCard(store: store, ownerId: user.uid, events: const ['worker_call', 'worker_whatsapp']),
+                ),
+              ),
+            ),
+          ]);
         },
       ),
     );

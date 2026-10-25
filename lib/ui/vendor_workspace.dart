@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import 'my_numbers_card.dart';
 import 'quick_add.dart';
 import 'vendor_ads_page.dart';
 import 'vendor_section_exclusives.dart';
@@ -40,6 +41,9 @@ class VendorWorkspace extends StatelessWidget {
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
     QuickAddHome(store: store),
+    const SizedBox(height: 12),
+    // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).
+    MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
     const SizedBox(height: 20),
     VendorShopPhotosSection(store: store, uid: uid),
     VendorShopAdSection(store: store, uid: uid),
