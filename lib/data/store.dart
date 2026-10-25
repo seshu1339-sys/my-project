@@ -155,9 +155,10 @@ class Store extends ChangeNotifier {
   /// and an item with no known town shows everywhere. [all] (the admin preview) ignores the town.
   List<Entry> _inTown(List<Entry> items, bool all) {
     if (all || town.isEmpty) return items;
-    final mine = town.trim().toLowerCase();
+    // Compared by town: a locality named "Krishna Bazar (Narsipatnam)" is in Narsipatnam.
+    final mine = townKey(town);
     return items.where((p) {
-      final there = productTown(p).trim().toLowerCase();
+      final there = townKey(productTown(p));
       return there.isEmpty || there == mine;
     }).toList();
   }

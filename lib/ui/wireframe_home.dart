@@ -23,6 +23,7 @@ import '../modules/services/services_page.dart';
 import '../domain/radius.dart';
 import 'home_section_config.dart';
 import 'home_strip_band.dart';
+import 'item_shops_page.dart';
 import '../domain/right_boxes.dart';
 import 'right_ad_boxes.dart';
 import 'shared.dart';
@@ -281,6 +282,8 @@ class WireframeHome extends StatelessWidget {
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
+                // While the customer types an item: choose it to see every shop in the town selling it, on a map and by price.
+                if (search.text.trim().length >= 2) ItemSearchChoices(store: store, query: search.text, openItem: onProduct),
                 wrapSection('tickerMarquee', notice),
                 LayoutBuilder(
                   builder: (context, c) {

@@ -240,6 +240,17 @@ exports.registerVendor = onCall(options, async request => {
   }, {merge: true});
   return {status: 'pending', vendorCode};
 });
+/// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec
+/// section 8: name, photo, address, phone to call, location). Merged, so a later verifyVendorShop or shop photo keeps its own fields.
+function vendorShopRecord(vendorId, data) {
+  const digits = String(data.phone || '').replace(/[^0-9]/g, '');
+  return {
+    name: data.name, ownerId: vendorId, phone: data.phone || '', whatsapp: digits.length === 10 ? `91${digits}` : digits,
+    address: data.address || '', category: data.shopCategory || '', description: data.description || '',
+    ...locationStamp({pincode: data.pincode, latitude: data.latitude, longitude: data.longitude}),
+    ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), active: true, updatedAt: FieldValue.serverTimestamp(),
+  };
+}
 exports.approveVendor = onCall(options, async request => {
   await requireAdmin(request);
   const {vendorId, approved, reason = '', feeRequired = false, feeAmount = 0} = request.data || {};
@@ -259,6 +270,7 @@ exports.approveVendor = onCall(options, async request => {
   if (approved && !fee.required) {
     const vendorRef = db.collection('vendors').doc(vendorId);
     batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
   }
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
@@ -324,6 +336,7 @@ exports.confirmVendorFeePayment = onCall(options, async request => {
   if (paid) {
     const data = application.data();
     batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
   }
   await batch.commit();
   return {status: paid ? 'approved' : 'payment_required'};

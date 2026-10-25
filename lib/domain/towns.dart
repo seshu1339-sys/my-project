@@ -15,6 +15,13 @@ const _placeholderAddresses = {'current gps location', 'pinned location'};
 String _norm(String value) =>
     value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
+/// The town a place name is in, for comparing: the India Post directory names some localities with their town in brackets
+/// ("Krishna Bazar (Narsipatnam)" is in Narsipatnam), so a customer located there sees the town's shops. Lower-cased.
+String townKey(String town) {
+  final bracket = RegExp(r'\(([^)]+)\)').firstMatch(town);
+  return _norm(bracket != null ? bracket.group(1)! : town);
+}
+
 /// Parses the admin's `serviceTowns` setting: comma- or newline-separated
 /// town names, each optionally followed by `=pin1|pin2` so a pincode alone can
 /// pick the town, e.g. `Narsipatnam=531116|531115, Anakapalle=531001`.

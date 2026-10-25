@@ -48,6 +48,11 @@ test('vendor shop photos: pending, approve/reject, and 15-day expiry', {skip: !p
   // ---- admin review: access control and one-shot guard
   await assert.rejects(() => review({vendorId: 'spV', slot: 1, approved: true}, vendor), /Administrator/);
   await review({vendorId: 'spV', slot: 1, approved: true});
+  // approved photo 1 is the shop's public photo (search and map); a copy, so the private original stays private
+  const shopRecord = (await db.collection('shops').doc('spShop').get()).data();
+  assert.match(shopRecord.imageUrl, /catalog%2Fshop_spV_1\.jpg\?alt=media&v=\d+$/);
+  assert.equal((await bucket.file('catalog/shop_spV_1.jpg').exists())[0], true);
+  assert.match((await db.collection('shops').doc('spShop').get()).data().photo4Url, /shop_spV_4/, 'other approved slots: photo<n>Url');
   doc = (await db.collection('vendorShopPhotos').doc('spV_1').get()).data();
   assert.equal(doc.status, 'approved'); assert.ok(doc.decidedAt);
   await assert.rejects(() => review({vendorId: 'spV', slot: 1, approved: true}), /already reviewed/);

@@ -77,5 +77,15 @@ exports.reviewShopPhoto = onCall(options, async request => {
     return data.path;
   });
   if (!approved && path) await getStorage().bucket().file(path).delete({ignoreNotFound: true});
+  // Approved: a public copy goes on the vendor's shop record (photo 1 is the shop's photo in search and on the map; the others are
+  // photo2Url, photo3Url...). The ?v= makes customers' browsers load a replaced photo instead of the old one.
+  if (approved && path) {
+    const bucket = getStorage().bucket();
+    const publicPath = `catalog/shop_${vendorId}_${slot}.jpg`;
+    await bucket.file(path).copy(bucket.file(publicPath));
+    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media&v=${Date.now()}`;
+    const shopId = (await db.collection('vendors').doc(vendorId).get()).data()?.shopId || vendorId;
+    await db.collection('shops').doc(shopId).set({[slot === 1 ? 'imageUrl' : `photo${slot}Url`]: url, ownerId: vendorId}, {merge: true});
+  }
   return {status: approved ? 'approved' : 'rejected'};
 });

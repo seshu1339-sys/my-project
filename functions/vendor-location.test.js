@@ -40,6 +40,11 @@ test('vendor registration requires GPS coordinates, and they carry onto the appr
   let vendor = (await db.collection('vendors').doc(gpsV).get()).data();
   assert.equal(vendor.latitude, 12.9716); assert.equal(vendor.longitude, 77.5946);
   assert.equal(vendor.verified, false, 'self-reported registration GPS is not the same as admin-verified location');
+  // ---- and the vendor's public shop record: what customers see in search and on the map (name, phone to call, address, place)
+  const shop = (await db.collection('shops').doc(gpsV).get()).data();
+  assert.deepEqual([shop.name, shop.ownerId, shop.phone, shop.address, shop.latitude, shop.longitude, shop.active],
+    [app.name, gpsV, app.phone, app.address, 12.9716, 77.5946, true]);
+  assert.equal(shop.pincode, app.pincode);
 
   // ---- the fee-payment path (confirmVendorFeePayment) also carries the coordinates
   const feeV = 'feeGpsV';
@@ -50,4 +55,5 @@ test('vendor registration requires GPS coordinates, and they carry onto the appr
   await fns.confirmVendorFeePayment.run({...admin, data: {vendorId: feeV, paid: true}});
   vendor = (await db.collection('vendors').doc(feeV).get()).data();
   assert.equal(vendor.latitude, 12.9716); assert.equal(vendor.longitude, 77.5946);
+  assert.equal((await db.collection('shops').doc(feeV).get()).data().latitude, 12.9716, 'the shop record on the fee path too');
 });

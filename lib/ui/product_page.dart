@@ -11,6 +11,7 @@ import 'responsive_header.dart';
 import 'reviews.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
+import 'item_shops_page.dart';
 import 'shop_page.dart';
 
 class ProductPage extends StatefulWidget {
@@ -180,6 +181,23 @@ class _ProductPageState extends State<ProductPage> {
                   style: const TextStyle(fontSize: 17, height: 1.6),
                 ),
                 const SizedBox(height: 20),
+                // The same item at the other shops of the town, on a map and by price (vendor spec section 8).
+                if (p.text('providerId').isEmpty && p.text('kind') != 'service')
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('compare-shops'),
+                      onPressed: () => openItemShops(
+                        context,
+                        store,
+                        name: p.text('name'),
+                        libraryItemId: p.text('libraryItemId'),
+                        openItem: (item) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProductPage(store: store, entry: item))),
+                      ),
+                      icon: const Icon(Icons.map_outlined),
+                      label: const Text('Compare shops selling this'),
+                    ),
+                  ),
                 // A service provider (their own listing, no shop) is booked by calling them: no bag buttons.
                 if (p.text('providerId').isEmpty) Builder(
                   builder: (context) {
