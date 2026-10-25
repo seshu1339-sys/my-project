@@ -12,6 +12,7 @@ import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'responsive_search_box.dart';
 import 'shared.dart';
+import '../services/usage.dart';
 
 Widget _identityHeaderSection(String key, Widget child) => child;
 
@@ -416,7 +417,10 @@ class ResponsiveHeader extends StatelessWidget {
                                 )
                               : AppTokens.radiusLg,
                         ),
-                        onTap: onLocation,
+                        onTap: () {
+                          Usage.button('header_location');
+                          onLocation();
+                        },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -527,7 +531,10 @@ class ResponsiveHeader extends StatelessWidget {
                       layout: notificationLayout,
                       icon: Icons.notifications_outlined,
                       tooltip: 'Notifications'.tr(context),
-                      onPressed: onAccount,
+                      onPressed: () {
+                        Usage.button('header_notifications');
+                        onAccount();
+                      },
                     ),
                   ),
                 if (wishlistLayout.visible)
@@ -538,7 +545,10 @@ class ResponsiveHeader extends StatelessWidget {
                       layout: wishlistLayout,
                       icon: Icons.favorite_border,
                       tooltip: 'Wishlist'.tr(context),
-                      onPressed: () => wishlist(context),
+                      onPressed: () {
+                        Usage.button('header_wishlist');
+                        wishlist(context);
+                      },
                     ),
                   ),
                 if (cartLayout.visible)
@@ -549,7 +559,10 @@ class ResponsiveHeader extends StatelessWidget {
                       layout: cartLayout,
                       icon: Icons.shopping_bag_outlined,
                       tooltip: 'Shopping bag'.tr(context),
-                      onPressed: onCart,
+                      onPressed: () {
+                        Usage.button('header_cart');
+                        onCart();
+                      },
                       badge: store.count > 0 ? '${store.count}' : null,
                     ),
                   ),

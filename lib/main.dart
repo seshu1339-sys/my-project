@@ -15,6 +15,7 @@ import 'ui/admin_auth.dart';
 import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
+import 'services/usage_start.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
 import 'services/location.dart';
@@ -58,6 +59,8 @@ Future<void> main() async {
   final store = Store(live: live, database: firestore);
   await store.init();
   if (kIsWeb && isAdminRoute) {
+    // Usage analytics (lib/services/usage.dart): the admin panel counts as the admin app.
+    if (live) unawaited(startUsage(app: 'admin'));
     runApp(AdminEntryApp(store: store));
     return;
   }
@@ -65,6 +68,7 @@ Future<void> main() async {
   if (live) {
     // Start counting visits, then genuine ad views once the device id exists.
     unawaited(Analytics.start().then((_) => Analytics.startAdTracker()));
+    unawaited(startUsage(app: 'customer'));
   }
   runApp(MarketApp(store: store));
   if (live) {

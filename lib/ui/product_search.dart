@@ -7,6 +7,7 @@ import '../domain/catalog.dart';
 import '../services/geocoding.dart';
 import '../services/location.dart';
 import '../services/location_town.dart';
+import '../services/usage.dart';
 import '../services/place_resolver.dart';
 import 'design_tokens.dart';
 import 'product_page.dart';
@@ -46,6 +47,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('nearby_search');
     _loadPresets();
     if (store.latitude == null) {
       _useGps();
@@ -324,6 +326,7 @@ class _ProductLocationTile extends StatelessWidget {
         tooltip: 'Directions',
         icon: const Icon(Icons.directions),
         onPressed: () async {
+          Usage.track('shop_directions', key: match.shop.id, label: match.shop.text('name'), town: match.shop.text('town'));
           final uri = Uri.https('www.google.com', '/maps/dir/', {
             'api': '1',
             'destination': '${match.shop.number('latitude')},${match.shop.number('longitude')}',

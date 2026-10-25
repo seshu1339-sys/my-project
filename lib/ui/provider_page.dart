@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import 'provider_registration_form.dart';
 import 'text_prompt_dialog.dart';
+import 'screen_view.dart';
+import '../services/usage.dart';
 
 /// Services in the vendor app: the service provider's own flow. Registration (verified email first), then waiting for the admin, then
 /// the live service with the charge per hour, which the provider can change. A provider account is separate from vendor accounts.
@@ -12,7 +14,9 @@ class ServiceProviderPage extends StatelessWidget {
   final Store store;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ScreenView('provider_page', child: _page(context));
+
+  Widget _page(BuildContext context) {
     final user = store.user;
     final actions = [if (store.live) IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     Widget page(Widget body) => Scaffold(appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
@@ -44,6 +48,7 @@ class ProviderStatusView extends StatelessWidget {
   final Future<void> Function(double rate)? onChangeRate;
 
   Future<void> _changeRate(BuildContext context) async {
+    Usage.button('provider_change_rate');
     final text = await askText(context, title: 'Your charge per hour', label: '₹ per hour', initial: '${application['hourlyRate'] ?? ''}', keyboardType: const TextInputType.numberWithOptions(decimal: true), fieldKey: const ValueKey('provider-new-rate'));
     final value = double.tryParse(text ?? '');
     if (value == null || value <= 0 || !context.mounted) return;

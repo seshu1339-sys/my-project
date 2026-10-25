@@ -31,6 +31,7 @@ const {validCoordinate, vendorItemUnit, DEFAULT_VENDOR_ITEM_LIMIT} = require('./
 const {accountCodeFor} = require('./vendor-id');
 const {freshPriceFields} = require('./vendor-prices');
 const {_photoCheck} = require('./photo-check');
+const {countUsage} = require('./usage');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -120,6 +121,12 @@ function staffProviderDetails(data = {}) {
   };
 }
 
+/// staff_added: which staff member added how many, in which town (usage.js).
+const countStaffAdded = (uid, staff, pincode) => {
+  const town = locationStamp({pincode}).town || '';
+  return countUsage(db, 'staff_added', {key: uid, label: `${staff.name || uid}${staff.staffCode ? ` (${staff.staffCode})` : ''}`, town, owners: [uid], uid});
+};
+
 const photoFolder = (staffUid, additionId) => `staffAdditions/${staffUid}/${additionId}`;
 
 async function verifyPhoto(path, label) {
@@ -171,6 +178,7 @@ exports.submitStaffVendor = onCall({...options, timeoutSeconds: 300}, async requ
     vendor: details.vendor, ...locationStamp({pincode: details.vendor.pincode, latitude: details.latitude, longitude: details.longitude}),
     photoPaths, items, vendorCode, submittedAt: FieldValue.serverTimestamp(),
   });
+  await countStaffAdded(uid, staff, details.vendor.pincode);
   if (staff.autoApprove === true) return {...(await autoApprove(ref, uid)), additionId, vendorCode};
   return {status: 'pending', additionId, vendorCode};
 });
@@ -204,6 +212,7 @@ exports.submitStaffProvider = onCall({...options, timeoutSeconds: 300}, async re
     ...locationStamp({pincode: details.provider.pincode, latitude: details.latitude, longitude: details.longitude}),
     photoPaths, providerCode, submittedAt: FieldValue.serverTimestamp(),
   });
+  await countStaffAdded(uid, staff, details.provider.pincode);
   if (staff.autoApprove === true) return {...(await autoApprove(ref, uid)), additionId, providerCode};
   return {status: 'pending', additionId, providerCode};
 });
@@ -379,6 +388,7 @@ exports.renewStaffVendorPrice = onCall(options, async request => {
   const vendor = (await db.collection('vendors').doc(product.ownerId).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('failed-precondition', 'This vendor is not active.');
   await productRef.update({price, ...freshPriceFields(), updatedAt: FieldValue.serverTimestamp()});
+  await countUsage(db, 'price_changed', {key: productId, label: product.name || '', town: product.town || '', owners: [product.ownerId, uid], uid});
   return {price};
 });
 

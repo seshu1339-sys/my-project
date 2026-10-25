@@ -7,6 +7,7 @@ import 'product_page.dart';
 import 'quick_fresh.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
+import 'screen_view.dart';
 
 class CategoryPage extends StatelessWidget {
   const CategoryPage({
@@ -18,7 +19,9 @@ class CategoryPage extends StatelessWidget {
   final String categoryId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ScreenView('category', child: _page(context));
+
+  Widget _page(BuildContext context) {
     final category = store
         .entries('categories')
         .where((item) => item.id == categoryId)

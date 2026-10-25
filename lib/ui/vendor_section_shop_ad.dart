@@ -6,6 +6,7 @@ import '../domain/catalog.dart';
 import '../domain/shop_ads.dart';
 import '../services/shop_ad_payment.dart';
 import 'vendor_section_kit.dart';
+import '../services/usage.dart';
 
 /// "Ad for your shop": the vendor ticks that they want an ad; the office arranges it offline ([payment]) and puts it in a Right Side
 /// Ad Box of the website. Then the vendor sees their ad and its total views since it started (not who is watching now).
@@ -52,6 +53,7 @@ class _ShopAdViewState extends State<ShopAdView> {
   bool? saving;
 
   Future<void> _tick(bool value) async {
+    Usage.button('vendor_shop_ad_tick');
     setState(() => saving = value);
     try {
       await widget.onInterest(value);

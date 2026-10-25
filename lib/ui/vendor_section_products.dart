@@ -6,6 +6,7 @@ import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'library_item_tile.dart';
 import 'vendor_section_kit.dart';
+import '../services/usage.dart';
 
 /// "Add an item": the vendor picks a category, then one of the admin's items (photo and name come with it, nothing is typed), the
 /// quantity (1-10 kg or 1-10 pieces) and the price for that quantity. Saved items go live at once at the vendor's location. A vendor
@@ -99,7 +100,12 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
       else if (!open)
         FilledButton.icon(
           key: const ValueKey('vendor-add-another'),
-          onPressed: busy || !shopPhotoReady ? null : () => setState(() => adding = true),
+          onPressed: busy || !shopPhotoReady
+              ? null
+              : () {
+                  Usage.button('vendor_add_another');
+                  setState(() => adding = true);
+                },
           icon: const Icon(Icons.add),
           label: Text(itemCount == 0 ? 'Add an item' : 'Add another item'),
         )
@@ -158,7 +164,12 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           const SizedBox(height: 8),
           FilledButton(
             key: const ValueKey('vendor-item-save'),
-            onPressed: busy || !shopPhotoReady ? null : () => run(_save),
+            onPressed: busy || !shopPhotoReady
+                ? null
+                : () {
+                    Usage.button('vendor_item_save');
+                    run(_save);
+                  },
             child: const Text('Save'),
           ),
         ],

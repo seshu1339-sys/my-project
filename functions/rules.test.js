@@ -86,6 +86,22 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(alice, 'photoCheckUsage/2026-10')));
     await assertFails(getDoc(doc(admin, 'photoFingerprints/p1')));
     await assertFails(setDoc(doc(admin, 'photoChecks/p2'), {online: 'none'}));
+    // Usage analytics: admin only, except a person's own numbers
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'usageDaily/2026-10-25~shop_call'), {total: 3});
+      await setDoc(doc(ctx.firestore(), 'usageOwnerDaily/alice~2026-10-25'), {ownerId: 'alice', counts: {shop_call: 3}});
+      await setDoc(doc(ctx.firestore(), 'usageOwnerDaily/bob~2026-10-25'), {ownerId: 'bob', counts: {shop_call: 1}});
+      await setDoc(doc(ctx.firestore(), 'usagePersonDaily/alice~2026-10-25'), {uid: 'alice'});
+      await setDoc(doc(ctx.firestore(), 'userActivity/alice'), {uid: 'alice'});
+    });
+    await assertSucceeds(getDoc(doc(admin, 'usageDaily/2026-10-25~shop_call')));
+    await assertFails(getDoc(doc(alice, 'usageDaily/2026-10-25~shop_call')));
+    await assertSucceeds(getDoc(doc(alice, 'usageOwnerDaily/alice~2026-10-25')));
+    await assertFails(getDoc(doc(alice, 'usageOwnerDaily/bob~2026-10-25')));
+    await assertFails(getDoc(doc(alice, 'usagePersonDaily/alice~2026-10-25')));
+    await assertSucceeds(getDoc(doc(admin, 'usagePersonDaily/alice~2026-10-25')));
+    await assertFails(getDoc(doc(alice, 'userActivity/alice')));
+    await assertFails(setDoc(doc(alice, 'usageOwnerDaily/alice~2026-10-25'), {ownerId: 'alice', counts: {shop_call: 999}}));
     // Vendor ads: the vendor reads only their own submissions and notices; nobody writes them from a client.
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), 'adSubmissions/s1'), {vendorId: 'alice', status: 'pending'});

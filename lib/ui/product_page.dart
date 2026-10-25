@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/store.dart';
+import '../services/usage.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'cart_page.dart';
@@ -29,6 +30,7 @@ class _ProductPageState extends State<ProductPage> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('product');
     store.trackItemView(entry);
   }
 
@@ -84,7 +86,10 @@ class _ProductPageState extends State<ProductPage> {
                   ? Icons.favorite
                   : Icons.favorite_border,
               tooltip: 'Wishlist'.tr(context),
-              onPressed: () => _toggleWishlist(context, p),
+              onPressed: () {
+                Usage.button('product_wishlist');
+                _toggleWishlist(context, p);
+              },
             ),
           ],
         ),
@@ -187,13 +192,16 @@ class _ProductPageState extends State<ProductPage> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: OutlinedButton.icon(
                       key: const ValueKey('compare-shops'),
-                      onPressed: () => openItemShops(
+                      onPressed: () {
+                        Usage.button('product_compare_shops');
+                        openItemShops(
                         context,
                         store,
                         name: p.text('name'),
                         libraryItemId: p.text('libraryItemId'),
                         openItem: (item) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProductPage(store: store, entry: item))),
-                      ),
+                      );
+                      },
                       icon: const Icon(Icons.map_outlined),
                       label: const Text('Compare shops selling this'),
                     ),
@@ -238,6 +246,7 @@ class _ProductPageState extends State<ProductPage> {
                                     ),
                               onPressed: _canAdd(p)
                                   ? () {
+                                      Usage.button('product_add_to_bag');
                                       store.add(p);
                                       message(context, 'Added to bag'.tr(context));
                                     }
@@ -278,6 +287,7 @@ class _ProductPageState extends State<ProductPage> {
                                     ),
                               onPressed: _canAdd(p)
                                   ? () {
+                                      Usage.button('product_buy_now');
                                       store.add(p);
                                       Navigator.push(
                                         context,
@@ -339,6 +349,7 @@ class _ProductPageState extends State<ProductPage> {
                   ContactActions(
                     phone: shop.text('phone'),
                     whatsapp: shop.text('whatsapp'),
+                    onUsed: (way) => trackShopContact(way, shop),
                   ),
                 ],
                 if (shop == null && p.text('providerId').isNotEmpty) ...[
@@ -346,6 +357,7 @@ class _ProductPageState extends State<ProductPage> {
                   ContactActions(
                     phone: p.text('phone'),
                     whatsapp: p.text('whatsapp'),
+                    onUsed: (way) => Usage.track(way == 'call' ? 'worker_call' : 'worker_whatsapp', key: p.id, label: p.text('name'), town: p.text('town')),
                   ),
                 ],
                 const Divider(height: 40),

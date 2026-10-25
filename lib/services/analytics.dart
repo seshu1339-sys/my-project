@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
 import 'ad_tracker.dart';
+import 'usage.dart';
 
 /// Anonymous, aggregate-only site and ad analytics for the customer app.
 ///
@@ -69,6 +70,8 @@ class Analytics {
 
   /// An ad was tapped. Every tap counts.
   static void click(Entry ad) {
+    // Usage analytics: which offer box was tapped (counted even before the visit counter has started).
+    if (ad.id.isNotEmpty) Usage.track('offer_click', key: ad.id, label: ad.text('name', ad.text('title', ad.id)), town: ad.text('town'));
     if (!_enabled || ad.id.isEmpty) return;
     _send('adClick', {'adId': ad.id, 'placement': ad.text('placement')});
   }

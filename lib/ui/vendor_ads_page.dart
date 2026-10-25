@@ -10,6 +10,7 @@ import 'ad_box.dart';
 import 'ad_reports_page.dart';
 import 'ads_column.dart';
 import 'shared.dart';
+import 'screen_view.dart';
 
 /// How long a vendor can run an ad for, with the plan each length goes with. The admin can still change plan and dates when approving.
 const vendorAdDurations = <int, String>{7: '1 week', 15: '15 days', 30: '1 month', 60: '2 months'};
@@ -60,7 +61,9 @@ class _VendorAdsPageState extends State<VendorAdsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ScreenView('vendor_my_ads', child: _page(context));
+
+  Widget _page(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('My Ads')),
     floatingActionButton: FloatingActionButton.extended(key: const ValueKey('my-ad-new'), onPressed: _editor, icon: const Icon(Icons.add), label: const Text('New ad')),
     body: StreamBuilder<List<Entry>>(

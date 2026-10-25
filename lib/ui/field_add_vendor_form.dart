@@ -14,6 +14,7 @@ import '../services/gps_address.dart';
 import '../services/location.dart';
 import 'library_item_tile.dart';
 import 'shop_map.dart';
+import '../services/usage.dart';
 
 /// The vendor's photos: photo 1 of the vendor or the shop, and two extra ones (all three are needed).
 const staffVendorPhotoNames = ['vendor_1', 'vendor_2', 'vendor_3'];
@@ -134,6 +135,7 @@ class _FieldAddVendorFormState extends State<FieldAddVendorForm> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('staff_add_vendor');
     _captureLocation();
   }
 

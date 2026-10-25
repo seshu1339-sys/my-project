@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/modules.dart';
 import '../services/strings.dart';
+import '../services/usage.dart';
 
 /// The big colour boxes of the home modules (Transport, Services): one box per module, side by side, equal width. Each has the module's
 /// icon and name and opens the module's own page. This widget only reads the list in modules/modules.dart.
@@ -30,7 +31,11 @@ class HomeModuleBoxes extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                onTap: () => module.open(context, store),
+                onTap: () {
+                  // Transport counts itself (transport_click); the box tapped is counted here.
+                  Usage.button('home_${module.id}');
+                  module.open(context, store);
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Column(

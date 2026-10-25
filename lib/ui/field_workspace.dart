@@ -8,6 +8,8 @@ import 'field_add_vendor_form.dart';
 import 'field_my_additions.dart';
 import 'field_entry_form.dart';
 import 'quick_add.dart';
+import 'screen_view.dart';
+import '../services/usage.dart';
 
 /// Shown only once the staff member's fieldStaff doc is 'active'. Lists past
 /// submissions and starts a new one; the server independently re-checks
@@ -25,7 +27,9 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
   String get uid => widget.uid;
 
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => ScreenView('staff_workspace', child: _page(context));
+
+  Widget _page(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
       Text('Field entries', style: Theme.of(context).textTheme.headlineSmall),
@@ -48,11 +52,14 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
       FilledButton.icon(
         key: const ValueKey('field-add'),
         style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
-        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
+        onPressed: () {
+          Usage.button('staff_add_button');
+          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
           store: store,
           vendorForm: (_) => FieldAddVendorForm(store: store),
           serviceForm: (_, type) => FieldAddProviderForm(store: store, serviceType: type),
-        ))),
+        )));
+        },
         icon: const Icon(Icons.add_circle_outline),
         label: const Text('Add', style: TextStyle(fontSize: 18)),
       ),
@@ -62,7 +69,10 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
       const Text('Capture an item at a vendor shop. Nothing you submit is visible to customers until an administrator approves it.'),
       const SizedBox(height: 16),
       FilledButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldEntryForm(store: store))),
+        onPressed: () {
+          Usage.button('staff_new_entry');
+          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldEntryForm(store: store)));
+        },
         icon: const Icon(Icons.add_a_photo_outlined),
         label: const Text('New entry'),
       ),

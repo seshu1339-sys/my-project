@@ -3,6 +3,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../services/usage.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
@@ -12,13 +13,16 @@ import 'responsive_header.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_map.dart';
+import 'screen_view.dart';
 
 class ShopPage extends StatelessWidget {
   const ShopPage({super.key, required this.store, required this.shop});
   final Store store;
   final Entry shop;
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ScreenView('shop', child: _page(context));
+
+  Widget _page(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(shop.text('name'))),
     body: Center(
       child: ConstrainedBox(
@@ -39,6 +43,7 @@ class ShopPage extends StatelessWidget {
             ContactActions(
               phone: shop.text('phone'),
               whatsapp: shop.text('whatsapp'),
+              onUsed: (way) => trackShopContact(way, shop),
             ),
             const SizedBox(height: 20),
             ShopMap(

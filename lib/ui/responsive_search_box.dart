@@ -7,6 +7,7 @@ import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
+import '../services/usage.dart';
 
 class ResponsiveSearchBox extends StatelessWidget {
   const ResponsiveSearchBox({
@@ -113,7 +114,10 @@ class ResponsiveSearchBox extends StatelessWidget {
                 'Voice search'.tr(context),
                 Icons.mic_none,
                 'voiceIconSize',
-                () => onAssistedSearch(false),
+                () {
+                  Usage.button('header_voice_search');
+                  onAssistedSearch(false);
+                },
                 tint('micIconColor', AppTokens.accentOrange),
               ),
               SizedBox(width: gap),
@@ -121,7 +125,10 @@ class ResponsiveSearchBox extends StatelessWidget {
                 'Camera search'.tr(context),
                 Icons.camera_alt_outlined,
                 'imageIconSize',
-                () => onAssistedSearch(true),
+                () {
+                  Usage.button('header_camera_search');
+                  onAssistedSearch(true);
+                },
                 tint('cameraIconColor', AppTokens.accentOrange),
               ),
             ],

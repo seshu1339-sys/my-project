@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +8,7 @@ import 'data/store.dart';
 import 'ui/admin.dart';
 import 'ui/shared.dart';
 import 'services/firebase_startup.dart';
+import 'services/usage_start.dart';
 import 'services/emulators.dart';
 
 // A separate entry point so the admin panel compiles into its own web
@@ -35,6 +38,8 @@ Future<void> main() async {
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
   await store.init();
+  // Usage analytics (lib/services/usage.dart): only with Firebase connected.
+  if (live) unawaited(startUsage(app: 'admin'));
   runApp(AdminApp(store: store));
 }
 

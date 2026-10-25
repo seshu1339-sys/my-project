@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/item_shops.dart';
+import '../services/usage.dart';
 import 'contact_actions.dart';
 import 'design_tokens.dart';
 import 'shared.dart';
@@ -28,6 +29,28 @@ Future<void> openDirections(BuildContext context, double latitude, double longit
   }
 }
 
+/// Counted once each time the page opens: the map and the price list were seen for this item (lib/services/usage.dart).
+class _SeenOnce extends StatefulWidget {
+  const _SeenOnce({required this.name, required this.town, required this.child});
+  final String name, town;
+  final Widget child;
+  @override
+  State<_SeenOnce> createState() => _SeenOnceState();
+}
+
+class _SeenOnceState extends State<_SeenOnce> {
+  @override
+  void initState() {
+    super.initState();
+    Usage.screen('where_to_buy');
+    Usage.track('map_view', key: itemNameKey(widget.name), label: widget.name, town: widget.town);
+    Usage.track('price_list_view', key: itemNameKey(widget.name), label: widget.name, town: widget.town);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 /// Vendor spec section 8: where to buy an item the customer chose. Every shop in the customer's town selling it, on a map (each pin is
 /// the shop's small photo with its price) and in a list from the lowest price up (photo, name, price, distance). Tapping a shop shows
 /// its photo, address, the route and its phone to call. It follows the catalogue live: a new price or a new shop shows at once.
@@ -38,7 +61,7 @@ class ItemShopsPage extends StatelessWidget {
   final ValueChanged<Entry> openItem;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => _SeenOnce(name: name, town: store.town, child: Scaffold(
     appBar: AppBar(title: Text('Where to buy $name')),
     body: ListenableBuilder(
       listenable: store,
@@ -77,7 +100,7 @@ class ItemShopsPage extends StatelessWidget {
         );
       },
     ),
-  );
+  ));
 
   void _showShop(BuildContext context, ItemOffer offer) => showModalBottomSheet<void>(
     context: context,
@@ -107,14 +130,22 @@ class ItemShopsPage extends StatelessWidget {
               if (offer.onMap)
                 FilledButton.icon(
                   key: const ValueKey('item-shop-directions'),
-                  onPressed: () => openDirections(sheet, offer.latitude!, offer.longitude!, fromLatitude: store.latitude, fromLongitude: store.longitude),
+                  onPressed: () {
+                    Usage.track('shop_directions', key: offer.product.text('shopId', offer.product.id), label: offer.shopName, town: offer.shop?.text('town') ?? '');
+                    openDirections(sheet, offer.latitude!, offer.longitude!, fromLatitude: store.latitude, fromLongitude: store.longitude);
+                  },
                   icon: const Icon(Icons.directions),
                   label: const Text('Directions'),
                 ),
-              ContactActions(phone: offer.phone, whatsapp: offer.whatsapp),
+              ContactActions(
+                phone: offer.phone,
+                whatsapp: offer.whatsapp,
+                onUsed: (way) => Usage.track(way == 'call' ? 'shop_call' : 'shop_whatsapp', key: offer.product.text('shopId', offer.product.id), label: offer.shopName, town: offer.shop?.text('town') ?? ''),
+              ),
               TextButton(
                 key: const ValueKey('item-shop-open-item'),
                 onPressed: () {
+                  Usage.button('where_to_buy_open_item');
                   Navigator.pop(sheet);
                   openItem(offer.product);
                 },
@@ -267,7 +298,10 @@ class ItemSearchChoices extends StatelessWidget {
               key: ValueKey('item-choice-${itemNameKey(c.name)}'),
               avatar: const Icon(Icons.map_outlined, size: 18),
               label: Text('${c.name} • ${c.shops} shop${c.shops == 1 ? '' : 's'} • from ${money(c.lowest)}'),
-              onPressed: () => openItemShops(context, store, name: c.name, libraryItemId: c.libraryItemId, openItem: openItem),
+              onPressed: () {
+                Usage.button('where_to_buy_choice', label: c.name);
+                openItemShops(context, store, name: c.name, libraryItemId: c.libraryItemId, openItem: openItem);
+              },
             ),
         ],
       ),

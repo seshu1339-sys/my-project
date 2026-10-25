@@ -11,6 +11,8 @@ import 'vendor_section_products.dart';
 import 'vendor_section_requests.dart';
 import 'vendor_section_shop_ad.dart';
 import 'vendor_section_shop_photos.dart';
+import 'screen_view.dart';
+import '../services/usage.dart';
 
 /// Business features. Only built once the application status is approved; the
 /// server independently refuses every one of these actions for anyone else.
@@ -23,7 +25,9 @@ class VendorWorkspace extends StatelessWidget {
   final String uid;
 
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
+  Widget build(BuildContext context) => ScreenView('vendor_workspace', child: _page(context));
+
+  Widget _page(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
     Text('Approved vendor workspace', style: Theme.of(context).textTheme.headlineSmall),
     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: store.firestore.collection('vendors').doc(uid).snapshots(),
@@ -62,7 +66,10 @@ class VendorMyAdsCard extends StatelessWidget {
   Widget build(BuildContext context) => vendorCard('My Ads', [
     FilledButton.icon(
       key: const ValueKey('open-my-ads'),
-      onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VendorAdsPage(store: store, uid: uid))),
+      onPressed: () {
+        Usage.button('vendor_open_my_ads');
+        Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VendorAdsPage(store: store, uid: uid)));
+      },
       icon: const Icon(Icons.campaign_outlined),
       label: const Text('Open My Ads'),
     ),

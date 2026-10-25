@@ -4,10 +4,12 @@ import '../../data/store.dart';
 import '../../domain/catalog.dart';
 import '../../services/search.dart';
 import '../../services/strings.dart';
+import '../../services/usage.dart';
 import '../../ui/details.dart';
 import '../../ui/layout_settings.dart';
 import 'service_categories.dart';
 import '../../ui/shared.dart';
+import '../../ui/screen_view.dart';
 
 /// Every visible service-kind product/service entry matching [query] (a
 /// blank query matches everything). Shared by [ServicesPage] and the
@@ -79,7 +81,9 @@ class _ServicesPageState extends State<ServicesPage> {
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => ScreenView('services', child: _page(context));
+
+  Widget _page(BuildContext context) => ListenableBuilder(
     // Re-subscribes this whole page to the store's own live Firestore
     // listener, so a service type's listings (and, once added, any new
     // service-type entry in a future services_list.json) appear without
@@ -151,7 +155,10 @@ class _ServicesPageState extends State<ServicesPage> {
               leading: _categoryThumb(context, category),
               title: Text(category.displayName),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => setState(() => _selected = category),
+              onTap: () {
+                Usage.track('service_open', key: category.id, label: category.displayName);
+                setState(() => _selected = category);
+              },
             ),
           ),
       ],

@@ -5,6 +5,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'text_prompt_dialog.dart';
+import '../services/usage.dart';
 
 /// "My vendors and services" in the staff app: everything this staff member added (Staff > Add), with its state (waiting for the admin,
 /// live, or not approved and why) and its ID (Vendor ID, or Provider ID for a service provider). A live vendor's items show their price; a price lasts 24 hours, so the staff member who
@@ -47,6 +48,7 @@ class StaffAdditionsView extends StatelessWidget {
   };
 
   Future<void> _newPrice(BuildContext context, Entry item) async {
+    Usage.button('staff_new_price');
     final text = await askText(
       context,
       title: 'Today\'s price: ${item.text('name')}',

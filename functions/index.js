@@ -8,6 +8,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {normalizeEvent, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
+const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
 const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
 initializeApp();
@@ -141,6 +142,13 @@ exports.trackAdEvents = onCall({...options, maxInstances: 5}, async request => {
   const staff = uid ? (await db.collection('fieldStaff').doc(uid).get()).exists || (await db.collection('quickAccounts').doc(uid).get()).exists : false;
   return recordAdEvents(db, batch, {userAgent: request.rawRequest?.headers?.['user-agent'], auth: request.auth, staffUids: staff ? [uid] : []});
 });
+// Usage analytics (functions/usage.js): what people do in the apps, in small batches; anyone may send (the device id is random).
+exports.trackUsage = onCall({...options, maxInstances: 5}, async request => {
+  let batch;
+  try { batch = normalizeUsageBatch(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  await rateLimit(`usage:${batch.deviceId}`, 30, 60 * 1000);
+  return recordUsage(db, batch, {uid: request.auth?.uid || null, userAgent: request.rawRequest?.headers?.['user-agent']});
+});
 // Keep legacy callable URLs explicit during migration; never issue PIN tokens.
 const retiredPhoneAuth = onCall(options, async () => {
   throw new HttpsError('failed-precondition', 'SMS/PIN sign-in has been replaced by verified email and password. Update the app and use email sign-in.');
@@ -238,6 +246,7 @@ exports.registerVendor = onCall(options, async request => {
     // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
+  await countUsage(db, 'vendor_register', {key: locationStamp({pincode: details.pincode}).town || details.pincode, label: locationStamp({pincode: details.pincode}).town || details.pincode, town: locationStamp({pincode: details.pincode}).town || '', uid});
   return {status: 'pending', vendorCode};
 });
 /// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec
@@ -429,6 +438,8 @@ exports.submitVendorChange = onCall(options, async request => {
     await target.set({...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     await db.collection('vendorChanges').add(change);
   } else await db.collection('vendorChanges').add(change);
+  if (isNew) await countUsage(db, 'item_added', {key: newValue.libraryItemId || newValue.name, label: newValue.name, town: newValue.town || '', owners: [uid], uid});
+  else if (type === 'price') await countUsage(db, 'price_changed', {key: targetId, label: (await target.get()).data()?.name || '', town: (await target.get()).data()?.town || '', owners: [uid], uid});
   return {status: change.status, docId: targetId};
 });
 exports.reviewVendorChange = onCall(options, async request => {

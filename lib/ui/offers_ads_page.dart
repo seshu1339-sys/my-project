@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import 'ad_box.dart';
+import 'screen_view.dart';
 
 /// "Offers & Ads": every ad that is live right now for the customer's location, one after another in the same box as on the home page.
 class OffersAdsPage extends StatelessWidget {
@@ -12,7 +13,9 @@ class OffersAdsPage extends StatelessWidget {
   final ValueChanged<Entry> onAd;
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
+  Widget build(BuildContext context) => ScreenView('offers', child: _page(context));
+
+  Widget _page(BuildContext context) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
       final config = AdsConfig.from(store.entries('settings'));

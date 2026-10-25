@@ -13,6 +13,7 @@ import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import '../modules/services/services_module.dart';
+import '../services/usage.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
@@ -90,6 +91,7 @@ class _StorefrontState extends State<Storefront> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('home');
     store.addListener(_resolvePlaceIfNeeded);
     _resolvePlaceIfNeeded();
     timer = Timer.periodic(const Duration(seconds: 30), (_) {

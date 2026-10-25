@@ -9,12 +9,15 @@ import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_map.dart';
 import 'shop_page.dart';
+import 'screen_view.dart';
 
 class ShopsPage extends StatelessWidget {
   const ShopsPage({super.key, required this.store});
   final Store store;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ScreenView('shops', child: _page(context));
+
+  Widget _page(BuildContext context) {
     final shops = store.nearby();
     final titleLayout = layoutFor(
       context,

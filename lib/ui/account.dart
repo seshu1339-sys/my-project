@@ -13,6 +13,7 @@ import 'account_complaints_section.dart';
 import 'account_language_field.dart';
 import 'account_orders_section.dart';
 import 'account_payment_card_section.dart';
+import '../services/usage.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key, required this.store});
@@ -51,6 +52,7 @@ class _AccountPageState extends State<AccountPage> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('account');
     name.text = widget.store.profileName;
     cardBrand.text = widget.store.paymentBrand;
     cardLast4.text = widget.store.paymentLast4;

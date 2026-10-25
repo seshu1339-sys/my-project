@@ -11,6 +11,7 @@ import '../domain/catalog.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
 import '../domain/towns.dart';
+import '../services/usage.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
 
@@ -509,6 +510,8 @@ class Store extends ChangeNotifier {
           );
     final nextDistrict = unchanged ? this.district : (district ?? '');
     final nextState = unchanged ? this.state : (state ?? '');
+    // Usage analytics: a newly chosen town.
+    if (nextTown.isNotEmpty && townKey(nextTown) != townKey(this.town)) Usage.track('location_change', key: townKey(nextTown), label: nextTown, town: nextTown);
     pincode = pin;
     address = value;
     this.town = nextTown;

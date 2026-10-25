@@ -12,6 +12,7 @@ import '../services/geocoding.dart';
 import '../services/gps_address.dart';
 import '../services/location.dart';
 import 'shop_map.dart';
+import '../services/usage.dart';
 
 /// Photos of the provider's work: at least 2, at most 3 (work_1..3).
 const staffWorkMinPhotos = 2, staffWorkMaxPhotos = 3;
@@ -100,6 +101,7 @@ class _FieldAddProviderFormState extends State<FieldAddProviderForm> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('staff_add_provider');
     _captureLocation();
   }
 

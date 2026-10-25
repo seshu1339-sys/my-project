@@ -6,6 +6,8 @@ import '../modules/transport/transport_module.dart';
 import 'big_option_tile.dart';
 import 'provider_page.dart';
 import 'vendor_page.dart';
+import 'screen_view.dart';
+import '../services/usage.dart';
 
 /// What a signed-in account of the vendor app is. Vendor, service-provider and field-staff accounts are completely separate: one login
 /// is only ever one of them. A person who wants more than one registers each with a different email address.
@@ -35,14 +37,25 @@ class VendorHomePage extends StatelessWidget {
 
   Widget _view(BuildContext context, VendorAccountRole role) => VendorHomeView(
     role: role,
-    onVendor: () => _open(context, VendorPage(store: store)),
-    onServices: () => _open(context, ServiceProviderPage(store: store)),
-    onTransport: () => openTransport(context, store),
+    onVendor: () {
+      Usage.button('vendor_home_vendor');
+      _open(context, VendorPage(store: store));
+    },
+    onServices: () {
+      Usage.button('vendor_home_services');
+      _open(context, ServiceProviderPage(store: store));
+    },
+    onTransport: () {
+      Usage.button('vendor_home_transport');
+      openTransport(context, store);
+    },
     onLogout: store.live ? store.logout : null,
   );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ScreenView('vendor_home', child: _page(context));
+
+  Widget _page(BuildContext context) {
     final uid = store.user?.uid;
     if (!store.live || uid == null) return _view(context, VendorAccountRole.none);
     DocumentReference<Map<String, dynamic>> doc(String collection) => store.firestore.collection(collection).doc(uid);

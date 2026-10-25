@@ -7,6 +7,7 @@ import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
+import '../services/usage.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key, required this.store});
@@ -23,6 +24,7 @@ class _CartPageState extends State<CartPage> {
   @override
   void initState() {
     super.initState();
+    Usage.screen('cart');
     address.text = widget.store.address;
     final configuredDefault = widget.store.business.text(
       'defaultPaymentMethod',

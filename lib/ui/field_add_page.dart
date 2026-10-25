@@ -4,6 +4,8 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../modules/transport/transport_module.dart';
 import 'big_option_tile.dart';
+import 'screen_view.dart';
+import '../services/usage.dart';
 
 /// Staff app > Add: what the staff member is adding, the same three options as the vendor app's home. A vendor opens [vendorForm];
 /// Services first asks which service (the admin's service types), then opens [serviceForm] for it; Transport is its own module
@@ -17,7 +19,9 @@ class FieldAddPage extends StatelessWidget {
   void _open(BuildContext context, WidgetBuilder page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: page));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ScreenView('staff_add', child: _page(context));
+
+  Widget _page(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Add')),
     body: Center(
       child: SingleChildScrollView(
@@ -74,6 +78,12 @@ class FieldServiceTypePage extends StatefulWidget {
 
 class _FieldServiceTypePageState extends State<FieldServiceTypePage> {
   final search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    Usage.screen('staff_service_types');
+  }
 
   @override
   void dispose() {
