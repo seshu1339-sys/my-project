@@ -11,8 +11,10 @@ test('usage batches: only the listed app events count; server-only and unknown e
     {event: 'item_added', key: 'x'}, // server only
     {event: 'hack', key: 'x'},
     {event: 'search_no_result', key: 'x'.repeat(300)},
+    {event: 'app_start', key: 'vendor/android/1-2 s', label: '1-2 s'},
+    {event: 'app_error', key: 'vendor/android/error/1a2b3c4d', label: 'StateError: Bad state'},
   ]});
-  assert.deepEqual(batch.events.map(e => e.event), ['shop_call', 'search_no_result']);
+  assert.deepEqual(batch.events.map(e => e.event), ['shop_call', 'search_no_result', 'app_start', 'app_error']);
   assert.equal(batch.events[1].key.length, 100, 'keys are cut short');
   assert.deepEqual([batch.app, batch.platform, batch.touch], ['vendor', 'android', false]);
   assert.throws(() => normalizeUsageBatch({deviceId: 'short', events: []}), /device id/);

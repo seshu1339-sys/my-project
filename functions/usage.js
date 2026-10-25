@@ -24,6 +24,8 @@ const CLIENT_EVENTS = {
   worker_call: {owner: 'service'}, worker_whatsapp: {owner: 'service'},
   map_view: {}, price_list_view: {}, service_open: {}, search: {}, search_no_result: {}, location_change: {},
   offer_click: {}, transport_click: {}, screen_view: {}, button: {}, notification_open: {},
+  // the admin's Setup check (lib/services/app_monitoring.dart): key <app>/<platform>/<speed group> and <app>/<platform>/<crash|error>/<id>
+  app_start: {}, app_error: {},
 };
 /// Counted by the server only (an app cannot send these).
 const SERVER_EVENTS = ['vendor_register', 'item_added', 'price_changed', 'ad_interest', 'staff_added'];

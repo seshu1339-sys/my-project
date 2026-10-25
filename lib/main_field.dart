@@ -8,12 +8,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'data/store.dart';
 import 'services/firebase_startup.dart';
 import 'services/usage_start.dart';
+import 'services/app_monitoring.dart';
+import 'services/google_analytics.dart';
 import 'services/emulators.dart';
 import 'ui/email_link.dart';
 import 'ui/field.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
+  AppMonitoring.start(app: 'staff');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;
@@ -33,7 +37,11 @@ Future<void> main() async {
   final store = Store(live: live, database: live ? FirebaseFirestore.instance : null);
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
-  if (live) unawaited(startUsage(app: 'staff'));
+  if (live) {
+    unawaited(startUsage(app: 'staff'));
+    // Google Analytics on the website (lib/services/google_analytics.dart), when the build has the measurement id.
+    startGoogleAnalytics(app: 'staff');
+  }
   runApp(FieldAssistantApp(store: store));
 }
 

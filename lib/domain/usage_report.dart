@@ -22,6 +22,8 @@ const usageEventLabels = {
   'screen_view': 'Screens opened',
   'button': 'Buttons used',
   'notification_open': 'Notifications opened',
+  'app_start': 'App starts',
+  'app_error': 'App errors and crashes',
   'vendor_register': 'Vendor registrations',
   'item_added': 'Items added by vendors',
   'price_changed': 'Price changes',

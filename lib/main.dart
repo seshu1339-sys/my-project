@@ -16,6 +16,8 @@ import 'domain/catalog.dart';
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/usage_start.dart';
+import 'services/app_monitoring.dart';
+import 'services/google_analytics.dart';
 import 'services/push_opens.dart';
 import 'services/emulators.dart';
 import 'services/admin_route.dart';
@@ -29,6 +31,8 @@ final _messenger = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
+  AppMonitoring.start(app: kIsWeb && isAdminRoute ? 'admin' : 'customer');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;
@@ -70,6 +74,8 @@ Future<void> main() async {
     // Start counting visits, then genuine ad views once the device id exists.
     unawaited(Analytics.start().then((_) => Analytics.startAdTracker()));
     unawaited(startUsage(app: 'customer'));
+    // Google Analytics on the website (lib/services/google_analytics.dart), when the build has the measurement id.
+    startGoogleAnalytics(app: 'customer');
     // The website opened from a notification (?nid=...): counted as opened.
     unawaited(reportWebPushOpen());
   }

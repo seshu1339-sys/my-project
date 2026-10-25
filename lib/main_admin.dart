@@ -9,6 +9,7 @@ import 'ui/admin.dart';
 import 'ui/shared.dart';
 import 'services/firebase_startup.dart';
 import 'services/usage_start.dart';
+import 'services/app_monitoring.dart';
 import 'services/emulators.dart';
 
 // A separate entry point so the admin panel compiles into its own web
@@ -16,6 +17,8 @@ import 'services/emulators.dart';
 // customer app. Build with: flutter build web -t lib/main_admin.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
+  AppMonitoring.start(app: 'admin');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;

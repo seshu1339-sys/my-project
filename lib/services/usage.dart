@@ -8,7 +8,7 @@ import '../domain/catalog.dart';
 ///
 /// The events (functions/usage.js CLIENT_EVENTS): shop_call, shop_whatsapp, shop_directions, worker_call, worker_whatsapp, map_view,
 /// price_list_view, service_open, search, search_no_result, location_change, offer_click, transport_click, screen_view, button,
-/// notification_open. [key] says what it was about (a shop id, an item, a town...), [label] the name people read.
+/// notification_open, app_start, app_error. [key] says what it was about (a shop id, an item, a town...), [label] the name people read.
 class Usage {
   Usage({
     required this.app,
