@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
+import 'field_add_page.dart';
 import 'field_entry_form.dart';
 import 'quick_add.dart';
 
@@ -35,6 +36,19 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
       ),
       const SizedBox(height: 8),
       QuickAddHome(store: store),
+      // Add a vendor, a service provider or (later) transport. Nothing goes live until an administrator approves it.
+      FilledButton.icon(
+        key: const ValueKey('field-add'),
+        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
+          store: store,
+          vendorForm: (_) => const _ComingNext(title: 'Add a vendor'),
+          serviceForm: (_, type) => _ComingNext(title: 'Add a ${type.text('name', 'service')}'),
+        ))),
+        icon: const Icon(Icons.add_circle_outline),
+        label: const Text('Add', style: TextStyle(fontSize: 18)),
+      ),
+      const SizedBox(height: 16),
       const Text('Capture an item at a vendor shop. Nothing you submit is visible to customers until an administrator approves it.'),
       const SizedBox(height: 16),
       FilledButton.icon(
@@ -80,4 +94,15 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
       isThreeLine: true,
     ));
   }
+}
+
+/// Until the forms for adding a vendor and a service provider are built (the next steps), what opens from Add.
+class _ComingNext extends StatelessWidget {
+  const _ComingNext({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(title)),
+    body: const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('This form comes in the next step.', textAlign: TextAlign.center))),
+  );
 }

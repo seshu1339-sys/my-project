@@ -61,6 +61,12 @@ void main() {
       expect(_matching(reach, RegExp(r'^modules/(module_admin|modules).dart$|^modules/[^/]+/admin_|^modules/services/services_page')), isEmpty);
     });
 
+    test('the staff app opens the Transport module page from Add, and carries no module admin screen', () {
+      final reach = _reach(graph, 'main_field.dart');
+      expect(reach, contains('modules/transport/transport_page.dart'));
+      expect(_matching(reach, RegExp(r'^modules/(module_admin|modules).dart$|^modules/[^/]+/admin_')), isEmpty);
+    });
+
     test('the vendor app does not carry the staff screens, and the staff app not the vendor ones', () {
       expect(_matching(_reach(graph, 'main_vendor.dart'), RegExp(r'^ui/field_')), isEmpty);
       expect(_matching(_reach(graph, 'main_field.dart'), RegExp(r'^ui/vendor_')), isEmpty);

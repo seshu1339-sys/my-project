@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/transport/transport_module.dart';
+import 'big_option_tile.dart';
 import 'provider_page.dart';
 import 'vendor_page.dart';
 
@@ -170,32 +171,5 @@ class _Option extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: enabled ? color : color.withValues(alpha: .45),
-    borderRadius: BorderRadius.circular(18),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Row(
-          children: [
-            Icon(icon, size: 48, color: Colors.white),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                ],
-              ),
-            ),
-            Icon(enabled ? Icons.chevron_right : Icons.block, color: Colors.white),
-          ],
-        ),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => BigOptionTile(title: title, subtitle: subtitle, icon: icon, color: color, enabled: enabled, onTap: onTap);
 }
