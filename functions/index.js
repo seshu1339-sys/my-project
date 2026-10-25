@@ -24,6 +24,9 @@ Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
 Object.assign(exports, require('./ids'));
+// Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
+const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
+exports.expireVendorPrices = expireVendorPrices;
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js
@@ -366,7 +369,7 @@ exports.submitVendorChange = onCall(options, async request => {
     newValue = {
       name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
       libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
-      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price,
+      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(),
       kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: true,
     };
   } else {
@@ -376,6 +379,8 @@ exports.submitVendorChange = onCall(options, async request => {
     const mine = current.exists && (data.ownerId ? data.ownerId === uid : (collection === 'shops' ? targetId === vendor.shopId : data.shopId === vendor.shopId));
     if (!mine) throw new HttpsError('not-found', 'Public item not found.');
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
+    // A new price for an item lasts 24 hours again (vendor-prices.js removes it after that).
+    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields()};
   }
   // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
   // map and list; other changes follow the admin's policy (autoPublishVendorChanges).

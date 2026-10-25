@@ -45,6 +45,19 @@ void main() {
     expect(libraryCategories(_library, _categories), [('cat-veg', 'Vegetables'), ('cat-kirana', 'Kirana'), ('', 'Other items')], reason: 'only categories with items, then Other');
   });
 
+  test('a vendor price lasts 24 hours, then the vendor sees it has expired', () {
+    final now = DateTime.utc(2026, 10, 25, 9, 0);
+    final fresh = {'price': 50, 'unit': '2 kg', 'priceExpiresAt': now.add(const Duration(hours: 23, minutes: 10)).toIso8601String()};
+    expect(vendorPriceExpired(fresh, now), isFalse);
+    expect(vendorPriceLine(fresh, now), '₹50 for 2 kg • valid for 23 h 10 min');
+    final due = {...fresh, 'priceExpiresAt': now.subtract(const Duration(minutes: 1)).toIso8601String()};
+    expect(vendorPriceExpired(due, now), isTrue, reason: 'past its 24 hours, even before the price is removed');
+    expect(vendorPriceLine(due, now), 'Price expired: enter a new price');
+    expect(vendorPriceExpired({'unit': '2 kg', 'priceExpired': true}, now), isTrue, reason: 'the price was removed');
+    expect(vendorPriceLine({'price': 60, 'unit': '1 kg'}, now), '₹60 for 1 kg', reason: 'an item from before prices expired keeps showing its price');
+    expect(vendorPriceValidHours, 24);
+  });
+
   Future<_RecordingStore> pumpSection(WidgetTester tester, (int, int, bool) preview) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1;

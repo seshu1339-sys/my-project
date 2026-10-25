@@ -34,3 +34,24 @@ List<(String, String)> libraryCategories(List<Entry> library, List<Entry> catego
     if (used.contains(uncategorizedLibraryItems)) (uncategorizedLibraryItems, 'Other items'),
   ];
 }
+
+/// A vendor's price lasts this long; then it is removed (functions/vendor-prices.js) and the vendor enters a new one.
+const vendorPriceValidHours = 24;
+
+/// Whether a vendor item's price has run out at [now]: it has no price any more, or its 24 hours are over (priceExpiresAt).
+bool vendorPriceExpired(Map<String, dynamic> item, DateTime now) {
+  if (item['price'] is! num) return true;
+  final expires = DateTime.tryParse('${item['priceExpiresAt'] ?? ''}');
+  return expires != null && !now.isBefore(expires);
+}
+
+/// The price as the vendor sees it: "₹50 for 2 kg • valid for 23 h 10 min", or "Price expired: enter a new price".
+String vendorPriceLine(Map<String, dynamic> item, DateTime now) {
+  if (vendorPriceExpired(item, now)) return 'Price expired: enter a new price';
+  final unit = '${item['unit'] ?? ''}';
+  final price = '₹${item['price']}${unit.isEmpty ? '' : ' for $unit'}';
+  final expires = DateTime.tryParse('${item['priceExpiresAt'] ?? ''}');
+  if (expires == null) return price;
+  final left = expires.difference(now);
+  return '$price • valid for ${left.inHours} h ${left.inMinutes % 60} min';
+}

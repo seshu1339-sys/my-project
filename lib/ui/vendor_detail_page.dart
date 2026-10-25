@@ -222,7 +222,7 @@ class VendorItemsAdminCard extends StatelessWidget {
                   ? const Icon(Icons.inventory_2_outlined)
                   : SizedBox(width: 40, height: 40, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
               title: Text('${doc.data()['name'] ?? doc.id}'),
-              subtitle: Text('₹${doc.data()['price']} for ${doc.data()['unit'] ?? ''} • ${doc.data()['active'] == false ? 'Hidden' : 'Live'}'),
+              subtitle: Text('${vendorPriceLine(doc.data(), DateTime.now())} • ${doc.data()['active'] == false ? 'Hidden' : 'Live'}'),
               value: doc.data()['active'] != false,
               onChanged: (live) => store.updateFields('products', doc.id, {'active': live}),
             ),

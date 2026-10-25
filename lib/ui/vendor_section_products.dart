@@ -170,7 +170,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             child: const Text('Cancel'),
           ),
       ],
-    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it.');
+    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. A price stays for $vendorPriceValidHours hours; then it is removed and you enter a new price.');
   }
 }
 
@@ -271,7 +271,12 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     ? const Icon(Icons.inventory_2_outlined)
                     : SizedBox(width: 44, height: 44, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
                 title: Text('${doc.data()['name']}'),
-                subtitle: Text('₹${doc.data()['price']}${'${doc.data()['unit'] ?? ''}'.isEmpty ? '' : ' for ${doc.data()['unit']}'} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}'),
+                // Prices last 24 hours: an expired one is shown in red until the vendor enters a new price.
+                subtitle: Text(
+                  '${vendorPriceLine(doc.data(), DateTime.now())} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}',
+                  key: ValueKey('vendor-price-line-${doc.id}'),
+                  style: vendorPriceExpired(doc.data(), DateTime.now()) ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
+                ),
                 trailing: Wrap(children: [
                   IconButton(
                     tooltip: doc.data()['active'] == false ? 'Show on site' : 'Hide from site',
@@ -283,7 +288,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                           }),
                   ),
                   IconButton(
-                    tooltip: 'Update price',
+                    tooltip: vendorPriceExpired(doc.data(), DateTime.now()) ? 'Enter a new price' : 'Update price',
                     icon: const Icon(Icons.sell_outlined),
                     onPressed: busy
                         ? null
