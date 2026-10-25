@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
+import '../home_module.dart';
+
+Widget _build(Store store) => AdminTransportSection(store: store);
+
+/// The Transport module's section in the admin panel (listed in module_admin.dart).
+const transportAdminSection = ModuleAdminSection(
+  id: 'transport',
+  title: 'Transport',
+  icon: Icons.local_shipping_outlined,
+  hint: 'Bus tracking and seats (coming soon)',
+  build: _build,
+);
 
 /// Settings > Transport. Its own section, empty for now. Bus tracking and where seats are free or full are added here later.
 class AdminTransportSection extends StatelessWidget {

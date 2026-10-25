@@ -7,7 +7,7 @@ import 'data/store.dart';
 import 'services/firebase_startup.dart';
 import 'services/emulators.dart';
 import 'ui/email_link.dart';
-import 'ui/vendor.dart';
+import 'ui/vendor_home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,13 +46,14 @@ class VendorApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Vendor studio',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff8c4a22))),
+          // After sign-in: the home with Vendor, Services and Transport (ui/vendor_home.dart).
           home: !store.live
-              ? VendorPage(store: store)
+              ? VendorHomePage(store: store)
               : store.pendingEmailLink != null
                   ? EmailLinkPage(store: store, continueUrl: vendorContinueUrl)
                   : store.user == null
                       ? VendorLoginPage(store: store)
-                      : VendorPage(store: store),
+                      : VendorHomePage(store: store),
         ),
       );
 }

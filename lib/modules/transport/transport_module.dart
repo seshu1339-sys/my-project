@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import '../home_module.dart';
-import 'admin_transport.dart';
 import 'transport_page.dart';
 
 /// The Transport module. Its own folder, route and Firestore collection ("transport", nothing is stored there yet). For now the
@@ -14,8 +13,6 @@ void openTransport(BuildContext context, Store store) => Navigator.of(context).p
   MaterialPageRoute<void>(settings: const RouteSettings(name: transportRoute), builder: (_) => const TransportPage()),
 );
 
-Widget _admin(Store store) => AdminTransportSection(store: store);
-
 const transportModule = HomeModule(
   id: 'transport',
   title: 'Transport',
@@ -24,6 +21,4 @@ const transportModule = HomeModule(
   route: transportRoute,
   collection: transportCollection,
   open: openTransport,
-  admin: _admin,
-  adminHint: 'Bus tracking and seats (coming soon)',
 );

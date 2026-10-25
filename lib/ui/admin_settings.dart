@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
-import '../modules/modules.dart';
+import '../modules/module_admin.dart';
 import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
@@ -36,9 +36,8 @@ final _sections = <_SettingsSection>[
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
-  // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/modules.dart.
-  for (final module in homeModules)
-    if (module.admin != null) _SettingsSection('module-${module.id}', module.title, module.icon, module.adminHint),
+  // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
+  for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
 ];
 
 /// The Settings tab: a list of sections on the left (a plain list on a phone) and the chosen section beside it.
@@ -78,8 +77,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminSingleRecord(store: widget.store, section: key);
       default:
         if (key.startsWith('module-')) {
-          final module = homeModules.where((m) => 'module-${m.id}' == key).firstOrNull;
-          if (module?.admin != null) return module!.admin!(widget.store);
+          final section = moduleAdminSections.where((s) => 'module-${s.id}' == key).firstOrNull;
+          if (section != null) return section.build(widget.store);
         }
         return AdminEntryList(store: widget.store, section: key);
     }

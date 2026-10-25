@@ -45,6 +45,7 @@ void main() {
           expect(target.startsWith('lib/modules/') && !target.startsWith('lib/modules/$id/') && target != 'lib/modules/home_module.dart', isFalse,
               reason: '$here imports another module: $import');
           expect(target, isNot('lib/modules/modules.dart'), reason: '$here imports the registry');
+          expect(target, isNot('lib/modules/module_admin.dart'), reason: '$here imports the admin registry');
           if (target.startsWith('lib/ui/')) {
             final name = target.split('/').last;
             for (final word in forbidden) {
@@ -56,11 +57,12 @@ void main() {
     });
   }
 
-  test('outside code reaches a module only through the registry, its module file, or the Services listing helper', () {
-    const allowed = {
+  test('outside code reaches a module only through the registries, the contract, a module file, or the Services listing helper', () {
+    final allowed = {
       'lib/modules/modules.dart',
+      'lib/modules/module_admin.dart',
       'lib/modules/home_module.dart',
-      'lib/modules/services/services_module.dart',
+      for (final id in moduleIds) 'lib/modules/$id/${id}_module.dart',
       'lib/modules/services/services_page.dart', // localServiceEntries, used by the home Local Services section
     };
     final all = Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'));
@@ -85,5 +87,14 @@ void main() {
       routes.add(m!.group(1)!);
     }
     expect(routes.toSet().length, routes.length);
+  });
+
+  test('a module file never imports its admin screen (so the vendor app can open a module without admin code)', () {
+    for (final id in moduleIds) {
+      final file = File('lib/modules/$id/${id}_module.dart');
+      for (final import in _imports(file)) {
+        expect(import.contains('admin'), isFalse, reason: '${file.path} imports $import');
+      }
+    }
   });
 }
