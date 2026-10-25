@@ -15,7 +15,8 @@ class Usage {
     required this.deviceId,
     required this.platform,
     required this.transport,
-    this.flushEvery = const Duration(seconds: 10),
+    // Cost guard: one send at most every 30 seconds (each send is a few database writes); leaving the app sends at once.
+    this.flushEvery = const Duration(seconds: 30),
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 

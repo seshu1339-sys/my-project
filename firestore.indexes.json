@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "usageOwnerDaily",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "ownerId", "order": "ASCENDING"},
+        {"fieldPath": "day", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "vendorNotices",
       "queryScope": "COLLECTION",
       "fields": [

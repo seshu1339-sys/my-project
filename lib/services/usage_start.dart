@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'usage.dart';
@@ -25,6 +26,8 @@ Future<void> startUsage({required String app}) async {
       platform: kIsWeb ? 'web' : 'android',
       transport: (batch) => FirebaseFunctions.instance.httpsCallable('trackUsage').call(batch),
     )..touch();
+    // What is waiting is sent when the app is left (another tab, the home screen), not lost.
+    AppLifecycleListener(onHide: () => Usage.instance?.flush());
     // Signing in says who is active now (the admin's inactive-accounts list).
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) Usage.instance?.touch();

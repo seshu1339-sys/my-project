@@ -2,7 +2,7 @@ const {test} = require('node:test');
 const {readFileSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {initializeTestEnvironment, assertFails, assertSucceeds} = require('@firebase/rules-unit-testing');
-const {doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp} = require('firebase/firestore');
+const {doc, setDoc, getDoc, getDocs, updateDoc, serverTimestamp, Timestamp, collection, query, where, orderBy, limit} = require('firebase/firestore');
 test('Firestore denies escalation, PIN access and forged orders; isolates customer data', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
   try {
@@ -98,6 +98,9 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(alice, 'usageDaily/2026-10-25~shop_call')));
     await assertSucceeds(getDoc(doc(alice, 'usageOwnerDaily/alice~2026-10-25')));
     await assertFails(getDoc(doc(alice, 'usageOwnerDaily/bob~2026-10-25')));
+    // the "Your numbers" card: the owner's newest days
+    await assertSucceeds(getDocs(query(collection(alice, 'usageOwnerDaily'), where('ownerId', '==', 'alice'), orderBy('day', 'desc'), limit(60))));
+    await assertFails(getDocs(query(collection(alice, 'usageOwnerDaily'), where('ownerId', '==', 'bob'), orderBy('day', 'desc'), limit(60))));
     await assertFails(getDoc(doc(alice, 'usagePersonDaily/alice~2026-10-25')));
     await assertSucceeds(getDoc(doc(admin, 'usagePersonDaily/alice~2026-10-25')));
     await assertFails(getDoc(doc(alice, 'userActivity/alice')));

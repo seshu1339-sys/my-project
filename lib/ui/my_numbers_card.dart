@@ -71,18 +71,31 @@ class MyNumbersView extends StatelessWidget {
 }
 
 /// [MyNumbersView] read live for the signed-in owner [ownerId].
-class MyNumbersCard extends StatelessWidget {
+class MyNumbersCard extends StatefulWidget {
   const MyNumbersCard({super.key, required this.store, required this.ownerId, required this.events});
   final Store store;
   final String ownerId;
   final List<String> events;
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: store.firestore.collection('usageOwnerDaily').where('ownerId', isEqualTo: ownerId).limit(60).snapshots(),
+  State<MyNumbersCard> createState() => _MyNumbersCardState();
+}
+
+class _MyNumbersCardState extends State<MyNumbersCard> {
+  late final _mine = widget.store.firestore.collection('usageOwnerDaily').where('ownerId', isEqualTo: widget.ownerId);
+  // The newest 60 days (the index usageOwnerDaily ownerId + day, firestore.indexes.json). Until that index is deployed the query
+  // fails, and the records are read without an order instead (right for an owner's first 60 days).
+  late final _newest = _mine.orderBy('day', descending: true).limit(60).snapshots();
+  late final _anyOrder = _mine.limit(60).snapshots();
+
+  Widget _view(Stream<QuerySnapshot<Map<String, dynamic>>> stream, Widget Function() onError) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: stream,
     builder: (context, snapshot) {
-      if (snapshot.hasError) return const SizedBox.shrink();
-      return MyNumbersView(records: [for (final d in snapshot.data?.docs ?? const []) Entry(d.id, d.data())], events: events, now: DateTime.now());
+      if (snapshot.hasError) return onError();
+      return MyNumbersView(records: [for (final d in snapshot.data?.docs ?? const []) Entry(d.id, d.data())], events: widget.events, now: DateTime.now());
     },
   );
+
+  @override
+  Widget build(BuildContext context) => _view(_newest, () => _view(_anyOrder, () => const SizedBox.shrink()));
 }
