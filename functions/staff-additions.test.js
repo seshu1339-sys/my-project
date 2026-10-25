@@ -2,6 +2,14 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 require('./index'); // starts the Firebase app that staff-additions.js uses
 const {_staffAdditions} = require('./staff-additions');
+const {_photoCheck} = require('./photo-check');
+// The emulator has no Google credentials: the Google check answers "not found online".
+_photoCheck.setWebDetection(async () => ({}));
+/// The admin checks every photo of an addition with Google (required before approving).
+async function checkAll(db, additionId) {
+  const addition = (await db.collection('staffAdditions').doc(additionId).get()).data();
+  for (const path of [...addition.photoPaths, ...(addition.items || []).flatMap(item => item.photoPaths)]) await _photoCheck.checkPhotoAt(path, 'admin1');
+}
 
 const vendor = {name: 'Lakshmi Kirana', phone: '9876543210', ownerName: 'Lakshmi Devi', shopCategory: 'Kirana', address: 'Main Road, Narsipatnam', pincode: '531116'};
 const items = [{libraryItemId: 'lib-tomato', unitType: 'kg', quantity: 1, price: 30, photoCount: 2}];
@@ -78,6 +86,12 @@ test('staff add a vendor (pending), the admin approves: the vendor, its shop and
   await assert.rejects(() => fns.reviewStaffAddition.run({...as('addStaff'), data: {additionId: 'addition0001', approved: true}}), /Administrator/);
   await assert.rejects(() => fns.reviewStaffAddition.run({...admin, data: {additionId: 'addition0001', approved: false}}), /reason/);
 
+  // ---- every photo is checked with Google before the admin can approve
+  await assert.rejects(() => fns.reviewStaffAddition.run({...admin, data: {additionId: 'addition0001', approved: true}}), /Check every photo with Google first: 8 of 8/);
+  await _photoCheck.checkPhotoAt(`${folder('addition0001')}/vendor_1`, 'admin1');
+  await assert.rejects(() => fns.reviewStaffAddition.run({...admin, data: {additionId: 'addition0001', approved: true}}), /7 of 8 not checked/);
+  await checkAll(db, 'addition0001');
+
   // ---- approved: the vendor (no login of its own), its shop with the photos, address and phone, and its items, live at the place
   const approved = await fns.reviewStaffAddition.run({...admin, data: {additionId: 'addition0001', approved: true}});
   assert.equal(approved.status, 'approved');
@@ -142,6 +156,7 @@ test('staff add a service provider (pending, with the SRV ID); approved, the pro
   assert.deepEqual([pending.kind, pending.serviceName, pending.serviceTypeKey, pending.hourlyRate, pending.staffCode, pending.town], ['provider', 'Plumber', 'plumber', 250, 'STF-NRPM-116-482', 'Narsipatnam']);
   assert.equal((await db.collection('services').doc('prov-provAdd0001').get()).exists, false, 'nothing is live before the admin approves');
 
+  await checkAll(db, 'provAdd0001');
   const approved = await fns.reviewStaffAddition.run({...admin, data: {additionId: 'provAdd0001', approved: true}});
   assert.deepEqual(approved, {status: 'approved', providerId: 'provAdd0001', listingId: 'prov-provAdd0001'});
   const listing = (await db.collection('services').doc('prov-provAdd0001').get()).data();

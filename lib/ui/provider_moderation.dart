@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
+import 'photo_check.dart';
 import 'shop_map.dart';
 import 'text_prompt_dialog.dart';
 
@@ -56,6 +57,7 @@ class ProviderModerationPage extends StatelessWidget {
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ApplicationPhoto(label: 'Photo', path: data['photoPath']?.toString(), height: 160, width: 200),
+          if ('${data['photoPath'] ?? ''}'.isNotEmpty && status == 'pending') PhotoCheck(store: store, path: '${data['photoPath']}'),
           const SizedBox(height: 8),
           if ('${data['providerCode'] ?? ''}'.isNotEmpty) Text('Provider ID: ${data['providerCode']}'),
           Text('Mobile: ${data['phone'] ?? ''}'),

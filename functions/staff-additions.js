@@ -26,6 +26,7 @@ const {locationStamp} = require('./places');
 const {validCoordinate, vendorItemUnit, DEFAULT_VENDOR_ITEM_LIMIT} = require('./domain');
 const {accountCodeFor} = require('./vendor-id');
 const {freshPriceFields} = require('./vendor-prices');
+const {_photoCheck} = require('./photo-check');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -280,11 +281,13 @@ async function publishStaffProvider(ref, addition, decidedBy) {
   return {providerId: id, listingId};
 }
 
+/// Every private photo of an addition: the vendor's (or the provider's work) photos and each item's.
+const photosOf = addition => [...(addition.photoPaths || []), ...(addition.items || []).flatMap(item => item.photoPaths || [])];
+
 /// Removes the private originals of an addition once it is decided (the live copies are in catalog/).
 async function removePrivatePhotos(addition) {
   const bucket = getStorage().bucket();
-  const paths = [...(addition.photoPaths || []), ...(addition.items || []).flatMap(item => item.photoPaths || [])];
-  await Promise.all(paths.map(path => bucket.file(path).delete({ignoreNotFound: true})));
+  await Promise.all(photosOf(addition).map(path => bucket.file(path).delete({ignoreNotFound: true})));
 }
 
 // Admin: approve (the vendor goes live) or reject (with a reason the staff member sees) a staff addition.
@@ -304,6 +307,10 @@ exports.reviewStaffAddition = onCall({...options, timeoutSeconds: 120}, async re
     return {status: 'rejected'};
   }
   if (!['vendor', 'provider'].includes(addition.kind)) throw new HttpsError('failed-precondition', 'Unknown kind of addition.');
+  // Every photo is checked with Google first (functions/photo-check.js), so the admin approves knowing what the check found.
+  const photos = photosOf(addition);
+  const unchecked = await _photoCheck.uncheckedPhotos(photos);
+  if (unchecked.length) throw new HttpsError('failed-precondition', `Check every photo with Google first: ${unchecked.length} of ${photos.length} not checked yet.`);
   const out = addition.kind === 'provider' ? await publishStaffProvider(ref, addition, request.auth.uid) : await publishStaffVendor(ref, addition, request.auth.uid);
   await removePrivatePhotos(addition);
   return {status: 'approved', ...out};

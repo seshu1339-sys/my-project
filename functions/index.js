@@ -37,6 +37,9 @@ Object.assign(exports, {setAdInterest, assignRightBoxVendor});
 // Staff "Add": field staff add vendors and service providers for people without an account; the admin approves (only the callables are exported).
 const {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice} = require('./staff-additions');
 Object.assign(exports, {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice});
+// The admin's "Google check" of a photo under review: Cloud Vision web detection and the same-photo check (only the callable is exported).
+const {checkPhoto} = require('./photo-check');
+exports.checkPhoto = checkPhoto;
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js

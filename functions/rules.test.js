@@ -74,6 +74,18 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(getDoc(doc(anonymous, 'staffAdditions/a1')));
     await assertSucceeds(getDoc(doc(admin, 'staffAdditions/a2')));
     await assertFails(setDoc(doc(alice, 'staffAdditions/a1'), {staffUid: 'alice', status: 'approved'}));
+    // Google checks of photos and the month's count: the admin only.
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'photoChecks/p1'), {online: 'none'});
+      await setDoc(doc(ctx.firestore(), 'photoCheckUsage/2026-10'), {scans: 3});
+      await setDoc(doc(ctx.firestore(), 'photoFingerprints/p1'), {sha256: 'x'});
+    });
+    await assertSucceeds(getDoc(doc(admin, 'photoChecks/p1')));
+    await assertSucceeds(getDoc(doc(admin, 'photoCheckUsage/2026-10')));
+    await assertFails(getDoc(doc(alice, 'photoChecks/p1')));
+    await assertFails(getDoc(doc(alice, 'photoCheckUsage/2026-10')));
+    await assertFails(getDoc(doc(admin, 'photoFingerprints/p1')));
+    await assertFails(setDoc(doc(admin, 'photoChecks/p2'), {online: 'none'}));
     // Vendor ads: the vendor reads only their own submissions and notices; nobody writes them from a client.
     await env.withSecurityRulesDisabled(async ctx => {
       await setDoc(doc(ctx.firestore(), 'adSubmissions/s1'), {vendorId: 'alice', status: 'pending'});

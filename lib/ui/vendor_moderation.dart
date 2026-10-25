@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
+import 'photo_check.dart';
 import 'shop_map.dart';
 
 /// Vendor applications, fee payments, active/suspended vendors, pending shop
@@ -139,8 +140,12 @@ class VendorModerationPage extends StatelessWidget {
       children: [
         // The two mandatory photos are stored separately; both are shown for review.
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 16, runSpacing: 12, children: [
-          ApplicationPhoto(label: 'Vendor photo', path: data['vendorPhotoPath']?.toString(), height: 150, width: 200),
-          ApplicationPhoto(label: 'Shop photo', path: data['shopPhotoPath']?.toString(), height: 150, width: 200),
+          // Under each photo, the Google check (is the picture online, was it used before).
+          for (final (label, key) in const [('Vendor photo', 'vendorPhotoPath'), ('Shop photo', 'shopPhotoPath')])
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ApplicationPhoto(label: label, path: data[key]?.toString(), height: 150, width: 200),
+              if ('${data[key] ?? ''}'.isNotEmpty) PhotoCheck(store: store, path: '${data[key]}'),
+            ]),
         ])),
         if (data['latitude'] is num && data['longitude'] is num)
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -215,7 +220,10 @@ class VendorModerationPage extends StatelessWidget {
     return Card(child: ListTile(
       leading: ApplicationPhoto(label: 'Slot ${data['slot']}', path: data['path']?.toString(), height: 150, width: 200),
       title: Text('${data['vendorName'] ?? data['vendorId']}'),
-      subtitle: Text('Shop photo, slot ${data['slot']}'),
+      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Shop photo, slot ${data['slot']}'),
+        if ('${data['path'] ?? ''}'.isNotEmpty) PhotoCheck(store: store, path: '${data['path']}'),
+      ]),
       trailing: Wrap(children: [
         IconButton(tooltip: 'Approve', onPressed: () => _reviewShopPhoto(context, data['vendorId'].toString(), (data['slot'] as num).toInt(), approved: true), icon: const Icon(Icons.check)),
         IconButton(tooltip: 'Reject', onPressed: () => _reviewShopPhoto(context, data['vendorId'].toString(), (data['slot'] as num).toInt(), approved: false), icon: const Icon(Icons.close)),

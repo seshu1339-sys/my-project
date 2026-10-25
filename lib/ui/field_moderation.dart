@@ -5,7 +5,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import 'admin_staff_additions.dart';
 import 'moderation_dialogs.dart';
+import 'photo_check.dart';
 import 'shop_map.dart';
 
 /// Field Assistant approvals — a separate admin tool from Vendor moderation,
@@ -69,6 +71,21 @@ class FieldModerationPage extends StatelessWidget {
   Widget build(BuildContext context) => AdminPageFrame(
     title: 'Field Assistant approvals',
     body: ListView(padding: const EdgeInsets.all(20), children: [
+      // Vendors and service providers that staff added (Staff > Add): reviewed with a Google check of every photo.
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: store.firestore.collection('staffAdditions').where('status', isEqualTo: 'pending').limit(100).snapshots(),
+        builder: (context, snapshot) => Card(
+          child: ListTile(
+            key: const ValueKey('open-staff-additions'),
+            leading: const Icon(Icons.add_business_outlined),
+            title: const Text('Vendors and services added by staff'),
+            subtitle: Text(snapshot.hasError ? 'Could not load.' : '${snapshot.data?.size ?? 0} waiting for approval'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StaffAdditionsReviewPage(store: store))),
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
       Text('Pending field staff', style: Theme.of(context).textTheme.titleLarge),
       const Text('Anyone who signs into the Field Assistant app appears here first — nothing else is possible until approved.'),
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -150,7 +167,8 @@ class FieldModerationPage extends StatelessWidget {
       subtitle: Text('${data['staffName'] ?? data['staffUid']} • ₹${item['price']} • Stock ${item['stock']}'),
       children: [
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 12, runSpacing: 12, children: [
-          for (final p in (item['photoPaths'] as List? ?? const [])) ApplicationPhoto(path: p?.toString(), height: 150, width: 200),
+          for (final p in (item['photoPaths'] as List? ?? const []))
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [ApplicationPhoto(path: p?.toString(), height: 150, width: 200), PhotoCheck(store: store, path: '$p')]),
         ])),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text(
           shopId.isNotEmpty ? 'Existing shop: $shopId' : 'New shop: ${shop?['name']} • ${shop?['address']} • ${shop?['pincode']}',
