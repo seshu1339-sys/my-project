@@ -53,12 +53,17 @@ class HomeCategoryProductStrip extends StatelessWidget {
                     : colorFromHex(entry.text('textColor'), AppTokens.primary),
               ),
               const SizedBox(width: 8),
-              Text(
-                entry.text('text', defaultTitle).tr(context),
-                style: sectionTextStyle(
-                  entry,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+              // Flexible: a long title in a narrow column is cut with "..." instead of overflowing the row.
+              Flexible(
+                child: Text(
+                  entry.text('text', defaultTitle).tr(context),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sectionTextStyle(
+                    entry,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

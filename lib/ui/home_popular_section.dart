@@ -29,6 +29,7 @@ class HomePopularSection extends StatefulWidget {
     required this.onProduct,
     required this.onAdd,
     this.wrapSection = _identitySection,
+    this.showHeading = true,
   });
   final Store store;
   final List<Entry> settings;
@@ -41,6 +42,9 @@ class HomePopularSection extends StatefulWidget {
   final ValueChanged<Entry> onProduct, onAdd;
   final Widget Function(String sectionKey, Widget child) wrapSection;
   static Widget _identitySection(String sectionKey, Widget child) => child;
+
+  /// False when the heading is shown elsewhere (beside the Transport / Services boxes, see home_strip_band.dart).
+  final bool showHeading;
 
   @override
   State<HomePopularSection> createState() => _HomePopularSectionState();
@@ -63,15 +67,8 @@ class _HomePopularSectionState extends State<HomePopularSection> {
         key: widget.productsKey,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          HomeSectionHeading(
-            title: widget.searchText.isEmpty
-                ? sectionConfig(widget.settings, 'popular').text('text', 'Popular Products').tr(context)
-                : 'Search results'.tr(context),
-            subtitle: widget.searchText.isEmpty
-                ? 'Products and services from your neighbourhood'.tr(context)
-                : '{count} matching items'.tr(context, {'count': '${widget.products.length}'}),
-            appearance: sectionConfig(widget.settings, 'popular'),
-          ),
+          if (widget.showHeading)
+            HomePopularHeading(settings: widget.settings, searchText: widget.searchText, count: widget.products.length),
           if (widget.searchText.isEmpty && tabCategories.isNotEmpty)
             widget.wrapSection(
               'popularFilterChips',
@@ -143,4 +140,23 @@ class _HomePopularSectionState extends State<HomePopularSection> {
       ),
     );
   }
+}
+
+/// The heading of the Popular Products section ("Popular Products" and its subtitle, or "Search results" while the customer is searching).
+class HomePopularHeading extends StatelessWidget {
+  const HomePopularHeading({super.key, required this.settings, required this.searchText, required this.count});
+  final List<Entry> settings;
+  final String searchText;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => HomeSectionHeading(
+    title: searchText.isEmpty
+        ? sectionConfig(settings, 'popular').text('text', 'Popular Products').tr(context)
+        : 'Search results'.tr(context),
+    subtitle: searchText.isEmpty
+        ? 'Products and services from your neighbourhood'.tr(context)
+        : '{count} matching items'.tr(context, {'count': '$count'}),
+    appearance: sectionConfig(settings, 'popular'),
+  );
 }

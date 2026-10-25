@@ -21,7 +21,7 @@ import 'photo_library_page.dart';
 import '../modules/services/services_page.dart';
 import '../domain/radius.dart';
 import 'home_section_config.dart';
-import 'home_module_boxes.dart';
+import 'home_strip_band.dart';
 import '../domain/right_boxes.dart';
 import 'right_ad_boxes.dart';
 import 'shared.dart';
@@ -291,6 +291,24 @@ class WireframeHome extends StatelessWidget {
                     final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion);
                     final hasRightBoxes = shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
+                    final orderedSectionKeys = [...reorderableHomeSections]
+                      ..sort(
+                        (a, b) => sectionOrder(
+                          settings,
+                          a.key,
+                        ).compareTo(sectionOrder(settings, b.key)),
+                      );
+                    // The band under the Today's Offers cards: the product-card row and the Transport / Services boxes (home_strip_band.dart).
+                    final stripProducts = products
+                        .where((p) => p.text('categoryId') == 'cat-vegetables' || p.text('categoryId') == 'cat-fruits')
+                        .toList();
+                    final promoAt = orderedSectionKeys.indexWhere((d) => d.key == 'promo');
+                    final mainWidth = wide ? c.maxWidth - page.gap - railWidth : c.maxWidth;
+                    final bandSideBySide = mainWidth >= 640 && stripProducts.isNotEmpty;
+                    // The Popular Products heading goes into the band (so the boxes reach down to the category tabs) only when that
+                    // section comes right after Today's Offers.
+                    final headingInBand =
+                        bandSideBySide && promoAt >= 0 && promoAt + 1 < orderedSectionKeys.length && orderedSectionKeys[promoAt + 1].key == 'popular';
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
@@ -322,6 +340,7 @@ class WireframeHome extends StatelessWidget {
                         onProduct: onProduct,
                         onAdd: onAdd,
                         wrapSection: wrapSection,
+                        showHeading: !headingInBand,
                       ),
                       'localServices': HomeLocalServicesSection(
                         store: store,
@@ -332,21 +351,11 @@ class WireframeHome extends StatelessWidget {
                         onProduct: onProduct,
                       ),
                     };
-                    final orderedSectionKeys = [...reorderableHomeSections]
-                      ..sort(
-                        (a, b) => sectionOrder(
-                          settings,
-                          a.key,
-                        ).compareTo(sectionOrder(settings, b.key)),
-                      );
                     // On narrow/mobile layouts the ad rail collapses into this
                     // carousel, inserted at the very top of `main` — the
                     // ticker itself now lives outside `main` entirely (fixed
                     // beside the "All Categories" button), so "right after
                     // the ticker" is simply "first".
-                    final crossSellIndex = orderedSectionKeys.indexWhere(
-                      (d) => d.key == 'promo',
-                    );
                     final main = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -389,31 +398,25 @@ class WireframeHome extends StatelessWidget {
                             descriptor.key,
                             reorderedSections[descriptor.key]!,
                           ),
-                          // Transport and Services: two big boxes under the Today's Offers cards.
-                          if (i == crossSellIndex) HomeModuleBoxes(store: store),
-                          if (i == crossSellIndex)
-                            wrapSection(
-                              'crossSellStrip',
-                              HomeCategoryProductStrip(
-                                layout: layoutFor(
-                                  context,
-                                  settings,
-                                  'crossSellStrip',
+                          // Under the Today's Offers cards: the product cards, with the Transport and Services boxes beside them (or below them on a phone).
+                          if (i == promoAt)
+                            HomeStripBand(
+                              store: store,
+                              sideBySide: bandSideBySide,
+                              heading: headingInBand
+                                  ? HomePopularHeading(settings: settings, searchText: search.text, count: products.length)
+                                  : null,
+                              strip: wrapSection(
+                                'crossSellStrip',
+                                HomeCategoryProductStrip(
+                                  layout: layoutFor(context, settings, 'crossSellStrip'),
+                                  defaultTitle: 'Fresh Fruits & Vegetables'.tr(context),
+                                  icon: Icons.eco_outlined,
+                                  products: stripProducts,
+                                  store: store,
+                                  onProduct: onProduct,
+                                  wrapProductItem: wrapProductItem,
                                 ),
-                                defaultTitle: 'Fresh Fruits & Vegetables'
-                                    .tr(context),
-                                icon: Icons.eco_outlined,
-                                products: products
-                                    .where(
-                                      (p) =>
-                                          p.text('categoryId') ==
-                                              'cat-vegetables' ||
-                                          p.text('categoryId') == 'cat-fruits',
-                                    )
-                                    .toList(),
-                                store: store,
-                                onProduct: onProduct,
-                                wrapProductItem: wrapProductItem,
                               ),
                             ),
                         ],
