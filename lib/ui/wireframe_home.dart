@@ -21,6 +21,7 @@ import 'photo_library_page.dart';
 import 'services_page.dart';
 import '../domain/radius.dart';
 import 'home_section_config.dart';
+import 'home_service_boxes.dart';
 import '../domain/right_boxes.dart';
 import 'right_ad_boxes.dart';
 import 'shared.dart';
@@ -388,6 +389,8 @@ class WireframeHome extends StatelessWidget {
                             descriptor.key,
                             reorderedSections[descriptor.key]!,
                           ),
+                          // Transport and Services: two big boxes under the Today's Offers cards.
+                          if (i == crossSellIndex) HomeServiceBoxes(onServices: onServices),
                           if (i == crossSellIndex)
                             wrapSection(
                               'crossSellStrip',

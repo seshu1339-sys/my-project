@@ -160,14 +160,6 @@ class ResponsiveHeader extends StatelessWidget {
     final logo = layoutFor(context, settings, 'logo');
     // An uploaded logo (Business profile > Upload logo) takes the place of the icon + name text: it is shown wider, on its own.
     final hasLogoImage = (logo.entry.text('iconUrl').isNotEmpty ? logo.entry.text('iconUrl') : store.business.text('imageUrl')).isNotEmpty;
-    final servicesLayout = layoutFor(context, settings, 'services');
-    final servicesIconUrl = servicesLayout.entry.text('iconUrl');
-    final servicesIconColor = servicesLayout.entry.text('textColor').isEmpty
-        ? AppTokens.textPrimary
-        : colorFromHex(
-            servicesLayout.entry.text('textColor'),
-            AppTokens.textPrimary,
-          );
     // Three previously-hardcoded header pieces, each now independently
     // admin-editable (text/color/font/size/visibility) — see layout_settings.dart's
     // 'title'/'user'/'location' entries. Every field below falls back to
@@ -527,47 +519,6 @@ class ResponsiveHeader extends StatelessWidget {
                   ),
                 ),
                 divider(),
-                // Visible "Services" shortcut (was hamburger-menu-only) —
-                // the whole slot IS an admin-changeable image (Layout
-                // Settings → Services → "Icon image URL"), no separate text
-                // label beside it, falling back to a generic services icon
-                // when none is set.
-                wrapSection(
-                  'services',
-                  Semantics(
-                    label: 'Services'.tr(context),
-                    button: true,
-                    child: Tooltip(
-                      message: 'Services'.tr(context),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
-                        onTap: onServices,
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: servicesIconUrl.isEmpty
-                                ? Icon(
-                                    Icons.home_repair_service_outlined,
-                                    size: 28,
-                                    color: servicesIconColor,
-                                  )
-                                : Image.network(
-                                    servicesIconUrl,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, error, stack) => Icon(
-                                      Icons.home_repair_service_outlined,
-                                      size: 28,
-                                      color: servicesIconColor,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
                 if (notificationLayout.visible)
                   wrapSection(
                     'notificationIcon',
