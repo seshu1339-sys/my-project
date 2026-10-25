@@ -13,6 +13,7 @@ import 'admin_settings.dart';
 // main_admin.dart, admin_auth.dart, and test/admin_test.dart's direct `EntryEditor` usage -- keeps working unchanged.
 import 'admin_orders.dart';
 import 'complaint_moderation.dart';
+import 'provider_moderation.dart';
 import 'vendor_moderation.dart';
 import 'admin_search.dart';
 import 'quick_admin.dart';
@@ -148,10 +149,10 @@ class _VendorsTab extends StatelessWidget {
   final Store store;
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 3,
+    length: 4,
     child: Column(
       children: [
-        const TabBar(tabs: [Tab(text: 'Vendors'), Tab(text: 'Quick Add accounts'), Tab(text: 'Quick Add items')]),
+        const TabBar(isScrollable: true, tabs: [Tab(text: 'Vendors'), Tab(text: 'Service providers'), Tab(text: 'Quick Add accounts'), Tab(text: 'Quick Add items')]),
         Expanded(
           child: Builder(builder: (context) {
             final controller = DefaultTabController.of(context);
@@ -162,7 +163,8 @@ class _VendorsTab extends StatelessWidget {
                 child: AdminEmbedScope(
                   child: switch (controller.index) {
                     0 => VendorModerationPage(store: store),
-                    1 => QuickAccountsPage(store: store),
+                    1 => ProviderModerationPage(store: store),
+                    2 => QuickAccountsPage(store: store),
                     _ => QuickItemsAdminPage(store: store),
                   },
                 ),

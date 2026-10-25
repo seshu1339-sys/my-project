@@ -40,6 +40,15 @@ extension StoreUploads on Store {
     return image.bytes;
   }
 
+  /// A service provider's own photo for the application (private until the admin approves; then a public copy goes on the listing).
+  Future<Uint8List> uploadProviderPhoto(XFile file) async {
+    final uid = user?.uid;
+    if (uid == null) throw StateError('Sign in first.');
+    final image = await _readImage(this, file);
+    await FirebaseStorage.instance.ref('providerApplications/$uid/photo').putData(image.bytes, SettableMetadata(contentType: image.type));
+    return image.bytes;
+  }
+
   /// Stores the field-staff member's own mandatory registration photo at its
   /// fixed path (mirrors uploadApplicationPhoto's 'vendorPhoto' exactly, one
   /// level up at fieldStaffApplications/{uid}/staffPhoto instead, since staff

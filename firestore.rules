@@ -81,6 +81,15 @@ service cloud.firestore {
       allow read: if owner(uid) || admin();
       allow write: if false;
     }
+    // Service providers (a separate kind of account from vendors): written only by functions/providers.js.
+    match /providerApplications/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /providers/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
     match /vendorChanges/{changeId} {
       allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
       allow write: if false;

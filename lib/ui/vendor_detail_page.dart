@@ -6,6 +6,7 @@ import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'moderation_dialogs.dart';
 import 'shop_map.dart';
+import 'text_prompt_dialog.dart';
 
 /// One vendor's full admin profile, reached from the unified admin search
 /// (admin_search.dart). Consolidates the same per-vendor controls
@@ -172,24 +173,8 @@ class VendorItemsAdminCard extends StatelessWidget {
   final int itemLimit;
 
   Future<void> _changeLimit(BuildContext context) async {
-    final controller = TextEditingController(text: '$itemLimit');
-    final value = await showDialog<int>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Items this vendor may have'),
-        content: TextField(
-          key: const ValueKey('vendor-item-limit-field'),
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Number of items (0-100)', helperText: 'Items you hide still count.'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialog, int.tryParse(controller.text.trim())), child: const Text('Save')),
-        ],
-      ),
-    );
-    controller.dispose();
+    final text = await askText(context, title: 'Items this vendor may have', label: 'Number of items (0-100)', helper: 'Items you hide still count.', initial: '$itemLimit', keyboardType: TextInputType.number, fieldKey: const ValueKey('vendor-item-limit-field'));
+    final value = int.tryParse(text ?? '');
     if (value == null || !context.mounted) return;
     try {
       await store.call('setVendorItemLimit', {'vendorId': vendorUid, 'itemLimit': value});

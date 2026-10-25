@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/modules/transport/transport_page.dart';
+import 'package:ecommerce_app/ui/provider_page.dart';
 import 'package:ecommerce_app/ui/vendor_home.dart';
 import 'package:ecommerce_app/ui/vendor_page.dart';
 
@@ -64,7 +65,7 @@ void main() {
     expect(opened, isEmpty);
   });
 
-  testWidgets('the options open their pages: Transport says coming soon, Vendor the vendor flow', (tester) async {
+  testWidgets('the options open their pages: Transport says coming soon, Services the provider flow, Vendor the vendor flow', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
@@ -77,7 +78,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('vendor-home-services')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('services-coming')), findsOneWidget);
+    expect(find.byType(ServiceProviderPage), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('vendor-home-vendor')));

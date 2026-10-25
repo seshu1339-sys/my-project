@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/transport/transport_module.dart';
+import 'provider_page.dart';
 import 'vendor_page.dart';
 
 /// What a signed-in account of the vendor app is. A vendor account and a service-provider account are completely separate: one login
@@ -32,7 +33,7 @@ class VendorHomePage extends StatelessWidget {
   Widget _view(BuildContext context, VendorAccountRole role) => VendorHomeView(
     role: role,
     onVendor: () => _open(context, VendorPage(store: store)),
-    onServices: () => _open(context, const ServiceProviderComingPage()),
+    onServices: () => _open(context, ServiceProviderPage(store: store)),
     onTransport: () => openTransport(context, store),
     onLogout: store.live ? store.logout : null,
   );
@@ -48,9 +49,17 @@ class VendorHomePage extends StatelessWidget {
         stream: doc('vendors').snapshots(),
         builder: (context, vendor) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           stream: doc('quickAccounts').snapshots(),
-          builder: (context, quick) => _view(
-            context,
-            vendorAccountRole(vendorApplication: application.data?.data(), vendor: vendor.data?.data(), quickAccount: quick.data?.data()),
+          builder: (context, quick) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: doc('providerApplications').snapshots(),
+            builder: (context, provider) => _view(
+              context,
+              vendorAccountRole(
+                vendorApplication: application.data?.data(),
+                vendor: vendor.data?.data(),
+                quickAccount: quick.data?.data(),
+                providerApplication: provider.data?.data(),
+              ),
+            ),
           ),
         ),
       ),
@@ -169,27 +178,6 @@ class _Option extends StatelessWidget {
             ),
             Icon(enabled ? Icons.chevron_right : Icons.block, color: Colors.white),
           ],
-        ),
-      ),
-    ),
-  );
-}
-
-/// Services until service-provider registration is added (next part of this work): says it is on its way.
-class ServiceProviderComingPage extends StatelessWidget {
-  const ServiceProviderComingPage({super.key});
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Services')),
-    body: const Center(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'Service-provider registration opens here soon.',
-          key: ValueKey('services-coming'),
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
       ),
     ),

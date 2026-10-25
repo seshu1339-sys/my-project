@@ -180,7 +180,8 @@ class _ProductPageState extends State<ProductPage> {
                   style: const TextStyle(fontSize: 17, height: 1.6),
                 ),
                 const SizedBox(height: 20),
-                Builder(
+                // A service provider (their own listing, no shop) is booked by calling them: no bag buttons.
+                if (p.text('providerId').isEmpty) Builder(
                   builder: (context) {
                     final addLayout = layoutFor(
                       context,
@@ -320,6 +321,13 @@ class _ProductPageState extends State<ProductPage> {
                   ContactActions(
                     phone: shop.text('phone'),
                     whatsapp: shop.text('whatsapp'),
+                  ),
+                ],
+                if (shop == null && p.text('providerId').isNotEmpty) ...[
+                  Text('${p.text('serviceName')} • ${p.text('town')}', key: const ValueKey('provider-area')),
+                  ContactActions(
+                    phone: p.text('phone'),
+                    whatsapp: p.text('whatsapp'),
                   ),
                 ],
                 const Divider(height: 40),

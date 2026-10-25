@@ -33,6 +33,35 @@ extension StoreVendorActions on Store {
     return result['status'] as String;
   }
 
+  /// A service provider's application (a separate account from vendors).
+  Future<String> registerProvider({
+    required String name,
+    required String phone,
+    required String serviceTypeId,
+    required double hourlyRate,
+    required String address,
+    required String pincode,
+    required double latitude,
+    required double longitude,
+    String gpsAddress = '',
+  }) async {
+    final result = await call('registerProvider', {
+      'name': name,
+      'phone': phone,
+      'serviceTypeId': serviceTypeId,
+      'hourlyRate': hourlyRate,
+      'address': address,
+      'pincode': pincode,
+      'latitude': latitude,
+      'longitude': longitude,
+      if (gpsAddress.trim().isNotEmpty) 'gpsAddress': gpsAddress.trim(),
+    });
+    return result['status'] as String;
+  }
+
+  /// An approved provider's new charge per hour (shown at once on the listing).
+  Future<void> updateProviderRate(double hourlyRate) => call('updateProviderRate', {'hourlyRate': hourlyRate});
+
   Future<String> updateVendorOrder(String orderId, String status) async {
     final result = await call('updateVendorOrder', {'orderId': orderId, 'status': status});
     return result['status'] as String;

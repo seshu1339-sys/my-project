@@ -27,6 +27,9 @@ Object.assign(exports, require('./ids'));
 // Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
 const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
 exports.expireVendorPrices = expireVendorPrices;
+// Service providers: a separate kind of account (only the callables are exported).
+const {registerProvider, approveProvider, updateProviderRate} = require('./providers');
+Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
 // AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js
@@ -210,6 +213,8 @@ exports.registerVendor = onCall(options, async request => {
   const uid = requireUser(request);
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  // One login is never both a vendor and a service provider.
+  if ((await db.collection('providerApplications').doc(uid).get()).exists) throw new HttpsError('failed-precondition', 'This account is a service-provider account. Register as a vendor with a different email address.');
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');

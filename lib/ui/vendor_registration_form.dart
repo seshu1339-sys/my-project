@@ -7,8 +7,8 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/places.dart';
 import '../services/geocoding.dart';
+import '../services/gps_address.dart';
 import '../services/location.dart';
-import '../services/location_town.dart';
 import 'shop_map.dart';
 
 /// Returns every reason the registration must not be submitted yet. Mirrors the
@@ -102,16 +102,11 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
   /// is left alone; one that still shows the earlier GPS value is updated.
   Future<void> _fillAddressFromGps(Position point) async {
     setState(() => lookingUpAddress = true);
-    final found = await (widget.lookUpAddress ?? NominatimGeocoder(contactEmail: widget.store.business.text('supportEmail')).reverseAddress)(point.latitude, point.longitude);
-    final place = await (widget.findPlace ?? nearestPlaceFor)(point.latitude, point.longitude);
+    final gps = await addressForPoint(point.latitude, point.longitude, contactEmail: widget.store.business.text('supportEmail'), lookUp: widget.lookUpAddress, findPlace: widget.findPlace);
     if (!mounted) return;
     setState(() {
       lookingUpAddress = false;
-      final pin = (place != null && place.pincode.isNotEmpty) ? place.pincode : (found?.pincode ?? '');
-      var text = found?.text ?? (place == null ? '' : [place.town, place.district].where((p) => p.isNotEmpty).join(', '));
-      if (found != null && pin.isNotEmpty) {
-        text = found.pincode.isNotEmpty ? text.replaceAll(found.pincode, pin) : (text.contains(pin) ? text : '$text, $pin');
-      }
+      final pin = gps.pincode, text = gps.text;
       if (text.isNotEmpty) {
         if (address.text.trim().isEmpty || address.text.trim() == gpsAddress) address.text = text;
         gpsAddress = text;

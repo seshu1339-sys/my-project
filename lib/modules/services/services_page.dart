@@ -46,6 +46,8 @@ List<Entry> categoryServiceListings(Store store, ServiceCategory category) {
   final roots = category.id.split('_').where((w) => w.length >= 4).toList();
   if (roots.isEmpty) roots.add(category.id);
   return store.visibleServices().where((entry) {
+    // A service provider's listing names its type (typeId); other listings are matched by their words.
+    if (entry.text('typeId').isNotEmpty) return entry.text('typeId') == category.id;
     final words = '${entry.text('name')} ${entry.text('description')} ${entry.text('tags')}'
         .toLowerCase()
         .split(RegExp(r'[^a-z]+'))
