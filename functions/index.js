@@ -1,5 +1,6 @@
 'use strict';
 const {vendorCodeFor} = require('./vendor-id');
+const {otherAccountMessage} = require('./accounts');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
@@ -216,8 +217,9 @@ exports.registerVendor = onCall(options, async request => {
   const uid = requireUser(request);
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  // One login is never both a vendor and a service provider.
-  if ((await db.collection('providerApplications').doc(uid).get()).exists) throw new HttpsError('failed-precondition', 'This account is a service-provider account. Register as a vendor with a different email address.');
+  // One login is only ever one kind of account: a vendor, a service provider or field staff.
+  const taken = await otherAccountMessage(db, uid, 'vendor');
+  if (taken) throw new HttpsError('failed-precondition', taken);
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');

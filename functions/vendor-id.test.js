@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {cityCodeRows, cityCodeFor, vendorCodePrefix, autoCityCode, DEFAULT_CITY_CODES, VENDOR_CODE} = require('./vendor-id');
+const {cityCodeRows, cityCodeFor, vendorCodePrefix, autoCityCode, DEFAULT_CITY_CODES, VENDOR_CODE, ACCOUNT_CODE} = require('./vendor-id');
 
 test('city codes: the built-in table, a pincode listed by the admin, a post-office name, and four letters for an unknown town', () => {
   assert.deepEqual(cityCodeRows({}).map(r => r.code), ['NRPM', 'TUNI', 'RAJH']);
@@ -27,6 +27,12 @@ test('city codes: the built-in table, a pincode listed by the admin, a post-offi
   assert.deepEqual(cityCodeRows({rows: [{town: '', code: 'ABCD'}]}), DEFAULT_CITY_CODES, 'no valid row: the built-in table');
 
   assert.ok(VENDOR_CODE.test('VEN-NRPM-116-325'));
+  // field staff and service providers: the same shape with their own first part
+  assert.equal(vendorCodePrefix('531116', undefined, 'STF'), 'STF-NRPM-116');
+  assert.equal(vendorCodePrefix('533401', undefined, 'SRV'), 'SRV-TUNI-401');
+  assert.ok(ACCOUNT_CODE.STF.test('STF-NRPM-116-001'));
+  assert.ok(!ACCOUNT_CODE.STF.test('STF00001'), 'the earlier staff IDs are a different shape');
+  assert.ok(ACCOUNT_CODE.SRV.test('SRV-NRPM-116-042'));
   assert.ok(!VENDOR_CODE.test('VN00001'));
 });
 

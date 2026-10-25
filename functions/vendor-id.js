@@ -1,5 +1,6 @@
 'use strict';
-// Vendor IDs: VEN-<CITY>-<PIN>-<NNN>, e.g. VEN-NRPM-116-325.
+// Vendor IDs: VEN-<CITY>-<PIN>-<NNN>, e.g. VEN-NRPM-116-325. Field staff (STF-NRPM-116-001) and service providers (SRV-NRPM-116-001)
+// get IDs of the same shape, with their own first part.
 //   CITY  four-letter town code from the admin's city-code table (settings/cityCodes), e.g. Narsipatnam = NRPM
 //   PIN   the last three digits of the shop's pincode
 //   NNN   a three-digit number, unique for that CITY-PIN (reserved in _vendorCodes so two vendors never share an ID)
@@ -57,16 +58,17 @@ function cityCodeFor(pincode, rows = DEFAULT_CITY_CODES) {
   return {code: autoCityCode(town || 'XXXX'), town, auto: true};
 }
 
-/// "VEN-NRPM-116" for a pincode.
-function vendorCodePrefix(pincode, rows) {
+/// "VEN-NRPM-116" for a pincode ([kind] STF or SRV for a staff member's or a service provider's ID).
+function vendorCodePrefix(pincode, rows, kind = 'VEN') {
   const pin = String(pincode || '').trim();
   const last3 = /^\d{6}$/.test(pin) ? pin.slice(-3) : '000';
-  return `VEN-${cityCodeFor(pin, rows).code}-${last3}`;
+  return `${kind}-${cityCodeFor(pin, rows).code}-${last3}`;
 }
 
 const VENDOR_CODE = /^VEN-[A-Z]{4}-\d{3}-\d{3}$/;
+const ACCOUNT_CODE = {VEN: VENDOR_CODE, STF: /^STF-[A-Z]{4}-\d{3}-\d{3}$/, SRV: /^SRV-[A-Z]{4}-\d{3}-\d{3}$/};
 
-/// Reserves a new, unused vendor ID with the given prefix and returns it. Each ID is a document in _vendorCodes (server only), created
+/// Reserves a new, unused ID with the given prefix and returns it. Each ID (VEN, STF or SRV) is a document in _vendorCodes (server only), created
 /// inside a transaction, so the same ID can never be handed out twice. Tries random numbers first (IDs do not reveal how many vendors
 /// there are), then every number in order.
 async function reserveVendorCode(db, prefix, owner, random = Math.random) {
@@ -90,12 +92,15 @@ async function reserveVendorCode(db, prefix, owner, random = Math.random) {
   throw new Error(`Every vendor ID for ${prefix} is taken.`);
 }
 
-/// The vendor ID for an application: the one it already has when it still fits its pincode, else a newly reserved one.
-async function vendorCodeFor(db, {pincode, existing, owner}) {
+/// The ID of [kind] (VEN, STF or SRV) for a pincode: the one it already has when it still fits the pincode, else a newly reserved one.
+async function accountCodeFor(db, kind, {pincode, existing, owner}) {
   const rows = cityCodeRows((await db.collection('settings').doc('cityCodes').get()).data() || {});
-  const prefix = vendorCodePrefix(pincode, rows);
-  if (VENDOR_CODE.test(existing || '') && existing.startsWith(prefix + '-')) return existing;
+  const prefix = vendorCodePrefix(pincode, rows, kind);
+  if (ACCOUNT_CODE[kind].test(existing || '') && existing.startsWith(prefix + '-')) return existing;
   return reserveVendorCode(db, prefix, owner);
 }
 
-module.exports = {DEFAULT_CITY_CODES, cityCodeRows, autoCityCode, cityCodeFor, vendorCodePrefix, reserveVendorCode, vendorCodeFor, VENDOR_CODE};
+/// The vendor ID for an application.
+const vendorCodeFor = (db, args) => accountCodeFor(db, 'VEN', args);
+
+module.exports = {DEFAULT_CITY_CODES, cityCodeRows, autoCityCode, cityCodeFor, vendorCodePrefix, reserveVendorCode, vendorCodeFor, accountCodeFor, VENDOR_CODE, ACCOUNT_CODE};

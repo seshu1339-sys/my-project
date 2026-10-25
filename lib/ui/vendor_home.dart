@@ -6,9 +6,9 @@ import '../modules/transport/transport_module.dart';
 import 'provider_page.dart';
 import 'vendor_page.dart';
 
-/// What a signed-in account of the vendor app is. A vendor account and a service-provider account are completely separate: one login
-/// is never both. A person who wants both registers twice, with two different email addresses.
-enum VendorAccountRole { none, vendor, provider }
+/// What a signed-in account of the vendor app is. Vendor, service-provider and field-staff accounts are completely separate: one login
+/// is only ever one of them. A person who wants more than one registers each with a different email address.
+enum VendorAccountRole { none, vendor, provider, staff }
 
 /// The account's role from its records: a vendor application or vendor record (or an admin-made Quick Add vendor account) makes it a
 /// vendor account; a service-provider application makes it a provider account. Neither yet: it may become either.
@@ -17,9 +17,11 @@ VendorAccountRole vendorAccountRole({
   Map<String, dynamic>? vendor,
   Map<String, dynamic>? quickAccount,
   Map<String, dynamic>? providerApplication,
+  Map<String, dynamic>? staff,
 }) {
   if (vendorApplication != null || vendor != null || quickAccount?['role'] == 'vendor') return VendorAccountRole.vendor;
   if (providerApplication != null) return VendorAccountRole.provider;
+  if (staff != null || quickAccount?['role'] == 'staff') return VendorAccountRole.staff;
   return VendorAccountRole.none;
 }
 
@@ -51,13 +53,17 @@ class VendorHomePage extends StatelessWidget {
           stream: doc('quickAccounts').snapshots(),
           builder: (context, quick) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: doc('providerApplications').snapshots(),
-            builder: (context, provider) => _view(
-              context,
-              vendorAccountRole(
-                vendorApplication: application.data?.data(),
-                vendor: vendor.data?.data(),
-                quickAccount: quick.data?.data(),
-                providerApplication: provider.data?.data(),
+            builder: (context, provider) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: doc('fieldStaff').snapshots(),
+              builder: (context, staff) => _view(
+                context,
+                vendorAccountRole(
+                  vendorApplication: application.data?.data(),
+                  vendor: vendor.data?.data(),
+                  quickAccount: quick.data?.data(),
+                  providerApplication: provider.data?.data(),
+                  staff: staff.data?.data(),
+                ),
               ),
             ),
           ),
@@ -78,6 +84,8 @@ class VendorHomeView extends StatelessWidget {
       'This account is registered as a service provider. A vendor account must be a separate account: sign out and register as a vendor with a different email address.';
   static const servicesBlocked =
       'This account is registered as a vendor. A service-provider account must be a separate account: sign out and register as a service provider with a different email address.';
+  static const staffBlocked =
+      'This account is a field-staff account. Vendor and service-provider accounts must be separate accounts: sign out and register with a different email address.';
 
   void _explain(BuildContext context, String title, String body) => showDialog<void>(
     context: context,
@@ -94,20 +102,28 @@ class VendorHomeView extends StatelessWidget {
       _Option(
         key: 'vendor',
         title: 'Vendor',
-        subtitle: role == VendorAccountRole.provider ? 'Not for this account' : 'Sell your shop\'s items',
+        subtitle: role == VendorAccountRole.provider || role == VendorAccountRole.staff ? 'Not for this account' : 'Sell your shop\'s items',
         icon: Icons.storefront_outlined,
         color: const Color(0xff8c4a22),
-        enabled: role != VendorAccountRole.provider,
-        onTap: role == VendorAccountRole.provider ? () => _explain(context, 'Vendor', vendorBlocked) : onVendor,
+        enabled: role != VendorAccountRole.provider && role != VendorAccountRole.staff,
+        onTap: role == VendorAccountRole.provider
+            ? () => _explain(context, 'Vendor', vendorBlocked)
+            : role == VendorAccountRole.staff
+            ? () => _explain(context, 'Vendor', staffBlocked)
+            : onVendor,
       ),
       _Option(
         key: 'services',
         title: 'Services',
-        subtitle: role == VendorAccountRole.vendor ? 'Not for this account' : 'Offer your service by the hour',
+        subtitle: role == VendorAccountRole.vendor || role == VendorAccountRole.staff ? 'Not for this account' : 'Offer your service by the hour',
         icon: Icons.home_repair_service_outlined,
         color: const Color(0xFFD97706),
-        enabled: role != VendorAccountRole.vendor,
-        onTap: role == VendorAccountRole.vendor ? () => _explain(context, 'Services', servicesBlocked) : onServices,
+        enabled: role != VendorAccountRole.vendor && role != VendorAccountRole.staff,
+        onTap: role == VendorAccountRole.vendor
+            ? () => _explain(context, 'Services', servicesBlocked)
+            : role == VendorAccountRole.staff
+            ? () => _explain(context, 'Services', staffBlocked)
+            : onServices,
       ),
       _Option(
         key: 'transport',

@@ -8,12 +8,13 @@ import 'package:ecommerce_app/ui/vendor_home.dart';
 import 'package:ecommerce_app/ui/vendor_page.dart';
 
 void main() {
-  test('an account is a vendor account, a provider account, or neither yet; never both', () {
+  test('an account is a vendor account, a provider account, a field-staff account, or none yet; never two', () {
     expect(vendorAccountRole(), VendorAccountRole.none);
     expect(vendorAccountRole(vendorApplication: {'status': 'pending'}), VendorAccountRole.vendor);
     expect(vendorAccountRole(vendor: {'status': 'approved'}), VendorAccountRole.vendor);
     expect(vendorAccountRole(quickAccount: {'role': 'vendor'}), VendorAccountRole.vendor);
-    expect(vendorAccountRole(quickAccount: {'role': 'staff'}), VendorAccountRole.none);
+    expect(vendorAccountRole(quickAccount: {'role': 'staff'}), VendorAccountRole.staff, reason: 'an admin-made Quick Add staff account is staff');
+    expect(vendorAccountRole(staff: {'status': 'pending'}), VendorAccountRole.staff);
     expect(vendorAccountRole(providerApplication: {'status': 'pending'}), VendorAccountRole.provider);
     expect(vendorAccountRole(vendorApplication: {}, providerApplication: {}), VendorAccountRole.vendor, reason: 'a vendor record decides');
   });
@@ -54,6 +55,23 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('vendor-home-vendor')));
     await tester.tap(find.byKey(const ValueKey('vendor-home-transport')));
     expect(opened, ['vendor', 'transport']);
+  });
+
+  testWidgets('a field-staff account opens neither Vendor nor Services: it is told to use a separate account', (tester) async {
+    final opened = <String>[];
+    await show(tester, VendorAccountRole.staff, opened);
+    expect(find.text('Not for this account'), findsNWidgets(2));
+    await tester.tap(find.byKey(const ValueKey('vendor-home-vendor')));
+    await tester.pumpAndSettle();
+    expect(find.text(VendorHomeView.staffBlocked), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('vendor-home-services')));
+    await tester.pumpAndSettle();
+    expect(find.text(VendorHomeView.staffBlocked), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(opened, isEmpty);
   });
 
   testWidgets('a service-provider account cannot open Vendor', (tester) async {

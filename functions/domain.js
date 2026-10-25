@@ -206,7 +206,12 @@ function fieldShopDetails(data = {}) {
 function fieldStaffDetails(data = {}) {
   const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
   if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error('Provide a valid contact phone number.');
-  return {name: text(data.name, 2, 100, 'your full name'), phone};
+  // Registration is by location, like a vendor's: the GPS point and its pincode (the Staff ID is made from the pincode).
+  if (!validCoordinate(data.latitude) || !validCoordinate(data.longitude)) throw Error('Turn on your location and capture it before submitting.');
+  const pincode = typeof data.pincode === 'string' ? data.pincode.trim() : '';
+  if (!/^\d{6}$/.test(pincode)) throw Error('Provide a valid six-digit pincode.');
+  const gpsAddress = typeof data.gpsAddress === 'string' ? data.gpsAddress.trim().replace(/\s+/g, ' ').slice(0, 500) : '';
+  return {name: text(data.name, 2, 100, 'your full name'), phone, pincode, latitude: data.latitude, longitude: data.longitude, ...(gpsAddress ? {gpsAddress} : {})};
 }
 // Field Assistant: the item a staff member captured (name/price/stock), reusing
 // validateVendorChange's exact money/stock/name bounds.

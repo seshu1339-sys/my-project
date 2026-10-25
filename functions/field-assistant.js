@@ -11,6 +11,8 @@ const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
+const {otherAccountMessage} = require('./accounts');
+const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -35,20 +37,28 @@ async function requireAdmin(request) {
 // fieldStaffApplications/{uid}/staffPhoto (storage.rules only allows that
 // upload before this doc exists, or again after a rejection, matching the
 // vendor application photo's own lifecycle).
+// Registration is by location (GPS on, its pincode), and a field-staff account is never also a vendor or a service-provider account.
+// The Staff ID (STF-NRPM-116-001, functions/vendor-id.js) is made from the pincode right here; staff who registered before this keep
+// their earlier STF00001-style ID (functions/ids.js).
 exports.requestFieldStaffAccess = onCall(options, async request => {
   const uid = requireUser(request);
   const ref = db.collection('fieldStaff').doc(uid);
   const existing = await ref.get();
-  if (existing.exists) return {status: existing.data().status};
+  if (existing.exists) return {status: existing.data().status, staffCode: existing.data().staffCode || null};
   let details;
   try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  const taken = await otherAccountMessage(db, uid, 'staff');
+  if (taken) throw new HttpsError('failed-precondition', taken);
   await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
+  const staffCode = await accountCodeFor(db, 'STF', {pincode: details.pincode, existing: '', owner: uid});
   await ref.set({
     uid, name: details.name, phone: details.phone, email: request.auth.token.email || null,
-    staffPhotoPath: `fieldStaffApplications/${uid}/staffPhoto`,
+    staffPhotoPath: `fieldStaffApplications/${uid}/staffPhoto`, staffCode,
+    ...locationStamp({pincode: details.pincode, latitude: details.latitude, longitude: details.longitude}),
+    ...(details.gpsAddress ? {gpsAddress: details.gpsAddress} : {}),
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
-  return {status: 'pending'};
+  return {status: 'pending', staffCode};
 });
 
 // Admin: approve or reject a pending field-staff request.

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
+import 'shop_map.dart';
 
 /// One field-staff member's full admin profile, reached from the unified
 /// admin search (admin_search.dart). Consolidates the same per-staff controls
@@ -56,6 +58,16 @@ class StaffDetailPage extends StatelessWidget {
           Text('UID: $staffUid', style: Theme.of(context).textTheme.bodySmall),
           if ((data['email'] ?? '').toString().isNotEmpty) Text(data['email'].toString()),
           if ((data['phone'] ?? '').toString().isNotEmpty) Text('Phone: ${data['phone']}'),
+          if ('${data['pincode'] ?? ''}'.isNotEmpty) Text('Registered at: ${[data['town'], data['pincode']].where((v) => '${v ?? ''}'.isNotEmpty).join(' ')}'),
+          if ('${data['gpsAddress'] ?? ''}'.isNotEmpty) Text('Area from GPS: ${data['gpsAddress']}'),
+          if (data['latitude'] is num && data['longitude'] is num)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: ShopMap(shops: [Entry(staffUid, {'name': name, 'latitude': data['latitude'], 'longitude': data['longitude']})], height: 180),
+              ),
+            ),
           const SizedBox(height: 16),
           Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Photo', style: TextStyle(fontWeight: FontWeight.bold)),

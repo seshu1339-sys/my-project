@@ -8,6 +8,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
+const {accountKinds, otherAccountMessage} = require('./accounts');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -52,8 +53,7 @@ function providerApplication(data = {}) {
 
 /// Whether an account is already a vendor account (a vendor application or record, or an admin-made Quick Add vendor account).
 async function isVendorAccount(uid) {
-  const [application, vendor, quick] = await Promise.all(['vendorApplications', 'vendors', 'quickAccounts'].map(c => db.collection(c).doc(uid).get()));
-  return application.exists || vendor.exists || quick.data()?.role === 'vendor';
+  return (await accountKinds(db, uid)).vendor;
 }
 
 const photoPath = uid => `providerApplications/${uid}/photo`;
@@ -64,7 +64,9 @@ exports.registerProvider = onCall(options, async request => {
   const uid = requireUser(request);
   let details;
   try { details = providerApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  if (await isVendorAccount(uid)) throw new HttpsError('failed-precondition', 'This account is a vendor account. Register as a service provider with a different email address.');
+  // One login is only ever one kind of account: a vendor, a service provider or field staff.
+  const taken = await otherAccountMessage(db, uid, 'provider');
+  if (taken) throw new HttpsError('failed-precondition', taken);
   const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
   if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose a service from the list.');
   const ref = db.collection('providerApplications').doc(uid);

@@ -27,19 +27,27 @@ test('field staff access, suspension and entry submission/review lifecycle', {
   await db.collection('categories').doc('cat-grocery').set({name: 'Grocery', active: true});
   const item = {name: 'Rice 5kg', price: 250, stock: 40, categoryId: 'cat-grocery'};
 
-  // ---- self-registration requires a name, phone and mandatory staff photo
+  // ---- self-registration requires a name, phone, the location (GPS and its pincode) and mandatory staff photo
   const uid = 'staff1';
-  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}}), /photo/i, 'the staff photo is mandatory');
-  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {phone: '+911234567890'}}), /name/i, 'name is required');
+  const here = {latitude: 17.668, longitude: 82.612, pincode: '531116', gpsAddress: 'Gandhi Nagar, Narsipatnam, 531116'};
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890', ...here}}), /photo/i, 'the staff photo is mandatory');
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {phone: '+911234567890', ...here}}), /name/i, 'name is required');
   await stagePhoto(`fieldStaffApplications/${uid}/staffPhoto`);
-  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One'}}), /phone/i, 'phone is required');
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', ...here}}), /phone/i, 'phone is required');
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}}), /location/i, 'the location is required');
+  await assert.rejects(() => fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890', ...here, pincode: '5311'}}), /pincode/i);
 
-  // ---- self-registration is idempotent and starts pending
-  let result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}});
+  // ---- self-registration is idempotent and starts pending, with the Staff ID made from the pincode (STF-NRPM-116-NNN)
+  let result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890', ...here}});
   assert.equal(result.status, 'pending');
-  result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890'}});
+  assert.match(result.staffCode, /^STF-NRPM-116-\d{3}$/);
+  result = await fns.requestFieldStaffAccess.run({...staffAuth(uid), data: {name: 'Staff One', phone: '+911234567890', ...here}});
   assert.equal(result.status, 'pending', 're-requesting is a no-op');
-  assert.equal((await db.collection('fieldStaff').doc(uid).get()).data().phone, '+911234567890');
+  const registered = (await db.collection('fieldStaff').doc(uid).get()).data();
+  assert.equal(registered.phone, '+911234567890');
+  assert.equal(registered.staffCode, result.staffCode, 'the same ID, kept');
+  assert.deepEqual([registered.latitude, registered.longitude, registered.pincode, registered.town], [17.668, 82.612, '531116', 'Narsipatnam']);
+  assert.equal(registered.gpsAddress, 'Gandhi Nagar, Narsipatnam, 531116');
 
   // ---- a pending (not yet approved) staff member cannot submit
   await stagePhotos(uid, 'blocked', 1);

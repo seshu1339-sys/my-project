@@ -107,10 +107,19 @@ class FieldModerationPage extends StatelessWidget {
     final data = doc.data();
     final name = data['name']?.toString().isNotEmpty == true ? data['name'].toString() : doc.id;
     final email = data['email']?.toString() ?? '';
+    // Staff ID, phone and where they registered (staff who registered before the location was required have no place).
+    final place = [data['town'], data['pincode']].where((v) => '${v ?? ''}'.isNotEmpty).join(' ');
+    final details = [
+      if ('${data['staffCode'] ?? ''}'.isNotEmpty) 'Staff ID: ${data['staffCode']}',
+      if ('${data['phone'] ?? ''}'.isNotEmpty) 'Phone: ${data['phone']}',
+      if (place.isNotEmpty) 'Registered at: $place',
+    ].join(' • ');
     if (pending) {
       return Card(child: ListTile(
+        key: ValueKey('pending-staff-${doc.id}'),
         title: Text(name),
-        subtitle: Text(email),
+        subtitle: Text([email, if (details.isNotEmpty) details].join('\n')),
+        isThreeLine: details.isNotEmpty,
         trailing: Wrap(children: [
           IconButton(tooltip: 'Approve', onPressed: () => _reviewStaff(context, doc.id, approved: true), icon: const Icon(Icons.check)),
           IconButton(tooltip: 'Reject', onPressed: () => _reviewStaff(context, doc.id, approved: false), icon: const Icon(Icons.close)),
@@ -122,7 +131,8 @@ class FieldModerationPage extends StatelessWidget {
     final reason = data['decisionReason']?.toString() ?? '';
     return Card(child: ListTile(
       title: Text(name),
-      subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'),
+      subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
+      isThreeLine: details.isNotEmpty,
       trailing: suspended
           ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
           : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
