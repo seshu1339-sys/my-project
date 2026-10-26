@@ -6,6 +6,7 @@ import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
 import 'admin_entry_list.dart';
+import 'admin_fresh_strip.dart';
 import 'animation_settings_form.dart';
 import 'admin_frame.dart';
 import 'admin_page_preview.dart';
@@ -22,7 +23,7 @@ class _SettingsSection {
 
 /// Everything that is not a daily task lives here, in one place: each setting appears once, in one section.
 final _sections = <_SettingsSection>[
-  _SettingsSection('categories', 'Categories', Icons.category_outlined, 'The product categories customers browse'),
+  _SettingsSection('categories', 'Categories', Icons.category_outlined, 'The product categories customers browse; their order is the order of the Popular Products tabs'),
   _SettingsSection('services', 'Services', Icons.home_repair_service_outlined, 'Service listings and the service types (their own collection)'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('cityCodes', 'City codes', Icons.pin_outlined, 'Four-letter town codes in vendor IDs (VEN-NRPM-116-325)'),
@@ -31,7 +32,8 @@ final _sections = <_SettingsSection>[
   _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
   _SettingsSection('scrollingText', 'Scrolling Text', Icons.text_rotation_none, 'The moving red line at the top of the home page'),
   _SettingsSection('homeOffers', "Today's Offers", Icons.campaign_outlined, "The banner that names your town's offers, with the price chips"),
-  _SettingsSection('homePromo', "Today's Offers Box", Icons.view_carousel_outlined, 'The row of coloured offer boxes'),
+  _SettingsSection('homePromo', "Today's Offers Box", Icons.view_carousel_outlined, 'The 6 coloured offer boxes and the item offers in them'),
+  _SettingsSection('homeFresh', 'Fresh Fruits & Vegetables', Icons.eco_outlined, "The items of the strip under Today's Offers, in your order"),
   _SettingsSection('ads', 'Right Side Ads', Icons.campaign_outlined, 'The boxes on the right: animation, colours, every ad'),
   _SettingsSection('rightBoxes', 'Right Side Ad Boxes', Icons.view_agenda_outlined, 'Photo boxes down the right side: add, remove, photo, link'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
@@ -66,6 +68,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminHomeSectionPage(store: widget.store, part: 'notice');
       case 'homePromo':
         return AdminHomeSectionPage(store: widget.store, part: 'promo');
+      case 'homeFresh':
+        return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: widget.store));
       case 'ads':
         return AdminHomeSectionPage(store: widget.store, part: 'ads');
       case 'cityCodes':

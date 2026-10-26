@@ -17,6 +17,7 @@ const usageItems = [
   UsageItem('services', 'customer', 'screen', 'Services'),
   UsageItem('transport', 'customer', 'screen', 'Transport (coming soon)'),
   UsageItem('where_to_buy', 'customer', 'screen', 'Where to buy (map and price list)'),
+  UsageItem('shop_route', 'customer', 'screen', 'A shop on the map (road, phone)'),
   UsageItem('nearby_search', 'customer', 'screen', 'Search products near me'),
   UsageItem('offers', 'customer', 'screen', 'Offers'),
   // ---- customer: buttons
@@ -31,6 +32,7 @@ const usageItems = [
   UsageItem('product_add_to_bag', 'customer', 'button', 'Item: Add to bag'),
   UsageItem('product_buy_now', 'customer', 'button', 'Item: Buy now'),
   UsageItem('product_compare_shops', 'customer', 'button', 'Item: Compare shops selling this'),
+  UsageItem('item_shop_map', 'customer', 'button', 'Item: a shop of the list on the map'),
   UsageItem('product_wishlist', 'customer', 'button', 'Item: wishlist'),
   UsageItem('where_to_buy_choice', 'customer', 'button', 'Search: Where to buy choice'),
   UsageItem('where_to_buy_open_item', 'customer', 'button', 'Where to buy: Open the item'),
@@ -64,4 +66,6 @@ const usageItems = [
   UsageItem('admin_push_center', 'admin', 'screen', 'Push notifications'),
   UsageItem('admin_inactive_accounts', 'admin', 'screen', 'Inactive accounts'),
   UsageItem('admin_setup_check', 'admin', 'screen', 'Setup check'),
+  UsageItem('admin_today_offers', 'admin', 'screen', "Today's Offers: item offers"),
+  UsageItem('admin_fresh_strip', 'admin', 'screen', 'Fresh Fruits & Vegetables'),
 ];

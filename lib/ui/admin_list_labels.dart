@@ -69,6 +69,7 @@ String promotionPlacementLabel(Entry promotion) => switch (promotion.text('place
   'ad' => 'Advertisement',
   'box' => 'Promotional box',
   'ticker' => 'Ticker',
+  'offer' => "Today's Offers item",
   _ => 'Banner',
 };
 

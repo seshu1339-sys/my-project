@@ -66,10 +66,12 @@ void main() {
       expect(find.text('Fresh Fruits & Vegetables'), findsOneWidget);
       final arts = tester.widgetList<ProductArt>(find.byType(ProductArt));
       expect(
-        arts.map((a) => a.height),
-        everyElement(90.0),
-        reason: 'card photo height always comes from the shared main, never a per-card field',
+        arts.map((a) => a.height).toSet(),
+        hasLength(1),
+        reason: 'every card the same photo height, never a per-card field',
       );
+      // The shared main's height is the least; a wide card gets a bigger photo so it never looks small.
+      expect(arts.first.height, greaterThanOrEqualTo(90.0));
 
       // Apple (no override) keeps the default (no backgroundColor);
       // carrot's own backgroundColor override must not leak onto apple's

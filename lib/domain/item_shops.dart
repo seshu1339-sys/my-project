@@ -104,3 +104,42 @@ List<ItemOffer> itemOffers(
 
 /// "1.2 km", "350 m", or '' when the distance is not known.
 String distanceText(double? km) => km == null ? '' : km < 1 ? '${(km * 1000).round()} m' : '${km.toStringAsFixed(1)} km';
+
+/// An item the admin picks from the items the shops already sell (Today's Offers, the Fresh Fruits & Vegetables strip): its name
+/// and photo, so no new photo is needed.
+class ItemPick {
+  const ItemPick({required this.name, this.libraryItemId = '', this.productId = '', this.imageUrl = ''});
+  final String name, libraryItemId, productId, imageUrl;
+
+  factory ItemPick.from(Map data) => ItemPick(
+    name: '${data['name'] ?? ''}'.trim(),
+    libraryItemId: '${data['libraryItemId'] ?? ''}',
+    productId: '${data['productId'] ?? ''}',
+    imageUrl: '${data['imageUrl'] ?? ''}',
+  );
+
+  Map<String, String> toMap() => {'name': name, 'libraryItemId': libraryItemId, 'productId': productId, 'imageUrl': imageUrl};
+  String get key => itemNameKey(name);
+}
+
+/// The items any shop sells (one per item name) whose name has every word of [query], with a photo where any shop has one; the
+/// ones starting with the words first.
+List<ItemPick> itemPicks(List<Entry> products, String query, {int max = 12}) {
+  final words = itemNameKey(query).split(' ').where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return const [];
+  final byName = <String, ItemPick>{};
+  for (final p in products) {
+    final key = itemNameKey(p.text('name'));
+    if (key.isEmpty || p.text('kind') == 'service' || !words.every(key.contains)) continue;
+    final current = byName[key];
+    if (current == null || (current.imageUrl.isEmpty && p.text('imageUrl').isNotEmpty)) {
+      byName[key] = ItemPick(name: p.text('name').trim(), libraryItemId: p.text('libraryItemId'), productId: p.id, imageUrl: p.text('imageUrl'));
+    }
+  }
+  final list = byName.values.toList()
+    ..sort((a, b) {
+      final sa = a.key.startsWith(words.first) ? 0 : 1, sb = b.key.startsWith(words.first) ? 0 : 1;
+      return sa != sb ? sa.compareTo(sb) : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+  return list.take(max).toList();
+}

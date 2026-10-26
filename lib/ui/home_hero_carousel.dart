@@ -19,9 +19,13 @@ class HeroCarousel extends StatefulWidget {
     this.reverse = false,
     this.speed = 600,
     this.appearance = const Entry('', {}),
+    this.boxBuilder,
   });
   final List<Entry> entries;
   final Entry appearance;
+  /// Draws a box's inside instead of the promotion's own text (Today's Offers item offers, home_today_offers.dart): the box keeps
+  /// its size, place and movement. [index] is the entry's place in [entries].
+  final Widget Function(BuildContext context, Entry entry, int index)? boxBuilder;
   final void Function(String) onTap;
   final bool reverse;
   final double speed;
@@ -129,6 +133,9 @@ class _HeroCarouselState extends State<HeroCarousel> {
             ...widget.appearance.data,
             ...original.data,
           });
+          if (widget.boxBuilder != null) {
+            return SizedBox(height: double.infinity, child: widget.boxBuilder!(context, entry, entryIndex % widget.entries.length));
+          }
           void tap() {
             Analytics.click(entry);
             widget.onTap(entry.text('target'));
@@ -227,6 +234,12 @@ class _HeroCarouselState extends State<HeroCarousel> {
                                 ...widget.appearance.data,
                                 ...original.data,
                               });
+                              if (widget.boxBuilder != null) {
+                                return SizedBox(
+                                  height: double.infinity,
+                                  child: widget.boxBuilder!(context, entry, (group * count + offset) % widget.entries.length),
+                                );
+                              }
                               void tap() {
                                 Analytics.click(entry);
                                 widget.onTap(entry.text('target'));

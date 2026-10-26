@@ -549,7 +549,7 @@ class _EntryEditorState extends State<EntryEditor> {
           (key == 'kind'
                   ? ['product']
                   : key == 'placement'
-                  ? ['carousel', 'ticker', 'ad', 'box']
+                  ? ['carousel', 'ticker', 'ad', 'box', 'offer']
                   : key == 'mode'
                   ? ['light', 'dark', 'custom']
                   : key == 'noticeType'

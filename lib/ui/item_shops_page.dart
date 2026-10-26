@@ -95,7 +95,7 @@ class ItemShopsPage extends StatelessWidget {
               const SizedBox(height: 12),
             ],
             if (offers.isNotEmpty) Text('Lowest price first', style: Theme.of(context).textTheme.titleSmall),
-            for (final (i, offer) in offers.indexed) _OfferTile(key: ValueKey('item-offer-$i'), offer: offer, onTap: () => _showShop(context, offer)),
+            for (final (i, offer) in offers.indexed) ItemOfferTile(key: ValueKey('item-offer-$i'), offer: offer, onTap: () => _showShop(context, offer)),
           ],
         );
       },
@@ -159,8 +159,9 @@ class ItemShopsPage extends StatelessWidget {
   );
 }
 
-class _OfferTile extends StatelessWidget {
-  const _OfferTile({super.key, required this.offer, required this.onTap});
+/// One shop of an item's shop list: photo, name, price and how far (also the item page's list, lib/ui/item_shop_list.dart).
+class ItemOfferTile extends StatelessWidget {
+  const ItemOfferTile({super.key, required this.offer, required this.onTap});
   final ItemOffer offer;
   final VoidCallback onTap;
 

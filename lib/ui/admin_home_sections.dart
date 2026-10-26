@@ -5,6 +5,7 @@ import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import 'admin_ads.dart';
 import 'admin_entry_list.dart';
+import 'admin_today_offers.dart';
 import 'ads_column.dart';
 import 'animation_settings.dart';
 import 'color_picker_field.dart';
@@ -12,6 +13,7 @@ import 'home_ticker_strip.dart';
 import 'layout_editor.dart';
 import 'layout_settings.dart';
 import 'notice_independence.dart';
+import 'screen_view.dart';
 import 'section_animations.dart';
 import 'shared.dart';
 
@@ -26,7 +28,7 @@ class HomeSectionInfo {
 const homeSectionInfos = <String, HomeSectionInfo>{
   'scrollingText': HomeSectionInfo('scrollingText', 'Scrolling Text', 'The moving line across the very top of the home page.', Icons.text_rotation_none),
   'notice': HomeSectionInfo('notice', "Today's Offers", "The banner under it that says \"Today's <your town> Offers\" with the price chips. The town changes with the customer's location.", Icons.campaign_outlined),
-  'promo': HomeSectionInfo('promo', "Today's Offers Box", 'The row of coloured boxes below the banner ("Today\'s Offer ...").', Icons.view_carousel_outlined),
+  'promo': HomeSectionInfo('promo', "Today's Offers Box", 'The "Today\'s Offers" heading and its 6 coloured boxes below the banner, each showing an item offer.', Icons.view_carousel_outlined),
   'ads': HomeSectionInfo('ads', 'Right Side Ads', 'The boxes down the right-hand side of the home page.', Icons.ad_units_outlined),
   'boxes': HomeSectionInfo('boxes', 'Boxes below the ads', 'The boxes under the ads on the right ("Curated for you" ...).', Icons.dashboard_outlined),
 };
@@ -78,6 +80,7 @@ class AdminHomeSectionPage extends StatelessWidget {
             if (part == 'scrollingText') _button(context, 'open-scrolling-all', Icons.tune, 'All Scrolling Text options', 'Scrolling Text', AdminSingleRecord(store: store, section: 'scrollingText')),
             if (part == 'notice') _button(context, 'open-notice-layout', Icons.tune, "Size, fonts and more for Today's Offers", "Today's Offers", _layoutPage('notice')),
             if (part == 'promo') ...[
+              _button(context, 'open-promo-offers', Icons.local_offer_outlined, 'Item offers in the 6 boxes: item, price, shop, box, start and end', "Today's Offers: item offers", ScreenView('admin_today_offers', child: AdminTodayOffersPage(store: store))),
               _button(context, 'open-promo-items', Icons.list_alt, "The boxes in Today's Offers Box", "Today's Offers Box", AdminEntryList(store: store, section: 'promotions', placement: 'carousel')),
               _button(context, 'open-promo-layout', Icons.tune, 'Size, fonts and more', "Today's Offers Box", _layoutPage('promo')),
             ],

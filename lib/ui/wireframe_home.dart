@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/fresh_strip.dart';
 import '../domain/towns.dart';
 import '../services/ad_tracker.dart';
 import '../services/search.dart';
@@ -14,6 +15,7 @@ import 'home_nearby_section.dart';
 import 'home_popular_section.dart';
 import 'home_promotions.dart';
 import 'home_ticker_section.dart';
+import 'home_today_offers.dart';
 import 'layout_settings.dart';
 import 'animation_settings.dart';
 import 'quick_fresh.dart';
@@ -307,9 +309,13 @@ class WireframeHome extends StatelessWidget {
                         ).compareTo(sectionOrder(settings, b.key)),
                       );
                     // The band under the Today's Offers cards: the product-card row and the Transport / Services boxes (home_strip_band.dart).
-                    final stripProducts = products
-                        .where((p) => p.text('categoryId') == 'cat-vegetables' || p.text('categoryId') == 'cat-fruits')
-                        .toList();
+                    // The admin's items in the admin's order (Settings > Fresh Fruits & Vegetables), else the vegetables and fruits as before.
+                    final freshItems = freshStripItems(settings.where((e) => e.id == freshStripRecord).firstOrNull);
+                    final stripProducts = freshItems.isNotEmpty
+                        ? freshStripProducts(freshItems, products, store.pincode)
+                        : products
+                            .where((p) => p.text('categoryId') == 'cat-vegetables' || p.text('categoryId') == 'cat-fruits')
+                            .toList();
                     final promoAt = orderedSectionKeys.indexWhere((d) => d.key == 'promo');
                     final mainWidth = wide ? c.maxWidth - page.gap - railWidth : c.maxWidth;
                     final bandSideBySide = mainWidth >= 640 && stripProducts.isNotEmpty;
@@ -324,10 +330,13 @@ class WireframeHome extends StatelessWidget {
                                 (store.hasPlace ||
                                     offersForTown.hiddenForLocation > 0)
                             ? NoOffersNotice(store: store, onLocation: onLocation)
-                            : HeroCarousel(
-                          entries: offers,
+                            // The "Today's Offers" heading and its 6 boxes, each with its item offer of the moment (home_today_offers.dart).
+                            : TodayOffersSection(
+                          store: store,
+                          boxes: offers,
                           appearance: effectiveSectionConfig(settings, 'promo'),
-                          onTap: onPromotion,
+                          showAll: showAllLocations,
+                          onPromotion: onPromotion,
                           reverse:
                               offers.isNotEmpty &&
                               offers.first.text('direction', 'rtl') == 'ltr',

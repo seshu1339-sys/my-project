@@ -13,6 +13,7 @@ import 'reviews.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
 import 'item_shops_page.dart';
+import 'item_shop_list.dart';
 import 'shop_page.dart';
 
 class ProductPage extends StatefulWidget {
@@ -60,6 +61,65 @@ class _ProductPageState extends State<ProductPage> {
           )
           .take(4)
           .toList();
+      // Every shop of the town selling this item, beside the photo and price (below them on a phone). Not for services.
+      final shopList = p.text('providerId').isEmpty && p.text('kind') != 'service'
+          ? ItemShopList(store: store, name: p.text('name'), libraryItemId: p.text('libraryItemId'))
+          : null;
+      final head = <Widget>[
+        SizedBox(
+          height: 320,
+          child: PageView(
+            children: [
+              for (final url in images)
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: ProductArt(
+                    Entry(p.id, {...p.data, 'imageUrl': url}),
+                    height: 320,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (images.length > 1)
+          Center(child: Text('Swipe to view {n} images'.tr(context, {'n': '${images.length}'}))),
+        const SizedBox(height: 24),
+        Text(
+          p.text('name'),
+          style: const TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (p.number('avgRating') > 0) ...[
+          const SizedBox(height: 8),
+          RatingStars(
+            rating: p.number('avgRating'),
+            count: p.number('reviewCount').toInt(),
+            size: 18,
+          ),
+        ],
+        const SizedBox(height: 12),
+        Text(
+          '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}',
+          key: const ValueKey('product-price'),
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: AppTokens.primary,
+          ),
+        ),
+        if (store.pincode.isEmpty)
+          Text('Base price shown. Set a pincode on the home page for local pricing.'.tr(context)),
+        if (p.number('compareAtPrice') > p.price(store.pincode))
+          Text(
+            'Regular {regular}  •  Offer {offer}'.tr(context, {
+              'regular': money(p.number('compareAtPrice')),
+              'offer': money(p.price(store.pincode)),
+            }),
+            style: const TextStyle(color: Colors.black54),
+          ),
+      ];
       return Scaffold(
         appBar: AppBar(
           title: Text(p.text('name')),
@@ -95,60 +155,24 @@ class _ProductPageState extends State<ProductPage> {
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
+            constraints: BoxConstraints(maxWidth: shopList == null ? 900 : 1120),
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
-                SizedBox(
-                  height: 300,
-                  child: PageView(
-                    children: [
-                      for (final url in images)
-                        Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: ProductArt(
-                            Entry(p.id, {...p.data, 'imageUrl': url}),
-                            height: 300,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (images.length > 1)
-                  Center(child: Text('Swipe to view {n} images'.tr(context, {'n': '${images.length}'}))),
-                const SizedBox(height: 24),
-                Text(
-                  p.text('name'),
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (p.number('avgRating') > 0) ...[
-                  const SizedBox(height: 8),
-                  RatingStars(
-                    rating: p.number('avgRating'),
-                    count: p.number('reviewCount').toInt(),
-                    size: 18,
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Text(
-                  '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    color: AppTokens.primary,
-                  ),
-                ),
-                if (store.pincode.isEmpty)
-                  Text('Base price shown. Set a pincode on the home page for local pricing.'.tr(context)),
-                if (p.number('compareAtPrice') > p.price(store.pincode))
-                  Text(
-                    'Regular {regular}  •  Offer {offer}'.tr(context, {
-                      'regular': money(p.number('compareAtPrice')),
-                      'offer': money(p.price(store.pincode)),
-                    }),
-                    style: const TextStyle(color: Colors.black54),
+                if (shopList == null)
+                  ...head
+                else
+                  LayoutBuilder(
+                    builder: (context, c) => c.maxWidth >= 760
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: head)),
+                              const SizedBox(width: 24),
+                              SizedBox(width: 380, child: shopList),
+                            ],
+                          )
+                        : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [...head, const SizedBox(height: 16), shopList]),
                   ),
                 if (variants.isNotEmpty)
                   Padding(
