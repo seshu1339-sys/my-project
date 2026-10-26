@@ -5,6 +5,7 @@ import '../domain/catalog.dart';
 import '../domain/item_shops.dart';
 import '../domain/today_offers.dart';
 import 'admin_list_labels.dart';
+import 'admin_shops_location.dart';
 import 'shared.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
@@ -38,8 +39,21 @@ class AdminTodayOffersPage extends StatelessWidget {
         children: [
           const Text(
             'Each box shows its offer only from its start to its end. Put several offers in a box one after another: when one ends the '
-            'next one comes by itself. A box with no offer at that time is empty. The box colours stay as they are.',
+            'next one comes by itself. A box with no offer at that time shows its usual Today\'s Offers Box promotion. The box colours stay as they are.',
           ),
+          if (shopsWithoutLocation(store).isNotEmpty)
+            Card(
+              key: const ValueKey('offers-shops-without-location'),
+              child: ListTile(
+                leading: const Icon(Icons.location_off_outlined),
+                title: Text('${shopsWithoutLocation(store).length} shops have no place on the map'),
+                subtitle: const Text('Customers tapping their offers see no road or distance. Fix them.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Shops without location')), body: AdminShopsLocationPage(store: store))),
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           for (var slot = 1; slot <= todayOfferBoxCount; slot++)
             Card(
@@ -67,7 +81,7 @@ class AdminTodayOffersPage extends StatelessWidget {
                       ],
                     ),
                     if (!offers.any((o) => todayOfferSlot(o) == slot))
-                      const Padding(padding: EdgeInsets.only(top: 8), child: Text('No offers: the box is empty.')),
+                      const Padding(padding: EdgeInsets.only(top: 8), child: Text('No offers: the box shows its usual promotion.')),
                     for (final o in offers.where((o) => todayOfferSlot(o) == slot))
                       ListTile(
                         key: ValueKey('admin-offer-${o.id}'),

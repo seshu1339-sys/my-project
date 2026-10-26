@@ -68,4 +68,5 @@ const usageItems = [
   UsageItem('admin_setup_check', 'admin', 'screen', 'Setup check'),
   UsageItem('admin_today_offers', 'admin', 'screen', "Today's Offers: item offers"),
   UsageItem('admin_fresh_strip', 'admin', 'screen', 'Fresh Fruits & Vegetables'),
+  UsageItem('admin_shops_location', 'admin', 'screen', 'Shops without location'),
 ];

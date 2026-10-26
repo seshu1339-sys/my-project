@@ -23,9 +23,9 @@ class HeroCarousel extends StatefulWidget {
   });
   final List<Entry> entries;
   final Entry appearance;
-  /// Draws a box's inside instead of the promotion's own text (Today's Offers item offers, home_today_offers.dart): the box keeps
-  /// its size, place and movement. [index] is the entry's place in [entries].
-  final Widget Function(BuildContext context, Entry entry, int index)? boxBuilder;
+  /// Draws a box instead of the promotion's own (Today's Offers item offers, home_today_offers.dart): the box keeps its size, place
+  /// and movement. [index] is the entry's place in [entries]. Returning null draws the promotion as usual.
+  final Widget? Function(BuildContext context, Entry entry, int index)? boxBuilder;
   final void Function(String) onTap;
   final bool reverse;
   final double speed;
@@ -133,9 +133,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
             ...widget.appearance.data,
             ...original.data,
           });
-          if (widget.boxBuilder != null) {
-            return SizedBox(height: double.infinity, child: widget.boxBuilder!(context, entry, entryIndex % widget.entries.length));
-          }
+          final custom = widget.boxBuilder?.call(context, entry, entryIndex % widget.entries.length);
+          if (custom != null) return SizedBox(height: double.infinity, child: custom);
           void tap() {
             Analytics.click(entry);
             widget.onTap(entry.text('target'));
@@ -234,12 +233,8 @@ class _HeroCarouselState extends State<HeroCarousel> {
                                 ...widget.appearance.data,
                                 ...original.data,
                               });
-                              if (widget.boxBuilder != null) {
-                                return SizedBox(
-                                  height: double.infinity,
-                                  child: widget.boxBuilder!(context, entry, (group * count + offset) % widget.entries.length),
-                                );
-                              }
+                              final custom = widget.boxBuilder?.call(context, entry, (group * count + offset) % widget.entries.length);
+                              if (custom != null) return SizedBox(height: double.infinity, child: custom);
                               void tap() {
                                 Analytics.click(entry);
                                 widget.onTap(entry.text('target'));

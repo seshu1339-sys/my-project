@@ -7,6 +7,7 @@ import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
 import 'admin_entry_list.dart';
 import 'admin_fresh_strip.dart';
+import 'admin_shops_location.dart';
 import 'animation_settings_form.dart';
 import 'admin_frame.dart';
 import 'admin_page_preview.dart';
@@ -34,6 +35,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('homeOffers', "Today's Offers", Icons.campaign_outlined, "The banner that names your town's offers, with the price chips"),
   _SettingsSection('homePromo', "Today's Offers Box", Icons.view_carousel_outlined, 'The 6 coloured offer boxes and the item offers in them'),
   _SettingsSection('homeFresh', 'Fresh Fruits & Vegetables', Icons.eco_outlined, "The items of the strip under Today's Offers, in your order"),
+  _SettingsSection('shopsLocation', 'Shops without location', Icons.location_off_outlined, 'Shops missing latitude and longitude: distance and the road need them'),
   _SettingsSection('ads', 'Right Side Ads', Icons.campaign_outlined, 'The boxes on the right: animation, colours, every ad'),
   _SettingsSection('rightBoxes', 'Right Side Ad Boxes', Icons.view_agenda_outlined, 'Photo boxes down the right side: add, remove, photo, link'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
@@ -70,6 +72,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminHomeSectionPage(store: widget.store, part: 'promo');
       case 'homeFresh':
         return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: widget.store));
+      case 'shopsLocation':
+        return ScreenView('admin_shops_location', child: AdminShopsLocationPage(store: widget.store));
       case 'ads':
         return AdminHomeSectionPage(store: widget.store, part: 'ads');
       case 'cityCodes':

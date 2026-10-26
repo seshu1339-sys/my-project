@@ -71,6 +71,9 @@ double? _coordinate(Entry? e, String key) {
   return v is num && v != 0 ? v.toDouble() : null;
 }
 
+/// Whether a shop has its place on the map (latitude and longitude): its distance and the road to it need it.
+bool shopOnMap(Entry shop) => _coordinate(shop, 'latitude') != null && _coordinate(shop, 'longitude') != null;
+
 /// Every product of the item that has a price, with its shop: the cheapest first, then the nearest. The place is the shop's, else
 /// the product's own; the distance is from the customer when their location is known.
 List<ItemOffer> itemOffers(

@@ -7,7 +7,10 @@ import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/today_offers.dart';
 import 'package:ecommerce_app/services/customer_position.dart';
 import 'package:ecommerce_app/services/road_route.dart';
+import 'package:ecommerce_app/ui/admin_shops_location.dart';
 import 'package:ecommerce_app/ui/admin_today_offers.dart';
+import 'package:ecommerce_app/ui/entry_editor.dart';
+import 'package:ecommerce_app/ui/home_promo_card.dart';
 import 'package:ecommerce_app/ui/home_today_offers.dart';
 import 'package:ecommerce_app/ui/shop_route_map.dart';
 
@@ -48,6 +51,10 @@ void main() {
     // the 6 boxes keep the Today's Offers Box promotions' look, then the default colours
     final looks = todayOfferBoxLooks(const [Entry('p1', {'backgroundColor': '#111111'})]);
     expect(looks.map((l) => l.text('backgroundColor')), ['#111111', ...todayOfferDefaultColors.skip(1)]);
+    // the boxes on the page are the promotions as they are, plus default boxes only up to a live offer past them
+    final three = [for (var i = 1; i <= 3; i++) Entry('c$i', const {})];
+    expect(todayOfferBoxesFor(three, slots).map((b) => b.id), ['c1', 'c2', 'c3'], reason: 'offers in boxes 1 and 3 only');
+    expect(todayOfferBoxesFor(three, [null, null, null, null, offers[0], null]).map((b) => b.id), ['c1', 'c2', 'c3', 'today-offer-box-4', 'today-offer-box-5']);
   });
 
   Future<Store> openStore(List<Entry> offers) async {
@@ -58,13 +65,13 @@ void main() {
       const Entry('shopA', {'name': 'Lakshmi Kirana', 'latitude': 17.668, 'longitude': 82.612, 'phone': '9876511111', 'town': 'Narsipatnam', 'address': 'Main Road'}),
     ];
     store.catalog['promotions'] = [
-      for (var i = 1; i <= 6; i++) Entry('box$i', {'placement': 'carousel', 'order': i, 'name': "Today's Offer", 'backgroundColor': todayOfferDefaultColors[i - 1]}),
+      for (var i = 1; i <= 6; i++) Entry('box$i', {'placement': 'carousel', 'order': i, 'name': "Today's Offer", 'description': 'Old box $i', 'backgroundColor': todayOfferDefaultColors[i - 1]}),
       ...offers,
     ];
     return store;
   }
 
-  testWidgets('the home section: the heading, 6 boxes with photo, name and price, and a tap opens the shop on the map', (tester) async {
+  testWidgets('the home section: a box with a live offer shows it (white inside its colour, photo left, name and price right), the others are as before, and a tap opens the shop on the map', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -87,15 +94,23 @@ void main() {
     ));
     await tester.pump();
     expect(find.text("Today's Offers"), findsOneWidget);
-    for (var i = 1; i <= 6; i++) {
-      expect(find.byKey(ValueKey('today-offer-box-$i')), findsOneWidget);
+    // only box 2 has a live offer: the new design there, the other 5 boxes exactly as before
+    expect(find.byType(TodayOfferBox), findsOneWidget);
+    final box = find.byKey(const ValueKey('today-offer-box-2'));
+    expect(box, findsOneWidget);
+    for (final i in [1, 3, 4, 5, 6]) {
+      expect(find.text('Old box $i'), findsOneWidget);
     }
-    // only box 2 has an offer now: photo in a white circle, name and price in white
-    expect(find.descendant(of: find.byKey(const ValueKey('today-offer-box-2')), matching: find.byKey(const ValueKey('today-offer-circle'))), findsOneWidget);
-    expect(find.byKey(const ValueKey('today-offer-circle')), findsOneWidget, reason: 'the other boxes are empty');
-    expect(find.text('Tomato'), findsOneWidget);
-    expect(find.text('₹25 / 1 kg'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('Tomato')).style?.color, Colors.white);
+    expect(find.text('Old box 2'), findsNothing);
+    // inside: a white area in the box's colour, "Today's Offer" across the top, the photo left, the name and price under it right
+    expect(find.descendant(of: box, matching: find.byKey(const ValueKey('today-offer-white'))), findsOneWidget);
+    final label = tester.getRect(find.descendant(of: box, matching: find.text("Today's Offer")));
+    final photo = tester.getRect(find.descendant(of: box, matching: find.byKey(const ValueKey('today-offer-photo'))));
+    final name = tester.getRect(find.text('Tomato')), price = tester.getRect(find.byKey(const ValueKey('today-offer-rate')));
+    expect(tester.widget<Text>(find.byKey(const ValueKey('today-offer-rate'))).textSpan!.toPlainText().replaceAll('\u00A0', ' '), '₹25 / 1 kg');
+    expect(label.center.dy < photo.top, isTrue, reason: 'the label on top');
+    expect(photo.right < name.left && name.center.dy < price.center.dy, isTrue, reason: 'photo left; name, then price, right');
+    expect(tester.getSize(box), tester.getSize(find.byType(CompactBanner).first), reason: 'the same size as the other boxes');
     expect(find.text('Later'), findsNothing, reason: 'not started yet');
 
     await tester.tap(find.text('Tomato'));
@@ -106,6 +121,51 @@ void main() {
     expect(find.text('Tomato: ₹25 / 1 kg'), findsOneWidget);
     expect(find.byKey(const ValueKey('shop-route-directions')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('with no live offer, the boxes are exactly as before (never empty boxes)', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final live = DateTime.now().toUtc();
+    final store = await openStore([offer('o9', 1, live.add(const Duration(hours: 2)).toIso8601String(), live.add(const Duration(hours: 4)).toIso8601String())]);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TodayOffersSection(
+          store: store,
+          boxes: [for (final p in store.entries('promotions')) if (p.text('placement') == 'carousel') p],
+          appearance: const Entry('promo', {'visibleCount': 6}),
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(find.byType(TodayOfferBox), findsNothing);
+    expect(find.byType(CompactBanner), findsNWidgets(6));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('the admin\'s list of shops without a place on the map, each opening the shop to fix it', (tester) async {
+    final store = await openStore(const []);
+    store.catalog['shops'] = [
+      const Entry('shopA', {'name': 'Lakshmi Kirana', 'latitude': 17.668, 'longitude': 82.612}),
+      const Entry('shopB', {'name': 'Ravi Fruits', 'town': 'Narsipatnam', 'phone': '9876522222'}),
+      const Entry('shopC', {'name': 'Sai Market', 'latitude': 17.66, 'longitude': 0}),
+    ];
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: AdminShopsLocationPage(store: store))));
+    expect(find.text('2 shops without location'), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-no-location-shopB')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-no-location-shopC')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shop-no-location-shopA')), findsNothing);
+    expect(find.text('Narsipatnam • 9876522222'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('fix-shop-shopB')));
+    await tester.pumpAndSettle();
+    expect(find.byType(EntryEditor), findsOneWidget);
+    // every shop placed: nothing to fix
+    store.catalog['shops'] = [const Entry('shopA', {'name': 'Lakshmi Kirana', 'latitude': 17.668, 'longitude': 82.612})];
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: AdminShopsLocationPage(store: store))));
+    expect(find.byKey(const ValueKey('shops-location-all-good')), findsOneWidget);
   });
 
   testWidgets('the map: the road from the customer, the distance and time by road', (tester) async {

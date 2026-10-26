@@ -15,11 +15,11 @@ import 'home_impression_once.dart';
 import 'shared.dart';
 import 'shop_route_map.dart';
 
-/// Today's Offers on the home page: the "Today's Offers" heading and the 6 coloured boxes (lib/domain/today_offers.dart). Each box
-/// shows its item offer of the moment: the item's photo in a white circle, its name and the offer price in white. Tapping a box
-/// opens the shop on the map straight away (its place, the road and its phone). A box with no offer now is empty; the boxes change
-/// by themselves when an offer starts or ends. Until the admin has set item offers (for the customer's town), the boxes show the
-/// Today's Offers Box promotions as before.
+/// Today's Offers on the home page: the "Today's Offers" heading and the coloured boxes (lib/domain/today_offers.dart). While an item
+/// offer is live for a box, the box shows it: its colour as a frame round a white inside with "Today's Offer" across the top, the
+/// item's photo big on the left and its name and offer price on the right. Tapping it opens the shop on the map straight away (its
+/// place, the road and its phone). A box with no live offer shows its Today's Offers Box promotion as before (so the town, pincode
+/// and area boxes keep working); the boxes change by themselves when an offer starts or ends.
 class TodayOffersSection extends StatefulWidget {
   const TodayOffersSection({
     super.key,
@@ -119,17 +119,16 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
               ],
             ),
           ),
-          if (offers.isEmpty)
-            HeroCarousel(entries: widget.boxes, appearance: widget.appearance, onTap: widget.onPromotion ?? (_) {}, reverse: widget.reverse, speed: widget.speed)
-          else
-            HeroCarousel(
-              entries: todayOfferBoxLooks(widget.boxes),
-              appearance: widget.appearance,
-              onTap: (_) {},
-              reverse: widget.reverse,
-              speed: widget.speed,
-              boxBuilder: (context, look, i) => TodayOfferBox(key: ValueKey('today-offer-box-${i + 1}'), look: look, offer: slots[i], onOpen: _open),
-            ),
+          HeroCarousel(
+            entries: todayOfferBoxesFor(widget.boxes, slots),
+            appearance: widget.appearance,
+            onTap: widget.onPromotion ?? (_) {},
+            reverse: widget.reverse,
+            speed: widget.speed,
+            // Only a box with a live offer is drawn here; the others are the promotions as before.
+            boxBuilder: (context, look, i) =>
+                i < slots.length && slots[i] != null ? TodayOfferBox(key: ValueKey('today-offer-box-${i + 1}'), look: look, offer: slots[i]!, onOpen: _open) : null,
+          ),
           // A little room before the strip below (the boxes have no dots under them when all 6 fit).
           const SizedBox(height: 10),
         ],
@@ -138,61 +137,88 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
   );
 }
 
-/// One of the 6 boxes: its own colour and shape, and the offer (photo in a white circle, name, price) or nothing.
+/// A box with its live item offer: the box's colour as a rounded frame, and inside it a plain white area with "Today's Offer" across
+/// the top, the item's photo big on the left, and its name with the offer price under it on the right. The box keeps its size.
 class TodayOfferBox extends StatelessWidget {
   const TodayOfferBox({super.key, required this.look, required this.offer, required this.onOpen});
   final Entry look;
-  final Entry? offer;
+  final Entry offer;
   final ValueChanged<Entry> onOpen;
+
+  /// How thick the coloured frame is.
+  static const frame = 5.0;
 
   @override
   Widget build(BuildContext context) {
     final o = offer;
+    final colour = colorFromHex(look.text('backgroundColor'), AppTokens.primary);
+    final inner = max(clampedNumber(look, 'radius', 20, 0, 80) - frame, 6.0);
+    final photo = o.text('imageUrl');
+    final placeholder = const ColoredBox(color: Color(0xFFF3F4F6), child: Center(child: Icon(Icons.shopping_basket_outlined, color: Colors.black38)));
     final box = Container(
       decoration: entryDecoration(look, fallback: AppTokens.primaryLight),
-      child: o == null
-          ? const SizedBox.expand()
-          : LayoutBuilder(
-              builder: (context, c) {
-                // The same circle in every box: the boxes are all the same size.
-                final circle = min(c.maxHeight * .48, c.maxWidth * .62).clamp(40.0, 170.0);
-                const white = Colors.white;
-                return Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        key: const ValueKey('today-offer-circle'),
-                        width: circle,
-                        height: circle,
-                        padding: EdgeInsets.all(circle * .1),
-                        decoration: BoxDecoration(color: white, shape: BoxShape.circle, boxShadow: AppTokens.shadowSoft),
-                        child: ClipOval(child: ProductArt(Entry(o.id, {'imageUrl': o.text('imageUrl')}), height: circle * .8, width: circle * .8)),
-                      ),
-                      SizedBox(height: circle * .08),
-                      Text(
-                        o.text('name'),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: white, fontWeight: FontWeight.w800, fontSize: (circle * .19).clamp(13.0, 22.0), height: 1.15),
-                      ),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          todayOfferRate(o),
-                          key: const ValueKey('today-offer-rate'),
-                          style: TextStyle(color: white, fontWeight: FontWeight.w900, fontSize: (circle * .24).clamp(15.0, 28.0)),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+      padding: const EdgeInsets.all(frame),
+      child: Container(
+        key: const ValueKey('today-offer-white'),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(inner)),
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FittedBox(
+              fit: BoxFit.fitWidth,
+              child: Text("Today's Offer".tr(context), style: TextStyle(color: colour, fontWeight: FontWeight.w900)),
             ),
+            const SizedBox(height: 3),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      key: const ValueKey('today-offer-photo'),
+                      borderRadius: BorderRadius.circular(max(inner - 4, 4)),
+                      child: photo.isEmpty
+                          ? placeholder
+                          : Image.network(photo, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(o.text('name'), style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w800, fontSize: 18)),
+                          ),
+                        ),
+                        // The same size in every box: "₹25 / 1 kg" on one line when it fits, else "/ 1 dozen" under "₹40".
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: '₹${todayOfferAmount(o)}', style: const TextStyle(fontSize: 18)),
+                              if (o.text('unit').isNotEmpty) TextSpan(text: ' /\u00A0${o.text('unit').replaceAll(' ', '\u00A0')}', style: const TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                          key: const ValueKey('today-offer-rate'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: colour, fontWeight: FontWeight.w900, height: 1.1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    if (o == null) return box;
     return ImpressionOnce(
       entry: o,
       child: Material(
