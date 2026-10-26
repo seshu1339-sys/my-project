@@ -13,23 +13,34 @@ Uint8List _webp(int length) {
 Uint8List _jpeg(int length) => Uint8List(length)..setAll(0, [0xFF, 0xD8, 0xFF]);
 
 void main() {
-  test('a big JPEG photo is uploaded as the smaller WebP', () async {
+  test('a big JPEG photo is uploaded as the smaller WebP: 800 px, quality 72, once more at 60 when still over 60 KB', () async {
     final photo = _jpeg(4 * 1024 * 1024);
+    final calls = <(int, int)>[];
     final prepared = await prepareImageForUpload(
       photo,
       'IMG_2026.JPG',
       compress: (bytes, {required maxSide, required quality}) async {
-        expect(maxSide, 1600);
-        expect(quality, 80);
-        return _webp(180 * 1024);
+        calls.add((maxSide, quality));
+        return _webp(quality == 72 ? 90 * 1024 : 52 * 1024);
       },
     );
+    expect(calls, [(800, 72), (800, 60)]);
     expect(prepared.converted, isTrue);
     expect(prepared.ext, 'webp');
     expect(prepared.type, 'image/webp');
     expect(isWebp(prepared.bytes), isTrue);
-    expect(prepared.bytes.length, 180 * 1024);
+    expect(prepared.bytes.length, 52 * 1024);
     expect(prepared.originalBytes, 4 * 1024 * 1024);
+  });
+
+  test('a photo already light enough at quality 72 is encoded once', () async {
+    final calls = <int>[];
+    final prepared = await prepareImageForUpload(_jpeg(2 * 1024 * 1024), 'a.jpg', compress: (bytes, {required maxSide, required quality}) async {
+      calls.add(quality);
+      return _webp(45 * 1024);
+    });
+    expect(calls, [72]);
+    expect(prepared.bytes.length, 45 * 1024);
   });
 
   test('a PNG is converted too', () async {

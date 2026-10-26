@@ -6,12 +6,15 @@ import 'image_compress_native.dart'
 
 // Every photo any of the apps uploads (admin catalog, vendor, staff, Quick Add) goes through
 // [prepareImageForUpload] first: the longest side is cut to [uploadMaxSide] pixels and the picture is
-// re-encoded as WebP, so a 3-8 MB phone photo is stored as roughly 100-300 KB. If the device cannot do it, the
+// re-encoded as WebP, so a 3-8 MB phone photo is stored as roughly 50 KB (a detailed photo still over
+// [uploadTargetBytes] is encoded once more at [uploadRetryQuality]). If the device cannot do it, the
 // original photo is uploaded unchanged (an upload is never blocked), and the server converts it afterwards
 // (functions/image-webp.js).
 
-const uploadMaxSide = 1600;
-const uploadQuality = 80;
+const uploadMaxSide = 800;
+const uploadQuality = 72;
+const uploadRetryQuality = 60;
+const uploadTargetBytes = 60 * 1024;
 // What a person may pick. The 5 MB limit that Storage enforces applies to the compressed result.
 const maxOriginalBytes = 15 * 1024 * 1024;
 
@@ -71,6 +74,15 @@ Future<PreparedImage> prepareImageForUpload(
       maxSide: uploadMaxSide,
       quality: uploadQuality,
     );
+    // Still heavy (a very detailed photo): once more, a little lighter; the smaller one is kept.
+    if (small != null && isWebp(small) && small.length > uploadTargetBytes) {
+      final lighter = await (compress ?? imageCompressor)(
+        bytes,
+        maxSide: uploadMaxSide,
+        quality: uploadRetryQuality,
+      );
+      if (lighter != null && isWebp(lighter) && lighter.length < small.length) small = lighter;
+    }
   } catch (_) {
     small = null; // keep the original
   }
