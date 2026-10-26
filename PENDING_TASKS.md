@@ -1,6 +1,8 @@
 # Pending tasks: Analytics పని (రాత్రి 25→26 అక్టోబర్ 2026)
 
-అంతా branch `analytics` లో ఉంది (main నుండి వేరుగా). **ఏదీ deploy చేయలేదు, GitHub కి push చేయలేదు, Play Store కి upload చేయలేదు, ఏదీ delete చేయలేదు, Google Cloud లో ఏ setting మార్చలేదు.**
+**26 అక్టోబర్ ఉదయం update (మీరు "deploy cheyye" అన్న తర్వాత):** `analytics` ని `main` లో merge చేశాను (`f389d76`). Firestore rules + indexes, 4 hosting sites, Hostinger (locamarket.in) deploy అయ్యాయి, live లో check చేశాను. **ఇంకా మిగిలినవి:** functions deploy (మీరు, step 5.4), TTL (step 5.5), Play upload, GitHub push.
+
+రాత్రి పని అంతా branch `analytics` లో జరిగింది. రాత్రి ఏదీ deploy చేయలేదు, GitHub కి push చేయలేదు, Play Store కి upload చేయలేదు, ఏదీ delete చేయలేదు, Google Cloud లో ఏ setting మార్చలేదు.
 ప్రతి part తర్వాత `flutter analyze` (0 errors, 0 warnings) మరియు అన్ని tests run చేశాను: app tests 713 pass, backend tests 133 pass.
 
 ---
