@@ -39,7 +39,10 @@ void main() {
     final page = File('web/delete-account.html').readAsStringSync();
     expect(page, contains('Delete my account'));
     expect(page, contains('info@locamarket.in'));
-    expect(page, contains('30 days'));
+    expect(page, contains('7 days'));
+    expect(page, contains('V Loca Market'));
+    expect(page, contains('S Loca Market'));
+    expect(page, contains('phone number'));
     expect(page, contains('What we delete'));
     expect(page, contains('What we may keep'));
     expect(page.toLowerCase(), isNot(contains('<form')));
