@@ -92,3 +92,8 @@ for (const a of apps) {
   console.log(`web/${a.dir}/index.html  (${a.app})`);
 }
 module.exports = { apps, pageFor };
+
+// /delete-account is the same page as web/delete-account.html, also as a folder so Hostinger serves it at the clean address.
+fs.mkdirSync(path.join(web, 'delete-account'), { recursive: true });
+fs.copyFileSync(path.join(web, 'delete-account.html'), path.join(web, 'delete-account', 'index.html'));
+console.log('web/delete-account/index.html');

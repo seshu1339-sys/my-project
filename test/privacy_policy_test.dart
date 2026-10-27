@@ -51,6 +51,7 @@ void main() {
     final customer = (config['hosting'] as List).cast<Map<String, dynamic>>().firstWhere((h) => h['target'] == 'customer');
     final sources = [for (final r in (customer['rewrites'] as List).cast<Map<String, dynamic>>()) r['source']];
     expect(sources.indexOf('/delete-account'), lessThan(sources.indexOf('**')));
+    expect(File('web/delete-account/index.html').readAsStringSync(), page, reason: 'run node scripts/build-privacy-pages.cjs');
   });
 
   test('one page per app (/privacy, /privacy-vendor, /privacy-staff): its app and package, then the same policy, served before the app catch-all', () {
