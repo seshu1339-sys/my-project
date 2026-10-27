@@ -36,6 +36,12 @@
         {"source": "/privacy-policy/", "destination": "/privacy-policy.html"},
         {"source": "/delete-account", "destination": "/delete-account.html"},
         {"source": "/delete-account/", "destination": "/delete-account.html"},
+        {"source": "/privacy", "destination": "/privacy/index.html"},
+        {"source": "/privacy/", "destination": "/privacy/index.html"},
+        {"source": "/privacy-vendor", "destination": "/privacy-vendor/index.html"},
+        {"source": "/privacy-vendor/", "destination": "/privacy-vendor/index.html"},
+        {"source": "/privacy-staff", "destination": "/privacy-staff/index.html"},
+        {"source": "/privacy-staff/", "destination": "/privacy-staff/index.html"},
         {"source": "**", "destination": "/index.html"}
       ]
     },

@@ -49,4 +49,27 @@ void main() {
     final sources = [for (final r in (customer['rewrites'] as List).cast<Map<String, dynamic>>()) r['source']];
     expect(sources.indexOf('/delete-account'), lessThan(sources.indexOf('**')));
   });
+
+  test('one page per app (/privacy, /privacy-vendor, /privacy-staff): its app and package, then the same policy, served before the app catch-all', () {
+    // the policy itself, from its first section on (scripts/build-privacy-pages.cjs copies it; run it again after changing the policy)
+    String policyBody(String page) => page.substring(page.indexOf('<h2>1. Who we are</h2>'));
+    final config = jsonDecode(File('firebase.json').readAsStringSync()) as Map<String, dynamic>;
+    final customer = (config['hosting'] as List).cast<Map<String, dynamic>>().firstWhere((h) => h['target'] == 'customer');
+    final rewrites = (customer['rewrites'] as List).cast<Map<String, dynamic>>();
+    final sources = rewrites.map((r) => r['source']).toList();
+    for (final (dir, app, package) in [
+      ('privacy', 'Loca Market', 'in.locamarket.locamark'),
+      ('privacy-vendor', 'V Loca Market', 'in.locamarket.vendor'),
+      ('privacy-staff', 'S Loca Market', 'in.locamarket.staff'),
+    ]) {
+      final page = File('web/$dir/index.html').readAsStringSync();
+      expect(page, contains('<title>Privacy Policy | $app</title>'));
+      expect(page, contains('Privacy Policy &ndash; $app'));
+      expect(page, contains(package));
+      expect(policyBody(page), policyBody(html), reason: '$dir is out of date: run node scripts/build-privacy-pages.cjs');
+      expect(page.toLowerCase(), isNot(contains('<form')), reason: 'a public page with nothing to sign in to');
+      expect(sources.indexOf('/$dir'), allOf(isNonNegative, lessThan(sources.indexOf('**'))));
+      expect(rewrites.firstWhere((r) => r['source'] == '/$dir')['destination'], '/$dir/index.html');
+    }
+  });
 }
