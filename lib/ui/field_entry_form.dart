@@ -112,7 +112,7 @@ class _FieldEntryFormState extends State<FieldEntryForm> {
   /// The nearest town and pincode for a GPS fix; fills an empty pincode so the staff member need not type it.
   Future<void> _findTown(Position fix) async {
     try {
-      final place = await (widget.findPlace ?? (lat, lng) async => (await PlacesDirectory.instance.load()).nearestTown(lat, lng))(fix.latitude, fix.longitude);
+      final place = await (widget.findPlace ?? (lat, lng) async => (await PlacesDirectory.instance.loadForPoint(lat, lng)).nearestTown(lat, lng))(fix.latitude, fix.longitude);
       if (!mounted || place == null) return;
       setState(() {
         nearestPlace = place;

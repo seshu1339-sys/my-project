@@ -1,19 +1,25 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {readFileSync} = require('node:fs');
+const {readFileSync, readdirSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {promotionMatchesPlace, locationTokenMatches, parseLocationList} = require('./domain');
 const {placeForPincode} = require('./places');
 
-test('the functions copy of the places file is identical to the one the apps ship', () => {
-  assert.equal(readFileSync(resolve(__dirname, 'data/places.v1.json'), 'utf8'), readFileSync(resolve(__dirname, '../web/data/places.v1.json'), 'utf8'));
+test('the functions copy of the places files is identical to the ones the apps ship', () => {
+  const names = f => readdirSync(resolve(__dirname, f)).filter(n => /^places..*.v1.json$/.test(n)).sort();
+  assert.deepEqual(names('data'), names('../web/data'));
+  assert.ok(names('data').length >= 37, 'the index and a file for each of the 36 states and union territories');
+  for (const name of names('data')) {
+    assert.equal(readFileSync(resolve(__dirname, 'data', name), 'utf8'), readFileSync(resolve(__dirname, '../web/data', name), 'utf8'), name);
+  }
 });
 
 test('a pincode gives its town, district and state (head office first)', () => {
   assert.deepEqual(placeForPincode('533101'), {town: 'Rajahmundry', district: 'East Godavari', state: 'Andhra Pradesh'});
   assert.deepEqual(placeForPincode(' 520001 '), {town: 'Vijayawada', district: 'Krishna', state: 'Andhra Pradesh'});
   assert.equal(placeForPincode('500001').state, 'Telangana');
-  assert.deepEqual(placeForPincode('560001'), {}, 'outside AP/Telangana');
+  assert.deepEqual(placeForPincode('560001'), {town: 'Bengaluru', district: 'Bengaluru Urban', state: 'Karnataka'});
+  assert.deepEqual(placeForPincode('999999'), {}, 'not a pincode of the directory');
   assert.deepEqual(placeForPincode(''), {});
   assert.deepEqual(placeForPincode(undefined), {});
 });

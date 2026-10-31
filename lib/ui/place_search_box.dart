@@ -4,8 +4,9 @@ import '../domain/places.dart';
 import '../services/places_directory.dart';
 import '../services/strings.dart';
 
-/// A search box over the Andhra Pradesh / Telangana places directory: type a
-/// town (or the start of one) or a pincode and matching places appear live.
+/// A search box over the places directory of India: type a town (or the start of one) or a
+/// pincode and matching places appear live. The customer picks the state first (its file is the
+/// only one downloaded); with [onArea] set (the admin) every state is searched.
 ///
 /// Used by the customer's location dialog and the admin's Location field. The
 /// directory is only fetched when this box is first focused or typed in (or
@@ -23,11 +24,14 @@ class PlaceSearchBox extends StatefulWidget {
     this.loadNow = false,
     this.autofocus = false,
     this.limit = 8,
+    this.initialState = '',
   });
   final ValueChanged<Place> onPlace;
   final ValueChanged<PlaceArea>? onArea;
   final String label;
   final bool loadNow, autofocus;
+  // The state shown first (the customer's saved one); Andhra Pradesh when empty or unknown.
+  final String initialState;
   final int limit;
 
   @override
@@ -38,6 +42,11 @@ class _PlaceSearchBoxState extends State<PlaceSearchBox> {
   final controller = TextEditingController();
   final focus = FocusNode();
   PlacesIndex? index = PlacesDirectory.instance.ready;
+  PlacesManifest? manifest = PlacesDirectory.instance.manifestIfLoaded;
+  late String stateName = widget.initialState.isNotEmpty
+      ? widget.initialState
+      : PlacesDirectory.homeStates.first;
+  bool get _allStates => widget.onArea != null;
   bool loading = false;
   bool failed = false;
 
@@ -51,14 +60,27 @@ class _PlaceSearchBoxState extends State<PlaceSearchBox> {
   }
 
   Future<void> _ensureLoaded() async {
-    if (index != null || loading) return;
+    final directory = PlacesDirectory.instance;
+    final have = index;
+    if (loading || (have != null && (_allStates || have.states.contains(stateName)))) {
+      return;
+    }
     setState(() {
       loading = true;
       failed = false;
     });
     try {
-      final loaded = await PlacesDirectory.instance.load();
-      if (mounted) setState(() => index = loaded);
+      final infos = await directory.manifest();
+      if (infos.named(stateName) == null) stateName = PlacesDirectory.homeStates.first;
+      final loaded = _allStates
+          ? await directory.loadAll()
+          : await directory.load(states: [stateName]);
+      if (mounted) {
+        setState(() {
+          manifest = infos;
+          index = loaded;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => failed = true);
     } finally {
@@ -77,9 +99,16 @@ class _PlaceSearchBoxState extends State<PlaceSearchBox> {
   Widget build(BuildContext context) {
     final text = controller.text.trim();
     final loaded = index;
+    // The customer sees the chosen state only, though other states may be loaded already.
     final places = loaded == null
         ? const <Place>[]
-        : loaded.search(text, limit: widget.limit);
+        : _allStates
+        ? loaded.search(text, limit: widget.limit)
+        : loaded
+              .search(text, limit: widget.limit * 8)
+              .where((p) => p.state == stateName)
+              .take(widget.limit)
+              .toList();
     final areas = loaded == null || widget.onArea == null
         ? const <PlaceArea>[]
         : loaded.searchAreas(text);
@@ -87,6 +116,22 @@ class _PlaceSearchBoxState extends State<PlaceSearchBox> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (!_allStates && manifest != null)
+          DropdownButtonFormField<String>(
+            key: const ValueKey('place-state'),
+            initialValue: manifest!.named(stateName)?.name,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: 'State'.tr(context)),
+            items: [
+              for (final state in manifest!.states)
+                DropdownMenuItem(value: state.name, child: Text(state.name)),
+            ],
+            onChanged: (value) {
+              if (value == null || value == stateName) return;
+              setState(() => stateName = value);
+              _ensureLoaded();
+            },
+          ),
         TextField(
           key: const ValueKey('place-search'),
           controller: controller,

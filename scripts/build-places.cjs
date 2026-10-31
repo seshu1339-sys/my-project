@@ -1,8 +1,10 @@
-// Builds web/data/places.v1.json: every post office of Andhra Pradesh and
-// Telangana (name, district, pincode, coordinates) from India Post's "All India
-// Pincode Directory" (data.gov.in, open data under GODL-India).
+// Builds the places directory in web/data/: one file per state or union territory,
+// places.<state>.v1.json (every post office: name, district, pincode, coordinates),
+// and places.index.v1.json (the list of states with their districts, map box and
+// pincode prefixes), from India Post's "All India Pincode Directory" (data.gov.in,
+// open data under GODL-India). A phone only downloads the states it needs.
 //
-//   node scripts/build-places.cjs <pincode.csv> [out.json]
+//   node scripts/build-places.cjs <pincode.csv> [out-dir]
 //
 // The CSV columns are CircleName, RegionName, DivisionName, OfficeName,
 // Pincode, OfficeType, Delivery, District, StateName, Latitude, Longitude.
@@ -15,13 +17,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const input = process.argv[2];
-const output = process.argv[3] || path.join(__dirname, '../web/data/places.v1.json');
+const outDir = process.argv[3] || path.join(__dirname, '../web/data');
 if (!input) {
-  console.error('usage: node scripts/build-places.cjs <pincode.csv> [out.json]');
+  console.error('usage: node scripts/build-places.cjs <pincode.csv> [out-dir]');
   process.exit(1);
 }
 
-const STATES = { 'ANDHRA PRADESH': 'Andhra Pradesh', TELANGANA: 'Telangana' };
+// The source spells states in capitals; these two are long enough to want a fixed name.
+const STATE_FIXES = {
+  'THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU': 'Dadra and Nagar Haveli and Daman and Diu',
+  'ANDAMAN AND NICOBAR ISLANDS': 'Andaman and Nicobar Islands',
+  'JAMMU AND KASHMIR': 'Jammu and Kashmir',
+};
+const stateName = (raw) => {
+  const key = raw.trim().toUpperCase();
+  if (!key) return '';
+  return STATE_FIXES[key] || titleCase(key);
+};
+const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // The source file spells a few districts in ways nobody searches for.
 const DISTRICT_FIXES = {
   VISAKHAPATANAM: 'Visakhapatnam',
@@ -34,8 +47,9 @@ const DISTRICT_FIXES = {
   'WARANGAL RURAL': 'Warangal Rural',
   'WARANGAL URBAN': 'Warangal Urban',
 };
-// Rough bounding box of the two states; coordinates outside it are typos.
-const BOX = { latMin: 12.4, latMax: 19.95, lngMin: 76.7, lngMax: 84.9 };
+// Rough bounding box of India; coordinates outside it are typos. (A district's own
+// outliers are removed further down.)
+const BOX = { latMin: 6.5, latMax: 37.2, lngMin: 68, lngMax: 97.5 };
 
 function parseCsvLine(line) {
   const out = [];
@@ -94,7 +108,7 @@ let dropped = { notState: 0, junk: 0, badCoords: 0, duplicates: 0 };
 const rows = [];
 for (const line of lines.slice(1)) {
   const cells = parseCsvLine(line);
-  const stateRaw = STATES[cells[C.state].trim().toUpperCase()];
+  const stateRaw = stateName(cells[C.state]);
   if (!stateRaw) { dropped.notState++; continue; }
   const pin = cells[C.pin].trim();
   const rawName = cells[C.office];
@@ -195,27 +209,58 @@ for (const [pin, subs] of subsByPin) {
 
 places.sort((a, b) => a.district - b.district || a.name.localeCompare(b.name) || a.pin - b.pin);
 const r3 = (n) => Math.round(n * 1000) / 1000;
-const out = {
-  v: 1,
-  source: 'India Post, All India Pincode Directory (data.gov.in), Government Open Data License - India',
-  built: new Date().toISOString().slice(0, 10),
-  states,
-  districts,
-  // [name, district, pincode, kind (0 sub office / 1 village branch / 2 head office), lat, lng (0 = unknown), town it belongs to (only when different from name)]
-  places: places.map((r) => {
-    const row = [r.name, r.district, r.pin, r.head ? 2 : r.town ? 0 : 1, r.lat ? r3(r.lat) : 0, r.lng ? r3(r.lng) : 0];
-    const parent = townOfPin.get(r.pin);
-    if (parent && parent !== r.name) row.push(parent);
-    return row;
-  }),
-};
-fs.mkdirSync(path.dirname(output), { recursive: true });
-fs.writeFileSync(output, JSON.stringify(out));
+const source = 'India Post, All India Pincode Directory (data.gov.in), Government Open Data License - India';
+const built = new Date().toISOString().slice(0, 10);
 const zlib = require('node:zlib');
-const buf = fs.readFileSync(output);
+fs.mkdirSync(outDir, { recursive: true });
+// Files of an earlier build (a state that is gone, the old single file) must not linger.
+for (const f of fs.readdirSync(outDir)) if (/^places.[a-z0-9-]+.v1.json$/.test(f)) fs.rmSync(path.join(outDir, f));
+
+const index = { v: 1, source, built, states: [] };
+let totalBytes = 0, totalGzip = 0;
+const sizes = {};
+const stateOrder = states.map((name, i) => ({ name, i })).sort((a, b) => a.name.localeCompare(b.name));
+for (const { name, i: stateIdx } of stateOrder) {
+  const localDistricts = []; // [name, 0]
+  const localOf = new Map();
+  districts.forEach(([dName, dState], di) => {
+    if (dState === stateIdx) { localOf.set(di, localDistricts.length); localDistricts.push([dName, 0]); }
+  });
+  const mine = places.filter((p) => localOf.has(p.district));
+  const file = {
+    v: 1, source, built,
+    states: [name],
+    districts: localDistricts,
+    // [name, district, pincode, kind (0 sub office / 1 village branch / 2 head office), lat, lng (0 = unknown), town it belongs to (only when different from name)]
+    places: mine.map((r) => {
+      const row = [r.name, localOf.get(r.district), r.pin, r.head ? 2 : r.town ? 0 : 1, r.lat ? r3(r.lat) : 0, r.lng ? r3(r.lng) : 0];
+      const parent = townOfPin.get(r.pin);
+      if (parent && parent !== r.name) row.push(parent);
+      return row;
+    }),
+  };
+  const fileName = `places.${slug(name)}.v1.json`;
+  const text = JSON.stringify(file);
+  fs.writeFileSync(path.join(outDir, fileName), text);
+  const located = mine.filter((p) => p.lat);
+  const pins = [...new Set(mine.map((p) => p.pin))];
+  index.states.push({
+    name,
+    file: fileName,
+    places: mine.length,
+    districts: localDistricts.map((d) => d[0]),
+    // [south, west, north, east] of the offices that have coordinates, for choosing the state of a GPS fix
+    box: located.length ? [Math.min(...located.map((p) => p.lat)), Math.min(...located.map((p) => p.lng)), Math.max(...located.map((p) => p.lat)), Math.max(...located.map((p) => p.lng))].map(r3) : [0, 0, 0, 0],
+    // the first two digits of the state's pincodes, for choosing the state of a typed pincode
+    pinPrefixes: [...new Set(pins.map((p) => Math.floor(p / 10000)))].sort((a, b) => a - b),
+  });
+  const gz = zlib.gzipSync(text, { level: 9 }).length;
+  sizes[name] = { places: mine.length, kb: Math.round(text.length / 1024), gzipKb: Math.round(gz / 1024) };
+  totalBytes += text.length; totalGzip += gz;
+}
+fs.writeFileSync(path.join(outDir, 'places.index.v1.json'), JSON.stringify(index));
 console.log(JSON.stringify({
-  output, places: out.places.length, towns: places.filter((p) => p.town).length, villages: places.filter((p) => !p.town).length,
-  districts: districts.length, states, pincodes: new Set(places.map((p) => p.pin)).size,
-  withCoordinates: places.filter((p) => p.lat).length, dropped,
-  bytes: buf.length, gzipBytes: zlib.gzipSync(buf, { level: 9 }).length, brotliBytes: zlib.brotliCompressSync(buf).length,
+  outDir, states: index.states.length, places: places.length, districts: districts.length,
+  pincodes: new Set(places.map((p) => p.pin)).size, withCoordinates: places.filter((p) => p.lat).length, dropped,
+  totalMB: +(totalBytes / 1048576).toFixed(2), totalGzipMB: +(totalGzip / 1048576).toFixed(2), sizes,
 }, null, 1));

@@ -251,7 +251,7 @@ test('Quick Add end to end: accounts, shop lock by GPS, 100 m check, batches, to
 
 test('the pincode directory gives every place a coordinate and finds the nearest town', () => {
   const {filledCoordinates, nearestPlace, findPlace} = require('./places');
-  const data = require('./data/places.v1.json');
+  const data = require('./places').placesData(['Andhra Pradesh']);
   const filled = filledCoordinates(data.places);
   assert.equal(filled.length, data.places.length);
   assert.equal(filled.filter(([lat, lng]) => lat === 0 && lng === 0).length, 0, 'no place is left without coordinates');
@@ -260,7 +260,8 @@ test('the pincode directory gives every place a coordinate and finds the nearest
   assert.deepEqual(filled[2], [14.085, 77.437]);   // Adadakulapalli, 515124
   assert.deepEqual(filled[3], [13.805, 77.044]);   // Agali S.O, 515311
   assert.equal(nearestPlace(17.0005, 81.804).town, 'Rajahmundry');
-  assert.equal(nearestPlace(13.0, 77.5), null, 'Bengaluru is outside Andhra Pradesh and Telangana');
+  assert.equal(nearestPlace(12.97, 77.59).state, 'Karnataka', 'Bengaluru is in the directory now');
+  assert.equal(nearestPlace(25.0, 60.0), null, 'the Arabian Sea is nowhere near a post office');
   assert.equal(findPlace({town: 'Rajahmundry', district: 'East Godavari', pincode: '533101'}).state, 'Andhra Pradesh');
   assert.equal(findPlace({town: 'Rajahmundry', district: 'East Godavari', pincode: '500001'}), null);
 });

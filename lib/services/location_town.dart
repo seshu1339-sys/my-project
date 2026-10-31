@@ -13,11 +13,11 @@ Future<String> townForPoint(Store store, double latitude, double longitude) =>
     ).reverseTown(latitude, longitude);
 
 /// The directory place nearest to a GPS fix (loads the directory, which stays
-/// cached afterwards), or null when it can't be loaded or the fix is outside
-/// Andhra Pradesh / Telangana.
+/// state's file, which stays cached afterwards), or null when it can't be loaded or the fix is outside
+/// India.
 Future<Place?> nearestPlaceFor(double latitude, double longitude) async {
   try {
-    return (await PlacesDirectory.instance.load()).nearestTown(latitude, longitude);
+    return (await PlacesDirectory.instance.loadForPoint(latitude, longitude)).nearestTown(latitude, longitude);
   } catch (_) {
     return null;
   }

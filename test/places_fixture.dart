@@ -4,27 +4,35 @@ import 'dart:io';
 import 'package:ecommerce_app/domain/places.dart';
 import 'package:ecommerce_app/services/places_directory.dart';
 
-/// The real, shipped places file (web/data/places.v1.json), read from disk.
-final String placesFileText = File(
-  'web/data/${PlacesDirectory.fileName}',
-).readAsStringSync();
+/// The text of a shipped places file (web/data/<name>), read from disk.
+String placesFileNamed(String fileName) => File('web/data/$fileName').readAsStringSync();
 
-/// The shipped file, parsed once and searchable.
-final PlacesIndex realIndex = PlacesIndex.fromJson(
-  jsonDecode(placesFileText) as Map<String, dynamic>,
+/// The shipped places index (every state and its districts).
+final PlacesManifest realManifest = PlacesManifest.fromJson(
+  jsonDecode(placesFileNamed(PlacesDirectory.indexFileName)) as Map<String, dynamic>,
 );
 
-/// Points [PlacesDirectory] at the shipped file instead of the network (and
+/// The shipped files of the home states (Andhra Pradesh, Telangana), joined: the shape the app
+/// reads, and most of the tests' "real directory".
+final Map<String, dynamic> realIndexJson = mergePlaceFiles([
+  for (final name in PlacesDirectory.homeStates)
+    jsonDecode(placesFileNamed(realManifest.named(name)!.file)) as Map<String, dynamic>,
+]);
+
+/// The home states, parsed once and searchable.
+final PlacesIndex realIndex = PlacesIndex.fromJson(realIndexJson);
+
+/// Points [PlacesDirectory] at the shipped files instead of the network (and
 /// off the real disk cache). Returns a counter of how many times the app asked
-/// to download it. Call from `setUp`.
+/// to download a state's file (the small index is not counted). Call from `setUp`.
 ({int Function() fetches}) usePlacesFixture() {
   var fetches = 0;
   PlacesDirectory.instance
     ..reset()
     ..useDiskCache = false
-    ..fetchText = () async {
-      fetches++;
-      return placesFileText;
+    ..fetchText = (fileName) async {
+      if (fileName != PlacesDirectory.indexFileName) fetches++;
+      return placesFileNamed(fileName);
     };
   return (fetches: () => fetches);
 }

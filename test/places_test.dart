@@ -1,7 +1,10 @@
-// The AP/Telangana places directory: the shipped data file, search, nearest
+// The places directory of India: the shipped data files (one per state), search, nearest
 // town, offer targeting by town/district/state, the customer's location dialog
 // (live suggestions, GPS), the admin Location field, and that nothing loads
 // until one of them is opened.
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart' show Position;
@@ -53,6 +56,74 @@ Widget _opener(Store store, {Future<Position> Function()? locate}) =>
     );
 
 void main() {
+  group('all of India, a state at a time', () {
+    test('the index lists every state and union territory, each with its file', () {
+      expect(realManifest.states.length, 36);
+      for (final name in ['Andhra Pradesh', 'Telangana', 'Karnataka', 'Tamil Nadu', 'Maharashtra', 'Delhi', 'Ladakh', 'Lakshadweep']) {
+        expect(realManifest.named(name), isNotNull, reason: name);
+      }
+      for (final state in realManifest.states) {
+        expect(File('web/data/${state.file}').existsSync(), isTrue, reason: state.file);
+        expect(state.districts, isNotEmpty, reason: state.name);
+        expect(state.pinPrefixes, isNotEmpty, reason: state.name);
+      }
+    });
+
+    test('every state file holds only its own state, with valid pincodes', () {
+      for (final state in realManifest.states) {
+        final index = PlacesIndex.fromJson(
+          jsonDecode(placesFileNamed(state.file)) as Map<String, dynamic>,
+        );
+        expect(index.states, [state.name]);
+        expect(index.length, greaterThan(5), reason: state.name);
+        expect(index.places.every((p) => RegExp(r'^[1-9][0-9]{5}$').hasMatch(p.pincode)), isTrue, reason: state.name);
+        expect(
+          index.places.every((p) => state.pinPrefixes.contains(int.parse(p.pincode.substring(0, 2)))),
+          isTrue,
+          reason: state.name,
+        );
+      }
+    });
+
+    test('a GPS fix or a pincode points at the right state', () {
+      expect(realManifest.statesAt(12.97, 77.59).map((s) => s.name), contains('Karnataka'));
+      expect(realManifest.statesAt(13.08, 80.27).map((s) => s.name), contains('Tamil Nadu'), reason: 'Chennai');
+      expect(realManifest.statesAt(19.07, 72.88).map((s) => s.name), contains('Maharashtra'), reason: 'Mumbai');
+      expect(realManifest.statesAt(28.61, 77.21).map((s) => s.name), contains('Delhi'));
+      expect(realManifest.statesAt(0, 0), isEmpty, reason: 'the Gulf of Guinea');
+      expect(realManifest.statesForPincode('560001').map((s) => s.name), contains('Karnataka'));
+      expect(realManifest.statesForPincode('533101').map((s) => s.name), contains('Andhra Pradesh'));
+      expect(realManifest.statesForPincode('50001'), isEmpty);
+      expect(realManifest.statesForPincode('abcdef'), isEmpty);
+    });
+
+    test('the admin finds districts and states anywhere in India', () {
+      expect(realManifest.searchAreas('karnat').map((a) => a.token), contains('state:Karnataka'));
+      expect(realManifest.searchAreas('bengaluru').map((a) => a.token), contains('district:Bengaluru Urban'));
+      expect(realManifest.searchAreas('x'), isEmpty);
+    });
+
+    test('states are downloaded when asked for, once each, and joined', () async {
+      final counter = usePlacesFixture();
+      final directory = PlacesDirectory.instance;
+      expect(directory.ready, isNull);
+      final karnataka = await directory.load(states: ['Karnataka']);
+      expect(karnataka.states, ['Karnataka']);
+      expect(counter.fetches(), 1);
+      expect(karnataka.nearestTown(12.97, 77.59)?.state, 'Karnataka');
+      final both = await directory.load(states: ['Karnataka', 'Kerala']);
+      expect(both.states, ['Karnataka', 'Kerala']);
+      expect(counter.fetches(), 2, reason: 'Karnataka was already loaded');
+      expect(both.byPincode('560001')?.town, 'Bengaluru');
+      expect(both.byPincode('695001')?.state, 'Kerala');
+      final gps = await directory.loadForPoint(17.385, 78.486);
+      expect(gps.nearestTown(17.385, 78.486)?.district, 'Hyderabad');
+      expect(gps.states, contains('Telangana'));
+      await expectLater(directory.loadForPoint(0, 0), throwsStateError);
+      await expectLater(directory.load(states: ['Atlantis']), throwsStateError);
+    });
+  });
+
   group('the shipped file', () {
     test('covers Andhra Pradesh and Telangana, towns and villages', () {
       expect(realIndex.states, ['Andhra Pradesh', 'Telangana']);
@@ -403,7 +474,7 @@ void main() {
       }
 
       await pick('Raj', const ValueKey('place-result-Rajahmundry-533101'));
-      expect(counter.fetches(), 1);
+      expect(counter.fetches(), realManifest.states.length, reason: 'the admin searches all of India');
       await pick('East God', const ValueKey('place-area-district:East Godavari'));
       await pick('Telan', const ValueKey('place-area-state:Telangana'));
       final field = tester.widget<TextFormField>(find.byKey(const ValueKey('locations-text')));

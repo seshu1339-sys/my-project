@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-/// One post office of Andhra Pradesh / Telangana from India Post's pincode
+/// One post office of India from India Post's pincode
 /// directory (see scripts/build-places.cjs): a place a customer can pick.
 class Place {
   const Place({
@@ -103,11 +103,134 @@ class _Indexed {
   final int weight;
 }
 
+/// One state or union territory of `places.index.v1.json`: the file holding its places, its
+/// districts, the map box of its offices and the first two digits of its pincodes.
+class PlaceStateInfo {
+  const PlaceStateInfo({
+    required this.name,
+    required this.file,
+    required this.districts,
+    required this.box,
+    required this.pinPrefixes,
+  });
+  final String name, file;
+  final List<String> districts;
+  // [south, west, north, east]; all zeros when no office of the state has coordinates.
+  final List<double> box;
+  final List<int> pinPrefixes;
+
+  bool boxContains(double latitude, double longitude, double marginDegrees) =>
+      box.any((v) => v != 0) &&
+      latitude >= box[0] - marginDegrees &&
+      latitude <= box[2] + marginDegrees &&
+      longitude >= box[1] - marginDegrees &&
+      longitude <= box[3] + marginDegrees;
+}
+
+/// Every state and union territory, with its districts: small, loaded once, and enough to pick
+/// which state files to download. Parses `web/data/places.index.v1.json`.
+class PlacesManifest {
+  PlacesManifest._(this.states);
+
+  factory PlacesManifest.fromJson(Map<String, dynamic> json) {
+    return PlacesManifest._([
+      for (final raw in json['states'] as List)
+        PlaceStateInfo(
+          name: (raw as Map)['name'] as String,
+          file: raw['file'] as String,
+          districts: [for (final d in raw['districts'] as List) d as String],
+          box: [for (final v in raw['box'] as List) (v as num).toDouble()],
+          pinPrefixes: [for (final v in raw['pinPrefixes'] as List) v as int],
+        ),
+    ]);
+  }
+
+  final List<PlaceStateInfo> states;
+
+  PlaceStateInfo? named(String name) {
+    final wanted = _norm(name);
+    for (final state in states) {
+      if (_norm(state.name) == wanted) return state;
+    }
+    return null;
+  }
+
+  /// The states whose map box (plus a margin) holds the point, nearest box centre first.
+  List<PlaceStateInfo> statesAt(
+    double latitude,
+    double longitude, {
+    double marginDegrees = 0.6,
+  }) {
+    final found = [
+      for (final state in states)
+        if (state.boxContains(latitude, longitude, marginDegrees)) state,
+    ];
+    double away(PlaceStateInfo s) {
+      final dLat = (s.box[0] + s.box[2]) / 2 - latitude;
+      final dLng = (s.box[1] + s.box[3]) / 2 - longitude;
+      return dLat * dLat + dLng * dLng;
+    }
+
+    found.sort((a, b) => away(a).compareTo(away(b)));
+    return found;
+  }
+
+  /// The states whose pincodes start with the same two digits as [pincode].
+  List<PlaceStateInfo> statesForPincode(String pincode) {
+    if (!RegExp(r'^[1-9]\d{5}$').hasMatch(pincode)) return const [];
+    final prefix = int.parse(pincode.substring(0, 2));
+    return [
+      for (final state in states)
+        if (state.pinPrefixes.contains(prefix)) state,
+    ];
+  }
+
+  /// Districts and states whose name matches what the admin typed (all of India).
+  List<PlaceArea> searchAreas(String query) {
+    final text = query.trim().toLowerCase();
+    if (text.length < 2) return const [];
+    bool hit(String name) {
+      final lower = name.toLowerCase();
+      return lower.startsWith(text) ||
+          lower.split(RegExp(r'[\s\-]+')).any((w) => w.startsWith(text));
+    }
+
+    return [
+      for (final state in states)
+        if (hit(state.name)) PlaceArea.state(state.name),
+      for (final state in states)
+        for (final district in state.districts)
+          if (hit(district)) PlaceArea.district(district, state.name),
+    ];
+  }
+}
+
+/// One file per state, each holding one state, joined into the single shape [PlacesIndex.fromJson]
+/// reads: the states side by side, with the district numbers of every row moved to match.
+Map<String, dynamic> mergePlaceFiles(List<Map<String, dynamic>> files) {
+  final states = <String>[];
+  final districts = <List<Object?>>[];
+  final places = <List<Object?>>[];
+  for (final file in files) {
+    final stateOffset = states.length, districtOffset = districts.length;
+    states.addAll([for (final s in file['states'] as List) s as String]);
+    for (final d in file['districts'] as List) {
+      districts.add([(d as List)[0], (d[1] as int) + stateOffset]);
+    }
+    for (final raw in file['places'] as List) {
+      final row = List<Object?>.of(raw as List);
+      row[1] = (row[1] as int) + districtOffset;
+      places.add(row);
+    }
+  }
+  return {'v': 1, 'states': states, 'districts': districts, 'places': places};
+}
+
 /// The directory, searchable. Pure (no I/O): build it from the parsed JSON.
 class PlacesIndex {
   PlacesIndex._(this.states, this.districts, this._entries);
 
-  /// Parses `web/data/places.v1.json`.
+  /// Parses a places file (or several, joined by [mergePlaceFiles]).
   factory PlacesIndex.fromJson(Map<String, dynamic> json) {
     final states = [for (final s in json['states'] as List) s as String];
     final districts = [
@@ -220,7 +343,7 @@ class PlacesIndex {
 
   /// The town nearest to a GPS fix, from the directory's own coordinates.
   /// Null when the nearest place with coordinates is more than [maxKm] away
-  /// (the customer isn't in Andhra Pradesh / Telangana).
+  /// (the customer isn't in any state loaded).
   Place? nearestTown(double latitude, double longitude, {double maxKm = 60}) {
     Place? bestTown, bestAny;
     var townKm = double.infinity, anyKm = double.infinity;
@@ -254,7 +377,7 @@ class PlacesIndex {
 
   /// The place a pincode belongs to: its head office if it has one, else its
   /// first town-type office, else any office with that pincode. Null when the
-  /// pincode is not in the directory (outside Andhra Pradesh / Telangana).
+  /// pincode is not in the states loaded.
   Place? byPincode(String pincode) {
     Place? town, any;
     for (final entry in _entries) {

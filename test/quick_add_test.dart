@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -16,7 +15,6 @@ import 'package:ecommerce_app/ui/quick_fresh.dart';
 import 'places_fixture.dart';
 
 final _now = DateTime(2026, 10, 21, 9, 0);
-final realIndexJson = jsonDecode(placesFileText) as Map<String, dynamic>;
 
 Future<Store> _store({bool extraPlace = false}) async {
   SharedPreferences.setMockInitialValues({});

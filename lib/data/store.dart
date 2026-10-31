@@ -110,9 +110,10 @@ class Store extends ChangeNotifier {
     } else if (nextTown.isNotEmpty && nextDistrict.isEmpty) {
       // The typed pincode settles which town of that name is meant, when it agrees.
       final byPin = pincode.isNotEmpty ? index.byPincode(pincode) : null;
-      final place = byPin != null && byPin.town.toLowerCase() == nextTown.toLowerCase()
-          ? byPin
-          : index.townNamed(nextTown);
+      // (a sub office such as Rajampet of pincode 503110 belongs to the town Kamareddy: its own name counts too)
+      final sameTown = byPin != null &&
+          (byPin.town.toLowerCase() == nextTown.toLowerCase() || byPin.name.toLowerCase() == nextTown.toLowerCase());
+      final place = sameTown ? byPin : index.townNamed(nextTown);
       if (place != null) {
         nextDistrict = place.district;
         nextState = place.state;

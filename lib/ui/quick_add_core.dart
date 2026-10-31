@@ -87,10 +87,12 @@ class QuickEnv {
   /// The town nearest to a GPS fix, from the pincode directory.
   Future<Place?> place(double latitude, double longitude) async {
     if (findPlace != null) return findPlace!(latitude, longitude);
-    return (await PlacesDirectory.instance.load()).nearestTown(latitude, longitude);
+    return (await PlacesDirectory.instance.loadForPoint(latitude, longitude)).nearestTown(latitude, longitude);
   }
 
-  Future<PlacesIndex> places() => (loadPlaces ?? PlacesDirectory.instance.load)();
+  /// The directory for the search box: the state(s) already loaded for the GPS fix, else all of India.
+  Future<PlacesIndex> places() async =>
+      loadPlaces != null ? loadPlaces!() : (PlacesDirectory.instance.ready ?? await PlacesDirectory.instance.loadAll());
   Future<Map<String, dynamic>> run(Store store, String name, Map<String, dynamic> data) => (call ?? store.call)(name, data);
 }
 

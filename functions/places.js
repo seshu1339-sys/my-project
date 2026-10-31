@@ -1,12 +1,33 @@
 'use strict';
 // Which town / district / state a pincode belongs to, from the same India Post
-// directory the apps use (functions/data/places.v1.json is a copy of
-// web/data/places.v1.json; a test keeps the two identical). Used to aim offer
+// directory the apps use (functions/data/places.*.v1.json are copies of
+// web/data/places.*.v1.json, one file per state; a test keeps them identical). Used to aim offer
 // push notifications at the places an offer was made for. Loaded on first use only.
 let byPincode = null;
 
+/// Every state's file joined into the one shape the rest of this file reads: {states, districts, places},
+/// the district number of each row moved to match (the same join as mergePlaceFiles in the app).
+let allData = null;
+function placesData(only) {
+  const read = name => JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'data', name), 'utf8'));
+  if (!only && allData) return allData;
+  const index = read('places.index.v1.json');
+  const states = [], districts = [], places = [];
+  for (const info of index.states) {
+    if (only && !only.includes(info.name)) continue;
+    const file = read(info.file);
+    const stateOffset = states.length, districtOffset = districts.length;
+    states.push(...file.states);
+    for (const [name, stateIndex] of file.districts) districts.push([name, stateIndex + stateOffset]);
+    for (const row of file.places) places.push([row[0], row[1] + districtOffset, ...row.slice(2)]);
+  }
+  const data = {v: 1, states, districts, places};
+  if (!only) allData = data;
+  return data;
+}
+
 function build() {
-  const data = require('./data/places.v1.json');
+  const data = placesData();
   const map = new Map();
   for (const row of data.places) {
     const [name, districtIndex, pin, kind] = row;
@@ -20,7 +41,7 @@ function build() {
   return map;
 }
 
-/// {town, district, state} for a pincode, or {} when it is not in Andhra Pradesh / Telangana.
+/// {town, district, state} for a pincode, or {} when it is not in the directory.
 function placeForPincode(pincode) {
   if (!byPincode) byPincode = build();
   const found = byPincode.get(String(pincode || '').trim());
@@ -74,7 +95,7 @@ function filledCoordinates(places) {
 let directory = null;
 function load() {
   if (directory) return directory;
-  const data = require('./data/places.v1.json');
+  const data = placesData();
   const coordinates = filledCoordinates(data.places);
   directory = data.places.map((row, i) => {
     const [districtName, stateIndex] = data.districts[row[1]];
@@ -95,7 +116,7 @@ function kmBetween(aLat, aLng, bLat, bLng) {
 }
 
 /// The town nearest to a GPS fix (the same rule as PlacesIndex.nearestTown in the app), or null when
-/// the nearest place is more than [maxKm] away, i.e. the phone is not in Andhra Pradesh / Telangana.
+/// the nearest place is more than [maxKm] away, i.e. the phone is not in India.
 function nearestPlace(latitude, longitude, maxKm = 60) {
   let bestTown = null, bestAny = null, townKm = Infinity, anyKm = Infinity;
   for (const place of load()) {
@@ -123,4 +144,4 @@ function officesForPincode(pincode) {
   return [...names];
 }
 
-module.exports = {placeForPincode, locationStamp, filledCoordinates, nearestPlace, findPlace, kmBetween, officesForPincode};
+module.exports = {placesData, placeForPincode, locationStamp, filledCoordinates, nearestPlace, findPlace, kmBetween, officesForPincode};
