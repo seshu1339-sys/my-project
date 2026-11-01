@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/android_sizes.dart';
 import '../domain/catalog.dart';
 import '../services/localization.dart';
 import '../services/strings.dart';
 import '../services/usage.dart';
+import 'android_layout.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
@@ -38,13 +40,15 @@ class AndroidHomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = store.entries('settings');
+    final settings = androidSettings(store.entries('settings'));
+    final sizes = AndroidSizes.from(settings);
+    double searchSize(String field) => sizes.value('search', field) ?? androidSearchDefaults[field]!;
     final logo = layoutFor(context, settings, 'logo');
     final logoUrl = logo.entry.text('iconUrl').isNotEmpty ? logo.entry.text('iconUrl') : store.business.text('imageUrl');
     final searchLayout = layoutFor(context, settings, 'search');
     // The search box as the header has it, only slimmer and using all the room the row leaves it.
     final slim = ComponentLayout(
-      Entry(searchLayout.entry.id, {...searchLayout.entry.data, 'width': 0, 'mobileWidth': 0, 'tabletWidth': 0, 'minWidth': 0, 'margin': 0, 'padding': 0, 'height': 44, 'minHeight': 0, 'gap': 0}),
+      Entry(searchLayout.entry.id, {...searchLayout.entry.data, 'width': 0, 'mobileWidth': 0, 'tabletWidth': 0, 'minWidth': 0, 'margin': searchSize('margin'), 'padding': searchSize('padding'), 'height': searchSize('height'), 'minHeight': 0, 'gap': 0}),
       searchLayout.viewport,
     );
     // Wishlist, the seller page and the office dialog are the same ones the website header opens.

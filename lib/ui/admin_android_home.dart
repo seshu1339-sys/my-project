@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/android_home.dart';
 import '../domain/catalog.dart';
+import 'admin_android_sizes.dart';
 import 'android_layout.dart';
 import 'shared.dart';
 
@@ -139,6 +140,8 @@ class _AdminAndroidHomePageState extends State<AdminAndroidHomePage> {
           ),
         const SizedBox(height: 12),
         Align(alignment: Alignment.centerLeft, child: FilledButton(key: const ValueKey('save-android-home'), onPressed: busy ? null : _save, child: Text(busy ? 'Saving…' : 'Save'))),
+        const Divider(height: 40),
+        AndroidSizesEditor(store: store),
       ],
     );
   }

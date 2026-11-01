@@ -9,10 +9,13 @@ class HomeProductGrid extends StatelessWidget {
     required this.entries,
     required this.itemBuilder,
     this.appearance = const Entry('', {}),
+    this.smallestCard,
   });
   final List<Entry> entries;
   final Widget Function(Entry) itemBuilder;
   final Entry appearance;
+  // How narrow a card may get; null = the usual size. The Android app passes less, so its Items in a row setting can fit 2 or 3 on a phone.
+  final double? smallestCard;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
@@ -20,16 +23,17 @@ class HomeProductGrid extends StatelessWidget {
         appearance,
         MediaQuery.sizeOf(context).width,
       );
+      final floor = smallestCard ?? (layout.padding * 2 + 150).clamp(180, 320).toDouble();
       final columns = layout.columns(
         c.maxWidth,
         preferred: 250,
-        minimum: (layout.padding * 2 + 150).clamp(180, 320),
+        minimum: floor,
       );
       final slotWidth = (c.maxWidth - (columns - 1) * layout.gapX) / columns;
       final width = layout.width(
         slotWidth,
         fallback: slotWidth,
-        floor: (layout.padding * 2 + 150).clamp(180, 320),
+        floor: floor,
       );
       final rows = layout.rows;
       final visible = rows > 0 ? entries.take(rows * columns).toList() : entries;

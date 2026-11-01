@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
+import '../domain/android_sizes.dart';
+import 'android_layout.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'animation_settings.dart';
@@ -38,9 +40,11 @@ class HomeTickerSection extends StatelessWidget {
     final tickerSettings = independent
         ? null
         : store.visible('settings').where((e) => e.id == 'scrollingText').firstOrNull;
+    // In the Android app whatever it borrows from the Scrolling Text is the app's own sizes.
+    final borrowed = tickerSettings != null && isAndroidApp() ? AndroidSizes.from(settings).entry(tickerSettings) : tickerSettings;
     final noticeLayout = layoutFor(context, settings, 'notice');
     final ticker = Entry('notice', {
-      ...?tickerSettings?.data,
+      ...?borrowed?.data,
       ...noticeLayout.entry.data,
     });
     final translations = ticker.data['translations'];

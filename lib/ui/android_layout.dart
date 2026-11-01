@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 
+import '../domain/android_sizes.dart';
 import '../domain/catalog.dart';
 import 'home_section_config.dart';
 
@@ -14,11 +15,8 @@ bool isAndroidApp() => debugAndroidApp ?? (!kIsWeb && Platform.isAndroid);
 @visibleForTesting
 bool? debugAndroidApp;
 
-/// The side margin of the Android home page: small, so more photos fit.
-const androidEdge = 6.0;
-
 /// The home parts' own padding and margin (Settings > Layout) never take more room than this in the Android app.
-const _tightParts = {'promo', 'notice', 'crossSellStrip', 'products', 'popular', 'localServices', 'nearby', 'nearbyShopCard', 'background'};
+const _tightParts = {'section_promo', 'section_notice', 'section_crossSellStrip', 'section_products', 'section_popular', 'section_localServices', 'section_nearby', 'section_nearbyShopCard', 'section_background'};
 const _maxPartPadding = 4.0;
 const _maxPartMargin = 2.0;
 
@@ -31,6 +29,10 @@ List<Entry> tightForAndroid(List<Entry> settings) => [
     else
       e,
 ];
+
+/// The settings as the Android app reads them: the website's padding and margin capped, then the app's own sizes (Settings > Android App)
+/// on top. Nothing is saved, and the website never calls this.
+List<Entry> androidSettings(List<Entry> settings) => AndroidSizes.from(settings).applyTo(tightForAndroid(settings));
 
 /// The usual top-to-bottom order of the parts under the top row, as the app builds them until the admin places them differently
 /// (Settings > Android App): the ad boxes, the red scrolling banner, the notice banner, Fresh today, Today's Offers and the band under

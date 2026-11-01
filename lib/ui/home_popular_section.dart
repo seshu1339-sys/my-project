@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/strings.dart';
+import 'android_layout.dart';
 import 'home_product_grid.dart';
 import 'home_product_tile.dart';
 import 'home_section_heading.dart';
@@ -125,6 +126,7 @@ class _HomePopularSectionState extends State<HomePopularSection> {
             HomeProductGrid(
               entries: filtered,
               appearance: widget.productLayout.entry,
+              smallestCard: isAndroidApp() ? 100 : null,
               itemBuilder: (entry) => HomeProductTile(
                 entry: entry,
                 price: entry.price(widget.store.pincode),

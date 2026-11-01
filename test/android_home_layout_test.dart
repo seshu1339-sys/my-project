@@ -69,7 +69,6 @@ void main() {
     final store = await _store(boxes: 0);
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
-    expect(find.byKey(const ValueKey('android-ads')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('android-settings-menu')));
     await tester.pumpAndSettle();
     for (final t in ['Notifications', 'Wishlist', 'Shopping bag', 'Your account', 'Become a Seller', 'Office / Head Office']) {
@@ -157,6 +156,42 @@ void main() {
     final store = await _store(prefs: {});
     await open(tester, store);
     expect(find.text('Where are you shopping?'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('Android: with no ads the row shows empty boxes; one ad fills one box; the switch hides the row', (tester) async {
+    Future<Store> show(int boxes, {Map<String, Object> androidHome = const {}}) async {
+      final store = await _store(boxes: boxes, androidHome: androidHome);
+      debugAndroidApp = true;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      await tester.pumpWidget(MarketApp(store: store));
+      await tester.pump();
+      return store;
+    }
+
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final empty0 = find.byKey(const ValueKey('android-ad-empty-0')), empty1 = find.byKey(const ValueKey('android-ad-empty-1'));
+
+    var store = await show(0);
+    expect(find.byKey(const ValueKey('android-ads')), findsOneWidget);
+    expect(tester.getSize(empty0), tester.getSize(empty1));
+    expect(tester.getTopRight(empty1).dx, lessThanOrEqualTo(360));
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+
+    store = await show(1);
+    expect(find.byKey(const ValueKey('android-ad-1')), findsOneWidget);
+    expect(empty0, findsNothing);
+    expect(tester.getSize(find.byKey(const ValueKey('android-ad-1'))), tester.getSize(empty1));
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+
+    store = await show(0, androidHome: {'showAds': 'false'});
+    expect(find.byKey(const ValueKey('android-ads')), findsNothing);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });

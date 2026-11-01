@@ -22,6 +22,7 @@ import 'android_ads_strip.dart';
 import 'android_home_header.dart';
 import 'android_layout.dart';
 import '../domain/android_home.dart';
+import '../domain/android_sizes.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
@@ -105,7 +106,8 @@ class WireframeHome extends StatelessWidget {
     // The Android app's home page is laid out more tightly and differently at the top (android_layout.dart); everywhere else this is
     // exactly the website's page.
     final android = isAndroidApp();
-    final settings = android ? tightForAndroid(store.entries('settings')) : store.entries('settings');
+    final settings = android ? androidSettings(store.entries('settings')) : store.entries('settings');
+    final androidSizes = AndroidSizes.from(settings);
     final categories = store
         .visible('categories')
         .where((e) => e.text('parentId').isEmpty)
@@ -165,12 +167,13 @@ class WireframeHome extends StatelessWidget {
     // offers row) -- driven by the admin's Scrolling Text Settings
     // (settings/scrollingText), independent of the "Today's Best Offers"
     // product-chip strip above.
-    final scrolling = store
+    final savedScrolling = store
         .visible('settings')
         .firstWhere(
           (e) => e.id == 'scrollingText',
           orElse: () => const Entry('scrollingText', {}),
         );
+    final scrolling = android ? androidSizes.entry(savedScrolling) : savedScrolling;
     final tickerTextValue = noticeTickerText(scrolling, store.language);
     // The Scrolling Text's own animation (Settings > Homepage sections): "Marquee" is the strip's own scrolling, the others play on it as it appears.
     final scrollingAnimation = effectiveSectionConfig(settings, 'scrollingText');
@@ -221,7 +224,7 @@ class WireframeHome extends StatelessWidget {
     // Side padding of the page. The header is laid out OUTSIDE it so its line
     // stretches from the left edge of the screen to the right edge; its content
     // gets the same padding inside.
-    final edge = android ? androidEdge : page
+    final edge = android ? androidSizes.value('page', 'padding') ?? androidDefaultEdge : page
         .n(
           'padding',
           MediaQuery.sizeOf(context).width < 700 ? 10 : 18,
