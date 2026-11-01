@@ -1,6 +1,6 @@
 'use strict';
 const {vendorCodeFor} = require('./vendor-id');
-const {otherAccountMessage} = require('./accounts');
+const {otherAccountMessage, claimEmailRole} = require('./accounts');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
@@ -25,6 +25,8 @@ Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
+Object.assign(exports, require('./login'));
+Object.assign(exports, require('./email-login'));
 Object.assign(exports, require('./ids'));
 // Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
 const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
@@ -241,7 +243,7 @@ exports.registerVendor = onCall(options, async request => {
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'vendor');
+  const taken = await otherAccountMessage(db, uid, 'vendor', request.auth.token.email);
   if (taken) throw new HttpsError('failed-precondition', taken);
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
@@ -256,6 +258,7 @@ exports.registerVendor = onCall(options, async request => {
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
   await countUsage(db, 'vendor_register', {key: locationStamp({pincode: details.pincode}).town || details.pincode, label: locationStamp({pincode: details.pincode}).town || details.pincode, town: locationStamp({pincode: details.pincode}).town || '', uid});
+  await claimEmailRole(db, request.auth.token.email, 'vendor');
   return {status: 'pending', vendorCode};
 });
 /// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec

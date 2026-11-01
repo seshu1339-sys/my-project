@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
@@ -91,8 +93,13 @@ class Store extends ChangeNotifier {
   bool followsGps = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
-  String? pendingEmailLink;
-  String emailForSignInLink = '';
+  /// Which app this is: 'user' (customers, open to every email), 'vendor' (vendors and service providers) or 'staff'. The server
+  /// (functions/login.js claimAppRole) refuses a vendor/staff app login whose email holds the other role.
+  String appRole = 'user';
+
+  /// Why the last sign-in was refused (the email holds another role); shown on the login screen, null otherwise.
+  String? roleBlock;
+  String? _gatedUid;
   User? get user => live ? FirebaseAuth.instance.currentUser : null;
   /// Completes the stored place from the places directory: the town (and its
   /// district/state) of a typed pincode, or the district/state of a town that
@@ -204,10 +211,6 @@ class Store extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     if (live) {
-      emailForSignInLink = prefs.getString('emailForSignInLink') ?? '';
-      if (FirebaseAuth.instance.isSignInWithEmailLink(Uri.base.toString())) {
-        pendingEmailLink = Uri.base.toString();
-      }
     }
     pincode = prefs.getString('pincode') ?? '';
     address = prefs.getString('address') ?? '';
@@ -252,6 +255,8 @@ class Store extends ChangeNotifier {
     } else {
       _subscriptions.add(
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
+          if (u == null) _gatedUid = null;
+          if (u != null && u.emailVerified && _gatedUid != u.uid && !await _roleAllowed(u)) return;
           admin =
               u != null &&
               u.emailVerified &&
@@ -663,38 +668,74 @@ class Store extends ChangeNotifier {
     );
   }
 
-  /// [continueUrl] lets another app (the vendor site) receive its own link;
-  /// the customer site remains the default.
-  Future<void> sendSignInLink(String email, {String? continueUrl}) async {
-    await FirebaseAuth.instance.setLanguageCode(language);
-    await FirebaseAuth.instance.sendSignInLinkToEmail(
-      email: email,
-      actionCodeSettings: ActionCodeSettings(
-        url: continueUrl ?? 'https://e-commerce-app-a3897.web.app/?emailSignIn=1',
-        handleCodeInApp: true,
-      ),
-    );
-    // Only remember the address after sending succeeds. Never put it in the URL.
-    emailForSignInLink = email;
-    await (await SharedPreferences.getInstance()).setString(
-      'emailForSignInLink',
-      email,
-    );
+  /// Asks the server whether this app may let [u] in (one email is only one of vendor / service provider / staff; customers are
+  /// open to everyone). A refused email is signed out at once and [roleBlock] says why. A network failure does not lock anyone out:
+  /// the server checks again when they register or act.
+  Future<bool> _roleAllowed(User u) async {
+    try {
+      await call('claimAppRole', {'app': appRole});
+      _gatedUid = u.uid;
+      return true;
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code != 'failed-precondition') return true;
+      roleBlock = e.message ?? 'This email is already registered in another role. Please use a different email.';
+      await _forgetGoogle();
+      await FirebaseAuth.instance.signOut();
+      notifyListeners();
+      return false;
+    } catch (_) {
+      return true;
+    }
   }
 
-  Future<void> completeSignInLink(String email, String link) async {
-    if (!FirebaseAuth.instance.isSignInWithEmailLink(link)) {
-      throw StateError('Use the complete sign-in link from your email.');
+  bool _googleReady = false;
+  Future<void> _forgetGoogle() async {
+    if (kIsWeb || !_googleReady) return;
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {
+      /* Nothing to forget. */
     }
-    await FirebaseAuth.instance.signInWithEmailLink(
-      email: email,
-      emailLink: link,
-    );
+  }
+
+  /// Main sign-in: the phone's own Google account list; one tap, no typing, and Google has already verified the email.
+  /// Returns false when the person closed the account list without choosing.
+  Future<bool> signInWithGoogle() async {
+    roleBlock = null;
+    try {
+      if (kIsWeb) {
+        await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+      } else {
+        if (!_googleReady) {
+          await GoogleSignIn.instance.initialize();
+          _googleReady = true;
+        }
+        final account = await GoogleSignIn.instance.authenticate();
+        await FirebaseAuth.instance.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: account.authentication.idToken),
+        );
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return false;
+      rethrow;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return false;
+      rethrow;
+    }
+    return true;
+  }
+
+  /// Backup sign-in: the server emails a 6-digit code to [email].
+  Future<void> requestEmailCode(String email) async {
+    await call('requestEmailLoginCode', {'email': email});
+  }
+
+  /// Checks the code the person typed; the server marks the email verified and hands back a sign-in token.
+  Future<void> verifyEmailCode(String email, String code) async {
+    roleBlock = null;
+    final result = await call('verifyEmailLoginCode', {'email': email, 'code': code});
+    await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
     await FirebaseAuth.instance.currentUser!.getIdToken(true);
-    pendingEmailLink = null;
-    emailForSignInLink = '';
-    await (await SharedPreferences.getInstance()).remove('emailForSignInLink');
-    notifyListeners();
   }
 
   Future<void> registerEmail(String email, String password) async {

@@ -9,7 +9,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data/store.dart';
 import 'ui/storefront.dart';
-import 'ui/email_link.dart';
 import 'ui/details.dart';
 import 'ui/admin_auth.dart';
 import 'domain/catalog.dart';
@@ -206,9 +205,7 @@ class MarketApp extends StatelessWidget {
       theme: buildAppTheme(store, dark: false),
       darkTheme: buildAppTheme(store, dark: true),
       themeMode: resolveThemeMode(store),
-      home: store.pendingEmailLink != null
-          ? EmailLinkPage(store: store)
-          : Storefront(store: store),
+      home: Storefront(store: store),
     ),
   );
 }

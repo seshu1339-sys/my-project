@@ -11,7 +11,7 @@ const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
-const {otherAccountMessage} = require('./accounts');
+const {otherAccountMessage, claimEmailRole} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -47,7 +47,7 @@ exports.requestFieldStaffAccess = onCall(options, async request => {
   if (existing.exists) return {status: existing.data().status, staffCode: existing.data().staffCode || null};
   let details;
   try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  const taken = await otherAccountMessage(db, uid, 'staff');
+  const taken = await otherAccountMessage(db, uid, 'staff', request.auth.token.email);
   if (taken) throw new HttpsError('failed-precondition', taken);
   await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
   const staffCode = await accountCodeFor(db, 'STF', {pincode: details.pincode, existing: '', owner: uid});
@@ -58,6 +58,7 @@ exports.requestFieldStaffAccess = onCall(options, async request => {
     ...(details.gpsAddress ? {gpsAddress: details.gpsAddress} : {}),
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
+  await claimEmailRole(db, request.auth.token.email, 'staff');
   return {status: 'pending', staffCode};
 });
 

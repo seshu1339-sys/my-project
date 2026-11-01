@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/account.dart';
-import 'package:ecommerce_app/ui/email_link.dart';
+import 'package:ecommerce_app/ui/sign_in_panel.dart';
 
 class EmailTestUser implements User {
   @override
@@ -57,63 +57,83 @@ class EmailTestStore extends Store {
     return false;
   }
 
+  bool googleResult = true;
+  String? codeSentTo, codeTyped;
   @override
-  Future<void> sendSignInLink(String email, {String? continueUrl}) async {
-    action = 'send-link';
-    submittedEmail = email;
+  Future<bool> signInWithGoogle() async {
+    action = 'google';
+    return googleResult;
   }
 
   @override
-  Future<void> completeSignInLink(String email, String link) async {
-    action = 'complete-link';
+  Future<void> requestEmailCode(String email) async {
+    action = 'send-code';
+    codeSentTo = email;
+  }
+
+  @override
+  Future<void> verifyEmailCode(String email, String code) async {
+    action = 'verify-code';
+    codeTyped = code;
     submittedEmail = email;
-    throw FirebaseAuthException(code: 'expired-action-code');
   }
 }
 
 Finder field(String label) => find.byWidgetPredicate(
   (w) => w is TextField && w.decoration?.labelText == label,
 );
+/// The sign-in form is now taller (Google button on top), so these tests use a tall screen.
+void tallScreen(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
-  testWidgets(
-    'passwordless links send without a password and handle expired links',
-    (tester) async {
-      final store = EmailTestStore();
-      await tester.pumpWidget(MaterialApp(home: EmailLinkPage(store: store)));
-      expect(field('Password'), findsNothing);
-      await tester.enterText(field('Email address'), 'customer@example.com');
-      await tester.tap(find.text('Send sign-in link'));
-      await tester.pumpAndSettle();
-      expect(store.action, 'send-link');
-      expect(find.textContaining('Sign-in link sent'), findsOneWidget);
-      await tester.tap(find.text('I already have a sign-in link'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        field('Sign-in link'),
-        'https://example.test/?mode=signIn&oobCode=expired',
-      );
-      await tester.tap(find.text('Complete sign-in'));
-      await tester.pumpAndSettle();
-      expect(store.action, 'complete-link');
-      expect(find.textContaining('expired, or already used'), findsOneWidget);
-      expect(store.submittedEmail, 'customer@example.com');
-    },
-  );
-  testWidgets('incoming link asks for email on a different device', (
-    tester,
-  ) async {
-    final store = EmailTestStore()
-      ..pendingEmailLink = 'https://example.test/?mode=signIn&oobCode=code';
-    await tester.pumpWidget(MaterialApp(home: EmailLinkPage(store: store)));
-    expect(find.text('Confirm your email to sign in'), findsOneWidget);
-    await tester.tap(find.text('Complete sign-in'));
+  testWidgets('Google is the main sign-in; the email code is only a backup', (tester) async {
+    final store = EmailTestStore();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store))));
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.byKey(const ValueKey('code-email')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('google-sign-in')));
     await tester.pumpAndSettle();
-    expect(store.action, isNull);
-    expect(find.textContaining('Enter the email address'), findsOneWidget);
+    expect(store.action, 'google');
+  });
+  testWidgets('the email code backup sends a code, then signs in with the 6 digits', (tester) async {
+    final store = EmailTestStore();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SignInPanel(store: store)))));
+    await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('code-email')), 'not an email');
+    await tester.tap(find.byKey(const ValueKey('send-code')));
+    await tester.pumpAndSettle();
+    expect(store.action, isNot('send-code'));
+    expect(find.text('Enter a valid email address.'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('code-email')), 'customer@example.com');
+    await tester.tap(find.byKey(const ValueKey('send-code')));
+    await tester.pumpAndSettle();
+    expect(store.codeSentTo, 'customer@example.com');
+    await tester.enterText(find.byKey(const ValueKey('code-field')), '12');
+    await tester.tap(find.byKey(const ValueKey('verify-code')));
+    await tester.pumpAndSettle();
+    expect(store.action, 'send-code', reason: 'a short code is not submitted');
+    await tester.enterText(find.byKey(const ValueKey('code-field')), '123456');
+    await tester.tap(find.byKey(const ValueKey('verify-code')));
+    await tester.pumpAndSettle();
+    expect(store.action, 'verify-code');
+    expect(store.codeTyped, '123456');
+    expect(store.submittedEmail, 'customer@example.com');
+  });
+  testWidgets('an email refused for holding another role is told so', (tester) async {
+    final store = EmailTestStore()..roleBlock = 'This email is already registered in another role. Please use a different email.';
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store))));
+    expect(find.byKey(const ValueKey('sign-in-error')), findsOneWidget);
+    expect(find.textContaining('already registered in another role'), findsOneWidget);
   });
   testWidgets('email login and reset use entered address without SMS fields', (
     tester,
   ) async {
+    tallScreen(tester);
     final store = EmailTestStore();
     await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
     expect(find.text('Send SMS code'), findsNothing);
@@ -133,6 +153,7 @@ void main() {
   testWidgets(
     'registration validates confirmation and shows verification gate',
     (tester) async {
+    tallScreen(tester);
       final store = EmailTestStore();
       await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
       await tester.tap(find.text('Create an account'));
@@ -164,6 +185,7 @@ void main() {
   testWidgets('after registering and signing out, the sign-in form is shown, not registration', (
     tester,
   ) async {
+    tallScreen(tester);
     final store = EmailTestStore();
     await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
     await tester.tap(find.text('Create an account'));

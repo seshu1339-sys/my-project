@@ -123,7 +123,7 @@ class _AccountPageState extends State<AccountPage> {
                             final verified = await widget.store
                                 .refreshEmailVerification();
                             if (context.mounted && !verified) {
-                              message(context, 'Your email is not verified yet. Open the email link first.'.tr(context));
+                              message(context, 'Your email is not verified yet. Sign in with Google or an email code first.'.tr(context));
                             }
                           }),
                     child: Text('I have verified my email'.tr(context)),

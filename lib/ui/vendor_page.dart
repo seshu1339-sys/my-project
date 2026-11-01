@@ -38,7 +38,7 @@ class _VendorPageState extends State<VendorPage> {
     if (!user.emailVerified) {
       return Scaffold(
         appBar: AppBar(title: const Text('Vendor studio'), actions: actions),
-        body: const _Message(title: 'Verify your email first', body: 'Sign out and use "Continue with email link" so we can verify your email. The vendor registration form opens after your email is verified.'),
+        body: const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The vendor registration form opens after your email is verified.'),
       );
     }
     final uid = user.uid;

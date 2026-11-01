@@ -46,7 +46,7 @@ class _FieldHomePageState extends State<FieldHomePage> {
         appBar: AppBar(title: const Text('Field Assistant'), actions: actions),
         body: const _Message(
           title: 'Verify your email first',
-          body: 'Sign out and use "Continue with email link" so we can verify your email. Registration opens once your email is verified.',
+          body: 'Sign out and sign in again with Google or an email code so we can verify your email. Registration opens once your email is verified.',
         ),
       );
     }

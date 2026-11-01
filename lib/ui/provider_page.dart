@@ -23,7 +23,7 @@ class ServiceProviderPage extends StatelessWidget {
     Widget page(Widget body) => Scaffold(appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
     if (!store.live || user == null) return page(const _Message(title: 'Services', body: 'Connect Firebase to register as a service provider.'));
     if (!user.emailVerified) {
-      return page(const _Message(title: 'Verify your email first', body: 'Sign out and use "Continue with email link" so we can verify your email. The service-provider registration opens after that.'));
+      return page(const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The service-provider registration opens after that.'));
     }
     return page(
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(

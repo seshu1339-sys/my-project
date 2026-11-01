@@ -8,7 +8,7 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
-const {accountKinds, otherAccountMessage} = require('./accounts');
+const {accountKinds, otherAccountMessage, claimEmailRole} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -66,7 +66,7 @@ exports.registerProvider = onCall(options, async request => {
   let details;
   try { details = providerApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'provider');
+  const taken = await otherAccountMessage(db, uid, 'provider', request.auth.token.email);
   if (taken) throw new HttpsError('failed-precondition', taken);
   const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
   if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose a service from the list.');
@@ -86,6 +86,7 @@ exports.registerProvider = onCall(options, async request => {
     submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     decisionReason: FieldValue.delete(), decidedAt: FieldValue.delete(),
   }, {merge: true});
+  await claimEmailRole(db, request.auth.token.email, 'provider');
   return {status: 'pending', providerCode};
 });
 

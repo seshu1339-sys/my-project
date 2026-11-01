@@ -46,8 +46,8 @@ test('a service provider registers (separately from vendors), the admin approves
   // ---- one login is never both: a vendor account cannot become a provider, a provider account cannot become a vendor
   await db.collection('vendorApplications').doc('vendX').set({status: 'pending'});
   await photo('vendX');
-  await assert.rejects(() => register('vendX'), /vendor account/);
-  await assert.rejects(() => fns.registerVendor.run({...as('provA'), data: {ownerName: 'S K', phone: '9876543210', name: 'Shop', shopCategory: 'Kirana', address: 'Main Road, Narsipatnam', pincode: '531116', description: 'A shop for testing here', latitude: 17.668, longitude: 82.612}}), /service-provider account/);
+  await assert.rejects(() => register('vendX'), /already registered in another role/);
+  await assert.rejects(() => fns.registerVendor.run({...as('provA'), data: {ownerName: 'S K', phone: '9876543210', name: 'Shop', shopCategory: 'Kirana', address: 'Main Road, Narsipatnam', pincode: '531116', description: 'A shop for testing here', latitude: 17.668, longitude: 82.612}}), /already registered in another role/);
 
   // ---- only the admin decides; a rejection needs a reason
   await assert.rejects(() => fns.approveProvider.run({...as('provA'), data: {providerId: 'provA', approved: true}}), /Administrator/);

@@ -5,10 +5,10 @@ import '../services/strings.dart';
 
 import '../data/store.dart';
 import 'account_language_field.dart';
-import 'email_link.dart';
 import 'layout_settings.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
+import 'sign_in_panel.dart';
 
 /// Throws if [value] isn't a plausible email address. Shared by this form
 /// and AccountPage's own "Reset password by email" button for an
@@ -34,8 +34,8 @@ Future<void> sendPasswordReset(
 }
 
 /// The signed-out "Welcome to your neighbourhood" / "Create your account"
-/// form: language picker, email+password sign-in/register, email-link
-/// sign-in, forgot-password. Fully self-contained -- owns its own
+/// form: language picker, Google / email-code sign-in (SignInPanel),
+/// email+password sign-in/register, forgot-password. Fully self-contained -- owns its own
 /// controllers and busy/registering state -- since it only ever renders
 /// when store.user is null, with no state to share with AccountPage's other
 /// (signed-in) branches. Extracted out of account.dart so the account shell
@@ -112,6 +112,10 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
         onChanged: (value) => run(() => widget.store.setLanguage(value)),
       ),
       const SizedBox(height: 14),
+      SignInPanel(store: widget.store),
+      const SizedBox(height: 16),
+      Text('Or use your email and password'.tr(context), style: Theme.of(context).textTheme.labelLarge),
+      const SizedBox(height: 8),
       TextField(
         controller: email,
         enabled: !busy,
@@ -131,17 +135,6 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
           registering ? AutofillHints.newPassword : AutofillHints.password,
         ],
         decoration: InputDecoration(labelText: 'Password'.tr(context)),
-      ),
-      OutlinedButton(
-        onPressed: busy
-            ? null
-            : () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => EmailLinkPage(store: widget.store),
-                ),
-              ),
-        child: Text('Sign in with an email link'.tr(context)),
       ),
       if (registering) ...[
         const SizedBox(height: 14),

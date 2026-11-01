@@ -1,4 +1,4 @@
-// Phase 2 of the screen-label translation work: account, email-link,
+// Phase 2 of the screen-label translation work: account,
 // services, product/shop/cart screens. Checks the translation tables
 // themselves (shape, placeholders) and that the real screens pick them up.
 import 'package:flutter/material.dart';
@@ -11,7 +11,6 @@ import 'package:ecommerce_app/services/strings_details.dart';
 import 'package:ecommerce_app/services/strings_table.dart';
 import 'package:ecommerce_app/ui/account.dart';
 import 'package:ecommerce_app/ui/cart_page.dart';
-import 'package:ecommerce_app/ui/email_link.dart';
 
 final _placeholder = RegExp(r'\{[a-z0-9]+\}');
 
@@ -100,17 +99,6 @@ void main() {
     expect(find.text('మీ ఖాతా'), findsOneWidget);
     expect(find.text('మీరు డెమోను చూస్తున్నారు'), findsOneWidget);
     expect(find.text('You’re exploring the demo'), findsNothing);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('the email-link page shows Telugu labels', (tester) async {
-    final store = await _store();
-    await _pumpTelugu(tester, EmailLinkPage(store: store));
-    expect(find.text('ఈమెయిల్ లింక్ సైన్-ఇన్'), findsOneWidget);
-    expect(find.text('పాస్‌వర్డ్ లేకుండా సైన్ ఇన్ చేయండి'), findsOneWidget);
-    expect(find.text('సైన్-ఇన్ లింక్ పంపండి'), findsOneWidget);
-    expect(find.text('Send sign-in link'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });

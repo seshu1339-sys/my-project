@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,7 +10,7 @@ import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
-import 'ui/email_link.dart';
+import 'ui/sign_in_panel.dart';
 import 'ui/vendor_home.dart';
 
 Future<void> main() async {
@@ -35,6 +34,7 @@ Future<void> main() async {
     return;
   }
   final store = Store(live: live, database: live ? FirebaseFirestore.instance : null);
+  store.appRole = 'vendor';
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) {
@@ -44,10 +44,6 @@ Future<void> main() async {
   }
   runApp(VendorApp(store: store));
 }
-
-/// On the web the emailed link returns to this same vendor site; on Android the
-/// vendor pastes the link into the app (the same fallback the customer app has).
-String? get vendorContinueUrl => kIsWeb ? '${Uri.base.origin}/?emailSignIn=1' : null;
 
 class VendorApp extends StatelessWidget {
   const VendorApp({super.key, required this.store});
@@ -62,42 +58,17 @@ class VendorApp extends StatelessWidget {
           // After sign-in: the home with Vendor, Services and Transport (ui/vendor_home.dart).
           home: !store.live
               ? VendorHomePage(store: store)
-              : store.pendingEmailLink != null
-                  ? EmailLinkPage(store: store, continueUrl: vendorContinueUrl)
-                  : store.user == null
-                      ? VendorLoginPage(store: store)
-                      : VendorHomePage(store: store),
+              : store.user == null
+                  ? VendorLoginPage(store: store)
+                  : VendorHomePage(store: store),
         ),
       );
 }
 
-class VendorLoginPage extends StatefulWidget {
+/// Vendors and service providers sign in with Google (or an emailed code); the registration form opens once the email is in.
+class VendorLoginPage extends StatelessWidget {
   const VendorLoginPage({super.key, required this.store});
   final Store store;
-  @override
-  State<VendorLoginPage> createState() => _VendorLoginPageState();
-}
-
-class _VendorLoginPageState extends State<VendorLoginPage> {
-  final email = TextEditingController(), password = TextEditingController();
-  bool busy = false;
-  Future<void> submit() async {
-    setState(() => busy = true);
-    try {
-      await widget.store.login(email.text.trim(), password.text);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    email.dispose();
-    password.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -110,22 +81,9 @@ class _VendorLoginPageState extends State<VendorLoginPage> {
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Text('Become a vendor', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 8),
-                const Text('Enter your email to receive a secure sign-in link. Once your email is verified you can register your shop for approval.'),
+                const Text('Sign in with your Google account. Once you are in you can register your shop or service for approval.'),
                 const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => EmailLinkPage(store: widget.store, continueUrl: vendorContinueUrl))),
-                  child: const Text('Continue with email link'),
-                ),
-                const SizedBox(height: 28),
-                const Text('Returning vendor? Sign in with your password.'),
-                const SizedBox(height: 8),
-                TextField(controller: email, decoration: const InputDecoration(labelText: 'Email address')),
-                const SizedBox(height: 12),
-                TextField(controller: password, obscureText: true, onSubmitted: (_) => submit(), decoration: const InputDecoration(labelText: 'Password')),
-                const SizedBox(height: 16),
-                OutlinedButton(onPressed: busy ? null : submit, child: Text(busy ? 'Signing in...' : 'Sign in')),
+                SignInPanel(store: store),
               ]),
             ),
           ),
