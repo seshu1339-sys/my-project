@@ -16,10 +16,28 @@ void main() {
       expect((c.adSlots, c.showAds), (4, false));
     });
 
+    test('nothing saved: the usual order, everything visible', () {
+      const usual = ['ads', 'scrollingText', 'notice', 'quickFresh', 'promo', 'strip', 'popular', 'localServices', 'nearby'];
+      final c = AndroidHomeConfig.from(const []);
+      expect(c.arrange(usual), usual);
+      expect(c.visibleOrder(usual), usual);
+    });
+
+    test('a saved order places those parts first, hidden parts are left out, unknown names are ignored', () {
+      const usual = ['ads', 'scrollingText', 'notice', 'promo', 'nearby'];
+      final c = AndroidHomeConfig.from([const Entry('androidHome', {'order': 'nearby,bogus,promo,nearby', 'hidden': 'notice,ads', 'showAds': 'true'})]);
+      expect(c.arrange(usual), ['nearby', 'promo', 'ads', 'scrollingText', 'notice']);
+      expect(c.visibleOrder(usual), ['nearby', 'promo', 'ads', 'scrollingText'], reason: 'notice hidden; ads follow showAds, not hidden');
+      final noAds = AndroidHomeConfig.from([const Entry('androidHome', {'showAds': 'false'})]);
+      expect(noAds.visibleOrder(usual), ['scrollingText', 'notice', 'promo', 'nearby']);
+    });
+
     test('saving and reading back gives the same choice, and the website settings are not involved', () {
-      const saved = AndroidHomeConfig(adSlots: 3, showAds: false);
+      const saved = AndroidHomeConfig(adSlots: 3, showAds: false, order: ['nearby', 'promo'], hidden: {'notice'});
       final back = AndroidHomeConfig.from([Entry(androidHomeId, saved.toFields())]);
       expect((back.adSlots, back.showAds), (3, false));
+      expect(back.order, ['nearby', 'promo']);
+      expect(back.hidden, {'notice'});
       final web = AdsConfig.from([Entry(androidHomeId, saved.toFields()), const Entry('adsConfig', {'desktopSlots': 4, 'mobileSlots': 1, 'seconds': 8})]);
       expect((web.desktopSlots, web.mobileSlots, web.seconds), (4, 1, 8));
     });

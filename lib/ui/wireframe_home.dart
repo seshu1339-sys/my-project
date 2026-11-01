@@ -21,6 +21,7 @@ import 'animation_settings.dart';
 import 'android_ads_strip.dart';
 import 'android_home_header.dart';
 import 'android_layout.dart';
+import '../domain/android_home.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
@@ -282,8 +283,6 @@ class WireframeHome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Android: the ad boxes come right under the top row (the same boxes the website has down its right side).
-                if (android) Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town)),
                 if (!store.live)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -309,7 +308,7 @@ class WireframeHome extends StatelessWidget {
                 if (search.text.trim().length >= 2) ItemSearchChoices(store: store, query: search.text, openItem: onProduct),
                 // Usage analytics: what customers search for, and what finds nothing.
                 if (search.text.trim().length >= 2) SearchUsageReporter(query: search.text, results: products.length, town: store.town),
-                wrapSection('tickerMarquee', notice),
+                if (!android) wrapSection('tickerMarquee', notice),
                 LayoutBuilder(
                   builder: (context, c) {
                     final railWidth = adLayout.width(
@@ -342,7 +341,7 @@ class WireframeHome extends StatelessWidget {
                     // The search results heading goes into the band (under the cards, beside the boxes) only when that
                     // section comes right after Today's Offers.
                     final headingInBand =
-                        bandSideBySide && promoAt >= 0 && promoAt + 1 < orderedSectionKeys.length && orderedSectionKeys[promoAt + 1].key == 'popular';
+                        !android && bandSideBySide && promoAt >= 0 && promoAt + 1 < orderedSectionKeys.length && orderedSectionKeys[promoAt + 1].key == 'popular';
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
@@ -394,17 +393,7 @@ class WireframeHome extends StatelessWidget {
                     // ticker itself now lives outside `main` entirely (fixed
                     // beside the "All Categories" button), so "right after
                     // the ticker" is simply "first".
-                    final main = Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // The "All Categories" button + chip-strip ticker
-                        // lives inside `main` (not as a separate full-width
-                        // row above the main/ads split) specifically so its
-                        // right edge always matches the offer cards/
-                        // categories/products below it, not the ad rail's --
-                        // keeping every section in this column visually
-                        // aligned to the same left/right edges regardless of
-                        // the ad rail's own width.
+                    final noticeRow =
                         Padding(
                           padding: EdgeInsets.only(bottom: android ? 4 : 8),
                           child: Row(
@@ -427,17 +416,8 @@ class WireframeHome extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ),
-                        // Quick Add Item: "Showing items in: <location>" + "Fresh today".
-                        QuickFreshToday(store: store),
-                        for (final (i, descriptor)
-                            in orderedSectionKeys.indexed) ...[
-                          wrapSection(
-                            descriptor.key,
-                            reorderedSections[descriptor.key]!,
-                          ),
-                          // Under the Today's Offers cards: the product cards, with the Transport and Services boxes beside them (or below them on a phone).
-                          if (i == promoAt)
+                        );
+                    final stripBand =
                             HomeStripBand(
                               store: store,
                               sideBySide: bandSideBySide,
@@ -454,8 +434,8 @@ class WireframeHome extends StatelessWidget {
                                   wrapProductItem: wrapProductItem,
                                 ),
                               ),
-                            ),
-                        ],
+                            );
+                    final nearbySection =
                         wrapSection(
                           'nearby',
                           HomeNearbySection(
@@ -471,7 +451,43 @@ class WireframeHome extends StatelessWidget {
                             ),
                             wrapSection: wrapSection,
                           ),
-                        ),
+                        );
+                    // The Android app's home page: the same parts, in the order the admin chose (Settings > Android App), without the hidden ones.
+                    Widget androidParts() {
+                      final home = AndroidHomeConfig.from(settings);
+                      final parts = <String, Widget>{
+                        'ads': Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town)),
+                        'scrollingText': wrapSection('tickerMarquee', notice),
+                        'notice': noticeRow,
+                        'quickFresh': QuickFreshToday(store: store),
+                        'promo': wrapSection('promo', reorderedSections['promo']!),
+                        'strip': stripBand,
+                        'popular': wrapSection('popular', reorderedSections['popular']!),
+                        'localServices': wrapSection('localServices', reorderedSections['localServices']!),
+                        'nearby': nearbySection,
+                      };
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [for (final key in home.visibleOrder(androidDefaultOrder(settings))) KeyedSubtree(key: ValueKey('android-part-$key'), child: parts[key]!)],
+                      );
+                    }
+
+                    final Widget main = android ? androidParts() : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        noticeRow,
+                        // Quick Add Item: "Showing items in: <location>" + "Fresh today".
+                        QuickFreshToday(store: store),
+                        for (final (i, descriptor)
+                            in orderedSectionKeys.indexed) ...[
+                          wrapSection(
+                            descriptor.key,
+                            reorderedSections[descriptor.key]!,
+                          ),
+                          // Under the Today's Offers cards: the product cards, with the Transport and Services boxes beside them (or below them on a phone).
+                          if (i == promoAt) stripBand,
+                        ],
+                        nearbySection,
                       ],
                     );
                     return wide

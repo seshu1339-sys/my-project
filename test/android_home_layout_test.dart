@@ -42,7 +42,8 @@ void main() {
     final header = tester.getRect(find.byKey(const ValueKey('android-header')));
     final ads = tester.getRect(find.byKey(const ValueKey('android-ads')));
     expect(header.height, lessThan(64));
-    expect(ads.top, lessThan(header.bottom + 8));
+    // (the test store is not live, so its one-line "Demo marketplace" notice sits between them)
+    expect(ads.top, lessThan(header.bottom + 60));
     // two whole boxes of one size side by side
     final a = tester.getRect(find.byKey(const ValueKey('android-ad-1'))), b = tester.getRect(find.byKey(const ValueKey('android-ad-2')));
     expect(a.width, closeTo(b.width, .5));
@@ -156,6 +157,72 @@ void main() {
     final store = await _store(prefs: {});
     await open(tester, store);
     expect(find.text('Where are you shopping?'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  Future<void> androidApp(WidgetTester tester, Store store) async {
+    debugAndroidApp = true;
+    tester.view.physicalSize = const Size(360, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  double top(WidgetTester tester, String part) => tester.getTopLeft(find.byKey(ValueKey('android-part-$part'))).dy;
+
+  testWidgets('Android: nothing saved means every part is built in the usual order', (tester) async {
+    final store = await _store();
+    await androidApp(tester, store);
+    final parts = ['ads', 'scrollingText', 'notice', 'quickFresh', 'promo', 'strip', 'popular', 'localServices', 'nearby'];
+    for (final p in parts) {
+      expect(find.byKey(ValueKey('android-part-$p')), findsOneWidget, reason: p);
+    }
+    for (var i = 1; i < parts.length; i++) {
+      expect(top(tester, parts[i]), greaterThanOrEqualTo(top(tester, parts[i - 1])), reason: '${parts[i - 1]} before ${parts[i]}');
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('Android: the saved order and the hidden parts are used, and a later change applies without a restart', (tester) async {
+    final store = await _store(androidHome: {'order': 'nearby,promo', 'hidden': 'scrollingText,popular,localServices'});
+    await androidApp(tester, store);
+    expect(find.byKey(const ValueKey('android-part-scrollingText')), findsNothing);
+    expect(find.byKey(const ValueKey('android-part-popular')), findsNothing);
+    expect(find.byKey(const ValueKey('android-part-localServices')), findsNothing);
+    expect(top(tester, 'nearby'), lessThan(top(tester, 'promo')));
+    expect(top(tester, 'promo'), lessThan(top(tester, 'ads')));
+    expect(find.byKey(const ValueKey('android-part-notice')), findsOneWidget);
+    store.catalog['settings']!.removeWhere((e) => e.id == 'androidHome');
+    store.catalog['settings']!.add(const Entry('androidHome', {'order': 'promo', 'hidden': 'nearby', 'showAds': 'false'}));
+    store.notifyListeners();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('android-part-nearby')), findsNothing);
+    expect(find.byKey(const ValueKey('android-part-ads')), findsNothing);
+    expect(find.byKey(const ValueKey('android-part-scrollingText')), findsOneWidget);
+    expect(top(tester, 'promo'), lessThan(top(tester, 'scrollingText')));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('the website ignores the Android order and hidden parts', (tester) async {
+    debugAndroidApp = false;
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store(androidHome: {'order': 'nearby', 'hidden': 'promo,popular,notice', 'showAds': 'false'});
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('today-offers')), findsOneWidget);
+    expect(find.byKey(const ValueKey('right-ad-boxes')), findsOneWidget);
+    expect(find.byKey(const ValueKey('android-part-promo')), findsNothing);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
