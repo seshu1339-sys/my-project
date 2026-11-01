@@ -6,26 +6,20 @@ import 'package:ecommerce_app/domain/catalog.dart';
 
 void main() {
   group('Android home settings', () {
-    test('with nothing saved the app starts from the website\'s phone value and the default order, everything shown', () {
-      final c = AndroidHomeConfig.from([const Entry('adsConfig', {'mobileSlots': 2})]);
-      expect(c.adSlots, 2);
-      expect(c.visibleParts, androidHomeParts);
+    test('with nothing saved the app shows two ad boxes, and the ads are shown', () {
+      final c = AndroidHomeConfig.from([const Entry('adsConfig', {'mobileSlots': 1})]);
+      expect((c.adSlots, c.showAds), (2, true));
     });
 
-    test('saved slots, order and hidden parts are read; missing and unknown parts are handled', () {
-      final c = AndroidHomeConfig.from([const Entry('androidHome', {'adSlots': 4, 'order': 'ads,notice,bogus', 'hidden': 'boxes,nonsense'})]);
-      expect(c.adSlots, 4);
-      expect(c.order, ['ads', 'notice', 'scrollingText', 'promo', 'boxes']);
-      expect(c.visibleParts, ['ads', 'notice', 'scrollingText', 'promo']);
+    test('saved slots and the ads switch are read', () {
+      final c = AndroidHomeConfig.from([const Entry('androidHome', {'adSlots': 4, 'showAds': 'false'})]);
+      expect((c.adSlots, c.showAds), (4, false));
     });
 
     test('saving and reading back gives the same choice, and the website settings are not involved', () {
-      const saved = AndroidHomeConfig(adSlots: 3, order: ['promo', 'ads', 'notice', 'scrollingText', 'boxes'], hidden: {'notice'});
+      const saved = AndroidHomeConfig(adSlots: 3, showAds: false);
       final back = AndroidHomeConfig.from([Entry(androidHomeId, saved.toFields())]);
-      expect(back.adSlots, 3);
-      expect(back.order, saved.order);
-      expect(back.hidden, saved.hidden);
-      // the website's ad settings are what they were
+      expect((back.adSlots, back.showAds), (3, false));
       final web = AdsConfig.from([Entry(androidHomeId, saved.toFields()), const Entry('adsConfig', {'desktopSlots': 4, 'mobileSlots': 1, 'seconds': 8})]);
       expect((web.desktopSlots, web.mobileSlots, web.seconds), (4, 1, 8));
     });

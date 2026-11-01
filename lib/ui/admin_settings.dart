@@ -41,7 +41,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('rightBoxes', 'Right Side Ad Boxes', Icons.view_agenda_outlined, 'Photo boxes down the right side: add, remove, photo, link'),
   _SettingsSection('productImageLibrary', 'Product Image Library', Icons.photo_library_outlined, 'Approved photos vendors can choose'),
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
-  _SettingsSection('androidHome', 'Android App', Icons.phone_android_outlined, 'Home screen of the Android app only: ads shown, which parts, their order'),
+  _SettingsSection('androidHome', 'Android App', Icons.phone_android_outlined, 'Android app only: how many ad boxes show at the top, and whether they show'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),

@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
 import '../services/place_resolver.dart';
 import '../services/search.dart';
 import 'account.dart';
+import 'android_layout.dart';
 import 'details.dart';
 import 'location_picker_dialog.dart';
 import 'shared.dart';
@@ -88,12 +90,27 @@ class _StorefrontState extends State<Storefront> {
     completeStoredPlace(store).whenComplete(() => _resolvingPlace = false);
   }
 
+  /// Android app only: "Where are you shopping?" is shown the very first time the app opens, never again. The chosen place is saved on the
+  /// phone (Store), so every later start opens the home page with it; only the pin in the top row opens the picker after that.
+  Future<void> _askLocationOnce() async {
+    if (!isAndroidApp() || store.hasPlace) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('locationAsked') ?? false) return;
+      await prefs.setBool('locationAsked', true);
+    } catch (_) {
+      return;
+    }
+    if (mounted && !store.hasPlace) await location();
+  }
+
   @override
   void initState() {
     super.initState();
     Usage.screen('home');
     store.addListener(_resolvePlaceIfNeeded);
     _resolvePlaceIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _askLocationOnce());
     timer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         setState(() {});

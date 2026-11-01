@@ -34,7 +34,7 @@ class RightAdBoxes extends StatelessWidget {
               key: ValueKey('right-box-${box.number}'),
               height: rightBoxHeight,
               width: double.infinity,
-              child: _SeenCounter(
+              child: SeenCounter(
                 adId: box.countsViews ? box.adId : '',
                 tracker: tracker,
                 town: town,
@@ -70,16 +70,16 @@ class RightAdBoxes extends StatelessWidget {
 
 /// Reports one view of [adId] once the box has been on screen for a second (the tracker and the server drop repeats within a minute).
 /// Does nothing for a box without a shop ad or without a tracker.
-class _SeenCounter extends StatefulWidget {
-  const _SeenCounter({required this.adId, required this.tracker, required this.town, required this.child});
+class SeenCounter extends StatefulWidget {
+  const SeenCounter({super.key, required this.adId, required this.tracker, required this.town, required this.child});
   final String adId, town;
   final AdsTracker? tracker;
   final Widget child;
   @override
-  State<_SeenCounter> createState() => _SeenCounterState();
+  State<SeenCounter> createState() => SeenCounterState();
 }
 
-class _SeenCounterState extends State<_SeenCounter> {
+class SeenCounterState extends State<SeenCounter> {
   Timer? _watch;
   int _visibleMs = 0;
 
@@ -90,10 +90,10 @@ class _SeenCounterState extends State<_SeenCounter> {
   }
 
   @override
-  void didUpdateWidget(_SeenCounter old) {
-    super.didUpdateWidget(old);
+  void didUpdateWidget(SeenCounter oldWidget) {
+    super.didUpdateWidget(oldWidget);
     // Another ad in the box (the admin linked another vendor): its own view.
-    if (old.adId != widget.adId || old.tracker != widget.tracker) _start();
+    if (oldWidget.adId != widget.adId || oldWidget.tracker != widget.tracker) _start();
   }
 
   void _start() {

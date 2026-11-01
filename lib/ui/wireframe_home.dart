@@ -18,6 +18,9 @@ import 'home_ticker_section.dart';
 import 'home_today_offers.dart';
 import 'layout_settings.dart';
 import 'animation_settings.dart';
+import 'android_ads_strip.dart';
+import 'android_home_header.dart';
+import 'android_layout.dart';
 import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
@@ -98,7 +101,10 @@ class WireframeHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = store.entries('settings');
+    // The Android app's home page is laid out more tightly and differently at the top (android_layout.dart); everywhere else this is
+    // exactly the website's page.
+    final android = isAndroidApp();
+    final settings = android ? tightForAndroid(store.entries('settings')) : store.entries('settings');
     final categories = store
         .visible('categories')
         .where((e) => e.text('parentId').isEmpty)
@@ -169,7 +175,7 @@ class WireframeHome extends StatelessWidget {
     final scrollingAnimation = effectiveSectionConfig(settings, 'scrollingText');
     final notice0 = scrolling.active && tickerTextValue.isNotEmpty
         ? Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.only(bottom: android ? 4 : 8),
             child: TickerStrip(
               text: tickerTextValue,
               textColor: colorFromHex(
@@ -214,7 +220,7 @@ class WireframeHome extends StatelessWidget {
     // Side padding of the page. The header is laid out OUTSIDE it so its line
     // stretches from the left edge of the screen to the right edge; its content
     // gets the same padding inside.
-    final edge = page
+    final edge = android ? androidEdge : page
         .n(
           'padding',
           MediaQuery.sizeOf(context).width < 700 ? 10 : 18,
@@ -240,7 +246,19 @@ class WireframeHome extends StatelessWidget {
           children: [
             DefaultTextStyle.merge(
               style: sectionTextStyle(page.styled(context)),
-              child: ResponsiveHeader(
+              child: android
+                  ? AndroidHomeHeader(
+                      store: store,
+                      search: search,
+                      onSearch: onSearch,
+                      onLocation: onLocation,
+                      onAccount: onAccount,
+                      onCart: onCart,
+                      onAssistedSearch: onAssistedSearch,
+                      onProduct: onProduct,
+                      edgePadding: edge,
+                    )
+                  : ResponsiveHeader(
                 store: store,
                 search: search,
                 onSearch: onSearch,
@@ -264,6 +282,8 @@ class WireframeHome extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Android: the ad boxes come right under the top row (the same boxes the website has down its right side).
+                if (android) Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town)),
                 if (!store.live)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -299,7 +319,7 @@ class WireframeHome extends StatelessWidget {
                     // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
                     // A box with a vendor's shop ad counts its views (only in the customer app, which has the tracker).
                     final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town);
-                    final hasRightBoxes = shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
+                    final hasRightBoxes = !android && shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final orderedSectionKeys = [...reorderableHomeSections]
                       ..sort(
@@ -334,7 +354,8 @@ class WireframeHome extends StatelessWidget {
                             : TodayOffersSection(
                           store: store,
                           boxes: offers,
-                          appearance: effectiveSectionConfig(settings, 'promo'),
+                          // Android: two offer cards side by side
+                          appearance: android ? Entry('promo', {...effectiveSectionConfig(settings, 'promo').data, 'visibleCount': 2}) : effectiveSectionConfig(settings, 'promo'),
                           showAll: showAllLocations,
                           onPromotion: onPromotion,
                           reverse:
@@ -385,7 +406,7 @@ class WireframeHome extends StatelessWidget {
                         // aligned to the same left/right edges regardless of
                         // the ad rail's own width.
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.only(bottom: android ? 4 : 8),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

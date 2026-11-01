@@ -1,0 +1,162 @@
+// The Android app's home screen: one small top row, the ad boxes right under it, then the same rows as the website.
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ecommerce_app/data/store.dart';
+import 'package:ecommerce_app/domain/catalog.dart';
+import 'package:ecommerce_app/main.dart';
+import 'package:ecommerce_app/ui/android_layout.dart';
+
+Future<Store> _store({int boxes = 4, Map<String, Object> androidHome = const {}, Map<String, Object> prefs = const {'locationAsked': true}}) async {
+  SharedPreferences.setMockInitialValues(prefs);
+  final store = Store();
+  await store.init();
+  store.catalog.putIfAbsent('settings', () => []);
+  store.catalog['settings']!
+    ..add(Entry('rightAdBoxes', {'count': boxes, for (var n = 1; n <= boxes; n++) 'box${n}Image': 'https://example.invalid/$n.jpg'}))
+    ..add(const Entry('adsConfig', {'seconds': 3}))
+    ..add(Entry('androidHome', androidHome));
+  return store;
+}
+
+void main() {
+  tearDown(() => debugAndroidApp = null);
+
+  testWidgets('Android: one small top row, ads under it, no right-hand ad column, the website rows still there', (tester) async {
+    debugAndroidApp = true;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store();
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('android-header')), findsOneWidget);
+    expect(find.byKey(const ValueKey('android-location')), findsOneWidget);
+    expect(find.byKey(const ValueKey('responsive-search-box')), findsOneWidget);
+    expect(find.byTooltip('Voice search'), findsOneWidget);
+    expect(find.byTooltip('Camera search'), findsOneWidget);
+    expect(find.text('Welcome'), findsNothing);
+    expect(find.byKey(const ValueKey('right-ad-boxes')), findsNothing);
+    // the top row, then the ads straight under it
+    final header = tester.getRect(find.byKey(const ValueKey('android-header')));
+    final ads = tester.getRect(find.byKey(const ValueKey('android-ads')));
+    expect(header.height, lessThan(64));
+    expect(ads.top, lessThan(header.bottom + 8));
+    // two whole boxes of one size side by side
+    final a = tester.getRect(find.byKey(const ValueKey('android-ad-1'))), b = tester.getRect(find.byKey(const ValueKey('android-ad-2')));
+    expect(a.width, closeTo(b.width, .5));
+    expect(a.top, b.top);
+    expect(b.right, lessThanOrEqualTo(360));
+    expect(find.byKey(const ValueKey('android-ad-3')).hitTestable(), findsNothing);
+    // they slide on by themselves after the admin's "seconds" (3 here): box 3 comes in, one box at a time
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(tester.getRect(find.byKey(const ValueKey('android-ad-2'))).left, closeTo(a.left, 1));
+    expect(find.byKey(const ValueKey('android-ad-3')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('Android: the settings icon opens a menu with notifications, wishlist, bag, account, seller, office and the languages', (tester) async {
+    debugAndroidApp = true;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store(boxes: 0);
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('android-ads')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('android-settings-menu')));
+    await tester.pumpAndSettle();
+    for (final t in ['Notifications', 'Wishlist', 'Shopping bag', 'Your account', 'Become a Seller', 'Office / Head Office']) {
+      expect(find.text(t), findsOneWidget, reason: t);
+    }
+    await tester.tap(find.text('Wishlist'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing saved yet.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('the website is not the Android layout: the usual header and the right-hand ad boxes', (tester) async {
+    debugAndroidApp = false;
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store();
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('android-header')), findsNothing);
+    expect(find.byKey(const ValueKey('android-ads')), findsNothing);
+    expect(find.byKey(const ValueKey('right-ad-boxes')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  Future<void> open(WidgetTester tester, Store store) async {
+    await tester.pumpWidget(MarketApp(store: store));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  testWidgets('Android: "Where are you shopping?" comes only the first time the app opens, never again', (tester) async {
+    debugAndroidApp = true;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var store = await _store(prefs: {});
+    await open(tester, store);
+    expect(find.text('Where are you shopping?'), findsOneWidget);
+    await tester.tapAt(const Offset(5, 5)); // dismiss without choosing
+    await tester.pumpAndSettle();
+    expect(find.text('Where are you shopping?'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+    // the app is opened again: no dialog
+    store = Store();
+    await store.init();
+    await open(tester, store);
+    expect(find.text('Where are you shopping?'), findsNothing);
+    // only the pin opens it
+    await tester.tap(find.byKey(const ValueKey('android-location')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Where are you shopping?'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('Android: a saved location opens the home page straight away, with no dialog even the first time', (tester) async {
+    debugAndroidApp = true;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store(prefs: {'pincode': '531116', 'address': 'Narsipatnam', 'town': 'Narsipatnam'});
+    await open(tester, store);
+    expect(find.text('Where are you shopping?'), findsNothing);
+    expect(find.text('Narsipatnam'), findsWidgets);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+
+  testWidgets('the website never opens the location dialog by itself', (tester) async {
+    debugAndroidApp = false;
+    tester.view.physicalSize = const Size(1400, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final store = await _store(prefs: {});
+    await open(tester, store);
+    expect(find.text('Where are you shopping?'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    store.dispose();
+  });
+}
