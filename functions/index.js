@@ -144,7 +144,7 @@ exports.trackEvent = onCall({...options, maxInstances: 5}, async request => {
   return {ok: true};
 });
 // Genuine ad views for the unified Ads system. The device reports what happened in small batches; ad-tracking.js decides what counts
-// (on screen for a second, once per device per 30 minutes, never the vendor's own, admin, staff, bots or test devices).
+// (on screen for a second, once per device per minute, never the vendor's own, admin, staff, bots or test devices).
 exports.trackAdEvents = onCall({...options, maxInstances: 5}, async request => {
   let batch;
   try { batch = normalizeAdBatch(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }

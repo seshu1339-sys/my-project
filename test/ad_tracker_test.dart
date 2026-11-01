@@ -30,23 +30,23 @@ Future<void> done(WidgetTester tester, AdsTracker tracker) async {
 
 void main() {
   group('the tracker', () {
-    test('a view is sent once per ad per 30 minutes; time only follows a sent view', () async {
+    test('a view is sent once per ad per minute; time only follows a sent view', () async {
       var clock = DateTime(2026, 10, 26, 10);
       final sent = Sent();
       final t = make(sent, now: () => clock);
       t.view('a1', town: 'Narsipatnam');
       t.view('a1', town: 'Narsipatnam'); // a refresh
-      clock = clock.add(const Duration(minutes: 29));
+      clock = clock.add(const Duration(seconds: 59));
       t.view('a1', town: 'Narsipatnam');
       t.time('a2', 5); // never viewed: nothing to add time to
       t.time('a1', 4, town: 'Narsipatnam');
       await t.flush();
       expect(sent.events('view').length, 1);
       expect(sent.events('time').single['seconds'], 4);
-      clock = clock.add(const Duration(minutes: 2));
+      clock = clock.add(const Duration(seconds: 2));
       t.view('a1', town: 'Narsipatnam');
       await t.flush();
-      expect(sent.events('view').length, 2, reason: '31 minutes after the first');
+      expect(sent.events('view').length, 2, reason: '61 seconds after the first');
     });
 
     test('events go out in a batch per town, and a failed send never throws', () async {

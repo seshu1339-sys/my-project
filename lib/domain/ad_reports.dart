@@ -2,12 +2,16 @@ import 'catalog.dart';
 
 /// The numbers the ad reports add up. All come from what the server counted (functions/ad-tracking.js); nothing is estimated here.
 class AdTotals {
-  AdTotals({this.views = 0, this.unique = 0, this.taps = 0, this.seconds = 0, this.missed = 0});
-  int views, unique, taps, seconds, missed;
+  AdTotals({this.views = 0, this.appViews = 0, this.unique = 0, this.taps = 0, this.seconds = 0, this.missed = 0});
+  // views = every view; appViews = those from the Android app. Every view counted before the app existed is a website view.
+  int views, appViews, unique, taps, seconds, missed;
+
+  int get webViews => views - appViews;
 
   void add(Map<String, dynamic> data, {bool withUnique = true}) {
     int n(String k) => (data[k] is num) ? (data[k] as num).round() : 0;
     views += n('views');
+    appViews += n('appViews');
     taps += n('taps');
     seconds += n('seconds');
     missed += n('missed');
@@ -40,7 +44,10 @@ class AdReport {
       if (adIds != null && !adIds.contains(adId)) continue;
       Map<String, dynamic> pick() {
         if (town != null) return Map<String, dynamic>.from((doc.data['towns'] as Map?)?[town] as Map? ?? const {});
-        if (device != null) return Map<String, dynamic>.from((doc.data['devices'] as Map?)?[device] as Map? ?? const {});
+        if (device != null) {
+          final d = Map<String, dynamic>.from((doc.data['devices'] as Map?)?[device] as Map? ?? const {});
+          return {...d, 'appViews': device == 'android' ? d['views'] : 0};
+        }
         return doc.data;
       }
 
@@ -78,6 +85,7 @@ String reportSummaryText(AdReport report, {required String from, required String
   return [
     '${title ?? 'Ads report'}  $from to $to',
     'Total views: ${t.views}',
+    if (report.uniqueKnown) ...['Website views: ${t.webViews}', 'App views: ${t.appViews}'],
     if (report.uniqueKnown) 'Unique people: ${t.unique}',
     'Taps: ${t.taps}',
     'Time on screen: ${t.seconds} s',

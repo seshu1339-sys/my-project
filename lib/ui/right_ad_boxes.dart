@@ -68,7 +68,7 @@ class RightAdBoxes extends StatelessWidget {
   }
 }
 
-/// Reports one view of [adId] once the box has been on screen for a second (the tracker and the server drop repeats within 30 minutes).
+/// Reports one view of [adId] once the box has been on screen for a second (the tracker and the server drop repeats within a minute).
 /// Does nothing for a box without a shop ad or without a tracker.
 class _SeenCounter extends StatefulWidget {
   const _SeenCounter({required this.adId, required this.tracker, required this.town, required this.child});

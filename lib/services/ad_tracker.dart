@@ -1,7 +1,7 @@
 import 'dart:async';
 
 /// Reports what happens to each ad to the server in small batches (the callable `trackAdEvents`, functions/ad-tracking.js). The server
-/// decides what counts; this class only avoids sending what can never count (a second view of the same ad within 30 minutes) and keeps
+/// decides what counts; this class only avoids sending what can never count (a second view of the same ad within a minute) and keeps
 /// the number of calls small.
 ///
 /// Events: `view` (on screen for a second), `time` (more seconds on screen), `miss` (scheduled but never visible), `tap`.
@@ -22,7 +22,7 @@ class AdsTracker {
   /// The tracker the customer app uses, set once Firebase is connected (null in demo mode and in the admin / vendor apps).
   static AdsTracker? instance;
 
-  static const viewGap = Duration(minutes: 30);
+  static const viewGap = Duration(minutes: 1);
   final _queue = <Map<String, Object?>>[];
   final _viewed = <String, DateTime>{};
   Timer? _timer;
@@ -34,7 +34,7 @@ class AdsTracker {
     _timer ??= Timer(flushEvery, flush);
   }
 
-  /// The ad has now been on screen for a second. A repeat within 30 minutes is not sent at all.
+  /// The ad has now been on screen for a second. A repeat within a minute is not sent at all, on the website and in the app alike.
   void view(String adId, {String town = ''}) {
     final last = _viewed[adId];
     if (last != null && _now().difference(last) < viewGap) return;

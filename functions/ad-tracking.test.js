@@ -48,26 +48,29 @@ const ctx = (extra = {}) => ({userAgent: UA, auth: null, staffUids: [], ...extra
 const batch = (events, extra = {}) => normalizeBatch({visitorId: V, town: 'Narsipatnam', events, ...extra});
 const t0 = Date.parse('2031-03-05T10:00:00Z');
 
-test('a view counts once per device per 30 minutes; refreshing does not inflate it; unique people are counted separately', emulator, async () => {
+test('a view counts once per device per minute; refreshing does not inflate it; unique people are counted separately', emulator, async () => {
   const db = await setup();
   const view = {type: 'view', adId: 'ad1', seconds: 1};
   assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0)).views, 1);
   for (let i = 1; i <= 20; i++) assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0 + i * 1000)).views, 0, 'a refresh');
-  assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0 + 29 * 60000)).duplicates, 1);
+  assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0 + 59000)).duplicates, 1);
   let stats = (await db.collection('adStats').doc('ad1').get()).data();
   assert.equal(stats.views, 1);
   assert.equal(stats.unique, 1);
-  // 31 minutes later the same device is a new view but not a new person
-  assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0 + 31 * 60000)).views, 1);
+  assert.equal(stats.appViews, undefined, 'a website view is not an app view');
+  // 61 seconds later the same device is a new view but not a new person
+  assert.equal((await recordAdEvents(db, batch([view]), ctx(), t0 + 61000)).views, 1);
   stats = (await db.collection('adStats').doc('ad1').get()).data();
   assert.equal(stats.views, 2);
   assert.equal(stats.unique, 1);
-  // another device is another person
+  // another device is another person, and an app view is counted as one
   const other = normalizeBatch({visitorId: 'visitor-fedcba9876543210', town: 'Vizag', platform: 'android', events: [view]});
-  assert.equal((await recordAdEvents(db, other, ctx(), t0 + 40 * 60000)).views, 1);
+  assert.equal((await recordAdEvents(db, other, ctx(), t0 + 70000)).views, 1);
   stats = (await db.collection('adStats').doc('ad1').get()).data();
   assert.equal(stats.views, 3);
+  assert.equal(stats.appViews, 1);
   assert.equal(stats.unique, 2);
+  assert.equal((await db.collection('adStatsDaily').doc(`ad1~${dayKey(t0 + 70000)}`).get()).data().appViews, 1);
   assert.equal(stats.vendorId, 'v1');
 });
 

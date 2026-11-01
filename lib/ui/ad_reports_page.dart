@@ -82,13 +82,13 @@ class _AdReportsPageState extends State<AdReportsPage> {
   }
 
   List<ReportTable> _tables(AdReport r) {
-    List<Object> line(String label, AdTotals t) => [label, t.views, if (r.uniqueKnown) t.unique, t.taps, t.seconds, t.missed, t.scheduled];
-    final head = ['', 'Views', if (r.uniqueKnown) 'Unique people', 'Taps', 'Seconds on screen', 'Missed', 'Scheduled'];
+    List<Object> line(String label, AdTotals t) => [label, t.views, if (r.uniqueKnown) ...[t.webViews, t.appViews, t.unique], t.taps, t.seconds, t.missed, t.scheduled];
+    final head = ['', 'Views', if (r.uniqueKnown) ...['Website views', 'App views', 'Unique people'], 'Taps', 'Seconds on screen', 'Missed', 'Scheduled'];
     return [
       ReportTable('Per day', ['Day', ...head.skip(1)], [for (final d in r.days(dayText(from), dayText(to))) line(d.$1, d.$2)]),
       ReportTable('Per ad', ['Ad', ...head.skip(1)], [for (final e in r.byAd.entries) line(titleOf(e.key), e.value)]),
-      ReportTable('Per town', ['Town', ...head.skip(1).where((h) => h != 'Unique people')], [for (final e in r.byTown.entries) [townLabel(e.key), e.value.views, e.value.taps, e.value.seconds, e.value.missed, e.value.scheduled]]),
-      ReportTable('Per device', ['Device', ...head.skip(1).where((h) => h != 'Unique people')], [for (final e in r.byDevice.entries) [e.key == 'android' ? 'App' : 'Website', e.value.views, e.value.taps, e.value.seconds, e.value.missed, e.value.scheduled]]),
+      ReportTable('Per town', ['Town', ...head.skip(1).where((h) => !const {'Unique people', 'Website views', 'App views'}.contains(h))], [for (final e in r.byTown.entries) [townLabel(e.key), e.value.views, e.value.taps, e.value.seconds, e.value.missed, e.value.scheduled]]),
+      ReportTable('Per device', ['Device', ...head.skip(1).where((h) => !const {'Unique people', 'Website views', 'App views'}.contains(h))], [for (final e in r.byDevice.entries) [e.key == 'android' ? 'App' : 'Website', e.value.views, e.value.taps, e.value.seconds, e.value.missed, e.value.scheduled]]),
     ];
   }
 
@@ -181,6 +181,7 @@ class _AdReportsPageState extends State<AdReportsPage> {
             columns: [
               const DataColumn(label: Text('')),
               const DataColumn(label: Text('Views'), numeric: true),
+              if (unique) ...const [DataColumn(label: Text('Website'), numeric: true), DataColumn(label: Text('App'), numeric: true)],
               if (unique) const DataColumn(label: Text('People'), numeric: true),
               const DataColumn(label: Text('Taps'), numeric: true),
               const DataColumn(label: Text('Seconds'), numeric: true),
@@ -192,6 +193,7 @@ class _AdReportsPageState extends State<AdReportsPage> {
                 DataRow(cells: [
                   DataCell(Text(r.$1)),
                   DataCell(Text('${r.$2.views}')),
+                  if (unique) ...[DataCell(Text('${r.$2.webViews}')), DataCell(Text('${r.$2.appViews}'))],
                   if (unique) DataCell(Text('${r.$2.unique}')),
                   DataCell(Text('${r.$2.taps}')),
                   DataCell(Text('${r.$2.seconds}')),
@@ -226,7 +228,7 @@ class _AdReportsPageState extends State<AdReportsPage> {
               return Wrap(
                 key: const ValueKey('live-totals'),
                 spacing: 12,
-                children: [_card('Total views, all time (live)', live.views), _card('Unique people, all time', live.unique), _card('Taps, all time', live.taps)],
+                children: [_card('Total views, all time (live)', live.views), _card('Website views, all time', live.webViews), _card('App views, all time', live.appViews), _card('Unique people, all time', live.unique), _card('Taps, all time', live.taps)],
               );
             },
           ),
@@ -264,6 +266,7 @@ class _AdReportsPageState extends State<AdReportsPage> {
               spacing: 12,
               children: [
                 _card('Total views', r.total.views),
+                if (r.uniqueKnown) ...[_card('Website views', r.total.webViews), _card('App views', r.total.appViews)],
                 if (r.uniqueKnown) _card('Unique people', r.total.unique),
                 _card('Taps', r.total.taps),
                 _card('Seconds on screen', r.total.seconds),

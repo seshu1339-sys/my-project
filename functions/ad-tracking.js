@@ -3,8 +3,8 @@
 //
 // The customer site / app reports what happened to each ad in small batches (callable trackAdEvents). Everything that decides what
 // counts is decided HERE, on the server, never by the client:
-//   view   the ad was on screen for at least 1 second with the page / app active. Counted at most once per device per ad per 30 minutes,
-//          so refreshing again and again does not raise it. Also counts a "unique person" the first time a device ever sees the ad.
+//   view   the ad was on screen for at least 1 second with the page / app active. Counted at most once per device per ad per minute,
+//          so refreshing again and again does not raise it. The same rule for the website and the app. Also counts a "unique person" the first time a device ever sees the ad.
 //   time   more seconds on screen for an ad whose view was counted in the last 35 minutes (no view, no time).
 //   miss   the ad was scheduled into a box but was not visible for a second (tab hidden, scrolled away).
 //   tap    the ad was tapped (every tap counts).
@@ -19,7 +19,7 @@
 const {createHash} = require('node:crypto');
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
 
-const VIEW_GAP_MS = 30 * 60 * 1000;
+const VIEW_GAP_MS = 60 * 1000;
 const TIME_WINDOW_MS = 35 * 60 * 1000;
 const MAX_EVENTS = 50;
 const TYPES = ['view', 'time', 'miss', 'tap'];
@@ -93,8 +93,11 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
         tx.set(guardRef, {adId: event.adId, lastAt: Timestamp.fromMillis(now), expiresAt: Timestamp.fromMillis(now + 40 * 86400000)});
         const first = !unique.exists;
         if (first) tx.set(uniqueRef, {adId: event.adId, at: Timestamp.fromMillis(now)});
-        stat({views: inc(1), seconds: inc(event.seconds), ...(first ? {unique: inc(1)} : {})},
-          {views: inc(1), seconds: inc(event.seconds), ...split('views', 1), ...(first ? {unique: inc(1)} : {})});
+        // views = every view (website + app); appViews = the part from the Android app, so website views = views - appViews
+        // (every view counted before the app existed is a website view).
+        const app = device === 'android' ? {appViews: inc(1)} : {};
+        stat({views: inc(1), ...app, seconds: inc(event.seconds), ...(first ? {unique: inc(1)} : {})},
+          {views: inc(1), ...app, seconds: inc(event.seconds), ...split('views', 1), ...(first ? {unique: inc(1)} : {})});
         tx.set(db.collection('adViews').doc(), {...base, type: 'view', at: Timestamp.fromMillis(now), day, town: batch.town, device, seconds: event.seconds, visitor: key.slice(0, 12)});
         // The daily limit: once today's counted views reach it, the ad is marked for the rest of the (Indian) day and the site stops showing it.
         const limit = Math.round(Number(ad.maxPerDay)) || 0;

@@ -66,13 +66,13 @@ test('a vendor ticks "Ad for your shop"; the admin links a Right Side Ad Box to 
   // the same vendor again (for example after a new photo): the same ad goes on
   assert.deepEqual(await link(3, 'adV1'), {adId: first.adId, started: false});
 
-  // ---- views: counted like every other ad, once per device per 30 minutes, never the vendor's own
+  // ---- views: counted like every other ad, once per device per minute, never the vendor's own
   const V = 'visitor-0123456789abcdef', W = 'visitor-fedcba9876543210';
   const view = (visitorId, adId = first.adId) => normalizeBatch({visitorId, town: 'Narsipatnam', events: [{type: 'view', adId, seconds: 1}]});
   const ctx = (auth = null) => ({userAgent: 'Mozilla/5.0 Chrome/120', auth, staffUids: []});
   const t0 = Date.parse('2031-03-05T10:00:00Z');
   assert.equal((await recordAdEvents(db, view(V), ctx(), t0)).views, 1);
-  assert.equal((await recordAdEvents(db, view(V), ctx(), t0 + 60000)).views, 0, 'the same device again within 30 minutes');
+  assert.equal((await recordAdEvents(db, view(V), ctx(), t0 + 30000)).views, 0, 'the same device again within a minute');
   assert.equal((await recordAdEvents(db, view(W), ctx(), t0 + 120000)).views, 1);
   assert.equal((await recordAdEvents(db, view(V), ctx({uid: 'adV1', token: {}}), t0 + 40 * 60000)).ignored, 1, 'the vendor looking at their own ad');
   assert.equal((await recordAdEvents(db, normalizeBatch({visitorId: V, events: [{type: 'tap', adId: first.adId}]}), ctx(), t0 + 41 * 60000)).taps, 1);
