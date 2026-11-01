@@ -10,7 +10,7 @@ import 'layout_settings.dart';
 import 'home_section_config.dart';
 import 'shared.dart';
 
-/// The "Popular Products" / "Featured Products" homepage section (also
+/// The popular / featured products homepage section (also
 /// doubles as search results when the customer has typed into the header
 /// search box). Shows an "All" + per-category filter tab row above the grid
 /// — stateful locally since the selection only affects this section's own
@@ -67,8 +67,8 @@ class _HomePopularSectionState extends State<HomePopularSection> {
         key: widget.productsKey,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.showHeading)
-            HomePopularHeading(settings: widget.settings, searchText: widget.searchText, count: widget.products.length),
+          if (widget.showHeading && widget.searchText.isNotEmpty)
+            HomePopularHeading(settings: widget.settings, count: widget.products.length),
           if (widget.searchText.isEmpty && tabCategories.isNotEmpty)
             widget.wrapSection(
               'popularFilterChips',
@@ -142,21 +142,16 @@ class _HomePopularSectionState extends State<HomePopularSection> {
   }
 }
 
-/// The heading of the Popular Products section ("Popular Products" and its subtitle, or "Search results" while the customer is searching).
+/// The heading over the products while the customer is searching. With no search the section has no heading.
 class HomePopularHeading extends StatelessWidget {
-  const HomePopularHeading({super.key, required this.settings, required this.searchText, required this.count});
+  const HomePopularHeading({super.key, required this.settings, required this.count});
   final List<Entry> settings;
-  final String searchText;
   final int count;
 
   @override
   Widget build(BuildContext context) => HomeSectionHeading(
-    title: searchText.isEmpty
-        ? sectionConfig(settings, 'popular').text('text', 'Popular Products').tr(context)
-        : 'Search results'.tr(context),
-    subtitle: searchText.isEmpty
-        ? 'Products and services from your neighbourhood'.tr(context)
-        : '{count} matching items'.tr(context, {'count': '$count'}),
+    title: 'Search results'.tr(context),
+    subtitle: '{count} matching items'.tr(context, {'count': '$count'}),
     appearance: sectionConfig(settings, 'popular'),
   );
 }

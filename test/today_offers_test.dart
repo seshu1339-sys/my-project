@@ -93,7 +93,7 @@ void main() {
       ),
     ));
     await tester.pump();
-    expect(find.text("Today's Offers"), findsOneWidget);
+    expect(find.text("Today's Offers"), findsNothing, reason: 'the section has no heading');
     // only box 2 has a live offer: the new design there, the other 5 boxes exactly as before
     expect(find.byType(TodayOfferBox), findsOneWidget);
     final box = find.byKey(const ValueKey('today-offer-box-2'));

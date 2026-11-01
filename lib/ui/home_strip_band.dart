@@ -6,8 +6,7 @@ import 'home_module_boxes.dart';
 /// The band under the Today's Offers cards: the row of product cards (Fresh Fruits & Vegetables) and the Transport / Services boxes.
 ///
 /// Wide ([sideBySide]): the product cards that fit take the left, and the two boxes fill ALL the space to their right (equal width, no
-/// empty gap), from the bottom of the Today's Offers cards down to where the Popular Products heading ends (the category tabs line),
-/// so they are taller than the cards, with larger icon and text. The width left over after whole cards decides how wide the boxes are,
+/// empty gap), from the bottom of the Today's Offers cards down to the bottom of the product cards, with larger icon and text. The width left over after whole cards decides how wide the boxes are,
 /// so they stretch to fill the space on any screen. More cards than fit are reached by scrolling the row.
 ///
 /// Narrow: the product cards across the full width, and the two boxes below them, full width.
@@ -18,7 +17,7 @@ class HomeStripBand extends StatelessWidget {
   /// The row of product cards (empty when there are none).
   final Widget strip;
 
-  /// The Popular Products heading, shown under the cards so the boxes reach down to the category tabs (wide layout only).
+  /// The search results heading, shown under the cards while searching (wide layout only).
   final Widget? heading;
   final bool sideBySide;
 

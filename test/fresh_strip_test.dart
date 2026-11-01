@@ -60,8 +60,6 @@ void main() {
         body: Builder(
           builder: (context) => HomeCategoryProductStrip(
             layout: layoutFor(context, store.entries('settings'), 'crossSellStrip'),
-            defaultTitle: 'Fresh Fruits & Vegetables',
-            icon: Icons.eco_outlined,
             products: many(20),
             store: store,
             onProduct: (_) {},
@@ -95,8 +93,6 @@ void main() {
         body: Builder(
           builder: (context) => HomeCategoryProductStrip(
             layout: layoutFor(context, store.entries('settings'), 'crossSellStrip'),
-            defaultTitle: 'Fresh Fruits & Vegetables',
-            icon: Icons.eco_outlined,
             products: many(9),
             store: store,
             onProduct: (_) {},

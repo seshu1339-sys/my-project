@@ -319,7 +319,7 @@ class WireframeHome extends StatelessWidget {
                     final promoAt = orderedSectionKeys.indexWhere((d) => d.key == 'promo');
                     final mainWidth = wide ? c.maxWidth - page.gap - railWidth : c.maxWidth;
                     final bandSideBySide = mainWidth >= 640 && stripProducts.isNotEmpty;
-                    // The Popular Products heading goes into the band (so the boxes reach down to the category tabs) only when that
+                    // The search results heading goes into the band (under the cards, beside the boxes) only when that
                     // section comes right after Today's Offers.
                     final headingInBand =
                         bandSideBySide && promoAt >= 0 && promoAt + 1 < orderedSectionKeys.length && orderedSectionKeys[promoAt + 1].key == 'popular';
@@ -330,7 +330,7 @@ class WireframeHome extends StatelessWidget {
                                 (store.hasPlace ||
                                     offersForTown.hiddenForLocation > 0)
                             ? NoOffersNotice(store: store, onLocation: onLocation)
-                            // The "Today's Offers" heading and its 6 boxes, each with its item offer of the moment (home_today_offers.dart).
+                            // The 6 boxes of Today's Offers, each with its item offer of the moment (home_today_offers.dart).
                             : TodayOffersSection(
                           store: store,
                           boxes: offers,
@@ -420,15 +420,13 @@ class WireframeHome extends StatelessWidget {
                             HomeStripBand(
                               store: store,
                               sideBySide: bandSideBySide,
-                              heading: headingInBand
-                                  ? HomePopularHeading(settings: settings, searchText: search.text, count: products.length)
+                              heading: headingInBand && search.text.isNotEmpty
+                                  ? HomePopularHeading(settings: settings, count: products.length)
                                   : null,
                               strip: wrapSection(
                                 'crossSellStrip',
                                 HomeCategoryProductStrip(
                                   layout: layoutFor(context, settings, 'crossSellStrip'),
-                                  defaultTitle: 'Fresh Fruits & Vegetables'.tr(context),
-                                  icon: Icons.eco_outlined,
                                   products: stripProducts,
                                   store: store,
                                   onProduct: onProduct,

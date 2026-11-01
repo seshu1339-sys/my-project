@@ -73,7 +73,7 @@ void main() {
           await file.writeAsBytes(bytes!.buffer.asUint8List());
           image.dispose();
         });
-        await tester.ensureVisible(find.text('Popular Products'));
+        await tester.ensureVisible(find.text('All'));
         await tester.pump();
         await tester.runAsync(() async {
           final image =

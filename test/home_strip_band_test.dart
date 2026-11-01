@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
+import 'package:ecommerce_app/ui/home_category_product_strip.dart';
 import 'package:ecommerce_app/ui/home_strip_band.dart';
 
 Future<Store> _store({bool withStripProducts = true}) async {
@@ -44,13 +45,10 @@ void main() {
       final cards = ((b.width - HomeStripBand.minBoxesWidth) / HomeStripBand.cardPitch).floor();
       expect(t.left, closeTo(b.left + cards * HomeStripBand.cardPitch, 1.5));
       expect(s.right, closeTo(b.right, 1.5));
-      // Taller than a product card, from the top of the band to the bottom of the Popular Products heading (just above the category tabs).
-      expect(t.height, greaterThan(200));
+      // As tall as the product cards beside them, ending just above the category tabs.
       expect(t.top, closeTo(b.top, 1.5));
-      final subtitle = tester.getRect(find.text('Products and services from your neighbourhood'));
-      final tabs = tester.getRect(find.text('All'));
-      expect(t.bottom, greaterThanOrEqualTo(subtitle.bottom - 1));
-      expect(t.bottom, lessThanOrEqualTo(tabs.top + 1), reason: 'the boxes end at the category tabs line');
+      expect(t.bottom, closeTo(b.bottom, 1.5));
+      expect(t.bottom, lessThanOrEqualTo(tester.getRect(find.text('All')).top + 1), reason: 'the boxes end at the category tabs line');
       expect(find.byTooltip('Services'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       store.dispose();
@@ -68,8 +66,8 @@ void main() {
     expect(find.byKey(const ValueKey('home-strip-band')), findsNothing, reason: 'no side-by-side band on a phone');
     final t = tester.getRect(find.byKey(const ValueKey('home-box-transport')));
     final s = tester.getRect(find.byKey(const ValueKey('home-box-services')));
-    final strip = tester.getRect(find.text('Fresh Fruits & Vegetables'));
-    expect(t.top, greaterThan(strip.bottom), reason: 'below the product cards');
+    final strip = tester.getRect(find.byType(HomeCategoryProductStrip));
+    expect(t.top, greaterThanOrEqualTo(strip.bottom), reason: 'below the product cards');
     expect((t.width - s.width).abs(), lessThan(1));
     expect(t.top, s.top);
     expect(t.left, lessThan(24), reason: 'starts at the left edge of the page');

@@ -20,7 +20,8 @@ void main() {
     await tester.pump();
     expect(find.text('Browse your everyday essentials'), findsNothing);
     expect(find.text('All Categories'), findsNothing);
-    expect(find.text('Popular Products'), findsWidgets);
+    expect(find.text('Popular Products'), findsNothing);
+    expect(find.text('All'), findsWidgets);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
@@ -38,7 +39,7 @@ void main() {
     store.catalog['settings']!.add(const Entry('section_popular', {'order': 50}));
     await tester.pumpWidget(MarketApp(store: store));
     await tester.pump();
-    final popularY = tester.getTopLeft(find.text('Popular Products')).dy;
+    final popularY = tester.getTopLeft(find.text('All')).dy;
     final servicesY = tester.getTopLeft(find.text('Local Services')).dy;
     expect(servicesY, lessThan(popularY));
     expect(tester.takeException(), isNull);

@@ -51,8 +51,6 @@ void main() {
             body: Builder(
               builder: (context) => HomeCategoryProductStrip(
                 layout: layoutFrom(store, context),
-                defaultTitle: 'Fresh Fruits & Vegetables',
-                icon: Icons.eco_outlined,
                 products: [apple, carrot],
                 store: store,
                 onProduct: (_) {},
@@ -63,7 +61,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text('Fresh Fruits & Vegetables'), findsOneWidget);
+      expect(find.text('Fresh Fruits & Vegetables'), findsNothing, reason: 'the strip has no heading');
       final arts = tester.widgetList<ProductArt>(find.byType(ProductArt));
       expect(
         arts.map((a) => a.height).toSet(),
@@ -96,8 +94,6 @@ void main() {
           body: Builder(
             builder: (context) => HomeCategoryProductStrip(
               layout: layoutFrom(store, context),
-              defaultTitle: 'Fresh Fruits & Vegetables',
-              icon: Icons.eco_outlined,
               products: const [],
               store: store,
               onProduct: (_) {},

@@ -15,7 +15,7 @@ import 'home_impression_once.dart';
 import 'shared.dart';
 import 'shop_route_map.dart';
 
-/// Today's Offers on the home page: the "Today's Offers" heading and the coloured boxes (lib/domain/today_offers.dart). While an item
+/// Today's Offers on the home page: the coloured boxes (lib/domain/today_offers.dart). While an item
 /// offer is live for a box, the box shows it: its colour as a frame round a white inside with "Today's Offer" across the top, the
 /// item's photo big on the left and its name and offer price on the right. Tapping it opens the shop on the map straight away (its
 /// place, the road and its phone). A box with no live offer shows its Today's Offers Box promotion as before (so the town, pincode
@@ -103,22 +103,6 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
         key: const ValueKey('today-offers'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.local_offer_outlined, color: AppTokens.primary),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    "Today's Offers".tr(context),
-                    key: const ValueKey('today-offers-heading'),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ],
-            ),
-          ),
           HeroCarousel(
             entries: todayOfferBoxesFor(widget.boxes, slots),
             appearance: widget.appearance,

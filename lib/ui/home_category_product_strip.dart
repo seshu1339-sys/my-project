@@ -6,32 +6,27 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/fresh_strip.dart';
-import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'layout_settings.dart';
 import 'shared.dart';
 
-/// The "Fresh Fruits & Vegetables" strip of product cards (photo, name,
+/// The strip of fruit and vegetable product cards (photo, name,
 /// price), distinct from the full Featured Products grid further down the
 /// page: 9 cards at a time, fitted to the width (9, 5 or 3 a row), then the
 /// next 9 after a while, round and round (lib/domain/fresh_strip.dart). The
-/// whole strip (heading text, style, card photo brightness) is one numbered
+/// whole strip (style, card photo brightness) is one numbered
 /// "main" element (see element_groups.dart's `crossSellStrip`); each card's
 /// own color/image/brightness/text style is its own sub-number, never size.
 class HomeCategoryProductStrip extends StatefulWidget {
   const HomeCategoryProductStrip({
     super.key,
     required this.layout,
-    required this.defaultTitle,
-    required this.icon,
     required this.products,
     required this.store,
     required this.onProduct,
     this.wrapProductItem = _identityItem,
   });
   final ComponentLayout layout;
-  final String defaultTitle;
-  final IconData icon;
   final List<Entry> products;
   final Store store;
   final ValueChanged<Entry> onProduct;
@@ -64,7 +59,7 @@ class _HomeCategoryProductStripState extends State<HomeCategoryProductStrip> {
 
   @override
   Widget build(BuildContext context) {
-    final layout = widget.layout, products = widget.products, store = widget.store, icon = widget.icon;
+    final layout = widget.layout, products = widget.products, store = widget.store;
     if (!layout.visible || products.isEmpty) return const SizedBox.shrink();
     final entry = layout.entry;
     final pages = pagesOf(products);
@@ -74,31 +69,6 @@ class _HomeCategoryProductStripState extends State<HomeCategoryProductStrip> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                color: entry.text('textColor').isEmpty
-                    ? AppTokens.primary
-                    : colorFromHex(entry.text('textColor'), AppTokens.primary),
-              ),
-              const SizedBox(width: 8),
-              // Flexible: a long title in a narrow column is cut with "..." instead of overflowing the row.
-              Flexible(
-                child: Text(
-                  entry.text('text', widget.defaultTitle).tr(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sectionTextStyle(
-                    entry,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, c) {
               const gap = 10.0;
