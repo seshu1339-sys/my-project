@@ -7,6 +7,7 @@
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
+const {planAllows, PLAN_NEEDED} = require('./plan-gate');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
@@ -37,6 +38,7 @@ async function requireExclusivesVendor(uid) {
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved first.');
   if (vendor.specialCategoryExclusives !== true) throw new HttpsError('permission-denied', 'Special Category Exclusives is not enabled for your account.');
+  if (!(await planAllows(db, uid, 'exclusives'))) throw new HttpsError('failed-precondition', PLAN_NEEDED);
   return vendor;
 }
 function validDuration(days, vendor) {

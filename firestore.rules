@@ -260,6 +260,28 @@ service cloud.firestore {
       allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['submitted', 'confirmed', 'fulfilled', 'cancelled'];
     }
+    // Subscription Plans module (functions/modules/plans): vendors read the plans as the admin made them and their own plan; functions write everything.
+    match /vendorPlans/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /planServiceGates/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /vendorPlanPeriods/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+    match /vendorPlanStatus/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    // A payment request is the only meeting point of the plans and payment modules; a person reads their own, functions write them.
+    match /paymentRequests/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
     // PIN hashes, rate limits, and orders are created only by trusted functions.
     match /{document=**} { allow read, write: if false; }
   }

@@ -26,7 +26,7 @@ void main() {
 
       // The main tabs, in this order, and nothing else in the tab bar.
       final labels = tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList();
-      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Settings']);
+      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Settings']);
       // Insights is the first page you see.
       expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0);
       // The top bar has only Search, AI Agent (and Sign out when live), each with a visible text label, and no bare icons.
@@ -37,7 +37,7 @@ void main() {
 
       // Settings holds the rest. The Product Image Library is one of the collections of the generic admin form:
       // open its "Add new" form and the Preview dialog on it.
-      DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7); // the Settings tab (it may be scrolled off a phone's tab bar)
+      DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(labels.indexOf('Settings')); // the Settings tab (it may be scrolled off a phone's tab bar)
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('settings-productImageLibrary')), 120, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);

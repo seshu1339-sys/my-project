@@ -14,6 +14,7 @@ const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
 const {OPTIONS, areaFullMessage} = require('./radius');
+const {requirePlan} = require('./plan-gate');
 
 const PLANS = {normal: {rounds: 1, seconds: 5}, silver: {rounds: 2, seconds: 7}, gold: {rounds: 3, seconds: 10}};
 const CONTENT = ['image', 'text', 'imageText'];
@@ -76,6 +77,7 @@ async function submitAd(db, uid, data, now = Date.now()) {
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw Error('Only an approved vendor can submit ads.');
   if (vendor.suspended === true) throw Error('Your account is suspended.');
+  await requirePlan(db, uid, 'vendorAds', now);
   const fields = validateSubmission(data, uid);
   let adId = null;
   if (data.adId !== undefined && data.adId !== null && data.adId !== '') {

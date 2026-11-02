@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../modules/module_admin.dart';
 import '../services/admin_route.dart';
 import 'admin_entry_list.dart';
 import 'admin_frame.dart';
@@ -47,10 +48,13 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  static const _tabs = ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Settings'];
+  static final _tabs = ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', for (final m in moduleAdminTabs) m.title, 'Settings'];
 
   Widget _tab(String name) {
     final store = widget.store;
+    for (final module in moduleAdminTabs) {
+      if (module.title == name) return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: module.build(store)));
+    }
     final page = switch (name) {
       'Insights' => AdminInsightsPage(store: store),
       'Orders' => AdminOrders(store: store),

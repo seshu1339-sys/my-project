@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../modules/plans/plans_module.dart';
 import 'my_numbers_card.dart';
 import 'quick_add.dart';
 import 'vendor_ads_page.dart';
@@ -45,6 +46,7 @@ class VendorWorkspace extends StatelessWidget {
     // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).
     MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
     const SizedBox(height: 20),
+    VendorPlansSection(store: store, uid: uid),
     VendorShopPhotosSection(store: store, uid: uid),
     VendorShopAdSection(store: store, uid: uid),
     VendorMyAdsCard(store: store, uid: uid),
