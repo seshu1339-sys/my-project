@@ -1,11 +1,11 @@
 import 'catalog.dart';
 
 // Today's Offers: the 6 coloured boxes under the "Today's Offers" heading on the home page. Each box is one of the Today's Offers
-// Box promotions (placement 'carousel', in their order); while an item offer is live for it, the box shows the offer instead: a promotion with
-//   placement 'offer', slot 1-6 (the box), productId, name (the item), imageUrl (the item's photo), offerPrice, unit, shopId,
+// Box promotions (placement 'carousel', in their order) unless an offer fills it. An item offer is a promotion with
+//   placement 'offer', slot 1-6 (its turn in the list), productId, name (the item), imageUrl (the item's photo), offerPrice, unit, shopId,
 //   startsAt, endsAt (ISO)
-// set by the admin (Settings > Today's Offers Box > Item offers). Each box shows its offer only from its start to its end; several
-// offers can wait for the same box one after another, and a box with no offer now shows its promotion as before.
+// set by the admin (Settings > Today's Offers Box > Item offers). It shows only from its start to its end. Offers and the order of the
+// boxes are put together on the home page (lib/ui/home_today_offers.dart, lib/modules/offerrotation).
 
 const todayOfferBoxCount = 6;
 const todayOfferPlacement = 'offer';
@@ -23,18 +23,14 @@ int todayOfferSlot(Entry offer) {
 
 DateTime? _time(Entry e, String key) => DateTime.tryParse(e.text(key));
 
-/// What each box (index 0 = box 1) shows at [now]: the offer live then, the one that started last when two overlap; null for none.
-List<Entry?> todayOfferSlots(Iterable<Entry> offers, DateTime now) {
-  final slots = List<Entry?>.filled(todayOfferBoxCount, null);
-  for (final o in offers) {
-    final slot = todayOfferSlot(o);
-    if (!isTodayOffer(o) || slot == 0 || !o.visibleAt(now)) continue;
-    final current = slots[slot - 1];
-    final start = _time(o, 'startsAt'), currentStart = current == null ? null : _time(current, 'startsAt');
-    if (current == null || (start != null && (currentStart == null || start.isAfter(currentStart)))) slots[slot - 1] = o;
-  }
-  return slots;
-}
+/// The offers live at [now], by their box number, then by who started first.
+List<Entry> liveTodayOffers(Iterable<Entry> offers, DateTime now) => [
+  for (final o in offers)
+    if (isTodayOffer(o) && todayOfferSlot(o) != 0 && o.visibleAt(now)) o,
+]..sort((a, b) {
+    final bySlot = todayOfferSlot(a).compareTo(todayOfferSlot(b));
+    return bySlot != 0 ? bySlot : a.text('startsAt').compareTo(b.text('startsAt'));
+  });
 
 /// The next time after [now] that any box changes (an offer starts or ends), or null when none will.
 DateTime? nextTodayOfferChange(Iterable<Entry> offers, DateTime now) {
@@ -46,13 +42,6 @@ DateTime? nextTodayOfferChange(Iterable<Entry> offers, DateTime now) {
     }
   }
   return next;
-}
-
-/// The boxes on the page: the Today's Offers Box promotions as they are; when an offer is live for a box past the last of them,
-/// default-coloured boxes up to it.
-List<Entry> todayOfferBoxesFor(List<Entry> carousel, List<Entry?> slots) {
-  final last = slots.lastIndexWhere((o) => o != null) + 1;
-  return last <= carousel.length ? carousel : todayOfferBoxLooks(carousel).take(last).toList();
 }
 
 /// The look of each of the 6 boxes: the Today's Offers Box promotions in their order, then the default colours.

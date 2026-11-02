@@ -29,19 +29,18 @@ Entry offer(String id, int slot, String from, String to, {String name = 'Tomato'
 
 void main() {
   final now = DateTime.utc(2026, 10, 26, 6);
-  test('each box shows its offer only between its start and end; the next one waits; a box with none is empty', () {
+  test('an offer is live only between its start and end, and the live ones line up by box number', () {
     final offers = [
       offer('a', 1, '2026-10-26T00:00:00Z', '2026-10-26T12:00:00Z'),
       offer('b', 1, '2026-10-26T12:00:00Z', '2026-10-26T20:00:00Z', name: 'Onion'),
       offer('c', 2, '2026-10-25T00:00:00Z', '2026-10-26T05:00:00Z', name: 'ended'),
       offer('d', 3, '2026-10-26T05:00:00Z', '2026-10-27T00:00:00Z', name: 'Potato'),
-      offer('e', 3, '2026-10-26T05:30:00Z', '2026-10-26T09:00:00Z', name: 'Carrot'), // overlaps d, starts later: shows
+      offer('e', 3, '2026-10-26T05:30:00Z', '2026-10-26T09:00:00Z', name: 'Carrot'), // overlaps d: both show
       offer('f', 7, '2026-10-26T00:00:00Z', '2026-10-27T00:00:00Z', name: 'no box'),
       const Entry('carousel', {'placement': 'carousel', 'slot': 4}),
     ];
-    final slots = todayOfferSlots(offers, now);
-    expect(slots.map((o) => o?.text('name')), ['Tomato', null, 'Carrot', null, null, null]);
-    expect(todayOfferSlots(offers, DateTime.utc(2026, 10, 26, 13)).first?.text('name'), 'Onion', reason: 'the next one comes by itself');
+    expect(liveTodayOffers(offers, now).map((o) => o.text('name')), ['Tomato', 'Potato', 'Carrot']);
+    expect(liveTodayOffers(offers, DateTime.utc(2026, 10, 26, 13)).first.text('name'), 'Onion', reason: 'the next one comes by itself');
     expect(nextTodayOfferChange(offers, now), DateTime.utc(2026, 10, 26, 9));
     expect(overlappingTodayOffers(offers, offers[3]).map((o) => o.id), ['e']);
     expect(overlappingTodayOffers(offers, offers[0]), isEmpty, reason: 'one after another is not an overlap');
@@ -51,10 +50,6 @@ void main() {
     // the 6 boxes keep the Today's Offers Box promotions' look, then the default colours
     final looks = todayOfferBoxLooks(const [Entry('p1', {'backgroundColor': '#111111'})]);
     expect(looks.map((l) => l.text('backgroundColor')), ['#111111', ...todayOfferDefaultColors.skip(1)]);
-    // the boxes on the page are the promotions as they are, plus default boxes only up to a live offer past them
-    final three = [for (var i = 1; i <= 3; i++) Entry('c$i', const {})];
-    expect(todayOfferBoxesFor(three, slots).map((b) => b.id), ['c1', 'c2', 'c3'], reason: 'offers in boxes 1 and 3 only');
-    expect(todayOfferBoxesFor(three, [null, null, null, null, offers[0], null]).map((b) => b.id), ['c1', 'c2', 'c3', 'today-offer-box-4', 'today-offer-box-5']);
   });
 
   Future<Store> openStore(List<Entry> offers) async {
@@ -71,7 +66,7 @@ void main() {
     return store;
   }
 
-  testWidgets('the home section: a box with a live offer shows it (white inside its colour, photo left, name and price right), the others are as before, and a tap opens the shop on the map', (tester) async {
+  testWidgets('the home section: a live offer comes first (white inside its colour, photo left, name and price right), promotions fill the rest, and a tap opens the shop on the map', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -94,14 +89,14 @@ void main() {
     ));
     await tester.pump();
     expect(find.text("Today's Offers"), findsNothing, reason: 'the section has no heading');
-    // only box 2 has a live offer: the new design there, the other 5 boxes exactly as before
+    // one live offer: it takes the first box, whatever its box number, and promotions fill the other 5 exactly as before
     expect(find.byType(TodayOfferBox), findsOneWidget);
-    final box = find.byKey(const ValueKey('today-offer-box-2'));
+    final box = find.byKey(const ValueKey('today-offer-box-1'));
     expect(box, findsOneWidget);
-    for (final i in [1, 3, 4, 5, 6]) {
+    for (final i in [1, 2, 3, 4, 5]) {
       expect(find.text('Old box $i'), findsOneWidget);
     }
-    expect(find.text('Old box 2'), findsNothing);
+    expect(find.text('Old box 6'), findsNothing);
     // inside: a white area in the box's colour, "Today's Offer" across the top, the photo left, the name and price under it right
     expect(find.descendant(of: box, matching: find.byKey(const ValueKey('today-offer-white'))), findsOneWidget);
     final label = tester.getRect(find.descendant(of: box, matching: find.text("Today's Offer")));

@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "vendorPremium",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "active", "order": "ASCENDING"},
+        {"fieldPath": "endsAt", "order": "ASCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "vendorOffers",
       "queryScope": "COLLECTION",
       "fields": [
