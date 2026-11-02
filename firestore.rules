@@ -332,6 +332,48 @@ service cloud.firestore {
       allow write: if false;
     }
     match /aiDailyUse/{id} { allow read, write: if false; }
+    // Flash module (functions/modules/flash): a person reads their own chats in each of the three separate collections, the admin reads all.
+    // Tickets, their AI suggestions, the counts and the settings are for the admin only. Functions write everything.
+    match /flashUserChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashUserChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashVendorChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashVendorChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashStaffChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashStaffChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashTickets/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashTicketTriage/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashStats/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashConfig/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     // PIN hashes, rate limits, and orders are created only by trusted functions.
     match /{document=**} { allow read, write: if false; }
   }

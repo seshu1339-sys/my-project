@@ -20,6 +20,7 @@ test('there is a folder per module', () => {
   assert.ok(modules.includes('todays-offer'));
   assert.ok(modules.includes('wholesale'));
   assert.ok(modules.includes('payments'));
+  assert.ok(modules.includes('flash'));
 });
 
 for (const id of modules) {
