@@ -1,4 +1,5 @@
 import 'home_module.dart';
+import 'offers/admin_offers.dart';
 import 'plans/admin_plans.dart';
 import 'transport/admin_transport.dart';
 
@@ -6,4 +7,4 @@ import 'transport/admin_transport.dart';
 const moduleAdminSections = <ModuleAdminSection>[transportAdminSection];
 
 /// The modules with their own main tab in the admin panel, in this order, between Promotions and Settings.
-const moduleAdminTabs = <ModuleAdminSection>[plansAdminSection];
+const moduleAdminTabs = <ModuleAdminSection>[plansAdminSection, offersAdminSection];

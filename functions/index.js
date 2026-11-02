@@ -81,6 +81,7 @@ Object.assign(exports, require('./ai-agent-backup'));
 Object.assign(exports, require('./ai-agent-query'));
 // Independent feature modules (functions/modules/<name>/). Each is one line here and shares nothing with the others.
 Object.assign(exports, require('./modules/plans'));
+Object.assign(exports, require('./modules/vendor-offers'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

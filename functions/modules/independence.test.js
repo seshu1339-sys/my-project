@@ -15,6 +15,7 @@ const requires = file => [...readFileSync(file, 'utf8').matchAll(/require\('(\.[
 
 test('there is a folder per module', () => {
   assert.ok(modules.includes('plans'));
+  assert.ok(modules.includes('vendor-offers'));
 });
 
 for (const id of modules) {

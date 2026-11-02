@@ -282,6 +282,15 @@ service cloud.firestore {
       allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow write: if false;
     }
+    // Vendor Offers module (functions/modules/vendor-offers): anyone reads a live offer, a vendor their own, the admin all; functions write everything.
+    match /vendorOffers/{id} {
+      allow read: if resource.data.status == 'live' || admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /vendorOffersConfig/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     // PIN hashes, rate limits, and orders are created only by trusted functions.
     match /{document=**} { allow read, write: if false; }
   }

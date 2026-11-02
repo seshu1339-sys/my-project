@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "vendorOffers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "endsAt", "order": "ASCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "usageOwnerDaily",
       "queryScope": "COLLECTION",
       "fields": [

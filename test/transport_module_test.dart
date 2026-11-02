@@ -17,9 +17,9 @@ Future<Store> _store() async {
 }
 
 void main() {
-  test('Transport and Services are two modules with their own routes; Transport has its own collection', () {
-    expect(homeModules.map((m) => m.id), ['transport', 'services']);
-    expect(homeModules.map((m) => m.route).toSet(), hasLength(2));
+  test('Transport, Services and Shop Offers are modules with their own routes; Transport has its own collection', () {
+    expect(homeModules.map((m) => m.id), ['transport', 'services', 'offers']);
+    expect(homeModules.map((m) => m.route).toSet(), hasLength(3));
     expect(transportModule.route, '/transport');
     expect(transportModule.collection, 'transport');
   });
