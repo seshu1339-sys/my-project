@@ -308,6 +308,30 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/vendorPremium/$(request.auth.uid)).data.endsAt > request.time);
       allow write: if false;
     }
+    // Payment module (functions/modules/payments): vendors read only the bank details to pay to; the patterns, SMS records and claimed ids are admin only.
+    match /paymentBankPublic/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /paymentBankConfig/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /paymentSms/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /paymentIds/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /paymentScreenshotHashes/{id} { allow read, write: if false; }
+    // ai-core (functions/modules/ai-core): the log of every AI call is for the admin; the daily counts are for functions only.
+    match /aiCallLog/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /aiDailyUse/{id} { allow read, write: if false; }
     // PIN hashes, rate limits, and orders are created only by trusted functions.
     match /{document=**} { allow read, write: if false; }
   }

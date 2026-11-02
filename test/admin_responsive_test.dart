@@ -26,7 +26,7 @@ void main() {
 
       // The main tabs, in this order, and nothing else in the tab bar.
       final labels = tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList();
-      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Settings']);
+      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Payments', 'Settings']);
       // Insights is the first page you see.
       expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0);
       // The top bar has only Search, AI Agent (and Sign out when live), each with a visible text label, and no bare icons.

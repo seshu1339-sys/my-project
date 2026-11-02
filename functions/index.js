@@ -85,6 +85,7 @@ Object.assign(exports, require('./modules/vendor-offers'));
 Object.assign(exports, require('./modules/premium-status'));
 Object.assign(exports, require('./modules/todays-offer'));
 Object.assign(exports, require('./modules/wholesale'));
+Object.assign(exports, require('./modules/payments'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

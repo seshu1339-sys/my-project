@@ -30,7 +30,7 @@ void main() {
   const forbidden = ['shop', 'promo', 'vendor', 'quick_add', 'admin', 'ads_', 'ad_box', 'home_', 'wireframe', 'storefront', 'store_'];
 
   test('there is a folder per module', () {
-    expect(moduleIds, containsAll(['transport', 'services', 'offers', 'premium', 'offerstore', 'offerrotation', 'offerdisplay', 'premiumscreen', 'wholesale', 'premiumadmin']));
+    expect(moduleIds, containsAll(['transport', 'services', 'offers', 'premium', 'offerstore', 'offerrotation', 'offerdisplay', 'premiumscreen', 'wholesale', 'premiumadmin', 'payments']));
   });
 
   for (final id in moduleIds) {

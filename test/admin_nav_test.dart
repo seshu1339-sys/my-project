@@ -29,7 +29,7 @@ void main() {
   testWidgets('the main tabs are Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, the module tabs, then Settings', (tester) async {
     await _open(tester, 1200);
     expect(tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList(), [
-      'Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Settings',
+      'Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Payments', 'Settings',
     ]);
     expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0, reason: 'Insights is the home page');
     expect(find.text('Site and ad statistics'), findsOneWidget);

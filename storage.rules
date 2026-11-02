@@ -73,6 +73,11 @@ service firebase.storage {
       allow create, update: if isAdmin() && isImage();
       allow delete: if isAdmin();
     }
+    // Payment module: a screenshot is private to its vendor and the admin, and cannot be swapped after sending. Functions remove it after the decision.
+    match /paymentScreenshots/{uid}/{file} {
+      allow read: if verified() && (request.auth.uid == uid || isAdmin());
+      allow create: if verified() && request.auth.uid == uid && isImage() && resource == null;
+    }
     // Up to settings/business.vendorPhotoLimit shop photos per vendor (default 3), fixed
     // filenames shopPhoto1..shopPhoto9. The actual configured limit is enforced by
     // submitShopPhoto/reviewShopPhoto (functions/vendor-photos.js); this rule only fixes a

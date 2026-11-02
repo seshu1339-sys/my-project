@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/offers/offers_module.dart';
-import '../modules/plans/plans_module.dart';
 import 'my_numbers_card.dart';
 import 'quick_add.dart';
 import 'vendor_ads_page.dart';
+import 'vendor_plans_payment.dart';
 import 'vendor_premium_entry.dart';
 import 'vendor_section_exclusives.dart';
 import 'vendor_section_kit.dart';
@@ -49,7 +49,7 @@ class VendorWorkspace extends StatelessWidget {
     MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
     const SizedBox(height: 20),
     VendorPremiumEntry(store: store, uid: uid),
-    VendorPlansSection(store: store, uid: uid),
+    VendorPlansWithPayment(store: store, uid: uid),
     VendorOffersSection(store: store, uid: uid),
     VendorShopPhotosSection(store: store, uid: uid),
     VendorShopAdSection(store: store, uid: uid),
