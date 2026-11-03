@@ -308,16 +308,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/vendorPremium/$(request.auth.uid)).data.endsAt > request.time);
       allow write: if false;
     }
-    // Payment module (functions/modules/payments): vendors read only the bank details to pay to; the patterns, SMS records and claimed ids are admin only.
-    match /paymentBankPublic/{id} {
+    // Payment module (functions/modules/payments, Razorpay): vendors read only whether payments are open; the switch and the used
+    // payment ids are admin only. Only functions write.
+    match /paymentPublic/{id} {
       allow read: if signedIn();
       allow write: if false;
     }
-    match /paymentBankConfig/{id} {
-      allow read: if admin();
-      allow write: if false;
-    }
-    match /paymentSms/{id} {
+    match /paymentSettings/{id} {
       allow read: if admin();
       allow write: if false;
     }
@@ -325,7 +322,6 @@ service cloud.firestore {
       allow read: if admin();
       allow write: if false;
     }
-    match /paymentScreenshotHashes/{id} { allow read, write: if false; }
     // ai-core (functions/modules/ai-core): the log of every AI call is for the admin; the daily counts are for functions only.
     match /aiCallLog/{id} {
       allow read: if admin();

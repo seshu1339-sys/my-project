@@ -285,7 +285,7 @@ class _HomeSectionEditorState extends State<HomeSectionEditor> {
         );
       default: // ads: the real boxes changing from one ad to the next with the chosen animation
         final config = AdsConfig.from([Entry('adsConfig', {...store.entries('settings').where((e) => e.id == 'adsConfig').firstOrNull?.data ?? const {}, 'animation': animation, 'animationSpeed': speed ?? 5, 'seconds': 2, 'borderColor': colors['borderColor'] ?? '', 'backgroundColor': colors['backgroundColor'] ?? '', 'textColor': colors['textColor'] ?? ''})]);
-        final live = liveAds(store.entries('ads'), DateTime.now(), showAll: true);
+        final live = liveAds(customerAds(store.entries('ads')), DateTime.now(), showAll: true);
         final ads = live.length >= 2
             ? live.take(4).toList()
             : const [

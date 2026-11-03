@@ -1,113 +1,98 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import '../home_module.dart';
-import 'admin_payment_settings.dart';
 import 'payment_data.dart';
 
 Widget _build(Store store) => AdminPaymentsPage(store: store);
 
 /// The Payments tab of the admin panel (listed in module_admin.dart).
-const paymentsAdminSection = ModuleAdminSection(id: 'payments', title: 'Payments', icon: Icons.account_balance_outlined, hint: 'Manual check and bank settings', build: _build);
+const paymentsAdminSection = ModuleAdminSection(id: 'payments', title: 'Payments', icon: Icons.account_balance_outlined, hint: 'Razorpay on/off and recent payments', build: _build);
 
-/// Admin > Payments: the manual check list and the bank settings, saved through the module's own callables.
+/// Admin > Payments: the Razorpay switch, saved through the module's own callable, and the latest payments.
 class AdminPaymentsPage extends StatelessWidget {
   const AdminPaymentsPage({super.key, required this.store});
   final Store store;
 
-  Future<String> _screenshotUrl(String path) => FirebaseStorage.instance.ref(path).getDownloadURL();
-
   @override
-  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: store.firestore.collection('paymentRequests').where('status', isEqualTo: 'manual_review').snapshots(),
-    builder: (context, waiting) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: store.firestore.collection('paymentBankConfig').doc('main').snapshots(),
-      builder: (context, config) {
-        if (waiting.hasError || config.hasError) return const Center(child: Text('Payments could not load.'));
-        // The settings boxes are filled once, so they wait for the saved values: placeholders must never be saved over them.
-        if (!waiting.hasData || !config.hasData) return const Center(child: CircularProgressIndicator());
-        final saved = config.data?.data();
+  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('paymentSettings').doc('main').snapshots(),
+    builder: (context, settings) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: store.firestore.collection('paymentRequests').orderBy('createdAt', descending: true).limit(50).snapshots(),
+      builder: (context, recent) {
+        if (settings.hasError || recent.hasError) return const Center(child: Text('Payments could not load.'));
+        if (!settings.hasData || !recent.hasData) return const Center(child: CircularProgressIndicator());
+        final saved = settings.data?.data() ?? const {};
         return AdminPaymentsView(
-          waiting: [for (final doc in waiting.data!.docs) PaymentRequest.fromData(doc.id, doc.data())],
-          config: saved == null ? placeholderBankConfig : BankConfig(saved),
-          screenshotUrl: _screenshotUrl,
-          onDecide: (id, action) => store.call('reviewPayment', {'requestId': id, 'action': action}),
-          onSaveConfig: (fields) => store.call('savePaymentConfig', fields),
-          onTest: (sender, text) => store.call('testPaymentSms', {'sender': sender, 'text': text}),
+          enabled: saved['enabled'] == true,
+          keysSet: saved['keysSet'] == true,
+          recent: [for (final doc in recent.data!.docs) PaymentRequest.fromData(doc.id, doc.data())],
+          onSwitch: (on) async => Map<String, dynamic>.from(await store.call('savePaymentSettings', {'enabled': on})),
         );
       },
     ),
   );
 }
 
-class AdminPaymentsView extends StatelessWidget {
-  const AdminPaymentsView({super.key, required this.waiting, required this.config, required this.screenshotUrl, required this.onDecide, required this.onSaveConfig, required this.onTest});
-  final List<PaymentRequest> waiting;
-  final BankConfig config;
-  final Future<String> Function(String path) screenshotUrl;
-  final Future<void> Function(String requestId, String action) onDecide;
-  final Future<void> Function(Map<String, dynamic> fields) onSaveConfig;
-  final Future<Map<String, dynamic>> Function(String sender, String text) onTest;
+class AdminPaymentsView extends StatefulWidget {
+  const AdminPaymentsView({super.key, required this.enabled, required this.keysSet, required this.recent, required this.onSwitch});
+  final bool enabled, keysSet;
+  final List<PaymentRequest> recent;
+  // Saves the switch; the answer says whether the keys are set.
+  final Future<Map<String, dynamic>> Function(bool on) onSwitch;
 
-  Future<void> _decide(BuildContext context, PaymentRequest request, String action) async {
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: Text(action == 'approve' ? 'Approve ${paymentMoney(request.amount)}?' : 'Reject this payment?'),
-        content: Text(action == 'approve' ? 'Check the money is in the bank first. This activates what the vendor paid for.' : 'The vendor is told it was not accepted.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Cancel')),
-          FilledButton(key: const ValueKey('payment-confirm'), onPressed: () => Navigator.pop(dialog, true), child: Text(action == 'approve' ? 'Approve' : 'Reject')),
-        ],
-      ),
-    );
-    if (yes != true || !context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+  @override
+  State<AdminPaymentsView> createState() => _AdminPaymentsViewState();
+}
+
+class _AdminPaymentsViewState extends State<AdminPaymentsView> {
+  bool busy = false;
+
+  Future<void> _switch(bool on) async {
+    setState(() => busy = true);
     try {
-      await onDecide(request.id, action);
-      messenger.showSnackBar(SnackBar(content: Text(action == 'approve' ? 'Approved' : 'Rejected')));
+      final result = await widget.onSwitch(on);
+      if (!mounted) return;
+      final text = !on ? 'Payments are off. Vendors see "Payments will open soon".' : result['ready'] == true ? 'Payments are on.' : 'Saved, but the Razorpay keys are not set yet, so payments stay closed.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
-  Widget _claim(PaymentRequest request) {
-    final amount = request.claimedAmount;
-    return Text('The screenshot says: ${amount == null ? 'nothing readable' : '${paymentMoney(amount)}, ID ${request.claimedId}, ${request.claimedDate} ${request.claimedTime}'}');
-  }
-
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: [
-    Text('Manual check', style: Theme.of(context).textTheme.headlineSmall),
-    const Text('Payments that could not be confirmed by a bank SMS. AI only reads the screenshot; nothing here is approved until you do it.'),
-    const SizedBox(height: 8),
-    if (waiting.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Nothing is waiting.', key: ValueKey('payments-none-waiting')))),
-    for (final request in waiting)
-      Card(
-        key: ValueKey('payment-${request.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${request.label}: ${paymentMoney(request.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(request.reviewReason),
-            _claim(request),
-            if (request.screenshotPath.isNotEmpty)
-              FutureBuilder<String>(
-                future: screenshotUrl(request.screenshotPath),
-                builder: (context, url) => url.hasData
-                    ? Padding(padding: const EdgeInsets.only(top: 8), child: Image.network(url.data!, height: 240, errorBuilder: (_, _, _) => const Text('The screenshot could not load.')))
-                    : const SizedBox.shrink(),
-              ),
-            Wrap(spacing: 4, children: [
-              TextButton(key: ValueKey('payment-approve-${request.id}'), onPressed: () => _decide(context, request, 'approve'), child: const Text('Approve')),
-              TextButton(key: ValueKey('payment-reject-${request.id}'), onPressed: () => _decide(context, request, 'reject'), child: const Text('Reject')),
-            ]),
-          ]),
+  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
+    Card(
+      child: Column(children: [
+        SwitchListTile(
+          key: const ValueKey('payments-switch'),
+          title: const Text('Vendors can pay with Razorpay'),
+          subtitle: Text(widget.keysSet ? 'Razorpay keys are set.' : 'Razorpay keys are not set yet: payments stay closed even when this is on.'),
+          value: widget.enabled,
+          onChanged: busy ? null : _switch,
         ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            'Payments are confirmed by Razorpay itself; nothing here needs checking by hand. A payment marked "refund it" came in for a choice '
+            'the vendor had already changed: refund it from the Razorpay dashboard.',
+            style: TextStyle(fontSize: 12),
+          ),
+        ),
+      ]),
+    ),
+    const SizedBox(height: 12),
+    Text('Latest payments', style: Theme.of(context).textTheme.titleMedium),
+    if (widget.recent.isEmpty) const Padding(padding: EdgeInsets.all(12), child: Text('No payments yet.')),
+    for (final r in widget.recent)
+      ListTile(
+        key: ValueKey('payment-${r.id}'),
+        title: Text('${r.label} · ${paymentMoney(r.amount)}'),
+        subtitle: Text([paymentStatusWords[r.status] ?? r.status, if (r.razorpayPaymentId.isNotEmpty) r.razorpayPaymentId, 'vendor ${r.uid}'].join(' · ')),
+        leading: Icon(r.status == 'verified' ? Icons.check_circle_outline : r.status == 'paid_after_cancel' ? Icons.warning_amber : Icons.schedule),
       ),
-    const SizedBox(height: 24),
-    AdminPaymentSettings(config: config, onSave: onSaveConfig, onTest: onTest),
   ]);
 }

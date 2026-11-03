@@ -8,8 +8,8 @@
 //   time   more seconds on screen for an ad whose view was counted in the last 35 minutes (no view, no time).
 //   miss   the ad was scheduled into a box but was not visible for a second (tab hidden, scrolled away).
 //   tap    the ad was tapped (every tap counts).
-// Not counted at all: the vendor who owns the ad, the admin, field staff, known bots and crawlers, and the test devices listed in
-// settings/adsConfig.testDevices.
+// Not counted at all: the vendor who owns the ad, the admin, field staff (except for an ad the admin aimed at staff: audience
+// "staff"), known bots and crawlers, and the test devices listed in settings/adsConfig.testDevices.
 //
 // Every counted view / tap is written to adViews (time, town, device) so the admin can check any number later. Totals live in
 // adStats/<ad> (what the vendor app and admin watch live) and per day in adStatsDaily/<ad>~<day>.
@@ -55,7 +55,7 @@ function ignoredBecause({userAgent, auth, ad, config, visitorId, staffUids = []}
   const tests = String(config?.testDevices || '').split(/[,\s]+/).filter(Boolean);
   if (tests.includes(visitorId)) return 'test device';
   if (auth?.token?.admin === true) return 'admin';
-  if (auth?.uid && staffUids.includes(auth.uid)) return 'staff';
+  if (auth?.uid && staffUids.includes(auth.uid) && !String(ad?.audience || '').split(',').includes('staff')) return 'staff';
   if (auth?.uid && ad?.vendorId && ad.vendorId === auth.uid) return 'owner';
   return '';
 }

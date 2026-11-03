@@ -6,10 +6,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'data/store.dart';
 import 'services/firebase_startup.dart';
+import 'services/analytics.dart';
 import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
+import 'ui/app_bottom_ad.dart';
 import 'ui/sign_in_panel.dart';
 import 'ui/vendor_home.dart';
 
@@ -39,6 +41,8 @@ Future<void> main() async {
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) {
     unawaited(startUsage(app: 'vendor'));
+    // Views of the ads in the bottom box (lib/ui/app_bottom_ad.dart).
+    unawaited(Analytics.startAppAdTracker());
     // Google Analytics on the website (lib/services/google_analytics.dart), when the build has the measurement id.
     startGoogleAnalytics(app: 'vendor');
   }
@@ -55,6 +59,8 @@ class VendorApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Vendor studio',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff8c4a22))),
+          // The ads box at the bottom of every page, once signed in.
+          builder: (context, child) => withAppBottomAd(context, child, store),
           // After sign-in: the home with Vendor, Services and Transport (ui/vendor_home.dart).
           home: !store.live
               ? VendorHomePage(store: store)

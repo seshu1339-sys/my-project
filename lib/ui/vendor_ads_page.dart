@@ -145,7 +145,8 @@ class _VendorAdsPageState extends State<VendorAdsPage> {
             if (ad.text('status') == 'rejected' && ad.text('reason').isNotEmpty) Text('Reason: ${ad.text('reason')}', style: TextStyle(color: Theme.of(context).colorScheme.error)),
             Text(daysRemainingText(ad, now), key: ValueKey('my-ad-days-${ad.id}')),
             const SizedBox(height: 4),
-            Wrap(spacing: 16, key: ValueKey('my-ad-stats-${ad.id}'), children: [
+            // The admin can hide the numbers from vendors (Ads settings: "Vendors see how many people saw their ads").
+            if (config.vendorSeesViews) Wrap(spacing: 16, key: ValueKey('my-ad-stats-${ad.id}'), children: [
               Text('Views: ${totals.views}'),
               Text('People: ${totals.unique}'),
               Text('Taps: ${totals.taps}'),

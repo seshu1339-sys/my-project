@@ -13,6 +13,7 @@ import 'towns.dart';
 //   badge, coupon  tapAction call | whatsapp | shop | link          tapValue (number, shop id or address)
 //   startsAt, endsAt (ISO)   days "1,2,3" (1 = Monday .. 7 = Sunday, blank = every day)   slots "09:00-12:00,18:00-21:00" (blank = all day)
 //   locations (towns, blank = everywhere)   package normal|silver|gold   rounds, seconds, maxPerDay   pinned   order
+//   audience "customers,vendors,staff" (blank = customers)   categories "Grocery, Dairy" (shop categories for vendors; blank = all)
 // ---------------------------------------------------------------------------------------------
 
 /// The change animations of the Right Side Ads: the one list shared by the whole home page (home_animations.dart).
@@ -43,6 +44,7 @@ class AdsConfig {
     this.animationSpeed = 5,
     this.seconds = 5,
     this.pauseOnHover = true,
+    this.vendorSeesViews = true,
     this.label = 'Ad',
     this.maxPerArea = 0,
     this.backgroundColor = '',
@@ -52,6 +54,8 @@ class AdsConfig {
   final int desktopSlots, mobileSlots;
   final double boxHeight, radius, gap, borderWidth, shadow;
   final bool fitToScreen, pauseOnHover;
+  // Whether vendors see how many people saw their ads (My Ads, Ad for your shop); the admin's on/off switch.
+  final bool vendorSeesViews;
   final String borderColor, animation, label;
   final int animationSpeed, seconds;
   // The most ads (or offers) with a radius that may run over the same area at the same time; 0 = no limit.
@@ -82,6 +86,7 @@ class AdsConfig {
       animationSpeed: doc.number('animationSpeed', d.animationSpeed.toDouble()).round().clamp(1, 10),
       seconds: doc.number('seconds', d.seconds.toDouble()).round().clamp(2, 120),
       pauseOnHover: doc.text('pauseOnHover', 'true') != 'false',
+      vendorSeesViews: doc.text('vendorSeesViews', 'true') != 'false',
       maxPerArea: doc.number('maxPerArea', 0).round().clamp(0, 50),
       backgroundColor: doc.text('backgroundColor'),
       textColor: doc.text('textColor'),
@@ -163,6 +168,36 @@ List<Entry> liveAds(
     return pin != 0 ? pin : a.number('order').compareTo(b.number('order'));
   });
   return local;
+}
+
+/// Who an ad is for: customers (the website and the customer app), vendors and/or staff (the bottom box of their apps).
+const adAudienceNames = <String, String>{'customers': 'Customers', 'vendors': 'Vendors', 'staff': 'Staff'};
+
+/// The ad's audience; blank (every ad made before audiences existed) = customers only.
+Set<String> adAudience(Entry ad) {
+  final chosen = {for (final part in ad.text('audience').split(',')) if (adAudienceNames.containsKey(part.trim())) part.trim()};
+  return chosen.isEmpty ? {'customers'} : chosen;
+}
+
+/// The shop categories a vendor ad is limited to, lower-case; empty = every vendor.
+Set<String> adCategories(Entry ad) => {for (final part in ad.text('categories').split(',')) if (part.trim().isNotEmpty) part.trim().toLowerCase()};
+
+/// The ads for the customer website and app: those whose audience includes customers.
+List<Entry> customerAds(List<Entry> ads) => [for (final a in ads) if (adAudience(a).contains('customers')) a];
+
+/// The ads for the bottom box of the vendor app ([shopCategory] = the vendor's shop category) or, with [staff], the staff app: live
+/// now, for that audience, and for a vendor only those with no categories or with the vendor's own. Pinned first, then in order.
+List<Entry> appAds(List<Entry> ads, DateTime now, {bool staff = false, String shopCategory = ''}) {
+  final category = shopCategory.trim().toLowerCase();
+  final out = [
+    for (final a in ads)
+      if (adLiveNow(a, now) && adAudience(a).contains(staff ? 'staff' : 'vendors') && (staff || adCategories(a).isEmpty || adCategories(a).contains(category))) a,
+  ];
+  out.sort((a, b) {
+    final pin = (b.text('pinned') == 'true' || b.data['pinned'] == true ? 1 : 0) - (a.text('pinned') == 'true' || a.data['pinned'] == true ? 1 : 0);
+    return pin != 0 ? pin : a.number('order').compareTo(b.number('order'));
+  });
+  return out;
 }
 
 /// Seconds an ad stays on screen each time (its own, else the common default).

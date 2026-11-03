@@ -1,15 +1,13 @@
 'use strict';
 // The vendors' chat: its own categories, rules and data. Payment answers come only from the vendor's own paymentRequests documents, which
-// the payment module writes: Flash reads them, never decides a payment, and takes no screenshot. Each fact is read with the vendor's uid
+// the payment module writes: Flash reads them, never decides a payment. Each fact is read with the vendor's uid
 // from the server, and only what the chosen category needs.
 const {dateText, newestFirst} = require('../rules');
 
 const PAYMENT_WORDS = {
-  awaiting_payment: 'waiting for the vendor to pay and send the screenshot',
-  checking: 'screenshot received, being matched with the bank',
-  manual_review: 'the office is checking this payment',
+  awaiting_payment: 'waiting for the vendor to pay with Razorpay (Pay button on the plan card)',
   verified: 'confirmed',
-  rejected: 'not accepted; the office can say why',
+  paid_after_cancel: 'paid after the vendor changed plan; the office will refund it',
   cancelled: 'cancelled',
 };
 

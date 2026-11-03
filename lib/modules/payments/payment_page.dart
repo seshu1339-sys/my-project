@@ -1,20 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/store.dart';
 import 'payment_data.dart';
 
-/// A chosen screenshot: its bytes untouched, because shrinking it could blur the payment id.
-class PickedScreenshot {
-  const PickedScreenshot(this.bytes, this.contentType);
-  final Uint8List bytes;
-  final String contentType;
-}
-
-/// Reads the payment and the bank details, and sends the screenshot. The screen itself is [PaymentView].
+/// Reads the payment and opens its Razorpay link. The screen itself is [PaymentView].
 class PaymentPage extends StatefulWidget {
   const PaymentPage({super.key, required this.store, required this.requestId});
   final Store store;
@@ -27,43 +18,37 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   Store get store => widget.store;
   late final request = store.firestore.collection('paymentRequests').doc(widget.requestId).snapshots();
-  late final bank = store.firestore.collection('paymentBankPublic').doc('main').snapshots();
 
-  Future<void> _send(PickedScreenshot shot) async {
-    final uid = store.user?.uid;
-    if (uid == null) throw StateError('Sign in first.');
-    final path = 'paymentScreenshots/$uid/${widget.requestId}_${DateTime.now().microsecondsSinceEpoch}';
-    await FirebaseStorage.instance.ref(path).putData(shot.bytes, SettableMetadata(contentType: shot.contentType));
-    await store.call('submitPaymentScreenshot', {'requestId': widget.requestId, 'path': path});
+  Future<void> _pay() async {
+    final url = (await store.call('startRazorpayPayment', {'requestId': widget.requestId}))['url'];
+    if (url is! String || !await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)) throw StateError('The payment page could not open.');
   }
+
+  Future<String> _check() async => '${(await store.call('checkRazorpayPayment', {'requestId': widget.requestId}))['status']}';
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Payment')),
     body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: request,
-      builder: (context, requestDoc) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: bank,
-        builder: (context, bankDoc) {
-          final data = requestDoc.data?.data(), details = bankDoc.data?.data();
-          if (requestDoc.hasError || bankDoc.hasError) return const Center(child: Text('The payment could not load.'));
-          if (data == null || details == null) return const Center(child: CircularProgressIndicator());
-          return PaymentView(request: PaymentRequest.fromData(widget.requestId, data), bank: BankDetails.fromData(details), onSend: _send);
-        },
-      ),
+      builder: (context, requestDoc) {
+        final data = requestDoc.data?.data();
+        if (requestDoc.hasError) return const Center(child: Text('The payment could not load.'));
+        if (data == null) return const Center(child: CircularProgressIndicator());
+        return PaymentView(request: PaymentRequest.fromData(widget.requestId, data), onPay: _pay, onCheck: _check);
+      },
     ),
   );
 }
 
-/// How much to pay, where to, and the screenshot. After sending, it says what is happening.
+/// How much to pay and the Razorpay button. Razorpay opens in the browser (UPI, cards, net banking); the server hears from Razorpay
+/// when it is paid, and "I have paid" asks it at once.
 class PaymentView extends StatefulWidget {
-  const PaymentView({super.key, required this.request, required this.bank, required this.onSend, this.pick});
+  const PaymentView({super.key, required this.request, required this.onPay, required this.onCheck});
   final PaymentRequest request;
-  final BankDetails bank;
-  final Future<void> Function(PickedScreenshot shot) onSend;
-
-  /// Chooses a screenshot; the gallery unless a test gives another.
-  final Future<PickedScreenshot?> Function()? pick;
+  final Future<void> Function() onPay;
+  // The status after asking Razorpay.
+  final Future<String> Function() onCheck;
 
   @override
   State<PaymentView> createState() => _PaymentViewState();
@@ -71,82 +56,56 @@ class PaymentView extends StatefulWidget {
 
 class _PaymentViewState extends State<PaymentView> {
   bool busy = false;
+  bool opened = false;
 
-  Future<PickedScreenshot?> _gallery() async {
-    // No maxWidth or quality here: the photo goes up exactly as it is.
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (file == null) return null;
-    final name = file.name.toLowerCase();
-    final type = name.endsWith('.png') ? 'image/png' : name.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-    return PickedScreenshot(await file.readAsBytes(), type);
-  }
-
-  Future<void> _send() async {
-    final messenger = ScaffoldMessenger.of(context);
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => busy = true);
     try {
-      final shot = await (widget.pick ?? _gallery)();
-      if (shot == null || !mounted) return;
-      setState(() => busy = true);
-      await widget.onSend(shot);
+      await action();
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${e is StateError ? e.message : e}')));
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
-    if (mounted) setState(() => busy = false);
   }
 
-  Widget _row(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(children: [
-      SizedBox(width: 110, child: Text(label)),
-      Expanded(child: SelectableText(value, style: const TextStyle(fontWeight: FontWeight.w600))),
-      IconButton(
-        tooltip: 'Copy $label',
-        icon: const Icon(Icons.copy, size: 18),
-        onPressed: () => Clipboard.setData(ClipboardData(text: value)),
-      ),
-    ]),
-  );
-
-  String? get _status => switch (widget.request.status) {
-    'checking' => 'Your screenshot is in. We are matching it with the bank; this can take up to a few hours.',
-    'manual_review' => 'The office is checking your payment. You will be told when it is done.',
-    'verified' => 'Your payment is confirmed. Thank you.',
-    'rejected' => 'This payment was not accepted. Please contact the office.',
-    'cancelled' => 'This payment was cancelled.',
-    _ => null,
-  };
+  Future<void> _check() async {
+    final status = await widget.onCheck();
+    if (!mounted || status == 'verified') return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Razorpay has not confirmed the payment yet. If you paid, wait a minute and check again.')));
+  }
 
   @override
   Widget build(BuildContext context) {
-    final request = widget.request, bank = widget.bank;
+    final r = widget.request;
+    final money = paymentMoney(r.amount);
     return ListView(padding: const EdgeInsets.all(20), children: [
-      Text(request.label, style: Theme.of(context).textTheme.titleMedium),
-      Text(paymentMoney(request.amount), key: const ValueKey('payment-amount'), style: Theme.of(context).textTheme.headlineMedium),
-      if (_status case final status?)
-        Padding(padding: const EdgeInsets.only(top: 12), child: Text(status, key: const ValueKey('payment-status')))
-      else ...[
-        const SizedBox(height: 12),
-        const Text('Pay exactly this amount by UPI, then send the screenshot of the successful payment.'),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(children: [
-              _row('UPI ID', bank.upiId),
-              _row('Account name', bank.accountName),
-              _row('Account no.', bank.accountNumber),
-              _row('IFSC', bank.ifsc),
-            ]),
+      Text(r.label, style: Theme.of(context).textTheme.titleLarge),
+      Text(money, key: const ValueKey('payment-amount'), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 16),
+      switch (r.status) {
+        'awaiting_payment' => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Pay safely with Razorpay: UPI, debit or credit card, or net banking. The payment page opens in your browser.'),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const ValueKey('payment-pay'),
+            onPressed: busy ? null : () => _run(() async {
+              await widget.onPay();
+              if (mounted) setState(() => opened = true);
+            }),
+            icon: const Icon(Icons.lock_outline),
+            label: Text('Pay $money with Razorpay'),
           ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          key: const ValueKey('payment-send'),
-          onPressed: busy ? null : _send,
-          icon: const Icon(Icons.upload_file),
-          label: Text(busy ? 'Checking...' : 'Send payment screenshot'),
-        ),
-      ],
+          if (opened) ...[
+            const SizedBox(height: 8),
+            OutlinedButton(key: const ValueKey('payment-check'), onPressed: busy ? null : () => _run(_check), child: const Text('I have paid: check now')),
+            const Text('Your plan starts by itself once Razorpay confirms the payment, usually within a minute.', style: TextStyle(fontSize: 12)),
+          ],
+        ]),
+        'verified' => const ListTile(key: ValueKey('payment-done'), leading: Icon(Icons.check_circle, color: Colors.green), title: Text('Payment received. Thank you!')),
+        'paid_after_cancel' => const ListTile(leading: Icon(Icons.info_outline), title: Text('You paid for a choice you had already changed. The office will refund it.')),
+        _ => ListTile(leading: const Icon(Icons.block), title: Text(paymentStatusWords[r.status] ?? 'This payment is closed.')),
+      },
     ]);
   }
 }

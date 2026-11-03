@@ -196,15 +196,15 @@ test('a live offer reaches the user chat with its end date as written', emulated
 
 test('the vendor Payment category reads the vendor\'s own payment status only', emulated, async () => {
   const me = await vendorAccount(), other = await vendorAccount('other'), ai = model(), db = getFirestore();
-  await db.collection('paymentRequests').add({uid: me.uid, label: 'My plan', amount: 4999, status: 'manual_review', screenshotPath: 'paymentScreenshots/x', claimedId: '123456789012', createdAt: Timestamp.fromMillis(NOW - HOUR)});
+  await db.collection('paymentRequests').add({uid: me.uid, label: 'My plan', amount: 4999, status: 'awaiting_payment', razorpayLinkId: 'plink_secret1', razorpayLinkUrl: 'https://rzp.io/i/secret1', createdAt: Timestamp.fromMillis(NOW - HOUR)});
   await db.collection('paymentRequests').add({uid: other.uid, label: 'Other plan', amount: 1234, status: 'verified', createdAt: Timestamp.fromMillis(NOW - HOUR)});
   await send(ai.client, vendor, me, {category: 'Payment', text: 'Is my payment done?'});
   const sent = ai.calls[0].system;
-  assert.match(sent, /the office is checking this payment/);
+  assert.match(sent, /waiting for the vendor to pay with Razorpay/);
   assert.equal(sent.includes('Other plan'), false);
   assert.equal(sent.includes('1234'), false);
-  assert.equal(sent.includes('123456789012'), false, 'no payment id');
-  assert.equal(sent.includes('paymentScreenshots'), false);
+  assert.equal(sent.includes('plink_secret1'), false, 'no link id');
+  assert.equal(sent.includes('rzp.io'), false, 'no link');
 });
 
 test('the vendor Plan, Offers and Shop categories read the vendor\'s own records', emulated, async () => {

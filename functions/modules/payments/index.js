@@ -1,25 +1,29 @@
 'use strict';
-// Bank and SMS payment verification module. Its own files, callables and collections (see store.js). Any module can ask for a payment by
-// making a paymentRequests document; plans is the only one today, and this module never imports it.
+// Razorpay payment module. Its own files, callables and collections (see store.js). Any module can ask for a payment by making a
+// paymentRequests document; plans is the only one today, and this module never imports it. Vendors pay on a Razorpay Payment Link,
+// which opens in the browser on the website and in the Android app alike.
 //
-//   savePaymentConfig        admin    -> bank details, SMS senders and patterns
-//   testPaymentSms           admin    -> what the patterns find in a sample SMS
-//   reviewPayment            admin    -> approve or reject from the manual check
-//   submitPaymentScreenshot  vendor   -> reads the screenshot; refuses a repeat; goes to checking or the manual check
-//   smsIngest                endpoint -> the SMS forwarder; needs the SMS_INGEST_TOKEN secret
-//   closePaymentChecks       schedule -> a window closed with no SMS goes to the manual check
+//   savePaymentSettings    admin    -> switches payments on or off; says whether the Razorpay keys are set
+//   startRazorpayPayment   vendor   -> the Payment Link for a request
+//   checkRazorpayPayment   vendor   -> asks Razorpay whether the link is paid (for a late webhook)
+//   razorpayWebhook        endpoint -> Razorpay's payment_link.paid event; checked with RAZORPAY_WEBHOOK_SECRET
+//   cancelRazorpayLink     trigger  -> the asking module cancelled a request; its link is cancelled too
+//
+// Secrets to set before deploying: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET (placeholder values such as XX keep
+// payments closed). The webhook URL to give Razorpay is the razorpayWebhook function's URL, with the event payment_link.paid.
 const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {defineSecret} = require('firebase-functions/params');
 const {getFirestore} = require('firebase-admin/firestore');
-const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('../../admin-session');
-const {anthropic, anthropicKey} = require('../ai-core');
-const {tokenMatches} = require('./rules');
-const {saveConfig, testSms, ingestSms, submitScreenshot, closeChecks, reviewPayment} = require('./store');
+const {keysReady, signatureValid} = require('./rules');
+const {saveSettings, startPayment, checkPayment, handleEvent, cancelLinkOf} = require('./store');
 
-const smsToken = defineSecret('SMS_INGEST_TOKEN');
+const keyId = defineSecret('RAZORPAY_KEY_ID');
+const keySecret = defineSecret('RAZORPAY_KEY_SECRET');
+const webhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
+const withKeys = {...options, secrets: [keyId, keySecret]};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
@@ -32,34 +36,50 @@ async function requireAdmin(request) {
   await requireAdminSession(uid);
 }
 
-exports.savePaymentConfig = onCall(options, async request => {
+/// The Razorpay REST API, with the key id and secret as basic auth.
+function razorpay() {
+  if (!keysReady(keyId.value(), keySecret.value())) throw Error('Payments are not open yet.');
+  const auth = `Basic ${Buffer.from(`${keyId.value().trim()}:${keySecret.value().trim()}`).toString('base64')}`;
+  const send = async (method, path, body) => {
+    const response = await fetch(`https://api.razorpay.com/v1${path}`, {
+      method, headers: {authorization: auth, 'content-type': 'application/json'}, ...(body ? {body: JSON.stringify(body)} : {}),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(Error('Razorpay could not be reached. Try again.'), {status: response.status});
+    return json;
+  };
+  return {
+    createLink: payload => send('POST', '/payment_links', payload),
+    fetchLink: id => send('GET', `/payment_links/${encodeURIComponent(id)}`),
+    cancelLink: id => send('POST', `/payment_links/${encodeURIComponent(id)}/cancel`),
+  };
+}
+
+exports.savePaymentSettings = onCall(withKeys, async request => {
   await requireAdmin(request);
-  try { return await saveConfig(getFirestore(), request.data || {}); } catch (error) { return fail(error); }
+  try { return await saveSettings(getFirestore(), request.data || {}, keysReady(keyId.value(), keySecret.value())); } catch (error) { return fail(error); }
 });
-exports.testPaymentSms = onCall(options, async request => {
-  await requireAdmin(request);
-  try { return await testSms(getFirestore(), request.data || {}); } catch (error) { return fail(error); }
-});
-exports.reviewPayment = onCall(options, async request => {
-  await requireAdmin(request);
-  try { return await reviewPayment(getFirestore(), getStorage().bucket(), request.data || {}); } catch (error) { return fail(error); }
-});
-exports.submitPaymentScreenshot = onCall({...options, secrets: [anthropicKey], timeoutSeconds: 120, memory: '512MiB'}, async request => {
+exports.startRazorpayPayment = onCall(withKeys, async request => {
   const uid = requireVerified(request);
-  try { return await submitScreenshot(getFirestore(), getStorage().bucket(), anthropic, uid, request.data || {}); } catch (error) { return fail(error); }
+  try { return await startPayment(getFirestore(), razorpay(), uid, request.data || {}); } catch (error) { return fail(error); }
 });
-exports.smsIngest = onRequest({region: 'asia-south1', maxInstances: 3, invoker: 'public', secrets: [smsToken]}, async (req, res) => {
+exports.checkRazorpayPayment = onCall(withKeys, async request => {
+  const uid = requireVerified(request);
+  try { return await checkPayment(getFirestore(), razorpay(), uid, request.data || {}); } catch (error) { return fail(error); }
+});
+exports.razorpayWebhook = onRequest({region: 'asia-south1', maxInstances: 3, invoker: 'public', secrets: [webhookSecret]}, async (req, res) => {
   if (req.method !== 'POST') return void res.status(405).send('POST only');
-  if (!tokenMatches(req.get('authorization') ?? '', smsToken.value())) return void res.status(401).send('Unauthorized');
+  if (!signatureValid(req.rawBody, req.get('x-razorpay-signature'), webhookSecret.value())) return void res.status(401).send('Bad signature');
   try {
-    const result = await ingestSms(getFirestore(), getStorage().bucket(), req.body ?? {});
-    res.json(result);
+    res.json(await handleEvent(getFirestore(), req.body ?? {}));
   } catch (error) {
-    // Never the SMS text in a log.
-    console.error('SMS not stored', error.code ?? 'unknown');
+    // Razorpay sends the event again when it does not get a 2xx.
+    console.error('Razorpay event not stored', error.message);
     res.status(500).send('Try again');
   }
 });
-exports.closePaymentChecks = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1}, async () => {
-  await closeChecks(getFirestore());
+exports.cancelRazorpayLink = onDocumentUpdated({document: 'paymentRequests/{requestId}', region: 'asia-south1', maxInstances: 3, secrets: [keyId, keySecret]}, async event => {
+  const before = event.data.before.data(), after = event.data.after.data();
+  if (after.status !== 'cancelled' || !after.razorpayLinkId) return;
+  await cancelLinkOf(razorpay(), before, after);
 });
