@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
@@ -9,6 +10,7 @@ import '../services/search.dart';
 import '../services/strings.dart';
 import 'home_category_product_strip.dart';
 import 'home_footer_badges.dart';
+import 'home_site_links.dart';
 import 'home_no_offers.dart';
 import 'home_local_services_section.dart';
 import 'home_nearby_section.dart';
@@ -516,6 +518,7 @@ class WireframeHome extends StatelessWidget {
                   'footerBadges',
                   HomeFooterBadges(settings: settings, wrapSection: wrapSection),
                 ),
+                if (kIsWeb) const HomeSiteLinks(),
                 Center(
                   child: TextButton.icon(
                     key: const ValueKey('open-photo-library'),
