@@ -70,6 +70,27 @@ void main() {
     expect(find.text('Saved, but the Razorpay keys are not set yet, so payments stay closed.'), findsOneWidget);
   });
 
+  testWidgets('a failed try, a closed link and refunds are said plainly', (tester) async {
+    PaymentRequest with_(String status, {num refunded = 0, String failure = '', bool closed = false}) =>
+        PaymentRequest(id: 'r1', uid: 'v1', label: '3 Year plan', amount: 4999, status: status, refundedAmount: refunded, failureReason: failure, linkClosed: closed);
+    Future<void> show(PaymentRequest r) => tester.pumpWidget(page(PaymentView(request: r, onPay: () async {}, onCheck: () async => '')));
+    await show(with_('awaiting_payment', failure: 'Your bank declined the payment.'));
+    expect(find.textContaining('did not go through: Your bank declined the payment.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('payment-pay')), findsOneWidget, reason: 'can try again');
+    await show(with_('awaiting_payment', closed: true));
+    expect(find.byKey(const ValueKey('payment-link-closed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('payment-pay')), findsOneWidget);
+    await show(with_('refunded', refunded: 4999));
+    expect(find.textContaining('Refunded: ₹4999 was sent back'), findsOneWidget);
+    expect(find.byKey(const ValueKey('payment-pay')), findsNothing);
+    await show(with_('verified', refunded: 1000));
+    expect(find.text('Payment received. Thank you!'), findsOneWidget);
+    expect(find.textContaining('part refund of ₹1000'), findsOneWidget);
+    await tester.pumpWidget(page(AdminPaymentsView(enabled: true, keysSet: true, recent: [with_('refunded', refunded: 4999), with_('awaiting_payment', failure: 'Card declined.')], onSwitch: (_) async => const {})));
+    expect(find.textContaining('Refunded'), findsWidgets);
+    expect(find.textContaining('last try failed: Card declined.'), findsOneWidget);
+  });
+
   testWidgets('the screens fit a small phone', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;

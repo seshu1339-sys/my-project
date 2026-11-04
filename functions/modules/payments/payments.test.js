@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const {initializeApp, getApps} = require('firebase-admin/app');
 if (!getApps().length) initializeApp({projectId: 'demo-neighbourly'});
-const {getFirestore} = require('firebase-admin/firestore');
+const {getFirestore, Timestamp} = require('firebase-admin/firestore');
 const R = require('./rules');
 const {saveSettings, startPayment, checkPayment, handleEvent, cancelLinkOf} = require('./store');
 
@@ -145,4 +145,72 @@ test('an event for an unknown request, or for a link that is not the request\'s,
   assert.deepEqual(await handleEvent(db, paidEvent({reference_id: 'nobody'}), NOW), {handled: false});
   assert.deepEqual(await handleEvent(db, {event: 'payment.failed'}, NOW), {handled: false});
   assert.equal((await read(db, id)).status, 'awaiting_payment');
+});
+
+const refundEvent = (refund = {}) => ({event: 'refund.processed', payload: {refund: {entity: {id: 'rfnd_1', payment_id: 'pay_1', amount: 499900, status: 'processed', ...refund}}}});
+const failedEvent = (payment = {}) => ({event: 'payment.failed', payload: {payment: {entity: {id: 'pay_f1', status: 'failed', error_description: 'Your bank declined the payment.', notes: {requestId: 'r1'}, ...payment}}}});
+const closedEvent = (name, link = {}) => ({event: name, payload: {payment_link: {entity: {id: 'plink_1', reference_id: 'r1', ...link}}}});
+const noticesOf = async (db, title) => (await db.collection('vendorNotices').where('vendorId', '==', 'v1').where('title', '==', title).get()).docs.length;
+
+test('refund, failure and closed-link events are read only when they are complete', () => {
+  assert.deepEqual(R.refundFromEvent(refundEvent()), {refundId: 'rfnd_1', paymentId: 'pay_1', amountPaise: 499900});
+  assert.equal(R.refundFromEvent(refundEvent({status: 'pending'})), null);
+  assert.equal(R.refundFromEvent(refundEvent({amount: 0})), null);
+  assert.equal(R.refundFromEvent({...refundEvent(), event: 'refund.created'}), null);
+  assert.deepEqual(R.failureFromEvent(failedEvent()), {paymentId: 'pay_f1', reason: 'Your bank declined the payment.'});
+  assert.equal(R.failureFromEvent(paidEvent()), null);
+  assert.equal(R.requestIdOf(failedEvent()), 'r1', 'a failed payment is found by the request id in its notes');
+  assert.equal(R.closedLinkFromEvent(closedEvent('payment_link.expired'), request(), 'r1'), 'payment_link.expired');
+  assert.equal(R.closedLinkFromEvent(closedEvent('payment_link.expired', {id: 'plink_x'}), request(), 'r1'), '');
+  assert.equal(R.closedLinkFromEvent(closedEvent('payment_link.paid'), request(), 'r1'), '');
+});
+
+test('a full refund marks the request refunded once and tells the vendor; the plan is left alone', emulated, async () => {
+  const payId = `pay_${crypto.randomUUID().slice(0, 8)}`;
+  const {db, id} = await setup({status: 'verified', razorpayPaymentId: payId});
+  const event = refundEvent({id: `rfnd_${crypto.randomUUID().slice(0, 8)}`, payment_id: payId});
+  const before = await noticesOf(db, 'Refund processed');
+  assert.deepEqual(await handleEvent(db, event, NOW), {handled: true, status: 'refunded'});
+  const done = await read(db, id);
+  assert.equal(done.status, 'refunded');
+  assert.equal(done.refundedAmount, 4999);
+  assert.deepEqual(await handleEvent(db, event, NOW + 1000), {handled: true, status: 'refunded'}, 'sent again: nothing changes');
+  assert.equal((await read(db, id)).refundedAmount, 4999);
+  assert.equal(await noticesOf(db, 'Refund processed'), before + 1);
+  assert.deepEqual(await handleEvent(db, refundEvent({id: 'rfnd_nobody', payment_id: 'pay_nobody'}), NOW), {handled: false});
+});
+
+test('a part refund records the amount and keeps the request paid; two part refunds add up to a full one', emulated, async () => {
+  const payId = `pay_${crypto.randomUUID().slice(0, 8)}`;
+  const {db, id} = await setup({status: 'verified', razorpayPaymentId: payId});
+  const part = amount => refundEvent({id: `rfnd_${crypto.randomUUID().slice(0, 8)}`, payment_id: payId, amount});
+  assert.deepEqual(await handleEvent(db, part(100000), NOW), {handled: true, status: 'verified'});
+  assert.equal((await read(db, id)).refundedAmount, 1000);
+  assert.deepEqual(await handleEvent(db, part(399900), NOW), {handled: true, status: 'refunded'});
+  assert.equal((await read(db, id)).refundedAmount, 4999);
+});
+
+test('a failed payment keeps the request open for another try, with the reason, and tells the vendor once', emulated, async () => {
+  const {db, id} = await setup({razorpayLinkId: 'plink_1'});
+  const event = failedEvent({id: `pay_${crypto.randomUUID().slice(0, 8)}`, notes: {requestId: id}});
+  const before = await noticesOf(db, 'Payment did not go through');
+  assert.deepEqual(await handleEvent(db, event, NOW), {handled: true, status: 'awaiting_payment'});
+  const after = await read(db, id);
+  assert.equal(after.status, 'awaiting_payment');
+  assert.equal(after.lastFailure.reason, 'Your bank declined the payment.');
+  await handleEvent(db, event, NOW + 1000);
+  assert.equal(await noticesOf(db, 'Payment did not go through'), before + 1);
+  const done = await setup({status: 'verified'});
+  assert.deepEqual(await handleEvent(db, failedEvent({id: 'pay_zz', notes: {requestId: done.id}}), NOW), {handled: false}, 'a paid request is not reopened');
+});
+
+test('an expired or cancelled link drops the old link so Pay makes a new one; a request not waiting is left alone', emulated, async () => {
+  const {db, id} = await setup({razorpayLinkId: 'plink_1', razorpayLinkUrl: 'https://rzp.io/i/old', razorpayLinkExpiresAt: Timestamp.fromMillis(NOW - 1)});
+  assert.deepEqual(await handleEvent(db, closedEvent('payment_link.expired', {reference_id: id}), NOW), {handled: true, status: 'awaiting_payment'});
+  const closed = await read(db, id);
+  assert.equal(closed.razorpayLinkUrl, undefined);
+  assert.equal(closed.status, 'awaiting_payment');
+  assert.deepEqual(await startPayment(db, fakeApi(), 'v1', {requestId: id}, NOW), {url: 'https://rzp.io/i/abc'});
+  const cancelled = await setup({status: 'cancelled', razorpayLinkId: 'plink_1'});
+  assert.deepEqual(await handleEvent(db, closedEvent('payment_link.cancelled', {reference_id: cancelled.id}), NOW), {handled: false});
 });

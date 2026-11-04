@@ -85,6 +85,13 @@ class _PaymentViewState extends State<PaymentView> {
       const SizedBox(height: 16),
       switch (r.status) {
         'awaiting_payment' => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (r.failureReason.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('Your last payment did not go through: ${r.failureReason} You can try again.', key: const ValueKey('payment-failed'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          if (r.linkClosed)
+            const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('The earlier payment link has closed. Tap Pay to get a new one.', key: ValueKey('payment-link-closed'))),
           const Text('Pay safely with Razorpay: UPI, debit or credit card, or net banking. The payment page opens in your browser.'),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -102,7 +109,17 @@ class _PaymentViewState extends State<PaymentView> {
             const Text('Your plan starts by itself once Razorpay confirms the payment, usually within a minute.', style: TextStyle(fontSize: 12)),
           ],
         ]),
-        'verified' => const ListTile(key: ValueKey('payment-done'), leading: Icon(Icons.check_circle, color: Colors.green), title: Text('Payment received. Thank you!')),
+        'verified' => ListTile(
+          key: const ValueKey('payment-done'),
+          leading: const Icon(Icons.check_circle, color: Colors.green),
+          title: const Text('Payment received. Thank you!'),
+          subtitle: r.refundedAmount > 0 ? Text('A part refund of ${paymentMoney(r.refundedAmount)} has been processed. Your bank may take some time to show it.', key: const ValueKey('payment-part-refund')) : null,
+        ),
+        'refunded' => ListTile(
+          key: const ValueKey('payment-refunded'),
+          leading: const Icon(Icons.undo),
+          title: Text('Refunded: ${paymentMoney(r.refundedAmount > 0 ? r.refundedAmount : r.amount)} was sent back. Your bank may take some time to show it.'),
+        ),
         'paid_after_cancel' => const ListTile(leading: Icon(Icons.info_outline), title: Text('You paid for a choice you had already changed. The office will refund it.')),
         _ => ListTile(leading: const Icon(Icons.block), title: Text(paymentStatusWords[r.status] ?? 'This payment is closed.')),
       },

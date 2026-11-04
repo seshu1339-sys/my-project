@@ -6,11 +6,12 @@
 //   savePaymentSettings    admin    -> switches payments on or off; says whether the Razorpay keys are set
 //   startRazorpayPayment   vendor   -> the Payment Link for a request
 //   checkRazorpayPayment   vendor   -> asks Razorpay whether the link is paid (for a late webhook)
-//   razorpayWebhook        endpoint -> Razorpay's payment_link.paid event; checked with RAZORPAY_WEBHOOK_SECRET
+//   razorpayWebhook        endpoint -> Razorpay events: payment_link.paid, payment_link.expired, payment_link.cancelled, payment.failed,
+//                             refund.processed; checked with RAZORPAY_WEBHOOK_SECRET
 //   cancelRazorpayLink     trigger  -> the asking module cancelled a request; its link is cancelled too
 //
 // Secrets to set before deploying: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET (placeholder values such as XX keep
-// payments closed). The webhook URL to give Razorpay is the razorpayWebhook function's URL, with the event payment_link.paid.
+// payments closed). The webhook URL to give Razorpay is the razorpayWebhook function's URL, with those five events switched on.
 const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {defineSecret} = require('firebase-functions/params');

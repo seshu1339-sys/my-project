@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
+import 'package:ecommerce_app/services/strings.dart';
 import 'package:ecommerce_app/services/strings_account.dart';
 import 'package:ecommerce_app/services/strings_details.dart';
 import 'package:ecommerce_app/services/strings_table.dart';
@@ -110,5 +111,34 @@ void main() {
     expect(find.text('మీ తదుపరి స్థానిక కనుగోలు ఇక్కడ ఉంటుంది.'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
+  });
+  test('no row is still the English text copied into the other languages', () {
+    // Names and short codes that read the same everywhere may repeat in a few languages; a sentence copied into five is a placeholder.
+    for (final entry in tables.entries) {
+      for (final row in entry.value.entries) {
+        final copies = row.value.entries.where((e) => e.key != 'te' && e.value == row.key).length;
+        expect(copies, lessThan(5), reason: '${entry.key}: "${row.key}" is not translated');
+        expect(row.value['te'] == row.key, isFalse, reason: 'Telugu is missing for "${row.key}"');
+      }
+    }
+  });
+
+  test('the same Telugu word is used for a delivery charge everywhere', () {
+    for (final entry in tables.entries) {
+      for (final row in entry.value.entries) {
+        expect(row.value['te'], isNot(contains('రుసుము')), reason: '${entry.key}: "${row.key}" should say ఛార్జీ');
+      }
+    }
+  });
+
+  testWidgets('the bottom bar and the location, shop and chat screens speak Telugu', (tester) async {
+    final labels = ['Home', 'Shops', 'Account', 'Directions', 'Where are you shopping?', 'Save location', 'Lowest price first', 'Send', 'Offers & Ads'];
+    await _pumpTelugu(tester, Builder(builder: (context) => Column(children: [for (final l in labels) Text(l.tr(context))])));
+    for (final l in labels) {
+      expect(find.text(l), findsNothing, reason: l);
+    }
+    expect(find.text('హోమ్'), findsOneWidget);
+    expect(find.text('దుకాణాలు'), findsOneWidget);
+    expect(find.text('ఖాతా'), findsOneWidget);
   });
 }

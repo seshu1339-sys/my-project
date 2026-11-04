@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../data/store.dart';
 import 'flash_conversation.dart';
 import 'flash_data.dart';
+import '../../services/strings.dart';
 
 /// One chat box: the person's own chats in this box. The screen itself is [FlashChatListView].
 class FlashChatPage extends StatefulWidget {
@@ -30,7 +31,7 @@ class _FlashChatPageState extends State<FlashChatPage> {
     body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: chats,
       builder: (context, found) {
-        if (found.hasError) return const Center(child: Text('Your chats could not load.'));
+        if (found.hasError) return Center(child: Text('Your chats could not load.'.tr(context)));
         if (!found.hasData) return const Center(child: CircularProgressIndicator());
         return FlashChatListView(
           categories: setup.categories,
@@ -53,14 +54,14 @@ class FlashChatListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [
-    Text('What do you need help with?', style: Theme.of(context).textTheme.titleMedium),
+    Text('What do you need help with?'.tr(context), style: Theme.of(context).textTheme.titleMedium),
     const SizedBox(height: 8),
     Wrap(spacing: 8, runSpacing: 8, children: [
       for (final category in categories) ActionChip(key: ValueKey('flash-new-$category'), label: Text(category), onPressed: () => onNew(category)),
     ]),
     if (chats.isNotEmpty) ...[
       const SizedBox(height: 20),
-      Text('Your chats', style: Theme.of(context).textTheme.titleMedium),
+      Text('Your chats'.tr(context), style: Theme.of(context).textTheme.titleMedium),
       for (final chat in chats)
         ListTile(
           key: ValueKey('flash-chat-${chat.id}'),

@@ -62,7 +62,7 @@ class ContactActions extends StatelessWidget {
             launch(context, Uri(scheme: 'mailto', path: email));
           },
           icon: const Icon(Icons.email_outlined),
-          label: const Text('Email'),
+          label: Text('Email'.tr(context)),
         ),
       if (website.isNotEmpty)
         OutlinedButton.icon(
@@ -71,7 +71,7 @@ class ContactActions extends StatelessWidget {
             launch(context, Uri.parse(website));
           },
           icon: const Icon(Icons.public_outlined),
-          label: const Text('Website'),
+          label: Text('Website'.tr(context)),
         ),
     ],
   );

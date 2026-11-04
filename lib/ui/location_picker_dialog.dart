@@ -32,7 +32,7 @@ Future<void> showLocationPickerDialog(
   await showDialog<void>(
     context: context,
     builder: (dialog) => AlertDialog(
-      title: const Text('Where are you shopping?'),
+      title: Text('Where are you shopping?'.tr(context)),
       content: SizedBox(
         // Never request more than actually fits once the default AlertDialog inset is subtracted.
         width: (MediaQuery.sizeOf(context).width - 80).clamp(240, 400),
@@ -44,8 +44,8 @@ Future<void> showLocationPickerDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Set your pincode for local prices, or use GPS to find shops within their service radius.',
+              Text(
+                'Set your pincode for local prices, or use GPS to find shops within their service radius.'.tr(context),
               ),
               const SizedBox(height: 12),
               PlaceSearchBox(
@@ -101,14 +101,14 @@ Future<void> showLocationPickerDialog(
                 controller: pin,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                decoration: const InputDecoration(
-                  labelText: 'Six-digit pincode',
+                decoration: InputDecoration(
+                  labelText: 'Six-digit pincode'.tr(context),
                 ),
               ),
               TextField(
                 controller: address,
-                decoration: const InputDecoration(
-                  labelText: 'Area / address (optional)',
+                decoration: InputDecoration(
+                  labelText: 'Area / address (optional)'.tr(context),
                 ),
               ),
               const SizedBox(height: 12),
@@ -184,7 +184,7 @@ Future<void> showLocationPickerDialog(
                   if (dialog.mounted) Navigator.pop(dialog);
                 },
                 icon: const Icon(Icons.search),
-                label: const Text('Search by place name'),
+                label: Text('Search by place name'.tr(context)),
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
@@ -213,7 +213,7 @@ Future<void> showLocationPickerDialog(
                   if (dialog.mounted) Navigator.pop(dialog);
                 },
                 icon: const Icon(Icons.pin_drop_outlined),
-                label: const Text('Drop a pin on map'),
+                label: Text('Drop a pin on map'.tr(context)),
               ),
             ],
           ),
@@ -222,7 +222,7 @@ Future<void> showLocationPickerDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialog),
-          child: const Text('Later'),
+          child: Text('Later'.tr(context)),
         ),
         FilledButton(
           onPressed: () async {
@@ -238,7 +238,7 @@ Future<void> showLocationPickerDialog(
               Navigator.pop(dialog);
             }
           },
-          child: const Text('Save location'),
+          child: Text('Save location'.tr(context)),
         ),
       ],
     ),

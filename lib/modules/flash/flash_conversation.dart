@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import 'flash_data.dart';
+import '../../services/strings.dart';
 
 const _maxLetters = 1000;
 
@@ -67,7 +68,7 @@ class _FlashConversationPageState extends State<FlashConversationPage> {
             builder: (context, chatDoc) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: messages,
               builder: (context, found) {
-                if (chatDoc.hasError || found.hasError) return const Center(child: Text('This chat could not load.'));
+                if (chatDoc.hasError || found.hasError) return Center(child: Text('This chat could not load.'.tr(context)));
                 final status = chatDoc.data?.data()?['status']?.toString();
                 if (status == null || !found.hasData) return const Center(child: CircularProgressIndicator());
                 return _view([for (final doc in found.data!.docs) FlashMessage.fromData(doc.data())], status);
@@ -158,8 +159,8 @@ class _FlashConversationViewState extends State<FlashConversationView> {
     return Column(mainAxisSize: MainAxisSize.min, children: [
       if (_flashAnswered && !_busy)
         Wrap(spacing: 8, children: [
-          TextButton.icon(key: const ValueKey('flash-solved'), onPressed: () => _act(widget.onSolved), icon: const Icon(Icons.check), label: const Text('Problem solved')),
-          TextButton.icon(key: const ValueKey('flash-unsolved'), onPressed: () => _act(widget.onUnsolved), icon: const Icon(Icons.support_agent), label: const Text('Not solved')),
+          TextButton.icon(key: const ValueKey('flash-solved'), onPressed: () => _act(widget.onSolved), icon: const Icon(Icons.check), label: Text('Problem solved'.tr(context))),
+          TextButton.icon(key: const ValueKey('flash-unsolved'), onPressed: () => _act(widget.onUnsolved), icon: const Icon(Icons.support_agent), label: Text('Not solved'.tr(context))),
         ]),
       Row(children: [
         Expanded(
@@ -170,10 +171,10 @@ class _FlashConversationViewState extends State<FlashConversationView> {
             minLines: 1,
             maxLines: 4,
             onSubmitted: (_) => _send(),
-            decoration: const InputDecoration(hintText: 'Type your message', counterText: ''),
+            decoration: InputDecoration(hintText: 'Type your message'.tr(context), counterText: ''),
           ),
         ),
-        IconButton(key: const ValueKey('flash-send'), tooltip: 'Send', onPressed: _busy ? null : _send, icon: const Icon(Icons.send)),
+        IconButton(key: const ValueKey('flash-send'), tooltip: 'Send'.tr(context), onPressed: _busy ? null : _send, icon: const Icon(Icons.send)),
       ]),
     ]);
   }
@@ -182,10 +183,10 @@ class _FlashConversationViewState extends State<FlashConversationView> {
   Widget build(BuildContext context) => Column(children: [
     Expanded(
       child: ListView(padding: const EdgeInsets.all(12), children: [
-        if (widget.messages.isEmpty && !_showSending) const Text('Tell Flash what happened. If Flash cannot solve it, your problem goes to our team.'),
+        if (widget.messages.isEmpty && !_showSending) Text('Tell Flash what happened. If Flash cannot solve it, your problem goes to our team.'.tr(context)),
         for (final message in widget.messages) _bubble(message),
         if (_showSending) _bubble(FlashMessage(role: 'user', text: _sending!)),
-        if (_busy) const Padding(padding: EdgeInsets.all(8), child: Text('Flash is replying...', key: ValueKey('flash-busy'))),
+        if (_busy) Padding(padding: EdgeInsets.all(8), child: Text('Flash is replying...'.tr(context), key: ValueKey('flash-busy'))),
       ]),
     ),
     SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: _footer)),

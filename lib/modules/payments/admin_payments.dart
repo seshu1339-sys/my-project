@@ -78,7 +78,7 @@ class _AdminPaymentsViewState extends State<AdminPaymentsView> {
           padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: Text(
             'Payments are confirmed by Razorpay itself; nothing here needs checking by hand. A payment marked "refund it" came in for a choice '
-            'the vendor had already changed: refund it from the Razorpay dashboard.',
+            'the vendor had already changed: refund it from the Razorpay dashboard. A refund made there shows here as "Refunded"; it does not stop the plan of the vendor, so stop that by hand if needed.',
             style: TextStyle(fontSize: 12),
           ),
         ),
@@ -91,8 +91,8 @@ class _AdminPaymentsViewState extends State<AdminPaymentsView> {
       ListTile(
         key: ValueKey('payment-${r.id}'),
         title: Text('${r.label} · ${paymentMoney(r.amount)}'),
-        subtitle: Text([paymentStatusWords[r.status] ?? r.status, if (r.razorpayPaymentId.isNotEmpty) r.razorpayPaymentId, 'vendor ${r.uid}'].join(' · ')),
-        leading: Icon(r.status == 'verified' ? Icons.check_circle_outline : r.status == 'paid_after_cancel' ? Icons.warning_amber : Icons.schedule),
+        subtitle: Text([paymentStatusWords[r.status] ?? r.status, if (r.refundedAmount > 0 && r.status != 'refunded') 'part refund ${paymentMoney(r.refundedAmount)}', if (r.failureReason.isNotEmpty && r.status == 'awaiting_payment') 'last try failed: ${r.failureReason}', if (r.razorpayPaymentId.isNotEmpty) r.razorpayPaymentId, 'vendor ${r.uid}'].join(' · ')),
+        leading: Icon(r.status == 'verified' ? Icons.check_circle_outline : r.status == 'paid_after_cancel' ? Icons.warning_amber : r.status == 'refunded' ? Icons.undo : Icons.schedule),
       ),
   ]);
 }

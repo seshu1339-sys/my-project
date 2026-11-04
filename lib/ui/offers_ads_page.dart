@@ -4,7 +4,8 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import 'ad_box.dart';
-import 'screen_view.dart';
+import 'screen_view.dart';
+import '../services/strings.dart';
 
 /// "Offers & Ads": every ad that is live right now for the customer's location, one after another in the same box as on the home page.
 class OffersAdsPage extends StatelessWidget {
@@ -23,9 +24,9 @@ class OffersAdsPage extends StatelessWidget {
       final width = MediaQuery.sizeOf(context).width;
       final columns = width >= 1100 ? 3 : width >= 700 ? 2 : 1;
       return Scaffold(
-        appBar: AppBar(title: const Text('Offers & Ads')),
+        appBar: AppBar(title: Text('Offers & Ads'.tr(context))),
         body: live.isEmpty
-            ? const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No offers right now for your location. Please check again later.', textAlign: TextAlign.center)))
+            ? Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No offers right now for your location. Please check again later.'.tr(context), textAlign: TextAlign.center)))
             : GridView.builder(
                 key: const ValueKey('offers-ads-list'),
                 padding: const EdgeInsets.all(16),

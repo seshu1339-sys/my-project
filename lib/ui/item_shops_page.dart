@@ -9,7 +9,8 @@ import '../domain/item_shops.dart';
 import '../services/usage.dart';
 import 'contact_actions.dart';
 import 'design_tokens.dart';
-import 'shared.dart';
+import 'shared.dart';
+import '../services/strings.dart';
 
 /// Opens where to buy an item. [openItem] opens one shop's item (the product page), to put it in the bag.
 void openItemShops(BuildContext context, Store store, {required String name, String libraryItemId = '', required ValueChanged<Entry> openItem}) =>
@@ -88,13 +89,13 @@ class ItemShopsPage extends StatelessWidget {
               key: const ValueKey('item-shops-summary'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const Text('Prices are the shops\' own and change live.'),
+            Text('Prices are the shops\' own and change live.'.tr(context)),
             const SizedBox(height: 12),
             if (mapped.isNotEmpty) ...[
               ItemShopsMap(offers: mapped, latitude: store.latitude, longitude: store.longitude, onShop: (o) => _showShop(context, o)),
               const SizedBox(height: 12),
             ],
-            if (offers.isNotEmpty) Text('Lowest price first', style: Theme.of(context).textTheme.titleSmall),
+            if (offers.isNotEmpty) Text('Lowest price first'.tr(context), style: Theme.of(context).textTheme.titleSmall),
             for (final (i, offer) in offers.indexed) ItemOfferTile(key: ValueKey('item-offer-$i'), offer: offer, onTap: () => _showShop(context, offer)),
           ],
         );
@@ -135,7 +136,7 @@ class ItemShopsPage extends StatelessWidget {
                     openDirections(sheet, offer.latitude!, offer.longitude!, fromLatitude: store.latitude, fromLongitude: store.longitude);
                   },
                   icon: const Icon(Icons.directions),
-                  label: const Text('Directions'),
+                  label: Text('Directions'.tr(context)),
                 ),
               ContactActions(
                 phone: offer.phone,
@@ -149,7 +150,7 @@ class ItemShopsPage extends StatelessWidget {
                   Navigator.pop(sheet);
                   openItem(offer.product);
                 },
-                child: const Text('Open the item'),
+                child: Text('Open the item'.tr(context)),
               ),
             ],
           ),
@@ -293,7 +294,7 @@ class ItemSearchChoices extends StatelessWidget {
         runSpacing: 8,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Text('Where to buy:', style: TextStyle(fontWeight: FontWeight.w600)),
+          Text('Where to buy:'.tr(context), style: TextStyle(fontWeight: FontWeight.w600)),
           for (final c in choices)
             ActionChip(
               key: ValueKey('item-choice-${itemNameKey(c.name)}'),

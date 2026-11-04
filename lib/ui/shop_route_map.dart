@@ -11,7 +11,8 @@ import '../services/usage.dart';
 import 'contact_actions.dart';
 import 'design_tokens.dart';
 import 'item_shops_page.dart';
-import 'shared.dart';
+import 'shared.dart';
+import '../services/strings.dart';
 
 /// One shop to show on the map: who it is, where, how to reach it, and the item (and its price) the customer came for.
 class ShopStop {
@@ -189,7 +190,7 @@ class _ShopRouteViewState extends State<ShopRouteView> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(byRoad.isNotEmpty ? byRoad : '${distanceText(distance)} from you', key: const ValueKey('shop-route-distance')),
           ),
-        if (finding) const Padding(padding: EdgeInsets.only(top: 6), child: Text('Finding the way...')),
+        if (finding) Padding(padding: EdgeInsets.only(top: 6), child: Text('Finding the way...'.tr(context))),
         if (!finding && me == null && stop.onMap)
           Padding(
             padding: const EdgeInsets.only(top: 6),
@@ -197,10 +198,10 @@ class _ShopRouteViewState extends State<ShopRouteView> {
               key: const ValueKey('shop-route-locate'),
               onPressed: () => _findWay(again: true),
               icon: const Icon(Icons.my_location),
-              label: const Text('Show the way from my location'),
+              label: Text('Show the way from my location'.tr(context)),
             ),
           ),
-        if (!stop.onMap) const Padding(padding: EdgeInsets.only(top: 6), child: Text('This shop has not shared its location on the map yet.')),
+        if (!stop.onMap) Padding(padding: EdgeInsets.only(top: 6), child: Text('This shop has not shared its location on the map yet.'.tr(context))),
         if (stop.phone.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 10),
@@ -220,7 +221,7 @@ class _ShopRouteViewState extends State<ShopRouteView> {
                   openDirections(context, stop.latitude!, stop.longitude!, fromLatitude: me?.latitude, fromLongitude: me?.longitude);
                 },
                 icon: const Icon(Icons.directions),
-                label: const Text('Directions'),
+                label: Text('Directions'.tr(context)),
               ),
           ],
         ),

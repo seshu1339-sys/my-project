@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/geocoding.dart';
+import '../services/strings.dart';
 
 /// A search-as-you-type bottom sheet for picking a place by name, backed by
 /// the free OpenStreetMap Nominatim API. Pops with the selected
@@ -81,14 +82,14 @@ class _PlaceSearchSheetState extends State<PlaceSearchSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Search for a place', style: Theme.of(context).textTheme.titleMedium),
+            Text('Search for a place'.tr(context), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             TextField(
               controller: query,
               autofocus: true,
               onChanged: onChanged,
-              decoration: const InputDecoration(
-                labelText: 'Area, locality or landmark',
+              decoration: InputDecoration(
+                labelText: 'Area, locality or landmark'.tr(context),
                 prefixIcon: Icon(Icons.search),
               ),
             ),
@@ -138,7 +139,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Drop a pin on the map')),
+    appBar: AppBar(title: Text('Drop a pin on the map'.tr(context))),
     body: Stack(
       children: [
         Positioned.fill(
@@ -186,7 +187,7 @@ class _MapPinPickerPageState extends State<MapPinPickerPage> {
             child: FilledButton.icon(
               onPressed: () => Navigator.pop(context, center),
               icon: const Icon(Icons.check),
-              label: const Text('Confirm this location'),
+              label: Text('Confirm this location'.tr(context)),
             ),
           ),
         ),

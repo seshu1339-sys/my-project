@@ -15,7 +15,8 @@ import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import '../modules/services/services_module.dart';
-import '../services/usage.dart';
+import '../services/usage.dart';
+import '../services/strings.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
@@ -241,24 +242,24 @@ class _StorefrontState extends State<Storefront> {
                     );
                   }
                 },
-                destinations: const [
+                destinations: [
                   NavigationDestination(
                     icon: Icon(Icons.home_outlined),
                     selectedIcon: Icon(Icons.home_rounded),
-                    label: 'Home',
+                    label: 'Home'.tr(context),
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.grid_view_outlined),
                     selectedIcon: Icon(Icons.grid_view_rounded),
-                    label: 'Categories',
+                    label: 'Categories'.tr(context),
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.storefront_outlined),
-                    label: 'Shops',
+                    label: 'Shops'.tr(context),
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.person_outline),
-                    label: 'Account',
+                    label: 'Account'.tr(context),
                   ),
                 ],
               )

@@ -7,11 +7,14 @@
 //                            (razorpayLinkId, razorpayLinkUrl, razorpayLinkExpiresAt) and, once Razorpay says it is paid, status
 //                            verified, paidAt and razorpayPaymentId: all the asking module needs. A request cancelled by its module
 //                            has its link cancelled; one paid anyway becomes paid_after_cancel, for the admin to refund.
+//                            Refunds: a full one makes it refunded, a part one records refundedAmount; a failed try is kept as lastFailure;
+//                            an expired or cancelled link is dropped so Pay makes a new one. The vendor's plan is never touched by a refund.
+//   paymentRefunds/<id>      one per Razorpay refund, so a refund event sent twice counts once
 //   paymentIds/<paymentId>   one per Razorpay payment ever used, created in a transaction: one payment never pays two requests
 //
 // [api] is the Razorpay client made in index.js ({createLink, fetchLink, cancelLink}); tests pass their own.
-const {Timestamp} = require('firebase-admin/firestore');
-const {ID, linkPayload, paidFromLink, paidFromEvent, requestIdOf} = require('./rules');
+const {Timestamp, FieldValue} = require('firebase-admin/firestore');
+const {ID, linkPayload, paidFromLink, paidFromEvent, requestIdOf, refundFromEvent, failureFromEvent, closedLinkFromEvent, paise} = require('./rules');
 
 const requests = db => db.collection('paymentRequests');
 const stamp = ms => Timestamp.fromMillis(ms);
@@ -91,12 +94,62 @@ async function checkPayment(db, api, uid, data, now = Date.now()) {
   return {status};
 }
 
-/// A webhook event whose signature is already checked. Anything that is not a full payment of a known request is ignored.
+/// refund.processed: the money went back. The refund id is claimed once (Razorpay may send the event again). A full refund makes the
+/// request 'refunded'; a part refund only records the amount. The vendor's plan is not touched: the admin stops it by hand if needed.
+async function handleRefund(db, refund, now) {
+  const found = await requests(db).where('razorpayPaymentId', '==', refund.paymentId).limit(1).get();
+  if (found.empty) return {handled: false};
+  const ref = found.docs[0].ref;
+  const refundRef = db.collection('paymentRefunds').doc(refund.refundId);
+  const result = await db.runTransaction(async tx => {
+    const [requestDoc, refundDoc] = [await tx.get(ref), await tx.get(refundRef)];
+    const request = requestDoc.data();
+    if (refundDoc.exists) return {status: request.status, duplicate: true};
+    const refundedPaise = Math.round(Number(request.refundedAmount ?? 0) * 100) + refund.amountPaise;
+    const full = refundedPaise >= paise(request.amount);
+    const status = full ? 'refunded' : request.status;
+    tx.create(refundRef, {requestId: ref.id, uid: request.uid, amountPaise: refund.amountPaise, createdAt: stamp(now)});
+    tx.update(ref, {status, refundedAmount: refundedPaise / 100, refundedAt: stamp(now), updatedAt: stamp(now)});
+    return {status, request, refundedPaise, full};
+  });
+  if (result.duplicate) return {handled: true, status: result.status};
+  const money = `₹${result.refundedPaise / 100}`;
+  await notify(db, result.request.uid, 'Refund processed', result.full
+    ? `Your payment of ₹${result.request.amount} was refunded (${money}). Your bank may take some time to show it.`
+    : `A part refund of ${money} was processed for your payment of ₹${result.request.amount}. Your bank may take some time to show it.`, now);
+  return {handled: true, status: result.status};
+}
+
+/// payment.failed: the request stays open so the vendor can try again; the reason is kept and shown.
+async function handleFailure(db, requestId, failure, now) {
+  const request = (await requests(db).doc(requestId).get()).data();
+  if (request?.status !== 'awaiting_payment') return {handled: false};
+  if (request.lastFailure?.paymentId === failure.paymentId) return {handled: true, status: request.status};
+  await requests(db).doc(requestId).update({lastFailure: {paymentId: failure.paymentId, reason: failure.reason, at: stamp(now)}, updatedAt: stamp(now)});
+  await notify(db, request.uid, 'Payment did not go through', `${failure.reason} You can try again from the payment page.`, now);
+  return {handled: true, status: request.status};
+}
+
+/// payment_link.expired or .cancelled for a request still waiting: the old link is dropped, so tapping Pay makes a new one.
+async function handleClosedLink(db, requestId, request, now) {
+  if (request.status !== 'awaiting_payment') return {handled: false};
+  await requests(db).doc(requestId).update({razorpayLinkUrl: FieldValue.delete(), razorpayLinkExpiresAt: FieldValue.delete(), linkClosedAt: stamp(now), updatedAt: stamp(now)});
+  await notify(db, request.uid, 'Payment link closed', 'Your payment link is no longer open. Open the payment page and tap Pay to get a new one.', now);
+  return {handled: true, status: request.status};
+}
+
+/// A webhook event whose signature is already checked. Anything that is not about a known request is ignored.
 async function handleEvent(db, event, now = Date.now()) {
+  const refund = refundFromEvent(event);
+  if (refund) return handleRefund(db, refund, now);
   const requestId = requestIdOf(event);
   if (!requestId) return {handled: false};
   const request = (await requests(db).doc(requestId).get()).data();
-  const paid = request ? paidFromEvent(event, request, requestId) : null;
+  if (!request) return {handled: false};
+  const failure = failureFromEvent(event);
+  if (failure) return handleFailure(db, requestId, failure, now);
+  if (closedLinkFromEvent(event, request, requestId)) return handleClosedLink(db, requestId, request, now);
+  const paid = paidFromEvent(event, request, requestId);
   if (!paid) return {handled: false};
   const status = await markPaid(db, requestId, paid, now);
   await afterPaid(db, request, status, now);

@@ -5,7 +5,8 @@ import '../domain/item_shops.dart';
 import '../services/customer_position.dart';
 import '../services/usage.dart';
 import 'item_shops_page.dart';
-import 'shop_route_map.dart';
+import 'shop_route_map.dart';
+import '../services/strings.dart';
 
 /// The item page's list of every shop in the town selling the item: name, price and how far from the customer (their location is
 /// asked once a visit; without it the list has no distances). Tapping a shop opens it on the map with the road, its phone and photo.
@@ -65,12 +66,12 @@ class _ItemShopListState extends State<ItemShopList> {
             Align(
               alignment: Alignment.centerLeft,
               child: locating
-                  ? const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Finding your location...'))
+                  ? Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Finding your location...'.tr(context)))
                   : TextButton.icon(
                       key: const ValueKey('item-shops-locate'),
                       onPressed: () => _locate(again: true),
                       icon: const Icon(Icons.my_location),
-                      label: const Text('Turn on location to see how far each shop is'),
+                      label: Text('Turn on location to see how far each shop is'.tr(context)),
                     ),
             ),
           for (final (i, offer) in offers.indexed)

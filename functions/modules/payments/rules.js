@@ -59,10 +59,34 @@ function paidFromEvent(event, request, requestId) {
   return paidFromLink({...link, payments: [{payment_id: payment.id, status: payment.status, created_at: payment.created_at}]}, request, requestId);
 }
 
-/// Which request a webhook event is about, or ''.
+/// Which request a webhook event is about, or ''. A payment.failed event carries no link, so the request id the link put in the
+/// payment's notes is used then.
 function requestIdOf(event) {
-  const id = event?.payload?.payment_link?.entity?.reference_id;
+  const id = event?.payload?.payment_link?.entity?.reference_id ?? event?.payload?.payment?.entity?.notes?.requestId;
   return typeof id === 'string' && ID.test(id) ? id : '';
 }
 
-module.exports = {LINK_DAYS, ID, isPlaceholder, keysReady, paise, linkPayload, signatureValid, paidFromLink, paidFromEvent, requestIdOf};
+/// A refund.processed event: {refundId, paymentId, amountPaise}, or null. Razorpay sends amounts in paise.
+function refundFromEvent(event) {
+  const refund = event?.payload?.refund?.entity;
+  if (event?.event !== 'refund.processed' || !refund || refund.status !== 'processed') return null;
+  const amountPaise = Number(refund.amount);
+  if (!ID.test(String(refund.id ?? '')) || !ID.test(String(refund.payment_id ?? '')) || !(amountPaise > 0)) return null;
+  return {refundId: refund.id, paymentId: refund.payment_id, amountPaise};
+}
+
+/// A payment.failed event: {paymentId, reason}, or null. The reason is Razorpay's own plain-words description, cut short.
+function failureFromEvent(event) {
+  const payment = event?.payload?.payment?.entity;
+  if (event?.event !== 'payment.failed' || !ID.test(String(payment?.id ?? ''))) return null;
+  return {paymentId: payment.id, reason: String(payment.error_description || 'The payment did not go through.').slice(0, 200)};
+}
+
+/// Does a payment_link.expired or payment_link.cancelled event close this request's own link? Returns the event name or ''.
+function closedLinkFromEvent(event, request, requestId) {
+  const link = event?.payload?.payment_link?.entity;
+  if (!['payment_link.expired', 'payment_link.cancelled'].includes(event?.event) || !link) return '';
+  return link.reference_id === requestId && link.id === request.razorpayLinkId ? event.event : '';
+}
+
+module.exports = {LINK_DAYS, ID, isPlaceholder, keysReady, paise, linkPayload, signatureValid, paidFromLink, paidFromEvent, requestIdOf, refundFromEvent, failureFromEvent, closedLinkFromEvent};
