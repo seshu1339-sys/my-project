@@ -12,6 +12,7 @@ import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
 import 'ui/app_bottom_ad.dart';
+import 'ui/consent_checkbox.dart';
 import 'ui/sign_in_panel.dart';
 import 'ui/vendor_home.dart';
 
@@ -37,6 +38,7 @@ Future<void> main() async {
   }
   final store = Store(live: live, database: live ? FirebaseFirestore.instance : null);
   store.appRole = 'vendor';
+  store.requiresConsent = true;
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) {
@@ -60,7 +62,7 @@ class VendorApp extends StatelessWidget {
           title: 'Vendor studio',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff8c4a22))),
           // The ads box at the bottom of every page, once signed in.
-          builder: (context, child) => withAppBottomAd(context, child, store),
+          builder: (context, child) => withConsentGate(context, withAppBottomAd(context, child, store), store),
           // After sign-in: the home with Vendor, Services and Transport (ui/vendor_home.dart).
           home: !store.live
               ? VendorHomePage(store: store)

@@ -15,6 +15,7 @@ import '../domain/places.dart';
 import '../domain/quick_items.dart';
 import '../domain/towns.dart';
 import '../services/usage.dart';
+import 'store_consent.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
 
@@ -23,6 +24,7 @@ import '../services/notifications.dart';
 // calls identically to an instance method) — exported so every existing
 // `import '...store.dart'` keeps seeing `store.upload(...)`,
 // `store.registerVendor(...)` etc. exactly as before this split.
+export 'store_consent.dart';
 export 'store_uploads.dart';
 export 'store_vendor_actions.dart';
 
@@ -97,6 +99,27 @@ class Store extends ChangeNotifier {
   /// Which app this is: 'user' (customers, open to every email), 'vendor' (vendors and service providers) or 'staff'. The server
   /// (functions/login.js claimAppRole) refuses a vendor/staff app login whose email holds the other role.
   String appRole = 'user';
+
+  /// Agreement to the Terms & Conditions and the Privacy Policy (store_consent.dart). Only the customer, vendor and staff apps ask for it.
+  bool requiresConsent = false;
+
+  /// A signed-in person has not agreed to the current version yet: the agreement screen shows.
+  bool consentNeeded = false;
+
+  /// This phone has already had an agreement saved, so the sign-in screen does not show the tick box again.
+  bool deviceConsented = false;
+
+  /// The box was ticked on the sign-in screen; the agreement is saved right after sign-in.
+  bool pendingConsent = false;
+
+  /// The sign-in screen shows the tick box (nobody has agreed on this phone yet).
+  bool get asksConsentBeforeSignIn => requiresConsent && !deviceConsented;
+
+  /// The agreement screen covers the app: signed in, and no saved agreement for the current version.
+  bool get showsConsentScreen => live && requiresConsent && user != null && consentNeeded;
+
+  /// Lets the consent extension (store_consent.dart) tell the screens that the agreement state changed.
+  void consentChanged() => notifyListeners();
 
   /// Why the last sign-in was refused (the email holds another role); shown on the login screen, null otherwise.
   String? roleBlock;
@@ -222,6 +245,7 @@ class Store extends ChangeNotifier {
     if (live) {
     }
     pincode = prefs.getString('pincode') ?? '';
+    await loadConsentDevice();
     address = prefs.getString('address') ?? '';
     town = prefs.getString('town') ?? '';
     district = prefs.getString('district') ?? '';
@@ -266,6 +290,8 @@ class Store extends ChangeNotifier {
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
           if (u == null) _gatedUid = null;
           if (u != null && u.emailVerified && _gatedUid != u.uid && !await _roleAllowed(u)) return;
+          if (u == null) consentNeeded = false;
+          if (u != null && u.emailVerified) await syncConsent();
           admin =
               u != null &&
               u.emailVerified &&

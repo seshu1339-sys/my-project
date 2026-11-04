@@ -170,7 +170,7 @@ void main() {
         if (!index.containsKey(f)) visit(f);
       }
       final allowed = {
-        'data/store.dart,data/store_uploads.dart,data/store_vendor_actions.dart',
+        'data/store.dart,data/store_consent.dart,data/store_uploads.dart,data/store_vendor_actions.dart',
         'ui/product_page.dart,ui/shop_page.dart',
       };
       expect({for (final c in cycles) c.join(',')}.difference(allowed), isEmpty);

@@ -27,6 +27,7 @@ Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
 Object.assign(exports, require('./login'));
 Object.assign(exports, require('./email-login'));
+Object.assign(exports, require('./consent'));
 Object.assign(exports, require('./ids'));
 // Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
 const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');

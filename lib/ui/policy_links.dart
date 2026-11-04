@@ -21,7 +21,8 @@ class PolicyLinks extends StatelessWidget {
     ('Contact Us', '/contact'),
   ];
 
-  Future<void> _open(String path) async {
+  /// Opens a page of locamarket.in in the browser. A link that cannot open must not break sign-in.
+  static Future<void> open(String path) async {
     try {
       await launchUrl(Uri.https('locamarket.in', path), mode: LaunchMode.externalApplication);
     } catch (_) {
@@ -37,7 +38,7 @@ class PolicyLinks extends StatelessWidget {
         TextButton(
           key: ValueKey('policy-link-$path'),
           style: TextButton.styleFrom(visualDensity: VisualDensity.compact, textStyle: const TextStyle(fontSize: 12)),
-          onPressed: () => _open(path),
+          onPressed: () => open(path),
           child: Text(label),
         ),
     ],

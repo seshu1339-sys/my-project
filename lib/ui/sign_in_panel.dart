@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data/store.dart';
 import '../services/strings.dart';
+import 'consent_checkbox.dart';
 import 'policy_links.dart';
 
 /// The one sign-in used by the customer, vendor and staff apps: "Continue with Google" (the phone's own account list, one tap, no
@@ -42,6 +43,9 @@ class _SignInPanelState extends State<SignInPanel> {
     }
   }
 
+  /// The tick box is shown and not ticked yet.
+  bool get _needsTick => widget.store.asksConsentBeforeSignIn && !widget.store.pendingConsent;
+
   void _checkEmail() {
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email.text.trim())) {
       throw StateError('Enter a valid email address.'.tr(context));
@@ -64,9 +68,12 @@ class _SignInPanelState extends State<SignInPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Agreement to the Terms and the Privacy Policy comes before signing up (and so before signing in, as a new account is made by
+          // the same buttons). Once an agreement is saved on this phone the box is not shown again.
+          if (widget.store.asksConsentBeforeSignIn) ConsentCheckbox(store: widget.store, enabled: !busy),
           FilledButton.icon(
             key: const ValueKey('google-sign-in'),
-            onPressed: busy ? null : () => run(widget.store.signInWithGoogle),
+            onPressed: busy || _needsTick ? null : () => run(widget.store.signInWithGoogle),
             icon: const Icon(Icons.account_circle_outlined),
             label: Text('Continue with Google'.tr(context)),
           ),
@@ -101,7 +108,7 @@ class _SignInPanelState extends State<SignInPanel> {
             if (!sent)
               OutlinedButton(
                 key: const ValueKey('send-code'),
-                onPressed: busy
+                onPressed: busy || _needsTick
                     ? null
                     : () => run(() async {
                         _checkEmail();
