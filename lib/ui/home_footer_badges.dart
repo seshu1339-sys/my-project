@@ -1,3 +1,4 @@
+import '../domain/feature_flags.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
@@ -13,6 +14,9 @@ class HomeFooterBadges extends StatelessWidget {
   final List<Entry> settings;
   final Widget Function(String sectionKey, Widget child) wrapSection;
   static Widget _identitySection(String sectionKey, Widget child) => child;
+
+  // Our own promises about delivery and pay-on-delivery: shown only when showDeliveryPromises is true.
+  static const _deliveryPromiseKeys = {'footerBadge2', 'footerBadge6'};
 
   static const _badges = [
     (Icons.eco_outlined, 'Fresh & Premium Quality', 'footerBadge1'),
@@ -40,6 +44,7 @@ class HomeFooterBadges extends StatelessWidget {
         spacing: 16,
         children: [
           for (final (icon, label, key) in _badges)
+            if (showDeliveryPromises || !_deliveryPromiseKeys.contains(key))
             Builder(
               builder: (context) {
                 final layout = layoutFor(context, settings, key);

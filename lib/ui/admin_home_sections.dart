@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../domain/feature_flags.dart';
 import 'admin_ads.dart';
 import 'admin_entry_list.dart';
 import 'admin_today_offers.dart';
@@ -231,7 +232,7 @@ class _HomeSectionEditorState extends State<HomeSectionEditor> {
         final real = noticeTickerText(store.entries('settings').where((e) => e.id == 'scrollingText').firstOrNull ?? const Entry('x', {}), store.language);
         final strip = TickerStrip(
           key: ValueKey('preview-strip-${scrollSpeed.round()}'),
-          text: real.isEmpty ? 'Fresh offers every day  •  Shop local  •  Free delivery above ₹500' : real,
+          text: real.isEmpty ? showDeliveryPromises ? 'Fresh offers every day  •  Shop local  •  Free delivery above ₹500' : 'Fresh offers every day  •  Shop local' : real,
           textColor: fg ?? Colors.white,
           backgroundColor: bg ?? const Color(0xffd32f2f),
           borderColor: border == null ? null : colors['borderColor'],

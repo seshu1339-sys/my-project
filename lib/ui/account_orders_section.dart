@@ -41,7 +41,15 @@ class AccountOrdersSection extends StatelessWidget {
             .map(
               (d) => ListTile(
                 title: Text('Order {id}'.tr(context, {'id': d.id})),
-                subtitle: Text(d.data()['status'].toString()),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(d.data()['status'].toString()),
+                    // The vendor's phone number, to agree the payment and the handover directly (the app does neither).
+                    for (final shop in store.entries('shops').where((s) => ((d.data()['shopIds'] as List?) ?? const []).contains(s.id)))
+                      SelectableText('${shop.text('name')}: ${shop.text('phone', '-')}', key: ValueKey('order-vendor-phone-${d.id}-${shop.id}')),
+                  ],
+                ),
                 trailing: d.data()['status'] == 'fulfilled'
                     ? TextButton(
                         onPressed: () => run(() async {

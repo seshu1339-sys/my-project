@@ -10,6 +10,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../domain/delivery.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
 import '../domain/towns.dart';
@@ -196,15 +197,23 @@ class Store extends ChangeNotifier {
     (subtotal, line) =>
         subtotal + (item(line.key)?.price(pincode) ?? 0) * line.value,
   );
-  // Client-side estimate for display only; placeOrder recomputes this
-  // authoritatively from settings/business at checkout time.
-  double get deliveryFee {
-    final fee = business.number('deliveryFee', 0);
-    if (fee <= 0) return 0;
-    final threshold = business.number('freeDeliveryAbove', 0);
-    if (threshold > 0 && total >= threshold) return 0;
-    return fee;
+  /// The delivery charge of each shop in the bag, from the place the customer chose. A client-side estimate for display only; placeOrder
+  /// works it out again on the server, from the customer's real position, when the order request is sent. The admin alone sets the
+  /// rules (settings/business.deliveryFeeTiers, freeDeliveryAbove and a shop's freeDelivery), and the vendor is paid the charge directly.
+  List<DeliveryPart> get deliveryParts {
+    final subtotals = <String, double>{};
+    for (final line in cart.entries) {
+      final entry = item(line.key);
+      final shopId = entry?.text('shopId') ?? '';
+      if (entry == null || shopId.isEmpty) continue;
+      subtotals[shopId] = (subtotals[shopId] ?? 0) + entry.price(pincode) * line.value;
+    }
+    if (subtotals.isEmpty) return const [];
+    return buildDeliveryParts(subtotals: subtotals, shops: entries('shops'), business: business, latitude: latitude, longitude: longitude);
   }
+
+  /// The charges that are known (a shop past the last tier shows no charge; the customer settles that with the vendor).
+  double get deliveryFee => deliveryParts.fold(0, (running, part) => running + part.fee);
 
   double get grandTotal => total + deliveryFee;
   int get count => cart.values.fold(0, (a, b) => a + b);
@@ -627,7 +636,9 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> checkout(String deliveryAddress, String requestId, {String paymentMethod = 'direct_vendor'}) async {
+  /// Sends the order request to the shops. [phone] is the number the vendor can call and ([latitude], [longitude]) the customer's place,
+  /// for each shop's delivery charge. The phone number is kept on this order only, not in the account.
+  Future<String> checkout(String deliveryAddress, String requestId, {String paymentMethod = 'direct_vendor', required String phone, required double latitude, required double longitude}) async {
     if (!live) {
       throw StateError(
         'Demo checkout preview only. Connect Firebase to place orders.',
@@ -647,6 +658,9 @@ class Store extends ChangeNotifier {
               .toList(),
           'pincode': pincode,
           'address': deliveryAddress,
+          'phone': phone,
+          'latitude': latitude,
+          'longitude': longitude,
           'requestId': requestId,
           'paymentMethod': paymentMethod,
         });

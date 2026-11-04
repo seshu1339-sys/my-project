@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'feature_flags.dart';
+
 typedef Json = Map<String, dynamic>;
 
 class Entry {
@@ -468,7 +470,7 @@ Map<String, List<Entry>> demoCatalog() => {
       'width': 260,
       'height': 200,
       'order': 1,
-      'active': true,
+      'active': showDeliveryPromises,
     }),
     const Entry('ad3', {
       'name': 'Secure payments.',
@@ -478,7 +480,7 @@ Map<String, List<Entry>> demoCatalog() => {
       'width': 260,
       'height': 200,
       'order': 2,
-      'active': true,
+      'active': showDeliveryPromises,
     }),
     const Entry('box', {
       'name': 'Your daily essentials, sorted.',

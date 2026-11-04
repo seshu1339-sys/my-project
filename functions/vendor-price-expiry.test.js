@@ -39,7 +39,7 @@ test('a vendor price lasts 24 hours: then it is removed, the item hides and cann
   // ---- an item past its 24 hours cannot be ordered
   await ref.update({price: 50, endsAt: new Date(Date.now() - 1000).toISOString()});
   const customer = {auth: {uid: 'priceCustomer', token: {email_verified: true}}};
-  await assert.rejects(() => fns.placeOrder.run({...customer, data: {items: [{productId: made.docId, quantity: 1}], pincode: '531116', address: '12 Main Road, Narsipatnam', requestId: 'req-price-1'}}), /no longer available/);
+  await assert.rejects(() => fns.placeOrder.run({...customer, data: {items: [{productId: made.docId, quantity: 1}], pincode: '531116', address: '12 Main Road, Narsipatnam', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-price-1'}}), /no longer available/);
 
   // ---- the vendor enters a new price: valid for another 24 hours, shown again, can be ordered
   const renewed = await fns.submitVendorChange.run({...vendor, data: {type: 'price', collection: 'products', docId: made.docId, changes: {price: 46}}});
@@ -49,6 +49,6 @@ test('a vendor price lasts 24 hours: then it is removed, the item hides and cann
   assert.equal(item.priceExpired, false);
   assert.ok(Date.parse(item.priceExpiresAt) > Date.now() + VENDOR_PRICE_VALID_MS - 60000);
   assert.equal(item.endsAt, item.priceExpiresAt);
-  const order = await fns.placeOrder.run({...customer, data: {items: [{productId: made.docId, quantity: 1}], pincode: '531116', address: '12 Main Road, Narsipatnam', requestId: 'req-price-2'}});
+  const order = await fns.placeOrder.run({...customer, data: {items: [{productId: made.docId, quantity: 1}], pincode: '531116', address: '12 Main Road, Narsipatnam', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-price-2'}});
   assert.ok(order.orderId);
 });

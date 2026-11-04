@@ -10,17 +10,40 @@ function verifyPin(pin, record) {
   const actual = scryptSync(pin, record.salt, 64);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
-// A flat, business-wide delivery/service charge, waived above an optional
-// order total threshold. Unset or non-positive values mean no charge at
-// all, preserving prior behaviour for businesses that never configure it.
-function deliveryCharge(subtotal, business) {
-  const fee = Number(business?.deliveryFee);
-  if (!Number.isFinite(fee) || fee <= 0) return 0;
-  const threshold = Number(business?.freeDeliveryAbove);
-  if (Number.isFinite(threshold) && threshold > 0 && subtotal >= threshold) return 0;
-  return Math.round(fee * 100) / 100;
+// Delivery charge, worked out for each shop on its own. Only the admin sets any of it: settings/business.deliveryFeeTiers and
+// freeDeliveryAbove, and a shop's freeDelivery switch (the rules let only the admin write them; a vendor's change request cannot reach them).
+// The charge is paid to the vendor directly; the app never takes it. The old flat settings/business.deliveryFee is no longer used.
+//
+// deliveryFeeTiers is text such as "5:10, 10:20, 15:0": up to 5 km Rs 10, up to 10 km Rs 20, up to 15 km free. A fee of 0 is free.
+function parseDeliveryTiers(text) {
+  if (typeof text !== 'string') return [];
+  return text.split(',').map(part => part.split(':').map(piece => Number(piece.trim())))
+    .filter(([km, fee, ...rest]) => rest.length === 0 && Number.isFinite(km) && km > 0 && Number.isFinite(fee) && fee >= 0)
+    .map(([km, fee]) => ({km, fee: Math.round(fee * 100) / 100}))
+    .sort((x, y) => x.km - y.km);
 }
-function quote(items, products, pincode, business = {}, now = new Date()) {
+// The charge of one shop's part of an order. talkToVendor is true when the distance is past the last tier (or not known): the app then
+// shows no charge and the customer settles it with the vendor by phone.
+function shopDeliveryCharge({subtotal, shop, customer, business}) {
+  if (shop?.freeDelivery === true) return {fee: 0, talkToVendor: false, distanceKm: null};
+  const threshold = Number(business?.freeDeliveryAbove);
+  if (Number.isFinite(threshold) && threshold > 0 && subtotal >= threshold) return {fee: 0, talkToVendor: false, distanceKm: null};
+  const tiers = parseDeliveryTiers(business?.deliveryFeeTiers);
+  if (!tiers.length) return {fee: 0, talkToVendor: false, distanceKm: null};
+  if (!validCoordinate(shop?.latitude) || !validCoordinate(shop?.longitude) || !validCoordinate(customer?.latitude) || !validCoordinate(customer?.longitude)) {
+    return {fee: 0, talkToVendor: true, distanceKm: null};
+  }
+  const distance = Math.round(distanceKm(customer.latitude, customer.longitude, shop.latitude, shop.longitude) * 10) / 10;
+  const tier = tiers.find(candidate => distance <= candidate.km);
+  return tier ? {fee: tier.fee, talkToVendor: false, distanceKm: distance} : {fee: 0, talkToVendor: true, distanceKm: distance};
+}
+// A phone number as ten digits (a +91 or 0 in front is dropped), or '' when it is not an Indian mobile number.
+function cleanPhone(value) {
+  const digits = String(value ?? '').replace(/[\s\-()]/g, '').replace(/^(\+91|91|0)(?=\d{10}$)/, '');
+  return /^[6-9]\d{9}$/.test(digits) ? digits : '';
+}
+// delivery = {shops: {shopId: shop data}, customer: {latitude, longitude}}; without it there is no delivery charge.
+function quote(items, products, pincode, business = {}, now = new Date(), delivery = null) {
   if (!Array.isArray(items) || !items.length || items.length > 50) throw Error('Choose 1–50 items');
   const seen = new Set();
   const lines = items.map((item, i) => {
@@ -34,9 +57,18 @@ function quote(items, products, pincode, business = {}, now = new Date()) {
     return {productId: item.productId, name: p.name, kind: p.kind, shopId: p.shopId, quantity: item.quantity, unitPrice: Math.round(price * 100) / 100};
   });
   const subtotal = lines.reduce((sum, l) => sum + Math.round(l.unitPrice * 100) * l.quantity, 0) / 100;
-  const deliveryFee = deliveryCharge(subtotal, business);
+  const byShop = delivery ? deliveryByShop(lines, delivery, business) : [];
+  const deliveryFee = byShop.reduce((sum, part) => sum + Math.round(part.fee * 100), 0) / 100;
   const total = Math.round((subtotal + deliveryFee) * 100) / 100;
-  return {lines, subtotal, deliveryFee, total};
+  return {lines, subtotal, deliveryFee, deliveryByShop: byShop, total};
+}
+function deliveryByShop(lines, delivery, business) {
+  const totals = new Map();
+  for (const line of lines) {
+    if (!line.shopId) continue;
+    totals.set(line.shopId, (totals.get(line.shopId) ?? 0) + Math.round(line.unitPrice * 100) * line.quantity);
+  }
+  return [...totals].map(([shopId, cents]) => ({shopId, ...shopDeliveryCharge({subtotal: cents / 100, shop: delivery.shops?.[shopId], customer: delivery.customer, business})}));
 }
 function distanceKm(latitudeA, longitudeA, latitudeB, longitudeB) {
   const toRadians = value => value * Math.PI / 180;
@@ -273,4 +305,4 @@ function vendorItemLimit(vendor = {}) {
   const limit = vendor.itemLimit;
   return typeof limit === 'number' && Number.isInteger(limit) && limit >= 0 && limit <= 100 ? limit : DEFAULT_VENDOR_ITEM_LIMIT;
 }
-module.exports = {vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};
+module.exports = {parseDeliveryTiers, shopDeliveryCharge, cleanPhone, vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

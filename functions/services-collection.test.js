@@ -42,7 +42,7 @@ test('a service can be ordered (stock goes down) and cancelling the order gives 
   const customer = {auth: {uid: 'orderCustomer', token: {email_verified: true}}};
   const placed = await fns.placeOrder.run({...customer, data: {
     items: [{productId: 'order-svc-1', quantity: 2}, {productId: 'order-prod-1', quantity: 3}],
-    pincode: '533101', address: '12 Main Road, Rajahmundry', requestId: 'req-services-1',
+    pincode: '533101', address: '12 Main Road, Rajahmundry', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-services-1',
   }});
   const order = (await db.collection('orders').doc(placed.orderId).get()).data();
   assert.equal(order.lines.length, 2);
@@ -61,5 +61,5 @@ test('a service can be ordered (stock goes down) and cancelling the order gives 
   assert.equal((await db.collection('products').doc('order-prod-1').get()).data().stock, 10);
 
   // an unknown id is still refused
-  await assert.rejects(() => fns.placeOrder.run({...customer, data: {items: [{productId: 'no-such-item', quantity: 1}], pincode: '533101', address: '12 Main Road, Rajahmundry', requestId: 'req-services-2'}}), /no longer available/);
+  await assert.rejects(() => fns.placeOrder.run({...customer, data: {items: [{productId: 'no-such-item', quantity: 1}], pincode: '533101', address: '12 Main Road, Rajahmundry', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-services-2'}}), /no longer available/);
 });

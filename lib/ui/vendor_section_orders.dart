@@ -29,15 +29,19 @@ class _VendorOrdersSectionState extends State<VendorOrdersSection> with VendorSe
           final docs = snapshot.data?.docs ?? const [];
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             ListTile(leading: const Icon(Icons.receipt_long), title: const Text('Orders'), subtitle: Text('${docs.length} vendor orders')),
-            for (final doc in docs) _orderTile(doc),
+            for (final doc in docs) _orderTile(doc, shopId),
           ]);
         },
       );
     },
   );
 
-  Widget _orderTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Widget _orderTile(QueryDocumentSnapshot<Map<String, dynamic>> doc, String shopId) {
     final order = doc.data();
+    final delivery = [
+      for (final part in (order['deliveryByShop'] as List? ?? const []))
+        if (part is Map && part['shopId'] == shopId) part,
+    ].firstOrNull;
     final status = '${order['status']}';
     final lines = [for (final l in (order['lines'] as List? ?? const [])) '${(l as Map)['name']} × ${l['quantity']}'].join(', ');
     Widget action(String label, String next) => OutlinedButton(
@@ -56,6 +60,10 @@ class _VendorOrdersSectionState extends State<VendorOrdersSection> with VendorSe
           Text('Order ${doc.id.substring(0, 8)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           Text('$lines • Total ${order['total']}'),
           Text('${order['address']}'),
+          SelectableText('Customer phone: ${order['customerPhone'] ?? '-'}', key: ValueKey('order-customer-phone-${doc.id}')),
+          if (delivery != null && delivery['distanceKm'] != null) Text('Distance: ${delivery['distanceKm']} km'),
+          if (delivery != null && delivery['talkToVendor'] == true) const Text('Delivery charge for this distance: agree it with the customer by phone.'),
+          if (delivery != null && delivery['fee'] is num && delivery['fee'] > 0) Text('Delivery charge: ${delivery['fee']}'),
           Text('Payment: ${order['paymentMethod']} • ${order['paymentStatus']}'),
           Text('Status: $status'),
           Wrap(spacing: 8, children: [

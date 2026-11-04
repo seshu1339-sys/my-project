@@ -1,6 +1,6 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails} = require('./domain');
+const {hashPin, verifyPin, quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, vendorApplication, validateVendorChange, orderTransitionAllowed, pointInRectangle, pointInPolygon, promotionMatchesLocation, fieldShopDetails, fieldItemDetails} = require('./domain');
 const product = {name: 'Vegetables', active: true, stock: 3, price: 100, prices: {'560001': 90}, kind: 'product', shopId: 's1'};
 test('salted PIN hashes verify without retaining plaintext', () => {
   const a = hashPin('123456'), b = hashPin('123456');
@@ -25,23 +25,53 @@ test('quote has no delivery fee unless the business configures one', () => {
   assert.equal(result.subtotal, 100);
   assert.equal(result.total, 100);
 });
-test('quote applies a flat delivery fee and waives it above the free-delivery threshold', () => {
-  const business = {deliveryFee: 30, freeDeliveryAbove: 500};
-  const small = quote([{productId: 'p1', quantity: 1}], [product], '999999', business);
-  assert.equal(small.subtotal, 100);
-  assert.equal(small.deliveryFee, 30);
-  assert.equal(small.total, 130);
-  const large = quote([{productId: 'p1', quantity: 6}], [{...product, stock: 10}], '999999', business);
-  assert.equal(large.subtotal, 600);
-  assert.equal(large.deliveryFee, 0);
-  assert.equal(large.total, 600);
+const customer = {latitude: 17.0, longitude: 82.0};
+// A shop about 3 km, and one about 8 km, from the customer (0.027 degrees of latitude is about 3 km).
+const near = {latitude: 17.027, longitude: 82.0};
+const far = {latitude: 17.072, longitude: 82.0};
+const tiers = {deliveryFeeTiers: '5:10, 10:20, 15:0'};
+const one = (shop, business, qty = 1, stock = 10) => quote([{productId: 'p1', quantity: qty}], [{...product, stock}], '999999', business, new Date(), {shops: {s1: shop}, customer});
+test('there is no delivery charge unless the admin sets tiers, and the old flat fee is no longer used', () => {
+  assert.equal(one(near, {}).deliveryFee, 0);
+  assert.equal(one(near, {deliveryFee: 30}).deliveryFee, 0);
+  assert.equal(quote([{productId: 'p1', quantity: 1}], [product], '999999').deliveryFee, 0);
 });
-test('quote ignores an invalid or non-positive delivery fee configuration', () => {
-  for (const business of [{deliveryFee: -5}, {deliveryFee: 0}, {deliveryFee: 'free'}, {deliveryFee: NaN}, null, undefined]) {
-    const result = quote([{productId: 'p1', quantity: 1}], [product], '999999', business);
-    assert.equal(result.deliveryFee, 0);
-    assert.equal(result.total, 100);
-  }
+test('the delivery charge follows the distance tiers of the admin, and a tier of 0 is free', () => {
+  assert.equal(one(near, tiers).deliveryFee, 10);
+  assert.equal(one(near, tiers).total, 110);
+  assert.equal(one(far, tiers).deliveryFee, 20);
+  assert.equal(one(far, {deliveryFeeTiers: '5:10, 10:0'}).deliveryFee, 0);
+  assert.equal(one(near, {deliveryFeeTiers: 'bad, 5:x, -1:5'}).deliveryFee, 0);
+});
+test('past the last tier there is no charge in the app and the customer settles it with the vendor', () => {
+  const result = one(far, {deliveryFeeTiers: '5:10'});
+  assert.equal(result.deliveryFee, 0);
+  assert.equal(result.deliveryByShop[0].talkToVendor, true);
+  assert.equal(one(near, tiers).deliveryByShop[0].talkToVendor, false);
+});
+test('a free-delivery shop, or an order total above the admin limit, pays no delivery charge', () => {
+  assert.equal(one({...near, freeDelivery: true}, tiers).deliveryFee, 0);
+  assert.equal(one(near, {...tiers, freeDeliveryAbove: 500}, 6).deliveryFee, 0);
+  assert.equal(one(near, {...tiers, freeDeliveryAbove: 500}, 1).deliveryFee, 10);
+});
+test('each shop in an order gets its own delivery charge', () => {
+  const second = {...product, shopId: 's2'};
+  const result = quote([{productId: 'p1', quantity: 1}, {productId: 'p2', quantity: 1}], [product, second], '999999', tiers, new Date(), {shops: {s1: near, s2: far}, customer});
+  assert.deepEqual(result.deliveryByShop.map(part => [part.shopId, part.fee]), [['s1', 10], ['s2', 20]]);
+  assert.equal(result.deliveryFee, 30);
+  assert.equal(result.total, 230);
+});
+test('a shop without a place cannot be priced by distance, so the customer settles with the vendor', () => {
+  const result = one({}, tiers);
+  assert.equal(result.deliveryFee, 0);
+  assert.equal(result.deliveryByShop[0].talkToVendor, true);
+});
+test('customer phone numbers are cleaned to ten digits, or refused', () => {
+  assert.equal(cleanPhone('+91 98765 43210'), '9876543210');
+  assert.equal(cleanPhone('09876543210'), '9876543210');
+  assert.equal(cleanPhone('12345'), '');
+  assert.equal(cleanPhone('5876543210'), '');
+  assert.equal(cleanPhone(undefined), '');
 });
 test('shop radius helpers reject invalid coordinates and measure distance', () => {
   assert.equal(distanceKm(12.9716, 77.5946, 12.9716, 77.5946), 0);
