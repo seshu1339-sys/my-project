@@ -260,6 +260,116 @@ service cloud.firestore {
       allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['submitted', 'confirmed', 'fulfilled', 'cancelled'];
     }
+    // Subscription Plans module (functions/modules/plans): vendors read the plans as the admin made them and their own plan; functions write everything.
+    match /vendorPlans/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /planServiceGates/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /vendorPlanPeriods/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+    match /vendorPlanStatus/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    // A payment request is the only meeting point of the plans and payment modules; a person reads their own, functions write them.
+    match /paymentRequests/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+    // Vendor Offers module (functions/modules/vendor-offers): anyone reads a live offer, a vendor their own, the admin all; functions write everything.
+    match /vendorOffers/{id} {
+      allow read: if resource.data.status == 'live' || admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
+    match /vendorOffersConfig/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    // Premium status module (functions/modules/premium-status): a vendor reads their own; only functions write it.
+    match /vendorPremium/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    // Today's Offer module (functions/modules/todays-offer): offers are public like promotions; the apps choose which to show. Functions write them.
+    match /vendorTodaysOffers/{uid} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // Wholesale module (functions/modules/wholesale): holds phone numbers, so only the admin and vendors with a running plan read it.
+    match /wholesaleOffers/{id} {
+      allow read: if admin() || (signedIn()
+        && get(/databases/$(database)/documents/vendorPremium/$(request.auth.uid)).data.active == true
+        && get(/databases/$(database)/documents/vendorPremium/$(request.auth.uid)).data.endsAt > request.time);
+      allow write: if false;
+    }
+    // Payment module (functions/modules/payments, Razorpay): vendors read only whether payments are open; the switch and the used
+    // payment ids are admin only. Only functions write.
+    match /paymentPublic/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /paymentSettings/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /paymentIds/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    // ai-core (functions/modules/ai-core): the log of every AI call is for the admin; the daily counts are for functions only.
+    match /aiCallLog/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /aiDailyUse/{id} { allow read, write: if false; }
+    // Flash module (functions/modules/flash): a person reads their own chats in each of the three separate collections, the admin reads all.
+    // Tickets, their AI suggestions, the counts and the settings are for the admin only. Functions write everything.
+    match /flashUserChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashUserChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashVendorChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashVendorChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashStaffChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashStaffChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashTickets/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashTicketTriage/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashStats/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /flashConfig/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     // PIN hashes, rate limits, and orders are created only by trusted functions.
     match /{document=**} { allow read, write: if false; }
   }

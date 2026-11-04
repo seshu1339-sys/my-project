@@ -38,8 +38,8 @@ class AdminTodayOffersPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Each box shows its offer only from its start to its end. Put several offers in a box one after another: when one ends the '
-            'next one comes by itself. A box with no offer at that time shows its usual Today\'s Offers Box promotion. The box colours stay as they are.',
+            'An offer shows only from its start to its end. All live offers go in one list, yours first by box number, then the Premium vendors\' offers. '
+            'With more than fit, the boxes change to the next set and loop, at the speed set for Today\'s Offers. Boxes left over show the usual Today\'s Offers Box promotion. The box colours stay as they are.',
           ),
           if (shopsWithoutLocation(store).isNotEmpty)
             Card(
@@ -374,7 +374,7 @@ class _TodayOfferFormState extends State<TodayOfferForm> {
         ),
         if (overlaps.isNotEmpty)
           Text(
-            'Box $slot already has ${overlaps.map((o) => o.text('name')).join(', ')} at that time; the one that starts later shows then.',
+            'Box $slot already has ${overlaps.map((o) => o.text('name')).join(', ')} at that time; both show, one after the other in the list.',
             key: const ValueKey('offer-overlap'),
             style: TextStyle(color: Theme.of(context).colorScheme.tertiary),
           ),

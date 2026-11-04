@@ -5,7 +5,7 @@ import '../modules/modules.dart';
 import '../services/strings.dart';
 import '../services/usage.dart';
 
-/// The big colour boxes of the home modules (Transport, Services): one box per module, side by side, equal width. Each has the module's
+/// The big colour boxes of the home modules (Transport, Services, Shop Offers): one box per module, side by side, equal width. Each has the module's
 /// icon and name and opens the module's own page. This widget only reads the list in modules/modules.dart.
 ///
 /// [tall] = false: a row of boxes, [rowHeight] high, as wide as the space it is given (used below the product cards on a phone).

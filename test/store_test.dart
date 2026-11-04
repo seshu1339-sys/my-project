@@ -52,7 +52,7 @@ void main() {
     expect(restarted.language, 'hi');
   });
 
-  test('delivery fee is zero by default and only applies once configured', () async {
+  test('delivery charge follows the admin tiers for each shop and the old flat fee is ignored', () async {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
@@ -63,16 +63,25 @@ void main() {
     expect(store.total, 249);
     expect(store.deliveryFee, 0);
     expect(store.grandTotal, 249);
-    await store.save('settings', Entry('business', {
-      ...store.business.data,
-      'deliveryFee': 30,
-      'freeDeliveryAbove': 500,
-    }));
-    expect(store.deliveryFee, 30);
-    expect(store.grandTotal, 279);
+    await store.save('settings', Entry('business', {...store.business.data, 'deliveryFee': 30}));
+    expect(store.deliveryFee, 0, reason: 'the old flat fee is no longer used');
+    final shopId = product.text('shopId');
+    final shop = store.entries('shops').firstWhere((e) => e.id == shopId);
+    await store.save('shops', Entry(shopId, {...shop.data, 'latitude': 17.027, 'longitude': 82.0}));
+    store.latitude = 17.0;
+    store.longitude = 82.0;
+    await store.save('settings', Entry('business', {...store.business.data, 'deliveryFeeTiers': '5:10, 10:20', 'freeDeliveryAbove': 500}));
+    expect(store.deliveryFee, 10);
+    expect(store.grandTotal, 259);
     store.add(product, 2);
-    expect(store.total, 249 * 3);
-    expect(store.deliveryFee, 0, reason: 'above the free-delivery threshold');
+    expect(store.deliveryFee, 0, reason: 'above the free-delivery limit');
     expect(store.grandTotal, 249 * 3);
+    store.cart.clear();
+    store.add(product);
+    await store.save('settings', Entry('business', {...store.business.data, 'deliveryFeeTiers': '1:10', 'freeDeliveryAbove': 0}));
+    expect(store.deliveryParts.single.talkToVendor, isTrue, reason: 'past the last tier');
+    expect(store.deliveryFee, 0);
+    await store.save('shops', Entry(shopId, {...shop.data, 'latitude': 17.027, 'longitude': 82.0, 'freeDelivery': true}));
+    expect(store.deliveryParts.single.talkToVendor, isFalse);
   });
 }

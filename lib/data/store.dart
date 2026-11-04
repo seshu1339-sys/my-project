@@ -10,10 +10,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/catalog.dart';
+import '../domain/delivery.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
 import '../domain/towns.dart';
 import '../services/usage.dart';
+import 'store_consent.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
 
@@ -22,6 +24,7 @@ import '../services/notifications.dart';
 // calls identically to an instance method) — exported so every existing
 // `import '...store.dart'` keeps seeing `store.upload(...)`,
 // `store.registerVendor(...)` etc. exactly as before this split.
+export 'store_consent.dart';
 export 'store_uploads.dart';
 export 'store_vendor_actions.dart';
 
@@ -96,6 +99,27 @@ class Store extends ChangeNotifier {
   /// Which app this is: 'user' (customers, open to every email), 'vendor' (vendors and service providers) or 'staff'. The server
   /// (functions/login.js claimAppRole) refuses a vendor/staff app login whose email holds the other role.
   String appRole = 'user';
+
+  /// Agreement to the Terms & Conditions and the Privacy Policy (store_consent.dart). Only the customer, vendor and staff apps ask for it.
+  bool requiresConsent = false;
+
+  /// A signed-in person has not agreed to the current version yet: the agreement screen shows.
+  bool consentNeeded = false;
+
+  /// This phone has already had an agreement saved, so the sign-in screen does not show the tick box again.
+  bool deviceConsented = false;
+
+  /// The box was ticked on the sign-in screen; the agreement is saved right after sign-in.
+  bool pendingConsent = false;
+
+  /// The sign-in screen shows the tick box (nobody has agreed on this phone yet).
+  bool get asksConsentBeforeSignIn => requiresConsent && !deviceConsented;
+
+  /// The agreement screen covers the app: signed in, and no saved agreement for the current version.
+  bool get showsConsentScreen => live && requiresConsent && user != null && consentNeeded;
+
+  /// Lets the consent extension (store_consent.dart) tell the screens that the agreement state changed.
+  void consentChanged() => notifyListeners();
 
   /// Why the last sign-in was refused (the email holds another role); shown on the login screen, null otherwise.
   String? roleBlock;
@@ -196,15 +220,23 @@ class Store extends ChangeNotifier {
     (subtotal, line) =>
         subtotal + (item(line.key)?.price(pincode) ?? 0) * line.value,
   );
-  // Client-side estimate for display only; placeOrder recomputes this
-  // authoritatively from settings/business at checkout time.
-  double get deliveryFee {
-    final fee = business.number('deliveryFee', 0);
-    if (fee <= 0) return 0;
-    final threshold = business.number('freeDeliveryAbove', 0);
-    if (threshold > 0 && total >= threshold) return 0;
-    return fee;
+  /// The delivery charge of each shop in the bag, from the place the customer chose. A client-side estimate for display only; placeOrder
+  /// works it out again on the server, from the customer's real position, when the order request is sent. The admin alone sets the
+  /// rules (settings/business.deliveryFeeTiers, freeDeliveryAbove and a shop's freeDelivery), and the vendor is paid the charge directly.
+  List<DeliveryPart> get deliveryParts {
+    final subtotals = <String, double>{};
+    for (final line in cart.entries) {
+      final entry = item(line.key);
+      final shopId = entry?.text('shopId') ?? '';
+      if (entry == null || shopId.isEmpty) continue;
+      subtotals[shopId] = (subtotals[shopId] ?? 0) + entry.price(pincode) * line.value;
+    }
+    if (subtotals.isEmpty) return const [];
+    return buildDeliveryParts(subtotals: subtotals, shops: entries('shops'), business: business, latitude: latitude, longitude: longitude);
   }
+
+  /// The charges that are known (a shop past the last tier shows no charge; the customer settles that with the vendor).
+  double get deliveryFee => deliveryParts.fold(0, (running, part) => running + part.fee);
 
   double get grandTotal => total + deliveryFee;
   int get count => cart.values.fold(0, (a, b) => a + b);
@@ -213,6 +245,7 @@ class Store extends ChangeNotifier {
     if (live) {
     }
     pincode = prefs.getString('pincode') ?? '';
+    await loadConsentDevice();
     address = prefs.getString('address') ?? '';
     town = prefs.getString('town') ?? '';
     district = prefs.getString('district') ?? '';
@@ -257,6 +290,8 @@ class Store extends ChangeNotifier {
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
           if (u == null) _gatedUid = null;
           if (u != null && u.emailVerified && _gatedUid != u.uid && !await _roleAllowed(u)) return;
+          if (u == null) consentNeeded = false;
+          if (u != null && u.emailVerified) await syncConsent();
           admin =
               u != null &&
               u.emailVerified &&
@@ -627,7 +662,9 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> checkout(String deliveryAddress, String requestId, {String paymentMethod = 'direct_vendor'}) async {
+  /// Sends the order request to the shops. [phone] is the number the vendor can call and ([latitude], [longitude]) the customer's place,
+  /// for each shop's delivery charge. The phone number is kept on this order only, not in the account.
+  Future<String> checkout(String deliveryAddress, String requestId, {String paymentMethod = 'direct_vendor', required String phone, required double latitude, required double longitude}) async {
     if (!live) {
       throw StateError(
         'Demo checkout preview only. Connect Firebase to place orders.',
@@ -647,6 +684,9 @@ class Store extends ChangeNotifier {
               .toList(),
           'pincode': pincode,
           'address': deliveryAddress,
+          'phone': phone,
+          'latitude': latitude,
+          'longitude': longitude,
           'requestId': requestId,
           'paymentMethod': paymentMethod,
         });

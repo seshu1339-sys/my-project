@@ -161,6 +161,20 @@ void main() {
       expect(tester.widget<Text>(find.byKey(const ValueKey('shop-ad-ended-rbox-4-old'))).data, '1 Sep 2026 to 30 Sep 2026: 98,765 views');
     });
 
+    testWidgets('with the admin switch off the vendor sees the ad and its dates, but no view numbers', (tester) async {
+      await show(tester, ShopAdView(
+        interested: true,
+        ads: [_ad('rbox-1-new'), _ad('rbox-4-old', box: 4, live: false, started: DateTime(2026, 9, 1), ended: DateTime(2026, 9, 30))],
+        views: const {'rbox-1-new': 1234, 'rbox-4-old': 98765},
+        showViews: false,
+        onInterest: (_) async {},
+      ));
+      expect(find.text('Your ad is live on the website'), findsOneWidget);
+      expect(find.byKey(const ValueKey('shop-ad-views-rbox-1-new')), findsNothing);
+      expect(find.textContaining('1,234'), findsNothing);
+      expect(tester.widget<Text>(find.byKey(const ValueKey('shop-ad-ended-rbox-4-old'))).data, '1 Sep 2026 to 30 Sep 2026');
+    });
+
     testWidgets('a live ad with no views yet shows 0', (tester) async {
       await show(tester, ShopAdView(interested: false, ads: [_ad('rbox-2-z', box: 2)], views: const {}, onInterest: (_) async {}));
       expect(tester.widget<Text>(find.byKey(const ValueKey('shop-ad-views-rbox-2-z'))).data, '0');

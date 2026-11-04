@@ -14,6 +14,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
 const {countUsage} = require('./usage');
+const {planAllows, PLAN_NEEDED} = require('./plan-gate');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -57,6 +58,7 @@ exports.setAdInterest = onCall(options, async request => {
   const ref = db.collection('vendors').doc(uid);
   const vendor = (await ref.get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can use business features.');
+  if (interested && !(await planAllows(db, uid, 'rightBoxAds'))) throw new HttpsError('failed-precondition', PLAN_NEEDED);
   await ref.set({adInterest: interested, adInterestAt: FieldValue.serverTimestamp()}, {merge: true});
   if (interested) await countUsage(db, 'ad_interest', {key: uid, label: vendor.name || '', town: vendor.town || '', owners: [uid], uid});
   return {interested};

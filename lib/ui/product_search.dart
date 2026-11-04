@@ -13,7 +13,8 @@ import 'design_tokens.dart';
 import 'product_page.dart';
 import 'location_picker.dart';
 import 'shared.dart';
-import 'shop_map.dart';
+import 'shop_map.dart';
+import '../services/strings.dart';
 
 /// A shop, joined with one of its products, at a known distance from the
 /// customer — the unit both the map markers and the list rows are built from.
@@ -227,7 +228,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      TextButton(onPressed: () => setState(() => locationError = 'change'), child: const Text('Change')),
+                      TextButton(onPressed: () => setState(() => locationError = 'change'), child: Text('Change'.tr(context))),
                     ],
                   ),
                   if (locationError == 'change') _changeLocationRow(),
@@ -245,9 +246,9 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
                   ),
                   const SizedBox(height: 12),
                   if (matches.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text('No products found in this radius yet. Try a larger radius.'),
+                      child: Text('No products found in this radius yet. Try a larger radius.'.tr(context)),
                     )
                   else ...[
                     ShopMap(
@@ -272,9 +273,9 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
     child: Wrap(
       spacing: 8,
       children: [
-        OutlinedButton.icon(onPressed: _useGps, icon: const Icon(Icons.my_location), label: const Text('Use GPS')),
-        OutlinedButton.icon(onPressed: _searchPlace, icon: const Icon(Icons.search), label: const Text('Search place')),
-        OutlinedButton.icon(onPressed: _dropPin, icon: const Icon(Icons.pin_drop_outlined), label: const Text('Drop pin')),
+        OutlinedButton.icon(onPressed: _useGps, icon: const Icon(Icons.my_location), label: Text('Use GPS'.tr(context))),
+        OutlinedButton.icon(onPressed: _searchPlace, icon: const Icon(Icons.search), label: Text('Search place'.tr(context))),
+        OutlinedButton.icon(onPressed: _dropPin, icon: const Icon(Icons.pin_drop_outlined), label: Text('Drop pin'.tr(context))),
       ],
     ),
   );
@@ -293,7 +294,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
             const SizedBox(height: 16),
           ],
           if (!locating) ...[
-            const Text('We need your location to search nearby products.', textAlign: TextAlign.center),
+            Text('We need your location to search nearby products.'.tr(context), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             _changeLocationRow(),
           ],
@@ -323,7 +324,7 @@ class _ProductLocationTile extends StatelessWidget {
       ),
       isThreeLine: true,
       trailing: IconButton(
-        tooltip: 'Directions',
+        tooltip: 'Directions'.tr(context),
         icon: const Icon(Icons.directions),
         onPressed: () async {
           Usage.track('shop_directions', key: match.shop.id, label: match.shop.text('name'), town: match.shop.text('town'));

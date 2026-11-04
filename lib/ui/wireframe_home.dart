@@ -348,13 +348,10 @@ class WireframeHome extends StatelessWidget {
                     final reorderedSections = <String, Widget>{
                       'promo': LayoutSection(
                         layout: layoutFor(context, settings, 'promo'),
-                        child: offers.isEmpty &&
-                                (store.hasPlace ||
-                                    offersForTown.hiddenForLocation > 0)
-                            ? NoOffersNotice(store: store, onLocation: onLocation)
-                            // The 6 boxes of Today's Offers, each with its item offer of the moment (home_today_offers.dart).
-                            : TodayOffersSection(
+                        // The 6 boxes of Today's Offers, going through all live offers (home_today_offers.dart).
+                        child: TodayOffersSection(
                           store: store,
+                          empty: offers.isEmpty && (store.hasPlace || offersForTown.hiddenForLocation > 0) ? NoOffersNotice(store: store, onLocation: onLocation) : null,
                           boxes: offers,
                           // Android: two offer cards side by side
                           appearance: android ? Entry('promo', {...effectiveSectionConfig(settings, 'promo').data, 'visibleCount': 2}) : effectiveSectionConfig(settings, 'promo'),

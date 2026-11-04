@@ -30,7 +30,7 @@ void main() {
   const forbidden = ['shop', 'promo', 'vendor', 'quick_add', 'admin', 'ads_', 'ad_box', 'home_', 'wireframe', 'storefront', 'store_'];
 
   test('there is a folder per module', () {
-    expect(moduleIds, containsAll(['transport', 'services']));
+    expect(moduleIds, containsAll(['transport', 'services', 'offers', 'premium', 'offerstore', 'offerrotation', 'offerdisplay', 'premiumscreen', 'wholesale', 'premiumadmin', 'payments', 'flash']));
   });
 
   for (final id in moduleIds) {
@@ -78,9 +78,10 @@ void main() {
     }
   });
 
-  test('every module has its own route name and they are all different', () {
+  test('every module with a page has its own route name and they are all different', () {
+    const noPage = {'premium', 'offerstore', 'offerrotation', 'offerdisplay'};
     final routes = <String>[];
-    for (final id in moduleIds) {
+    for (final id in moduleIds.where((id) => !noPage.contains(id))) {
       final text = File('lib/modules/$id/${id}_module.dart').readAsStringSync();
       final m = RegExp("const ${id}Route = '(/[a-z-]+)'").firstMatch(text);
       expect(m, isNotNull, reason: '$id has no route constant');

@@ -20,6 +20,7 @@ const usageItems = [
   UsageItem('shop_route', 'customer', 'screen', 'A shop on the map (road, phone)'),
   UsageItem('nearby_search', 'customer', 'screen', 'Search products near me'),
   UsageItem('offers', 'customer', 'screen', 'Offers'),
+  UsageItem('shop_offers', 'customer', 'screen', 'Shop Offers (made by vendors)'),
   // ---- customer: buttons
   UsageItem('header_location', 'customer', 'button', 'Header: choose location'),
   UsageItem('header_voice_search', 'customer', 'button', 'Header: voice search'),
@@ -29,6 +30,7 @@ const usageItems = [
   UsageItem('header_cart', 'customer', 'button', 'Header: bag'),
   UsageItem('home_services', 'customer', 'button', 'Home: Services box'),
   UsageItem('home_transport', 'customer', 'button', 'Home: Transport box'),
+  UsageItem('home_offers', 'customer', 'button', 'Home: Shop Offers box'),
   UsageItem('product_add_to_bag', 'customer', 'button', 'Item: Add to bag'),
   UsageItem('product_buy_now', 'customer', 'button', 'Item: Buy now'),
   UsageItem('product_compare_shops', 'customer', 'button', 'Item: Compare shops selling this'),

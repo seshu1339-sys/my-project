@@ -6,6 +6,14 @@ RewriteEngine On
 RewriteRule ^(docs|\.github|test|android|lib|macos|linux|ios|scripts|functions|windows|web_admin_overlay|config|web)(/|$) - [F,L]
 RewriteRule ^(\.metadata|firebase\.json|pubspec\.lock|BUILD_STATUS\.md|pubspec\.yaml|storage\.rules|README\.md|firestore\.indexes\.json|firestore\.rules|\.firebaserc|\.gitignore|locamarket_products\.csv|devtools_options\.yaml|AI_HANDOFF\.md|analysis_options\.yaml)$ - [F,L]
 
+# Clean URL for /privacy-policy (a single file), as firebase.json's rewrite does.
+# The folder pages (/terms, /refund-policy, /pricing, /contact, /privacy...)
+# need nothing here: Apache serves their index.html itself.
+RewriteRule ^privacy-policy/?$ privacy-policy.html [L]
+
+# The old /shipping-policy address now goes to the Digital Delivery & Refund Policy (permanent redirect).
+RewriteRule ^shipping-policy/?$ /digital-delivery [R=301,L]
+
 # SPA fallback for the real deployed Flutter web app. Excludes /staging/ so
 # that subtree's own .htaccess handles its fallback independently (it has its
 # own base-href-correct index.html, never the root's).

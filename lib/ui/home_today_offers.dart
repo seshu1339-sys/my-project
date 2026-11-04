@@ -7,19 +7,32 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/today_offers.dart';
 import '../domain/towns.dart';
+import '../modules/offerdisplay/offerdisplay_module.dart';
+import '../modules/offerrotation/offerrotation_module.dart';
+import '../modules/offerstore/offerstore_module.dart';
 import '../services/analytics.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 import 'home_hero_carousel.dart';
 import 'home_impression_once.dart';
+import 'home_vendor_offers.dart';
 import 'shared.dart';
 import 'shop_route_map.dart';
 
-/// Today's Offers on the home page: the coloured boxes (lib/domain/today_offers.dart). While an item
-/// offer is live for a box, the box shows it: its colour as a frame round a white inside with "Today's Offer" across the top, the
-/// item's photo big on the left and its name and offer price on the right. Tapping it opens the shop on the map straight away (its
-/// place, the road and its phone). A box with no live offer shows its Today's Offers Box promotion as before (so the town, pincode
-/// and area boxes keep working); the boxes change by themselves when an offer starts or ends.
+/// One thing the carousel goes through: a promotion as it is, or an offer drawn inside a box's look.
+class _Box {
+  const _Box({this.promotion, this.offer});
+  final Entry? promotion;
+  final Widget Function(Entry look, int index)? offer;
+}
+
+/// Today's Offers on the home page: the coloured boxes (lib/domain/today_offers.dart). All live offers make one list, the admin's item
+/// offers first and then the vendors' offers in the customer's circle (lib/modules/offerrotation). The carousel shows them set by set and
+/// loops, at the Today's Offers speed the admin set; with few enough to fit they stay put. An admin offer shows its colour as a frame round a
+/// white inside with "Today's Offer" across the top, the item's photo big on the left and its name and offer price on the right; a tap
+/// opens the shop on the map straight away (its place, the road and its phone). A vendor offer shows only its photo and price, and a tap
+/// opens the shop's page. Boxes left over show their Today's Offers Box promotion as before (so the town, pincode and area boxes keep
+/// working); the boxes change by themselves when an offer starts or ends.
 class TodayOffersSection extends StatefulWidget {
   const TodayOffersSection({
     super.key,
@@ -30,8 +43,16 @@ class TodayOffersSection extends StatefulWidget {
     this.speed = 600,
     this.showAll = false,
     this.onPromotion,
+    this.empty,
+    this.vendorOffers,
   });
   final Store store;
+
+  /// Shown instead when there is nothing at all to put in the boxes.
+  final Widget? empty;
+
+  /// Where vendor offers come from; the offer store unless a test gives another.
+  final Stream<List<TodaysOffer>>? vendorOffers;
 
   /// Opens a promotion's target (the boxes before any item offer is set).
   final void Function(String target)? onPromotion;
@@ -91,33 +112,70 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.store,
-    builder: (context, _) {
-      final now = DateTime.now();
-      final offers = widget.store.entries('promotions').where((o) => isTodayOffer(o) && o.active && _inTown(o)).toList();
-      final slots = todayOfferSlots(offers, now);
-      _wake(nextTodayOfferChange(offers, now), now);
-      return Column(
-        key: const ValueKey('today-offers'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          HeroCarousel(
-            entries: todayOfferBoxesFor(widget.boxes, slots),
-            appearance: widget.appearance,
-            onTap: widget.onPromotion ?? (_) {},
-            reverse: widget.reverse,
-            speed: widget.speed,
-            // Only a box with a live offer is drawn here; the others are the promotions as before.
-            boxBuilder: (context, look, i) =>
-                i < slots.length && slots[i] != null ? TodayOfferBox(key: ValueKey('today-offer-box-${i + 1}'), look: look, offer: slots[i]!, onOpen: _open) : null,
-          ),
-          // A little room before the strip below (the boxes have no dots under them when all 6 fit).
-          const SizedBox(height: 10),
-        ],
+  _Box _vendorBox(TodaysOffer offer) => _Box(
+    offer: (look, i) {
+      final inner = max(clampedNumber(look, 'radius', 20, 0, 80) - VendorOfferBox.frameWidth, 6.0);
+      return VendorOfferBox(
+        key: ValueKey('vendor-offer-box-${i + 1}'),
+        photoUrl: offer.photoUrl,
+        price: offer.price == offer.price.roundToDouble() ? '₹${offer.price.round()}' : '₹${offer.price.toStringAsFixed(2)}',
+        frame: entryDecoration(look, fallback: AppTokens.primaryLight),
+        colour: colorFromHex(look.text('backgroundColor'), AppTokens.primary),
+        radius: inner,
+        onTap: () => openVendorOfferShop(context, widget.store, offer),
       );
     },
+  );
+
+  /// The earlier of the next admin offer change and the next vendor offer end.
+  DateTime? _nextChange(List<Entry> adminOffers, List<TodaysOffer> vendorOffers, DateTime now) {
+    final times = [?nextTodayOfferChange(adminOffers, now), for (final o in vendorOffers) o.endsAt];
+    return times.isEmpty ? null : times.reduce((a, b) => a.isBefore(b) ? a : b);
+  }
+
+  @override
+  Widget build(BuildContext context) => VendorOffersFeed(
+    store: widget.store,
+    source: widget.vendorOffers,
+    builder: (context, running) => ListenableBuilder(
+      listenable: widget.store,
+      builder: (context, _) {
+        final now = DateTime.now();
+        final adminOffers = widget.store.entries('promotions').where((o) => isTodayOffer(o) && o.active && _inTown(o)).toList();
+        final vendorOffers = vendorOffersForCustomer(running, {for (final shop in widget.store.nearby()) shop.id}, now);
+        _wake(_nextChange(adminOffers, vendorOffers, now), now);
+        final boxes = fillBoxes<_Box>(
+          mergeOffers(
+            [
+              for (final o in liveTodayOffers(adminOffers, now))
+                _Box(offer: (look, i) => TodayOfferBox(key: ValueKey('today-offer-box-${i + 1}'), look: look, offer: o, onOpen: _open)),
+            ],
+            [for (final o in vendorOffers) _vendorBox(o)],
+          ),
+          [for (final p in widget.boxes) _Box(promotion: p)],
+          todayOfferBoxCount,
+        );
+        if (boxes.isEmpty && widget.empty != null) return widget.empty!;
+        final looks = todayOfferBoxLooks(widget.boxes);
+        return Column(
+          key: const ValueKey('today-offers'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            HeroCarousel(
+              entries: [for (final (i, box) in boxes.indexed) box.promotion ?? looks[i % looks.length]],
+              appearance: widget.appearance,
+              onTap: widget.onPromotion ?? (_) {},
+              reverse: widget.reverse,
+              speed: widget.speed,
+              // Only offers are drawn here; the others are the promotions as before.
+              boxBuilder: (context, look, i) => i < boxes.length ? boxes[i].offer?.call(look, i) : null,
+            ),
+            // A little room before the strip below (the boxes have no dots under them when all 6 fit).
+            const SizedBox(height: 10),
+          ],
+        );
+      },
+    ),
   );
 }
 

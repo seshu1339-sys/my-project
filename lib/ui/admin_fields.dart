@@ -155,9 +155,10 @@ const fields = <String, Map<String, String>>{
     'searchRadiusMaxKm': 'Maximum product search radius (km)',
     'vendorPhotoLimit': 'Vendor shop photo limit (1-9, default 3; photo 1 is the shop, required)',
     'fieldPhotoLimit': 'Field Assistant item photo limit (1-9, default 2)',
-    'deliveryFee': 'Delivery / service fee (₹, 0 = none)',
+    'deliveryFeeTiers':
+        'Delivery charge by distance, paid to the vendor (km:₹ pairs, comma-separated, e.g. 5:10, 10:20, 15:0 = up to 5 km ₹10, up to 10 km ₹20, up to 15 km free; blank = no charge; past the last distance the customer agrees the charge with the vendor by phone)',
     'freeDeliveryAbove':
-        'Free delivery above order total (₹, 0 = always charge)',
+        'Free delivery above a shop\'s item total (₹, 0 = never free by total)',
     'enabledLanguages': 'Enabled languages (comma-separated codes)',
     'autoPublishVendorChanges':
         'Auto-publish approved vendor changes (true / false)',

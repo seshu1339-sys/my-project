@@ -22,11 +22,14 @@ Future<void> _tab(WidgetTester tester, int index) async {
   await tester.pumpAndSettle();
 }
 
+// Settings is the last tab, however many module tabs come before it.
+Future<void> _settingsTab(WidgetTester tester) => _tab(tester, DefaultTabController.of(tester.element(find.byType(TabBar).first)).length - 1);
+
 void main() {
-  testWidgets('the main tabs are Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, then Settings', (tester) async {
+  testWidgets('the main tabs are Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, the module tabs, then Settings', (tester) async {
     await _open(tester, 1200);
     expect(tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList(), [
-      'Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Settings',
+      'Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Payments', 'Flash', 'Settings',
     ]);
     expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0, reason: 'Insights is the home page');
     expect(find.text('Site and ad statistics'), findsOneWidget);
@@ -48,7 +51,7 @@ void main() {
 
   testWidgets('every other setting is in Settings, each in exactly one place', (tester) async {
     await _open(tester, 1200);
-    await _tab(tester, 7);
+    await _settingsTab(tester);
     for (final key in ['categories', 'fieldAssistants', 'settings', 'theme', 'animations', 'scrollingText', 'productImageLibrary', 'layout', 'locations']) {
       expect(find.byKey(ValueKey('settings-$key')), findsOneWidget, reason: key);
     }
@@ -66,7 +69,7 @@ void main() {
 
   testWidgets('Settings sections open: Field Assistants, Layout (Layout settings, Visual Editor, Page view), Quick Add locations', (tester) async {
     await _open(tester, 1200);
-    await _tab(tester, 7);
+    await _settingsTab(tester);
     await tester.tap(find.byKey(const ValueKey('settings-fieldAssistants')));
     await tester.pumpAndSettle();
     expect(find.textContaining('available when Firebase is connected'), findsOneWidget, reason: 'the offline demo says so instead of failing');
@@ -115,7 +118,7 @@ void main() {
 
   testWidgets('on a phone Settings is a list of sections that open one by one', (tester) async {
     await _open(tester, 390);
-    await _tab(tester, 7);
+    await _settingsTab(tester);
     expect(find.byKey(const ValueKey('settings-theme')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('settings-categories')));
     await tester.pumpAndSettle();

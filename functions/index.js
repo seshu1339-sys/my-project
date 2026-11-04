@@ -10,7 +10,7 @@ const {normalizeEvent, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
+const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
@@ -27,6 +27,7 @@ Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
 Object.assign(exports, require('./login'));
 Object.assign(exports, require('./email-login'));
+Object.assign(exports, require('./consent'));
 Object.assign(exports, require('./ids'));
 // Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
 const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
@@ -79,6 +80,14 @@ Object.assign(exports, require('./ai-agent-backup'));
 // are required directly by ai-agent-executor.js/ai-agent-query.js and never
 // appear in this Object.assign list.
 Object.assign(exports, require('./ai-agent-query'));
+// Independent feature modules (functions/modules/<name>/). Each is one line here and shares nothing with the others.
+Object.assign(exports, require('./modules/plans'));
+Object.assign(exports, require('./modules/vendor-offers'));
+Object.assign(exports, require('./modules/premium-status'));
+Object.assign(exports, require('./modules/todays-offer'));
+Object.assign(exports, require('./modules/wholesale'));
+Object.assign(exports, require('./modules/payments'));
+Object.assign(exports, require('./modules/flash'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
@@ -171,8 +180,15 @@ exports.placeOrder = onCall(options, async request => {
   if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email before ordering.');
   const {items, pincode, address, requestId} = request.data || {};
   const requestedPaymentMethod = request.data?.paymentMethod;
+  const customer = {latitude: request.data?.latitude, longitude: request.data?.longitude};
+  const customerPhone = cleanPhone(request.data?.phone);
   if (typeof pincode !== 'string' || !/^\d{6}$/.test(pincode) || typeof address !== 'string' || address.trim().length < 10 || address.length > 1000 || typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)) throw new HttpsError('invalid-argument', 'Provide a valid address, pincode and request ID.');
   if (!Array.isArray(items) || !items.length || items.length > 50 || items.some(i => typeof i?.productId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(i.productId))) throw new HttpsError('invalid-argument', 'Invalid items.');
+  // The app sends the order request to the vendor; it does not deliver or take money. It needs the customer's place (for each shop's
+  // delivery charge) and a phone number the vendor can call. The number is kept on this order only and is not checked by a code, so a
+  // wrong number is the customer's own responsibility.
+  if (!validCoordinate(customer.latitude) || !validCoordinate(customer.longitude)) throw new HttpsError('failed-precondition', 'Turn on your location to send an order request.');
+  if (!customerPhone) throw new HttpsError('invalid-argument', 'Enter a valid 10-digit mobile number.');
   await rateLimit(`order:${request.auth.uid}`, 20, 60 * 1000);
   const orderId = digest(`${request.auth.uid}:${requestId}`);
   const orderRef = db.collection('orders').doc(orderId);
@@ -184,14 +200,18 @@ exports.placeOrder = onCall(options, async request => {
     const serviceRefs = items.map(i => db.collection('services').doc(i.productId));
     const [businessSnapshot, ...found] = await tx.getAll(businessRef, ...productRefs, ...serviceRefs);
     const snapshots = items.map((_, i) => (found[i].exists ? found[i] : found[items.length + i]));
+    // Each shop in the order, for its delivery charge (the shop's place and its admin-set freeDelivery switch).
+    const shopIds = [...new Set(snapshots.map(s => s.data()?.shopId).filter(id => typeof id === 'string' && id))];
+    const shopSnapshots = shopIds.length ? await tx.getAll(...shopIds.map(id => db.collection('shops').doc(id))) : [];
+    const shops = Object.fromEntries(shopSnapshots.filter(s => s.exists).map(s => [s.id, s.data()]));
     let result;
-    try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data()); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
+    try { result = quote(items, snapshots.map(s => s.data()), pincode, businessSnapshot.data(), new Date(), {shops, customer}); } catch (e) { throw new HttpsError('failed-precondition', e.message); }
     const business = businessSnapshot.data() || {};
     const methods = paymentOptions(business);
     const paymentMethod = requestedPaymentMethod || business.defaultPaymentMethod || 'direct_vendor';
     if (typeof paymentMethod !== 'string' || methods[paymentMethod] !== true) throw new HttpsError('failed-precondition', 'This payment method is not currently available.');
     const paymentStatus = paymentMethod === 'platform_collected' ? 'pending_platform_collection' : paymentMethod === 'cash_on_delivery' ? 'pending_cash_on_delivery' : 'pending_vendor_direct';
-    tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), status: 'submitted', paymentMethod, paymentStatus, createdAt: FieldValue.serverTimestamp()});
+    tx.create(orderRef, {userId: request.auth.uid, ...result, shopIds: [...new Set(result.lines.map(line => line.shopId).filter(Boolean))], pincode, address: address.trim(), customerPhone, status: 'submitted', paymentMethod, paymentStatus, createdAt: FieldValue.serverTimestamp()});
     snapshots.forEach((snapshot, i) => tx.update(snapshot.ref, {stock: snapshot.data().stock - items[i].quantity}));
     return {orderId};
   });

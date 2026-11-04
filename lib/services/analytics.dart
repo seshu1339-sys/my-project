@@ -38,16 +38,37 @@ class Analytics {
     );
   }
 
+  /// This device's random id, made once and kept.
+  static Future<String> _deviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString('visitorId') ?? '';
+    if (!RegExp(r'^[a-zA-Z0-9-]{16,64}$').hasMatch(id)) {
+      final random = Random.secure();
+      id = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
+      await prefs.setString('visitorId', id);
+    }
+    return id;
+  }
+
+  /// The vendor and staff apps: counts views of the ads in their bottom box (lib/ui/app_bottom_ad.dart), and nothing else.
+  static Future<void> startAppAdTracker() async {
+    if (AdsTracker.instance != null) return;
+    try {
+      final id = await _deviceId();
+      AdsTracker.instance ??= AdsTracker(
+        visitorId: id,
+        platform: kIsWeb ? 'web' : 'android',
+        transport: (batch) => FirebaseFunctions.instance.httpsCallable('trackAdEvents').call(batch),
+      );
+    } catch (_) {
+      /* Counting must never stop the app. */
+    }
+  }
+
   /// Call once per app or site open, after Firebase is connected.
   static Future<void> start() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      var id = prefs.getString('visitorId') ?? '';
-      if (!RegExp(r'^[a-zA-Z0-9-]{16,64}$').hasMatch(id)) {
-        final random = Random.secure();
-        id = List.generate(32, (_) => random.nextInt(16).toRadixString(16)).join();
-        await prefs.setString('visitorId', id);
-      }
+      final id = await _deviceId();
       _visitorId = id;
       _enabled = true;
       // A visit that arrived through an ad link (?ad=<promotion id>) is credited to that ad.

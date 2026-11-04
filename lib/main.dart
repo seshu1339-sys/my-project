@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data/store.dart';
+import 'ui/consent_checkbox.dart';
 import 'ui/storefront.dart';
 import 'ui/details.dart';
 import 'ui/admin_auth.dart';
@@ -61,6 +62,8 @@ Future<void> main() async {
   }
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
+  // The customer app asks people to agree to the Terms and the Privacy Policy; the admin panel (same entry point on the web) does not.
+  store.requiresConsent = !(kIsWeb && isAdminRoute);
   await store.init();
   if (kIsWeb && isAdminRoute) {
     // Usage analytics (lib/services/usage.dart): the admin panel counts as the admin app.
@@ -200,7 +203,7 @@ class MarketApp extends StatelessWidget {
         textDirection: AppLocale.isRtl(store.language)
             ? TextDirection.rtl
             : TextDirection.ltr,
-        child: child ?? const SizedBox.shrink(),
+        child: withConsentGate(context, child, store),
       ),
       theme: buildAppTheme(store, dark: false),
       darkTheme: buildAppTheme(store, dark: true),

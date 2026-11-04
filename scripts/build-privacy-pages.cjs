@@ -22,7 +22,7 @@ const apps = [
     summary: [
       'Your email address and name for your account, and the language you choose.',
       'The town, pincode and address you choose and, only if you allow it, your device location, to show shops, offers and how far each shop is, and the road to a shop.',
-      'Your orders, wishlist, reviews and complaints.',
+      'Your order requests (with your address and phone number), wishlist, reviews and complaints.',
       'A notification token and your area if you turn notifications on, and whether a notification was opened.',
       'How the app is used (screens, buttons, searches, calls and directions to shops, as daily counts), app errors and start speed.',
     ],

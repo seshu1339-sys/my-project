@@ -50,6 +50,29 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/vendors/$(uid))
         && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
     }
+    // Vendor Offers module: an approved vendor's own offer photos, in the module's own folder. Removing them is done by functions.
+    match /vendorOffers/{uid}/{file} {
+      allow read: if true;
+      allow create, update: if verified() && request.auth.uid == uid && isImage()
+        && firestore.exists(/databases/(default)/documents/vendors/$(uid))
+        && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved';
+    }
+    // Today's Offer module: a vendor with a running plan uploads into their own folder. Removing is done by functions.
+    match /vendorTodaysOffers/{uid}/{file} {
+      allow read: if true;
+      allow create, update: if verified() && request.auth.uid == uid && isImage()
+        && firestore.exists(/databases/(default)/documents/vendors/$(uid))
+        && firestore.get(/databases/(default)/documents/vendors/$(uid)).data.status == 'approved'
+        && firestore.exists(/databases/(default)/documents/vendorPremium/$(uid))
+        && firestore.get(/databases/(default)/documents/vendorPremium/$(uid)).data.active == true
+        && firestore.get(/databases/(default)/documents/vendorPremium/$(uid)).data.endsAt > request.time;
+    }
+    // Wholesale module: photos the administrator adds.
+    match /wholesaleOffers/{file} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isImage();
+      allow delete: if isAdmin();
+    }
     // Up to settings/business.vendorPhotoLimit shop photos per vendor (default 3), fixed
     // filenames shopPhoto1..shopPhoto9. The actual configured limit is enforced by
     // submitShopPhoto/reviewShopPhoto (functions/vendor-photos.js); this rule only fixes a

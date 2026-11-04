@@ -188,7 +188,8 @@ void main() {
       final store = await _store();
       await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
       await tester.pump();
-      DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7);
+      final tabs = DefaultTabController.of(tester.element(find.byType(TabBar).first));
+      tabs.animateTo(tabs.length - 1); // Settings is the last tab
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('settings-animations')));
       await tester.pumpAndSettle();

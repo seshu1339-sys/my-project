@@ -14,7 +14,7 @@ Future<void> goTab(WidgetTester tester, int index) async {
 }
 
 Future<void> goSettings(WidgetTester tester, String key) async {
-  await goTab(tester, 7);
+  await goTab(tester, DefaultTabController.of(tester.element(find.byType(TabBar).first)).length - 1); // Settings is the last tab
   await tester.tap(find.byKey(ValueKey('settings-$key')));
   await tester.pumpAndSettle();
 }

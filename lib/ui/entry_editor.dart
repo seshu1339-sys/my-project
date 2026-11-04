@@ -69,6 +69,8 @@ class _EntryEditorState extends State<EntryEditor> {
   final form = GlobalKey<FormState>();
   late final Map<String, TextEditingController> controllers;
   bool active = true, busy = false;
+  // Shops only, and only the admin can change it: this shop's delivery charge is waived.
+  bool freeDelivery = false;
   // Set only once the geo-target picker is actually used this session; null
   // means "leave whatever shape data this promotion already has untouched"
   // (the spread in save() below already carries that forward).
@@ -92,7 +94,6 @@ class _EntryEditorState extends State<EntryEditor> {
     'fieldPhotoLimit',
     'quickItemsPerDayStaff',
     'quickItemsPerDayVendor',
-    'deliveryFee',
     'freeDeliveryAbove',
     'width',
     'height',
@@ -117,6 +118,7 @@ class _EntryEditorState extends State<EntryEditor> {
   void initState() {
     super.initState();
     active = widget.entry?.active ?? true;
+    freeDelivery = widget.entry?.data['freeDelivery'] == true;
     controllers = fields[widget.collection]!.map((key, label) {
       final value = widget.entry?.data[key];
       final text = key == 'translations' && value is Map
@@ -220,6 +222,7 @@ class _EntryEditorState extends State<EntryEditor> {
     setState(() => busy = true);
     try {
       final data = <String, dynamic>{...?widget.entry?.data, 'active': active};
+      if (widget.collection == 'shops') data['freeDelivery'] = freeDelivery;
       for (final field in controllers.entries) {
         final value = field.value.text.trim();
         if (numeric.contains(field.key)) {
@@ -923,6 +926,14 @@ class _EntryEditorState extends State<EntryEditor> {
                   ),
                 ],
               ),
+              if (widget.collection == 'shops')
+                SwitchListTile(
+                  key: const ValueKey('shop-free-delivery'),
+                  value: freeDelivery,
+                  onChanged: (v) => setState(() => freeDelivery = v),
+                  title: const Text('Free delivery'),
+                  subtitle: const Text('This shop pays no delivery charge. Only the admin can change this.'),
+                ),
               SwitchListTile(
                 value: active,
                 onChanged: (v) => setState(() => active = v),

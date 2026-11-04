@@ -8,6 +8,7 @@ import 'account_language_field.dart';
 import 'layout_settings.dart';
 import 'page_widgets.dart';
 import 'shared.dart';
+import 'consent_checkbox.dart';
 import 'sign_in_panel.dart';
 
 /// Throws if [value] isn't a plausible email address. Shared by this form
@@ -137,6 +138,8 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
         decoration: InputDecoration(labelText: 'Password'.tr(context)),
       ),
       if (registering) ...[
+        // The sign-in box above already covers this when it is shown; otherwise a new account asks here.
+        if (!widget.store.asksConsentBeforeSignIn && widget.store.requiresConsent) ConsentCheckbox(store: widget.store, enabled: !busy),
         const SizedBox(height: 14),
         TextField(
           controller: confirmPassword,
@@ -156,6 +159,9 @@ class _AccountAuthFormState extends State<AccountAuthForm> {
                   throw StateError('Enter your password.'.tr(context));
                 }
                 if (registering) {
+                  if (widget.store.requiresConsent && !widget.store.pendingConsent) {
+                    throw StateError('Tick the box to agree before you continue.'.tr(context));
+                  }
                   if (password.text.length < 6) {
                     throw StateError(
                       'Use at least six characters for your password.'.tr(context),

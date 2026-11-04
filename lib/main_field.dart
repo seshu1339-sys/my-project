@@ -6,10 +6,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'data/store.dart';
 import 'services/firebase_startup.dart';
+import 'services/analytics.dart';
 import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
+import 'ui/app_bottom_ad.dart';
+import 'ui/consent_checkbox.dart';
 import 'ui/sign_in_panel.dart';
 import 'ui/field.dart';
 
@@ -35,10 +38,13 @@ Future<void> main() async {
   }
   final store = Store(live: live, database: live ? FirebaseFirestore.instance : null);
   store.appRole = 'staff';
+  store.requiresConsent = true;
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) {
     unawaited(startUsage(app: 'staff'));
+    // Views of the ads in the bottom box (lib/ui/app_bottom_ad.dart).
+    unawaited(Analytics.startAppAdTracker());
     // Google Analytics on the website (lib/services/google_analytics.dart), when the build has the measurement id.
     startGoogleAnalytics(app: 'staff');
   }
@@ -55,6 +61,8 @@ class FieldAssistantApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Field Assistant',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff1b5e20))),
+          // The ads box at the bottom of every page, once signed in.
+          builder: (context, child) => withConsentGate(context, withAppBottomAd(context, child, store, staff: true), store),
           home: !store.live
               ? const FieldDemoPage()
               : store.user == null

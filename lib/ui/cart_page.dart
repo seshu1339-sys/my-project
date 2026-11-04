@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/catalog.dart';
+import '../domain/feature_flags.dart';
+import '../services/customer_position.dart';
 import '../services/strings.dart';
 import 'account.dart';
 import 'design_tokens.dart';
@@ -18,6 +21,7 @@ class CartPage extends StatefulWidget {
 
 class _CartPageState extends State<CartPage> {
   final address = TextEditingController();
+  final phone = TextEditingController();
   bool busy = false;
   String paymentMethod = 'direct_vendor';
   final requestId = DateTime.now().microsecondsSinceEpoch.toString();
@@ -35,6 +39,7 @@ class _CartPageState extends State<CartPage> {
   @override
   void dispose() {
     address.dispose();
+    phone.dispose();
     super.dispose();
   }
 
@@ -176,8 +181,10 @@ class _CartPageState extends State<CartPage> {
                 const SizedBox(height: 24),
                 Builder(
                   builder: (context) {
-                    final deliveryConfigured =
-                        widget.store.business.number('deliveryFee', 0) > 0;
+                    final tiers = widget.store.business.text('deliveryFeeTiers');
+                    final parts = widget.store.deliveryParts;
+                    final deliveryConfigured = tiers.trim().isNotEmpty && parts.isNotEmpty;
+                    final placeKnown = widget.store.latitude != null && widget.store.longitude != null;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -191,12 +198,24 @@ class _CartPageState extends State<CartPage> {
                           ),
                         ),
                         if (deliveryConfigured) ...[
+                          if (!placeKnown)
+                            Text('Turn on your location to see the delivery charge.'.tr(context))
+                          else
+                            for (final part in parts)
+                              Text(
+                                part.talkToVendor
+                                    ? '{shop}: The delivery charge for this distance is agreed with the vendor by phone.'.tr(context, {'shop': part.shopName})
+                                    : part.fee > 0
+                                    ? (parts.length == 1
+                                          ? 'Delivery fee {amount}'.tr(context, {'amount': money(part.fee)})
+                                          : 'Delivery fee {shop} {amount}'.tr(context, {'shop': part.shopName, 'amount': money(part.fee)}))
+                                    : (parts.length == 1
+                                          ? 'Delivery fee Free'.tr(context)
+                                          : 'Delivery fee {shop} Free'.tr(context, {'shop': part.shopName})),
+                              ),
                           Text(
-                            widget.store.deliveryFee > 0
-                                ? 'Delivery fee {amount}'.tr(context, {
-                                    'amount': money(widget.store.deliveryFee),
-                                  })
-                                : 'Delivery fee Free'.tr(context),
+                            'This charge and the price of the items are paid to the vendor directly. The app does not take any money.'.tr(context),
+                            style: const TextStyle(fontSize: 12),
                           ),
                           Text(
                             'Total {amount}'.tr(context, {'amount': money(widget.store.grandTotal)}),
@@ -218,7 +237,7 @@ class _CartPageState extends State<CartPage> {
                       if (business.text('directVendorPaymentEnabled', 'true') !=
                           'false')
                         'direct_vendor': 'Pay vendor directly'.tr(context),
-                      if (business.text('cashOnDeliveryEnabled') == 'true')
+                      if (showDeliveryPromises && business.text('cashOnDeliveryEnabled') == 'true')
                         'cash_on_delivery': 'Cash on delivery'.tr(context),
                       if (business.text('platformCollectionEnabled') == 'true')
                         'platform_collected': 'Platform payment (future)'.tr(context),
@@ -247,11 +266,23 @@ class _CartPageState extends State<CartPage> {
                 ),
                 const SizedBox(height: 20),
                 if (widget.store.pincode.isEmpty)
-                  Text('Add a delivery pincode on the home page before ordering.'.tr(context)),
+                  Text('Add your pincode on the home page before ordering.'.tr(context)),
                 TextField(
                   controller: address,
                   maxLines: 3,
-                  decoration: InputDecoration(labelText: 'Delivery / service address'.tr(context)),
+                  decoration: InputDecoration(labelText: 'Address'.tr(context)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const ValueKey('cart-phone'),
+                  controller: phone,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 14,
+                  decoration: InputDecoration(
+                    labelText: 'Your phone number'.tr(context),
+                    helperText: 'The vendor will call this number. A wrong number can stop your order, and that is your own responsibility.'.tr(context),
+                    helperMaxLines: 3,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Builder(builder: (context) => _buildSubmitButton(context)),
@@ -300,17 +331,50 @@ class _CartPageState extends State<CartPage> {
                 );
                 return;
               }
+              final number = phone.text.replaceAll(RegExp(r'[\s\-()]'), '').replaceFirst(RegExp(r'^(\+91|91|0)(?=\d{10}$)'), '');
+              if (!RegExp(r'^[6-9]\d{9}$').hasMatch(number)) {
+                message(context, 'Enter a valid 10-digit mobile number.'.tr(context));
+                return;
+              }
               setState(() => busy = true);
               try {
+                // The order request needs the customer's real position, for each shop's delivery charge. Without location there is no order.
+                final here = await CustomerPosition.find(again: true);
+                if (here == null) {
+                  if (context.mounted) message(context, 'Turn on your location to send an order request.'.tr(context));
+                  return;
+                }
+                final shopIds = {for (final key in widget.store.cart.keys) widget.store.item(key)?.text('shopId') ?? ''}..remove('');
+                final vendors = <Entry>[
+                  for (final shop in widget.store.entries('shops'))
+                    if (shopIds.contains(shop.id)) shop,
+                ];
                 final id = await widget.store.checkout(
                   address.text.trim(),
                   requestId,
                   paymentMethod: paymentMethod,
+                  phone: number,
+                  latitude: here.latitude,
+                  longitude: here.longitude,
                 );
                 if (context.mounted) {
-                  message(
-                    context,
-                    'Order {id} submitted. The shop will confirm fulfilment.'.tr(context, {'id': id}),
+                  await showDialog<void>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: Text('Order request sent'.tr(context)),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Order {id} submitted. The shop will confirm fulfilment.'.tr(context, {'id': id})),
+                          const SizedBox(height: 12),
+                          Text('Call the vendor to agree the payment and how you get the items:'.tr(context)),
+                          for (final shop in vendors)
+                            SelectableText('${shop.text('name')}: ${shop.text('phone', '-')}', key: ValueKey('vendor-phone-${shop.id}')),
+                        ],
+                      ),
+                      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text('Close'.tr(context)))],
+                    ),
                   );
                 }
               } catch (e) {
@@ -327,7 +391,7 @@ class _CartPageState extends State<CartPage> {
         busy
             ? 'Submitting…'.tr(context)
             : widget.store.live
-            ? layout.entry.text('text', 'Submit order request').tr(context)
+            ? layout.entry.text('text', 'Send order request').tr(context)
             : 'Preview checkout'.tr(context),
         style: overrideTextStyle(layout.entry),
       ),

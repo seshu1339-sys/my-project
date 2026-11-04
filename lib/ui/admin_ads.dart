@@ -515,6 +515,14 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
               value: values['pauseOnHover'] != 'false',
               onChanged: (v) => _set('pauseOnHover', v ? null : 'false'),
             ),
+            SwitchListTile(
+              key: const ValueKey('ads-config-vendor-views'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(_label('Vendors see how many people saw their ads', c.vendorSeesViews ? 'On' : 'Off')),
+              subtitle: const Text('In the vendor app: My Ads and Ad for your shop. Off hides the numbers; views are still counted for you.'),
+              value: values['vendorSeesViews'] != 'false',
+              onChanged: (v) => _set('vendorSeesViews', v ? null : 'false'),
+            ),
             FilledButton(key: const ValueKey('ads-config-save'), onPressed: busy ? null : _save, child: Text(busy ? 'Saving…' : 'Save ads settings')),
           ],
         ),
@@ -717,6 +725,13 @@ class _AdEditorPageState extends State<AdEditorPage> {
     final shops = widget.store.entries('shops');
     final towns = parseServiceTowns(widget.store.business.text('serviceTowns')).map((t) => t.name).toList();
     final chosenTowns = parseLocationList(s('locations')).map((t) => t.toLowerCase()).toSet();
+    final audience = adAudience(Entry(id, values));
+    final chosenCategories = adCategories(Entry(id, values));
+    // The categories the shops have, as their owners typed them; each spelling once.
+    final shopCategories = <String, String>{
+      for (final shop in widget.store.entries('shops'))
+        if (shop.text('category').trim().isNotEmpty) shop.text('category').trim().toLowerCase(): shop.text('category').trim(),
+    };
     final number = widget.ad == null ? '$adsSectionNumber.${widget.store.entries('ads').length + 1}' : '$adsSectionNumber.${sortedByOrder(widget.store.entries('ads')).indexWhere((a) => a.id == id) + 1}';
     return Scaffold(
       appBar: AppBar(title: Text(widget.ad == null ? 'Add Ad  ·  $number' : 'Edit Ad  ·  $number')),
@@ -822,6 +837,41 @@ class _AdEditorPageState extends State<AdEditorPage> {
             ),
           ]),
           _group('2 · When & where', 'when', [
+            Text(_label('Who sees it', audience.map((a) => adAudienceNames[a]).join(', ')), style: const TextStyle(fontWeight: FontWeight.w600)),
+            const Text('Customers: the website and the customer app. Vendors and Staff: the box at the bottom of their apps.', style: TextStyle(fontSize: 12)),
+            Wrap(spacing: 6, children: [
+              for (final e in adAudienceNames.entries)
+                FilterChip(
+                  key: ValueKey('ad-audience-${e.key}'),
+                  label: Text(e.value),
+                  selected: audience.contains(e.key),
+                  onSelected: (on) {
+                    final next = {...audience};
+                    on ? next.add(e.key) : next.remove(e.key);
+                    // Customers only is the default, so it is not stored.
+                    _set('audience', next.isEmpty || (next.length == 1 && next.contains('customers')) ? null : [for (final k in adAudienceNames.keys) if (next.contains(k)) k].join(','));
+                  },
+                ),
+            ]),
+            if (audience.contains('vendors')) ...[
+              Text(_label('Vendors in these shop categories', chosenCategories.isEmpty ? 'all vendors' : s('categories')), style: const TextStyle(fontWeight: FontWeight.w600)),
+              Wrap(spacing: 6, runSpacing: 6, children: [
+                for (final e in shopCategories.entries)
+                  FilterChip(
+                    key: ValueKey('ad-category-${e.key}'),
+                    label: Text(e.value),
+                    selected: chosenCategories.contains(e.key),
+                    onSelected: (on) {
+                      final next = [for (final c in s('categories').split(',')) if (c.trim().isNotEmpty && c.trim().toLowerCase() != e.key) c.trim()];
+                      if (on) next.add(e.value);
+                      _c('categories').text = next.join(', ');
+                      _set('categories', next.isEmpty ? null : next.join(', '));
+                    },
+                  ),
+              ]),
+              _field('categories', 'Shop categories (comma-separated; blank = all vendors)'),
+            ],
+            if (!audience.contains('customers')) const Text('Places and radius below apply to customers only.', style: TextStyle(fontSize: 12)),
             Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
               OutlinedButton.icon(key: const ValueKey('ad-start'), onPressed: () => _pickDate('startsAt', end: false), icon: const Icon(Icons.event), label: Text(s('startsAt').isEmpty ? 'Start date: from now' : 'Start: ${s('startsAt').substring(0, 10)}')),
               if (s('startsAt').isNotEmpty) TextButton(onPressed: () => _set('startsAt', null), child: const Text('Clear')),

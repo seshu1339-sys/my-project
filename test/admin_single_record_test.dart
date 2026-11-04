@@ -16,7 +16,8 @@ Future<Store> _open(WidgetTester tester, {bool withoutTheme = false}) async {
   if (withoutTheme) store.catalog['settings'] = [for (final e in store.catalog['settings']!) if (e.id != 'theme') e];
   await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
   await tester.pump();
-  DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7);
+  final tabs = DefaultTabController.of(tester.element(find.byType(TabBar).first));
+  tabs.animateTo(tabs.length - 1); // Settings is the last tab
   await tester.pumpAndSettle();
   return store;
 }
@@ -95,7 +96,8 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     tester.view.physicalSize = const Size(1200, 2000);
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    DefaultTabController.of(tester.element(find.byType(TabBar).first)).animateTo(7);
+    final tabs = DefaultTabController.of(tester.element(find.byType(TabBar).first));
+    tabs.animateTo(tabs.length - 1); // Settings is the last tab
     await tester.pumpAndSettle();
     await _section(tester, 'theme');
     expect(find.widgetWithText(TextFormField, 'Theme'), findsOneWidget, reason: 'the name field shows the default');

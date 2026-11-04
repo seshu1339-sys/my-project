@@ -227,7 +227,7 @@ class _ProductPageState extends State<ProductPage> {
                       );
                       },
                       icon: const Icon(Icons.map_outlined),
-                      label: const Text('Compare shops selling this'),
+                      label: Text('Compare shops selling this'.tr(context)),
                     ),
                   ),
                 // A service provider (their own listing, no shop) is booked by calling them: no bag buttons.

@@ -44,7 +44,7 @@ void main() {
       // They fill the space to the right of the whole product cards, up to the right edge of the band: no empty gap.
       final cards = ((b.width - HomeStripBand.minBoxesWidth) / HomeStripBand.cardPitch).floor();
       expect(t.left, closeTo(b.left + cards * HomeStripBand.cardPitch, 1.5));
-      expect(s.right, closeTo(b.right, 1.5));
+      expect(tester.getRect(find.byKey(const ValueKey('home-box-offers'))).right, closeTo(b.right, 1.5));
       // As tall as the product cards beside them, ending just above the category tabs.
       expect(t.top, closeTo(b.top, 1.5));
       expect(t.bottom, closeTo(b.bottom, 1.5));
@@ -71,7 +71,7 @@ void main() {
     expect((t.width - s.width).abs(), lessThan(1));
     expect(t.top, s.top);
     expect(t.left, lessThan(24), reason: 'starts at the left edge of the page');
-    expect(s.right, greaterThan(390 - 24), reason: 'reaches the right edge: full width');
+    expect(tester.getRect(find.byKey(const ValueKey('home-box-offers'))).right, greaterThan(390 - 24), reason: 'reaches the right edge: full width');
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });

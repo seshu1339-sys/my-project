@@ -27,6 +27,7 @@ test('who is never counted', () => {
   assert.equal(ignoredBecause({...base, config: {testDevices: `x ${V}`}}), 'test device');
   assert.equal(ignoredBecause({...base, auth: {uid: 'a', token: {admin: true}}}), 'admin');
   assert.equal(ignoredBecause({...base, auth: {uid: 's', token: {}}, staffUids: ['s']}), 'staff');
+  assert.equal(ignoredBecause({...base, ad: {audience: 'vendors,staff'}, auth: {uid: 's', token: {}}, staffUids: ['s']}), '', 'an ad aimed at staff counts staff views');
   assert.equal(ignoredBecause({...base, auth: {uid: 'v1', token: {}}}), 'owner');
   assert.equal(ignoredBecause({...base, auth: {uid: 'someone', token: {}}}), '');
 });

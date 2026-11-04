@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
+import '../domain/ads.dart';
 import '../domain/shop_ads.dart';
 import '../services/shop_ad_payment.dart';
 import 'vendor_section_kit.dart';
@@ -29,6 +30,7 @@ class VendorShopAdSection extends StatelessWidget {
           ads: shopAdsInOrder(ads.data ?? const []),
           views: shopAdViews(stats.data ?? const []),
           payment: payment,
+          showViews: AdsConfig.from(store.entries('settings')).vendorSeesViews,
           onInterest: store.setAdInterest,
         ),
       ),
@@ -38,8 +40,10 @@ class VendorShopAdSection extends StatelessWidget {
 
 /// The card itself: the tick, what happens next, the live ad with its total views, and earlier ads.
 class ShopAdView extends StatefulWidget {
-  const ShopAdView({super.key, required this.interested, required this.ads, required this.views, required this.onInterest, this.payment = const OfflineShopAdPayment()});
+  const ShopAdView({super.key, required this.interested, required this.ads, required this.views, required this.onInterest, this.payment = const OfflineShopAdPayment(), this.showViews = true});
   final bool interested;
+  // False when the admin hides view numbers from vendors.
+  final bool showViews;
   final List<ShopAd> ads;
   final Map<String, int> views;
   final Future<void> Function(bool interested) onInterest;
@@ -94,7 +98,7 @@ class _ShopAdViewState extends State<ShopAdView> {
         const Text('Earlier ads', style: TextStyle(fontWeight: FontWeight.w600)),
         for (final ad in ended)
           Text(
-            '${shopAdDate(ad.startedAt)} to ${shopAdDate(ad.endedAt)}: ${shopAdCount(widget.views[ad.id] ?? 0)} views',
+            '${shopAdDate(ad.startedAt)} to ${shopAdDate(ad.endedAt)}${widget.showViews ? ': ${shopAdCount(widget.views[ad.id] ?? 0)} views' : ''}',
             key: ValueKey('shop-ad-ended-${ad.id}'),
           ),
       ],
@@ -114,12 +118,15 @@ class _ShopAdViewState extends State<ShopAdView> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Your ad is live on the website', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(
-              shopAdCount(widget.views[ad.id] ?? 0),
-              key: ValueKey('shop-ad-views-${ad.id}'),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            Text(since.isEmpty ? 'total views since your ad started' : 'total views since $since, when your ad started'),
+            if (widget.showViews) ...[
+              Text(
+                shopAdCount(widget.views[ad.id] ?? 0),
+                key: ValueKey('shop-ad-views-${ad.id}'),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              Text(since.isEmpty ? 'total views since your ad started' : 'total views since $since, when your ad started'),
+            ] else if (since.isNotEmpty)
+              Text('Live since $since'),
           ]),
         ),
       ]),

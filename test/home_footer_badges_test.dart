@@ -26,7 +26,7 @@ void main() {
       // shared main now.
       await store.save(
         'settings',
-        const Entry('section_footerBadge2', {'iconSize': 12.0}),
+        const Entry('section_footerBadge3', {'iconSize': 12.0}),
       );
       await tester.pumpWidget(
         MaterialApp(
@@ -38,7 +38,8 @@ void main() {
       await tester.pump();
 
       final icons = tester.widgetList<Icon>(find.byType(Icon)).toList();
-      expect(icons, hasLength(6));
+      // Four: the delivery and pay-on-delivery promises are hidden (showDeliveryPromises is false).
+      expect(icons, hasLength(4));
       expect(icons.every((icon) => icon.size == 40.0), isTrue);
     },
   );
