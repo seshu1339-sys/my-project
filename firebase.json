@@ -42,6 +42,18 @@
         {"source": "/privacy-vendor/", "destination": "/privacy-vendor/index.html"},
         {"source": "/privacy-staff", "destination": "/privacy-staff/index.html"},
         {"source": "/privacy-staff/", "destination": "/privacy-staff/index.html"},
+        {"source": "/terms", "destination": "/terms/index.html"},
+        {"source": "/terms/", "destination": "/terms/index.html"},
+        {"source": "/refund-policy", "destination": "/refund-policy/index.html"},
+        {"source": "/refund-policy/", "destination": "/refund-policy/index.html"},
+        {"source": "/pricing", "destination": "/pricing/index.html"},
+        {"source": "/pricing/", "destination": "/pricing/index.html"},
+        {"source": "/shipping-policy", "destination": "/digital-delivery/index.html", "type": 301},
+        {"source": "/shipping-policy/", "destination": "/digital-delivery/index.html", "type": 301},
+        {"source": "/digital-delivery", "destination": "/digital-delivery/index.html"},
+        {"source": "/digital-delivery/", "destination": "/digital-delivery/index.html"},
+        {"source": "/contact", "destination": "/contact/index.html"},
+        {"source": "/contact/", "destination": "/contact/index.html"},
         {"source": "**", "destination": "/index.html"}
       ]
     },

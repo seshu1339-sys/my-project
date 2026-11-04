@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data/store.dart';
 import '../services/strings.dart';
+import 'policy_links.dart';
 
 /// The one sign-in used by the customer, vendor and staff apps: "Continue with Google" (the phone's own account list, one tap, no
 /// typing) and, as a backup for people with no Google account, a 6-digit code emailed to them. Both end with a verified email; the
@@ -145,6 +146,8 @@ class _SignInPanelState extends State<SignInPanel> {
             ],
           ],
           if (busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+          // Privacy, terms and contact pages (lib/ui/policy_links.dart): required for the store listings and the payment gateway.
+          PolicyLinks(appRole: widget.store.appRole),
         ],
       );
     },
