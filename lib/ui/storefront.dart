@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../services/place_resolver.dart';
 import '../services/search.dart';
+import '../services/search_providers.dart';
 import 'account.dart';
 import 'android_layout.dart';
 import 'details.dart';
@@ -15,14 +17,17 @@ import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import '../modules/services/services_module.dart';
-import '../services/usage.dart';
+import '../services/usage.dart';
 import '../services/strings.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
     super.key,
     required this.store,
-    this.searchService = const SmartSearch(),
+    this.searchService = const SmartSearch(
+      voice: DeviceVoiceSearch(),
+      image: CloudImageSearch(),
+    ),
   });
   final Store store;
   final SmartSearch searchService;
@@ -49,7 +54,14 @@ class _StorefrontState extends State<Storefront> {
             'Image search provider is not connected yet. Please type your search.',
           );
         }
-        final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+        if (FirebaseAuth.instance.currentUser == null) {
+          throw StateError('Please sign in to search by photo.');
+        }
+        final file = await ImagePicker().pickImage(
+          source: isAndroidApp() ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 1024,
+          imageQuality: 70,
+        );
         if (file == null) {
           return;
         }
