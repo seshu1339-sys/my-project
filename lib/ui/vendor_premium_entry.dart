@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -51,6 +52,9 @@ class _VendorPremiumPageState extends State<VendorPremiumPage> {
   late final premium = FirestorePremiumStatus(widget.store.firestore).watch(widget.uid);
   late final offers = FirestoreTodaysOfferStore(widget.store);
   late final own = offers.watchOwn(widget.uid);
+  // The plan's number of boxes and the vendor's own items (an item's photo is what its box shows).
+  late final plan = widget.store.firestore.collection('vendorPremium').doc(widget.uid).snapshots();
+  late final items = widget.store.firestore.collection('products').where('ownerId', isEqualTo: widget.uid).snapshots();
 
   Future<void> _call(String phone) async {
     try {
@@ -67,16 +71,29 @@ class _VendorPremiumPageState extends State<VendorPremiumPage> {
     builder: (context, status) {
       if (status.data == false) return const PremiumEndedScreen();
       return PremiumOfferScreen(
-        offerBox: StreamBuilder<TodaysOffer?>(
-          stream: own,
-          builder: (context, offer) {
-            final running = offer.data;
-            return TodaysOfferPanel(
-              offer: running == null ? null : RunningOffer(photoUrl: running.photoUrl, price: running.price, endsAt: running.endsAt),
-              hourOptions: todaysOfferHours,
-              onSubmit: (result) => offers.submit(widget.uid, result.photo.file!, result.price, result.hours),
-            );
-          },
+        offerBox: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: plan,
+          builder: (context, premium) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: items,
+            builder: (context, products) => StreamBuilder<List<TodaysOffer>>(
+              stream: own,
+              builder: (context, running) => TodaysOfferPanel(
+                boxes: todaysOfferBoxesOf(premium.data?.data()),
+                offers: [
+                  for (final o in running.data ?? const <TodaysOffer>[])
+                    RunningOffer(photoUrl: o.photoUrl, price: o.price, endsAt: o.endsAt, slot: o.slot, productId: o.productId, name: o.name, days: o.days),
+                ],
+                items: [
+                  for (final d in products.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                    if (d.data()['active'] != false && '${d.data()['imageUrl'] ?? ''}'.startsWith('http'))
+                      OfferItemChoice(id: d.id, name: '${d.data()['name'] ?? ''}', photoUrl: '${d.data()['imageUrl']}', price: d.data()['price'] as num?),
+                ],
+                dayOptions: todaysOfferDays,
+                onSubmit: (r) => offers.submit(productId: r.productId, price: r.price, days: r.days, slot: r.slot),
+                onRemove: offers.remove,
+              ),
+            ),
+          ),
         ),
         largeBox: WholesaleBox(source: FirestoreWholesaleOffers(widget.store.firestore), onCall: _call),
       );

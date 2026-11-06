@@ -1,7 +1,7 @@
 // Makes the three per-app privacy policy pages from the one policy, web/privacy-policy.html:
-//   web/privacy/index.html          locamarket.in/privacy          Loca Market (customers, in.locamarket.locamark)
-//   web/privacy-vendor/index.html   locamarket.in/privacy-vendor   V Loca Market (shop owners and service providers)
-//   web/privacy-staff/index.html    locamarket.in/privacy-staff    S Loca Market (field staff)
+//   web/privacy/index.html          locamarket.in/privacy          LOCAMARKET (customers, in.locamarket.locamark)
+//   web/privacy-vendor/index.html   locamarket.in/privacy-vendor   Loca Market Vendor (shop owners and service providers)
+//   web/privacy-staff/index.html    locamarket.in/privacy-staff    Loca Market staff (field staff)
 // Each is the full policy with the app's own name, package and a short "this app" summary at the top, so the Play listing of each
 // app links to a page about that app. A folder with index.html works on Hostinger without touching .htaccess, and firebase.json
 // rewrites the same paths. Run after changing web/privacy-policy.html:  node scripts/build-privacy-pages.cjs
@@ -15,7 +15,7 @@ const web = path.join(__dirname, '..', 'web');
 const apps = [
   {
     dir: 'privacy',
-    app: 'Loca Market',
+    app: 'LOCAMARKET',
     pkg: 'in.locamarket.locamark',
     who: 'customers',
     named: 'Local Market',
@@ -29,7 +29,7 @@ const apps = [
   },
   {
     dir: 'privacy-vendor',
-    app: 'V Loca Market',
+    app: 'Loca Market Vendor',
     pkg: 'in.locamarket.vendor',
     who: 'shop owners and service providers',
     named: 'V Local Market',
@@ -43,7 +43,7 @@ const apps = [
   },
   {
     dir: 'privacy-staff',
-    app: 'S Loca Market',
+    app: 'Loca Market staff',
     pkg: 'in.locamarket.staff',
     who: 'LocaMarket field staff',
     named: 'S Local Market',

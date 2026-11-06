@@ -10,7 +10,8 @@ const {normalizeEvent, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
+const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit} = require('./domain');
+const {vendorItemLimitNow} = require('./plan-gate');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
@@ -39,6 +40,9 @@ Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
 // Shop ads in the Right Side Ad Boxes, arranged offline: the vendor's "Ad for your shop" tick and the admin linking a box to a vendor.
 const {setAdInterest, assignRightBoxVendor} = require('./shop-ads');
 Object.assign(exports, {setAdInterest, assignRightBoxVendor});
+// Sample data: how many sample records there are, and "Delete all samples" (functions/samples.js).
+const {sampleSummary, deleteAllSamples} = require('./samples');
+Object.assign(exports, {sampleSummary, deleteAllSamples});
 // Staff "Add": field staff add vendors and service providers for people without an account; the admin approves (only the callables are exported).
 const {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove} = require('./staff-additions');
 Object.assign(exports, {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove});
@@ -85,6 +89,16 @@ Object.assign(exports, require('./ai-agent-query'));
 Object.assign(exports, require('./modules/plans'));
 Object.assign(exports, require('./modules/vendor-offers'));
 Object.assign(exports, require('./modules/premium-status'));
+// Offer Alerts: a vendor's offer with a 25 / 50 km alert reaches the customers inside that circle (functions/modules/offer-alerts).
+Object.assign(exports, require('./modules/offer-alerts'));
+// Staff Links: staff link a vendor / provider who registered themselves, by ID within 30 minutes (functions/modules/staff-links).
+Object.assign(exports, require('./modules/staff-links'));
+// Photo limits: own item photos, the shared photo allowance and the trim when a paid plan ends (functions/modules/photo-limits).
+Object.assign(exports, require('./modules/photo-limits'));
+// Showcase: the paid vendors' boxes in Today's Offers and the right-side ad boxes, within the plan km (functions/modules/showcase).
+Object.assign(exports, require('./modules/showcase'));
+// Staff Area System: areas, daily targets, missed days and the staff's Today's Offers (functions/modules/staff-areas).
+Object.assign(exports, require('./modules/staff-areas'));
 Object.assign(exports, require('./modules/todays-offer'));
 Object.assign(exports, require('./modules/wholesale'));
 Object.assign(exports, require('./modules/payments'));
@@ -437,11 +451,16 @@ exports.submitVendorChange = onCall(options, async request => {
     if (!libraryItem || libraryItem.active === false) throw new HttpsError('failed-precondition', 'Choose an item from the list.');
     // The product carries its shop's place (pincode, town, district, state, GPS) so it shows where it is.
     const shopPlace = vendor.shopId ? locationStamp((await db.collection('shops').doc(vendor.shopId).get()).data() || {}) : {};
+    // A category where the admin ticked "own photo required" (for example sarees): the item waits, hidden, until the vendor's own photo
+    // is approved (functions/modules/photo-limits). Otherwise the item uses our standard photo until the vendor adds their own.
+    const category = libraryItem.categoryId ? (await db.collection('categories').doc(libraryItem.categoryId).get()).data() : null;
+    const ownPhotoRequired = category?.ownPhotoRequired === true;
     newValue = {
-      name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
+      ...(ownPhotoRequired ? {awaitingOwnPhoto: true} : {}),
+      name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', libraryImageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
       libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
       unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(),
-      kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: true,
+      kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
     };
   } else {
     const current = await target.get();
@@ -458,12 +477,12 @@ exports.submitVendorChange = onCall(options, async request => {
   const autoPublish = isNew || type === 'price' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
   const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId: targetId, oldValue, newValue, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
   if (isNew) {
-    // Only [vendorItemLimit] items per vendor (items the admin hid count too). Counted and saved in one transaction, so two quick
+    // Only [vendorItemLimitNow] items per vendor (free or plan, functions/plan-gate.js) (items the admin hid count too). Counted and saved in one transaction, so two quick
     // saves can never go over the limit.
-    const limit = vendorItemLimit(vendor);
+    const limit = await vendorItemLimitNow(db, uid, vendor);
     await db.runTransaction(async tx => {
       const mine = await tx.get(db.collection('products').where('ownerId', '==', uid));
-      if (mine.size >= limit) throw new HttpsError('resource-exhausted', `You can have ${limit} item${limit === 1 ? '' : 's'}. Ask the admin for permission to add more.`);
+      if (mine.size >= limit) throw new HttpsError('resource-exhausted', `Your plan has ${limit} item${limit === 1 ? '' : 's'}, and they are all in use. A plan with more items is in Plans.`);
       tx.set(target, {...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()});
       tx.set(db.collection('vendorChanges').doc(), change);
     });

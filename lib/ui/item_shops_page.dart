@@ -6,10 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/item_shops.dart';
+import '../services/server_clock.dart';
 import '../services/usage.dart';
 import 'contact_actions.dart';
 import 'design_tokens.dart';
-import 'shared.dart';
+import 'shared.dart';
+
 import '../services/strings.dart';
 
 /// Opens where to buy an item. [openItem] opens one shop's item (the product page), to put it in the bag.
@@ -120,6 +122,7 @@ class ItemShopsPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(offer.shopName, style: Theme.of(sheet).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           Text('$name: ${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}', style: Theme.of(sheet).textTheme.titleMedium?.copyWith(color: AppTokens.primary)),
+          if (priceUpdatedToday(offer.product, ServerClock.now())) const Padding(padding: EdgeInsets.only(top: 4), child: Align(alignment: Alignment.centerLeft, child: UpdatedTodayTag())),
           if (offer.address.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(offer.address, key: const ValueKey('item-shop-address'))),
           if (offer.distanceKm != null) Text('${distanceText(offer.distanceKm)} from you'),
           if (offer.phone.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Phone: ${offer.phone}')),
@@ -162,23 +165,42 @@ class ItemShopsPage extends StatelessWidget {
 
 /// One shop of an item's shop list: photo, name, price and how far (also the item page's list, lib/ui/item_shop_list.dart).
 class ItemOfferTile extends StatelessWidget {
-  const ItemOfferTile({super.key, required this.offer, required this.onTap});
+  const ItemOfferTile({super.key, required this.offer, required this.onTap, this.now});
   final ItemOffer offer;
   final VoidCallback onTap;
+  // The clock (the server's time by default).
+  final DateTime Function()? now;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(top: 8),
-    child: ListTile(
-      onTap: onTap,
-      leading: _ShopPhoto(url: offer.photo, size: 52),
-      title: Text(offer.shopName, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text([
-        '${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}',
-        if (offer.distanceKm != null) distanceText(offer.distanceKm),
-      ].join(' • ')),
-      trailing: const Icon(Icons.chevron_right),
-    ),
+  Widget build(BuildContext context) {
+    final line = Text([
+      '${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}',
+      if (offer.distanceKm != null) distanceText(offer.distanceKm),
+    ].join(' • '));
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: ListTile(
+        onTap: onTap,
+        leading: _ShopPhoto(url: offer.photo, size: 52),
+        title: Text(offer.shopName, style: const TextStyle(fontWeight: FontWeight.w600)),
+        // A price set today carries the green "Updated today" label after it.
+        subtitle: priceUpdatedToday(offer.product, (now ?? ServerClock.now)())
+            ? Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [line, UpdatedTodayTag(key: ValueKey('updated-today-${offer.product.id}'))])
+            : line,
+        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+}
+
+/// The small green "Updated today" label next to a price the vendor set today (India date).
+class UpdatedTodayTag extends StatelessWidget {
+  const UpdatedTodayTag({super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(color: const Color(0xFFE8F5E9), border: Border.all(color: const Color(0xFF2E7D32)), borderRadius: BorderRadius.circular(4)),
+    child: Text('Updated today'.tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
   );
 }
 
@@ -284,7 +306,7 @@ class ItemSearchChoices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final choices = itemChoices(store.visibleProducts(), query, pincode: store.pincode);
+    final choices = itemChoices(store.visibleProducts(), query, pincode: store.pincode, categoryNames: {for (final c in store.visible('categories')) c.id: c.text('name')});
     if (choices.isEmpty) return const SizedBox.shrink();
     return Padding(
       key: const ValueKey('item-search-choices'),

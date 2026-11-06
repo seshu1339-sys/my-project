@@ -144,7 +144,7 @@ class _FlashConversationViewState extends State<FlashConversationView> {
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              if (!mine) Text(message.role == 'admin' ? 'Local Market team' : 'Flash', style: Theme.of(context).textTheme.labelSmall),
+              if (!mine) Text(message.role == 'admin' ? 'LOCAMARKET team' : 'Flash', style: Theme.of(context).textTheme.labelSmall),
               SelectableText(message.text),
             ]),
           ),

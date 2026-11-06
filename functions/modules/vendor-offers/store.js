@@ -39,7 +39,12 @@ async function saveOffer(db, bucket, uid, data, now = Date.now()) {
   }
   const shop = (await db.collection('shops').doc(vendor.shopId).get()).data();
   const status = statusOnSave(await approvalRequired(db));
+  // The nearby alert is chosen for a new offer, or when an ended one runs again (then it may alert again). Editing a running offer
+  // keeps what it had, so an edit never sends a second alert.
+  const fresh = !current || !isRunning(current, now);
+  const alert = fresh ? {alert: safe.alert, alertRadiusKm: FieldValue.delete(), alertClaimedAt: FieldValue.delete(), alertStatus: FieldValue.delete(), alertSentAt: FieldValue.delete()} : {};
   await ref.set({
+    ...alert,
     vendorId: uid, shopId: vendor.shopId, shopName: shop?.name || vendor.name || '',
     title: safe.title, details: safe.details, offerPrice: safe.offerPrice, regularPrice: safe.regularPrice, photos: safe.photos,
     status, endsAt: Timestamp.fromMillis(safe.days ? endsAtFrom(now, safe.days) : endsAt),

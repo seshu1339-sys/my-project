@@ -12,34 +12,43 @@ const S = require('./store');
 const user = require('./user/chat');
 const vendor = require('./vendor/chat');
 const staff = require('./staff/chat');
+const premium = require('./premium/chat');
+const provider = require('./provider/chat');
+const {SONNET, HAIKU} = require('../ai-core');
 
-const chats = {user, vendor, staff};
+const chats = {user, vendor, premium, provider, staff};
 const NOW = Date.parse('2026-11-02T10:00:00+05:30');
 const HOUR = 3600000;
 const reply = (answer, stop = 'end_turn') => ({stop_reason: stop, content: [{type: 'text', text: JSON.stringify(answer)}], usage: {input_tokens: 100, output_tokens: 20}});
 const SAID = {reply: 'Your order is confirmed by the shop.', outcome: 'answered', summary: ''};
 const TEAM = {reply: '', outcome: 'needs_team', summary: 'Wants a refund'};
 
-test('the three chats are separate, with the categories the owner chose', () => {
-  assert.deepEqual(user.categories, ['Orders', 'Offers', 'App', 'Other']);
-  assert.deepEqual(vendor.categories, ['Payment', 'Plan', 'Offers', 'Shop', 'Other']);
-  assert.deepEqual(staff.categories, ['Work', 'Account', 'App', 'Other']);
-  assert.equal(new Set([user.collection, vendor.collection, staff.collection]).size, 3);
-  assert.equal(new Set([user.rules, vendor.rules, staff.rules]).size, 3);
-  assert.equal(new Set([user.helpField, vendor.helpField, staff.helpField]).size, 3);
+test('the five chats are separate, with the categories of the promo-video spec', () => {
+  assert.deepEqual(user.categories, ['Search & shops', 'Offers', 'Services', 'App', 'Orders', 'Other']);
+  assert.deepEqual(vendor.categories, ['Login', 'Plans & prices', 'Items & photos', 'Offers', 'Payment', 'Shop', 'Other']);
+  assert.deepEqual(premium.categories, ['My plan', 'My stats', 'Ads & offers', 'Wholesale', 'Items & prices', 'Payment', 'Other']);
+  assert.deepEqual(provider.categories, ['Login', 'My listing', 'Charge per hour', 'App', 'Other']);
+  assert.deepEqual(staff.categories, ['My area', 'Targets', 'Missed days', 'Adding offers', 'Terms', 'Account', 'App', 'Other']);
+  const all = [user, vendor, premium, provider, staff];
+  for (const field of ['kind', 'collection', 'rules', 'helpField']) assert.equal(new Set(all.map(c => c[field])).size, 5, field);
+  assert.equal(premium.model, SONNET, 'the advanced chat uses the stronger model');
+  assert.equal(premium.priority, true, 'and comes first in the Support Inbox');
+  for (const c of [user, vendor, provider, staff]) assert.equal(c.model, undefined, c.kind);
 });
 
 test('nothing that talks to a person can read tickets', () => {
-  for (const file of ['answer.js', 'user/chat.js', 'vendor/chat.js', 'staff/chat.js']) {
+  for (const file of ['answer.js', 'user/chat.js', 'vendor/chat.js', 'vendor/facts.js', 'premium/chat.js', 'provider/chat.js', 'staff/chat.js']) {
     assert.equal(/flashTickets|flashTicketTriage/.test(readFileSync(join(__dirname, file), 'utf8')), false, file);
   }
 });
 
 test('the vendor chat reads payments only from the payment documents, and the other chats never do', () => {
   const source = name => readFileSync(join(__dirname, name), 'utf8');
-  assert.match(source('vendor/chat.js'), /collection\('paymentRequests'\)/);
-  for (const banned of ['paymentSms', 'paymentIds', 'paymentBankConfig']) assert.equal(source('vendor/chat.js').includes(banned), false, banned);
-  for (const name of ['user/chat.js', 'staff/chat.js']) assert.equal(source(name).includes('paymentRequests'), false, name);
+  assert.match(source('vendor/facts.js'), /collection\('paymentRequests'\)/);
+  for (const banned of ['paymentSms', 'paymentIds', 'paymentBankConfig']) {
+    for (const name of ['vendor/chat.js', 'vendor/facts.js', 'premium/chat.js']) assert.equal(source(name).includes(banned), false, `${name} ${banned}`);
+  }
+  for (const name of ['user/chat.js', 'staff/chat.js', 'provider/chat.js']) assert.equal(source(name).includes('paymentRequests'), false, name);
 });
 
 test('a ticket gets the fixed 24-hour reply, in Telugu for Telugu', () => {
@@ -213,7 +222,7 @@ test('the vendor Plan, Offers and Shop categories read the vendor\'s own records
   await db.collection('vendorOffers').add({vendorId: me.uid, title: 'My own offer', status: 'live', offerPrice: 50, regularPrice: 60, endsAt: Timestamp.fromMillis(NOW + HOUR)});
   await db.collection('vendorTodaysOffers').doc(me.uid).set({price: 77, hours: 24, endsAt: Timestamp.fromMillis(NOW + HOUR)});
   await db.collection('shops').doc(me.uid).set({name: 'Lakshmi Stores', category: 'Grocery', address: 'Main Road', active: true});
-  await send(ai.client, vendor, me, {category: 'Plan', text: 'plan?'});
+  await send(ai.client, vendor, me, {category: 'Plans & prices', text: 'plan?'});
   assert.match(ai.calls[0].system, /One Year.*03\/11\/2026/);
   await send(ai.client, vendor, me, {category: 'Offers', text: 'offers?'});
   assert.match(ai.calls[1].system, /My own offer/);
@@ -223,23 +232,32 @@ test('the vendor Plan, Offers and Shop categories read the vendor\'s own records
   assert.match(ai.calls[2].system, /VEN-1/);
 });
 
-test('the staff chat reads the member\'s own counts and account', emulated, async () => {
+test('the staff chat reads the member\'s own area, target, missed days, Terms and account', emulated, async () => {
   const me = await staffAccount(), ai = model(), db = getFirestore();
-  await db.collection('fieldSubmissions').add({staffUid: me.uid, status: 'pending'});
-  await db.collection('fieldSubmissions').add({staffUid: me.uid, status: 'pending'});
-  await db.collection('staffAdditions').add({staffUid: me.uid, status: 'approved'});
-  await db.collection('fieldSubmissions').add({staffUid: 'someone-else', status: 'rejected'});
-  await send(ai.client, staff, me, {category: 'Work', text: 'my work?'});
-  assert.match(ai.calls[0].system, /"fieldEntries":\{"pending":2\}/);
-  assert.match(ai.calls[0].system, /"vendorsAndProvidersAdded":\{"approved":1\}/);
+  const month = new Date(NOW + 19800000).toISOString().slice(0, 7);
+  await db.collection('staffAreas').doc('flashArea').set({name: 'Main Bazaar', town: 'Narsipatnam', radiusKm: 1, status: 'booked'});
+  await db.collection('staffAreaStaff').doc(me.uid).set({areaId: 'flashArea', month, missedThisMonth: 2});
+  await db.collection('staffAreaSettings').doc('main').set({monthlyPhotoTarget: 120, rateDaysPerWeek: 5, maxMissedDays: 6});
+  await db.collection('staffLinks').doc('vendor_x').set({kind: 'vendor', staffUid: me.uid});
+  await send(ai.client, staff, me, {category: 'My area', text: 'my area?'});
+  assert.match(ai.calls[0].system, /Main Bazaar/);
+  assert.match(ai.calls[0].system, /"livePhotos":120/);
+  assert.match(ai.calls[0].system, /"rateUpdateDaysAWeek":5/);
+  assert.match(ai.calls[0].system, /"missedDaysThisMonth":2/);
+  assert.match(ai.calls[0].system, /"missedDaysThatStopTheAccount":6/);
+  await send(ai.client, staff, me, {category: 'Terms', text: 'terms?'});
+  assert.match(ai.calls[1].system, /no fixed salary/);
   await send(ai.client, staff, me, {category: 'Account', text: 'my account?'});
-  assert.match(ai.calls[1].system, /STF-1/);
+  assert.match(ai.calls[2].system, /STF-1/);
+  assert.match(ai.calls[2].system, /"vendorsLinked":1/);
 });
 
 test('the role comes from the server: others cannot use the vendor or staff chat', emulated, async () => {
   const stranger = person('stranger'), ai = model();
   await assert.rejects(send(ai.client, vendor, stranger, {category: 'Payment', text: 'hi', role: 'vendor'}), /not for your account/);
-  await assert.rejects(send(ai.client, staff, stranger, {category: 'Work', text: 'hi', role: 'staff'}), /not for your account/);
+  await assert.rejects(send(ai.client, staff, stranger, {category: 'My area', text: 'hi', role: 'staff'}), /not for your account/);
+  await assert.rejects(send(ai.client, premium, stranger, {category: 'My plan', text: 'hi'}), /not for your account/);
+  await assert.rejects(send(ai.client, provider, stranger, {category: 'Login', text: 'hi'}), /not for your account/);
   assert.equal(ai.calls.length, 0);
   assert.equal((await send(ai.client, user, stranger, {category: 'App', text: 'hi'})).status, 'open');
 });
@@ -408,4 +426,60 @@ test('a ticket that cannot be read says so and stays open for the admin', emulat
     await S.triageTicket(db, client, id, {kind: 'user', uid: 'u', category: 'Other', summary: '', text: 'x'}, NOW);
     assert.equal((await db.collection('flashTicketTriage').doc(id).get()).data().failed, true);
   }
+});
+
+test('every chat has working knowledge until the admin writes their own; the office number is checked', () => {
+  for (const field of R.HELP_FIELDS.filter(f => f !== 'helpPremium')) assert.ok(R.helpFor({}, field).length > 100, field);
+  assert.equal(R.helpFor({helpUser: 'Our own text'}, 'helpUser'), 'Our own text');
+  assert.match(R.helpFor({}, 'helpUser'), /lowest price/);
+  assert.match(R.helpFor({}, 'helpStaff'), /30 minutes/);
+  const saved = R.validateConfig({dailyMessages: 30, helpPremium: ' Premium help ', supportPhone: '9876543210', supportWhatsapp: '+91 98765 43210'});
+  assert.equal(saved.helpPremium, 'Premium help');
+  assert.equal(saved.supportPhone, '9876543210');
+  assert.throws(() => R.validateConfig({dailyMessages: 30, supportPhone: 'call me'}), /office number/);
+});
+
+async function premiumAccount() {
+  const who = await vendorAccount('premium');
+  const db = getFirestore();
+  await db.collection('vendorPremium').doc(who.uid).set({uid: who.uid, active: true, endsAt: Timestamp.fromMillis(Date.now() + 365 * 24 * HOUR)});
+  await db.collection('vendorPlanStatus').doc(who.uid).set({uid: who.uid, planName: 'Premium', endsAt: Timestamp.fromMillis(NOW + 900 * 24 * HOUR), itemLimit: 10});
+  return who;
+}
+
+test('the Premium chat: only for a running plan, the stronger model, every fact at once (calls, wholesale, plan end) but never views', emulated, async () => {
+  const db = getFirestore();
+  const free = await vendorAccount('free');
+  await assert.rejects(send(model().client, premium, free, {category: 'My plan', text: 'hi'}), /not for your account/);
+  const me = await premiumAccount(), ai = model();
+  const day = new Date(NOW + 19800000).toISOString().slice(0, 10);
+  await db.collection('usageOwnerDaily').doc(`${me.uid}~${day}`).set({ownerId: me.uid, day, counts: {shop_call: 7, shop_directions: 3, ad_view: 99}});
+  await db.collection('wholesaleOffers').add({name: 'Rice 25 kg bag', price: 1100, minQuantity: 2, wholesaler: 'Sri Traders', phone: '9000000001', validUntil: Timestamp.fromMillis(Date.now() + 24 * HOUR)});
+  await send(ai.client, premium, me, {category: 'My stats', text: 'how many calls?', now: NOW});
+  const system = ai.calls[0].system;
+  assert.equal(ai.calls[0].model, SONNET);
+  assert.match(system, /"shop_call":7/);
+  assert.equal(system.includes('ad_view'), false, 'never a view number');
+  assert.match(system, /Rice 25 kg bag/);
+  assert.match(system, /"itemsAllowed":10/);
+  assert.match(system, /up to eight sentences/);
+});
+
+test('a Premium ticket comes first: it carries priority', emulated, async () => {
+  const me = await premiumAccount();
+  const {chatId} = await send(model(TEAM).client, premium, me, {category: 'Payment', text: 'my money'});
+  const ticket = (await getFirestore().collection('flashTickets').doc(`premium_${chatId}`).get()).data();
+  assert.equal(ticket.priority, true);
+  assert.equal(ticket.kind, 'premium');
+});
+
+test('the service providers have their own basic chat with their own listing', emulated, async () => {
+  const db = getFirestore();
+  const who = person('provider');
+  await db.collection('providerApplications').doc(who.uid).set({name: 'Raju', providerCode: 'SRV-NRPM-116-001', serviceName: 'Plumber', hourlyRate: 250, status: 'pending', submittedAt: Timestamp.fromMillis(NOW)});
+  const ai = model();
+  await send(ai.client, provider, who, {category: 'My listing', text: 'when am I live?'});
+  assert.equal(ai.calls[0].model, HAIKU);
+  assert.match(ai.calls[0].system, /SRV-NRPM-116-001/);
+  assert.match(ai.calls[0].system, /"chargePerHour":250/);
 });

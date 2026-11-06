@@ -71,6 +71,8 @@ class _EntryEditorState extends State<EntryEditor> {
   bool active = true, busy = false;
   // Shops only, and only the admin can change it: this shop's delivery charge is waived.
   bool freeDelivery = false;
+  // Categories: the vendor must add their own photo for items of this category (for example sarees).
+  bool ownPhotoRequired = false;
   // Set only once the geo-target picker is actually used this session; null
   // means "leave whatever shape data this promotion already has untouched"
   // (the spread in save() below already carries that forward).
@@ -119,6 +121,7 @@ class _EntryEditorState extends State<EntryEditor> {
     super.initState();
     active = widget.entry?.active ?? true;
     freeDelivery = widget.entry?.data['freeDelivery'] == true;
+    ownPhotoRequired = widget.entry?.data['ownPhotoRequired'] == true;
     controllers = fields[widget.collection]!.map((key, label) {
       final value = widget.entry?.data[key];
       final text = key == 'translations' && value is Map
@@ -223,6 +226,7 @@ class _EntryEditorState extends State<EntryEditor> {
     try {
       final data = <String, dynamic>{...?widget.entry?.data, 'active': active};
       if (widget.collection == 'shops') data['freeDelivery'] = freeDelivery;
+      if (widget.collection == 'categories') data['ownPhotoRequired'] = ownPhotoRequired;
       for (final field in controllers.entries) {
         final value = field.value.text.trim();
         if (numeric.contains(field.key)) {
@@ -933,6 +937,14 @@ class _EntryEditorState extends State<EntryEditor> {
                   onChanged: (v) => setState(() => freeDelivery = v),
                   title: const Text('Free delivery'),
                   subtitle: const Text('This shop pays no delivery charge. Only the admin can change this.'),
+                ),
+              if (widget.collection == 'categories')
+                SwitchListTile(
+                  key: const ValueKey('category-own-photo-required'),
+                  value: ownPhotoRequired,
+                  onChanged: (v) => setState(() => ownPhotoRequired = v),
+                  title: const Text('Own photo required'),
+                  subtitle: const Text("Vendors must add their own photo for items of this category (for example sarees); the item shows after the admin's photo check."),
                 ),
               SwitchListTile(
                 value: active,

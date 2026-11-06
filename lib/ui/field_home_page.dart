@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_registration_form.dart';
-import 'quick_add.dart';
+import '../modules/staffareas/staffareas_module.dart';
+import '../modules/flash/flash_module.dart' show staffAppFlashButton;
 import 'field_workspace.dart';
 
 /// Why this login cannot register as field staff: vendor, service-provider and field-staff accounts are completely separate, so an
@@ -43,7 +44,7 @@ class _FieldHomePageState extends State<FieldHomePage> {
     final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     if (!user.emailVerified) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Field Assistant'), actions: actions),
+        appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),
         body: const _Message(
           title: 'Verify your email first',
           body: 'Sign out and sign in again with Google or an email code so we can verify your email. Registration opens once your email is verified.',
@@ -51,16 +52,17 @@ class _FieldHomePageState extends State<FieldHomePage> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Field Assistant'), actions: actions),
+      floatingActionButton: staffAppFlashButton(store),
+      appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: store.firestore.collection('fieldStaff').doc(user.uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) return const _Message(title: 'Could not load your access status', body: 'Please check your connection and try again.');
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final status = snapshot.data!.data()?['status'];
-          if (status == 'active') return FieldWorkspace(store: store, uid: user.uid);
-          // An account the admin created for Quick Add goes straight to Quick Add.
-          return QuickAccountGate(store: store, role: 'staff', quickOnly: () => QuickAddOnly(store: store), otherwise: () => _fieldStage(snapshot.data!, status));
+          if (status == 'active') return FieldWorkspace(store: store, uid: user.uid, areaDashboard: StaffAreaDashboard(store: store, uid: user.uid));
+          // Quick Add is closed (owner, 6 Nov 2026): every staff account goes through registration and the area.
+          return _fieldStage(snapshot.data!, status);
         },
       ),
     );
@@ -78,11 +80,9 @@ class _FieldHomePageState extends State<FieldHomePage> {
             return const _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved. Contact the administrator for details.');
           }
           final code = '${snapshot.data()?['staffCode'] ?? ''}';
-          return _Message(
-            title: 'Waiting for approval',
-            body: 'Your access request is waiting for administrator approval. You will be able to submit entries here once it is approved.'
-                '${code.isEmpty ? '' : '\n\nYour Staff ID: $code'}',
-          );
+          // Registration finishes with the area: the staff member chooses a free one standing inside it and accepts the Terms
+          // (lib/modules/staffareas). The area stays Pending, held for them, until the admin approves them.
+          return _PendingStaff(store: store, uid: snapshot.id, staffCode: code);
         }
       }
     }
@@ -130,5 +130,28 @@ class _Message extends StatelessWidget {
         ]),
       ),
     ),
+  );
+}
+
+/// A registered staff member waiting for approval: first their area (claimed standing inside it, Terms accepted), then the wait.
+class _PendingStaff extends StatelessWidget {
+  const _PendingStaff({required this.store, required this.uid, required this.staffCode});
+  final Store store;
+  final String uid, staffCode;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('staffAreaStaff').doc(uid).snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      final mine = snapshot.data!.data();
+      final area = mine?['areaId'] == null ? null : '${mine?['areaName'] ?? ''}';
+      if (area == null) return StaffAreaClaimPage(store: store);
+      return _Message(
+        title: 'Waiting for approval',
+        body: 'Your registration is waiting for administrator approval. Your area "$area" is held for you until then; nobody else can take it.'
+            '${staffCode.isEmpty ? '' : '\n\nYour Staff ID: $staffCode'}',
+      );
+    },
   );
 }

@@ -8,6 +8,8 @@ import '../domain/android_sizes.dart';
 import '../domain/catalog.dart';
 import '../domain/right_boxes.dart';
 import '../services/ad_tracker.dart';
+import '../services/server_clock.dart';
+import 'ad_box.dart';
 import 'right_ad_boxes.dart';
 
 /// The ads of the Android home page: small boxes of one size side by side right under the top row, never a half box. They are the
@@ -15,35 +17,78 @@ import 'right_ad_boxes.dart';
 /// they slide along by themselves, one box at a time, and come round again. Each step waits the seconds of Settings > Right Side Ads
 /// ("Seconds each ad stays"), the same setting as the website. How many show at once is Settings > Android App. With fewer ads than
 /// boxes, or none, the rest are empty boxes of the same size with the "your ad here" text, so the row is always there.
-class AndroidAdsStrip extends StatelessWidget {
-  const AndroidAdsStrip({super.key, required this.settings, required this.onTarget, this.tracker, this.town = ''});
+class AndroidAdsStrip extends StatefulWidget {
+  const AndroidAdsStrip({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now});
   final List<Entry> settings;
   final ValueChanged<String> onTarget;
   final AdsTracker? tracker;
   final String town;
 
+  /// The live ads of the Ads list for this customer (lib/domain/ads.dart liveAds); they follow the boxes with a photo.
+  final List<Entry> Function(DateTime now)? adsAt;
+
+  /// The clock; the server's time by default.
+  final DateTime Function()? now;
+
+  @override
+  State<AndroidAdsStrip> createState() => _AndroidAdsStripState();
+}
+
+class _AndroidAdsStripState extends State<AndroidAdsStrip> {
+  Timer? _tick;
+  String _signature = '';
+
+  DateTime get _now => (widget.now ?? ServerClock.now)();
+
+  @override
+  void initState() {
+    super.initState();
+    // A box or an ad may start or end at any moment: look again every 5 seconds, no reload needed.
+    _tick = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && _items(_now).$3 != _signature) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  (List<RightBox>, List<Entry>, String) _items(DateTime now) {
+    final boxes = liveRightBoxes(rightBoxesRecord(widget.settings), now);
+    final ads = widget.adsAt?.call(now) ?? const <Entry>[];
+    return (boxes, ads, [for (final b in boxes) 'b${b.number}${b.imageUrl}', for (final a in ads) 'a${a.id}'].join('|'));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final settings = widget.settings;
     final home = AndroidHomeConfig.from(settings);
-    final boxes = liveRightBoxes(rightBoxesRecord(settings));
+    final (boxes, ads, signature) = _items(_now);
+    _signature = signature;
     if (!home.showAds) return const SizedBox.shrink();
     final slots = home.adSlots.clamp(1, 12);
     return _Strip(
       key: ValueKey('android-ads-$slots'),
-      boxes: boxes,
+      // The boxes with a photo first (inside their dates), then the live ads of the Ads list.
+      boxes: <Object>[...boxes, ...ads],
       slots: slots,
       seconds: AdsConfig.from(settings).seconds,
       height: AndroidSizes.from(settings).value('ads', 'height'),
-      onTarget: onTarget,
-      tracker: tracker,
-      town: town,
+      onTarget: widget.onTarget,
+      tracker: widget.tracker,
+      town: widget.town,
+      config: AdsConfig.from(settings),
     );
   }
 }
 
 class _Strip extends StatefulWidget {
-  const _Strip({super.key, required this.boxes, required this.slots, required this.seconds, required this.onTarget, required this.tracker, required this.town, this.height});
-  final List<RightBox> boxes;
+  const _Strip({super.key, required this.boxes, required this.slots, required this.seconds, required this.onTarget, required this.tracker, required this.town, required this.config, this.height});
+  // Each one is a RightBox (a box with its photo) or an Entry (an ad of the Ads list).
+  final List<Object> boxes;
+  final AdsConfig config;
   final int slots, seconds;
   // The admin's height (Settings > Android App); null = small, by the box's width.
   final double? height;
@@ -90,7 +135,34 @@ class _StripState extends State<_Strip> {
     super.dispose();
   }
 
-  Widget _tile(RightBox box) => Padding(
+  Widget _tile(Object item) {
+    if (item is Entry) return _adTile(item);
+    return _boxTile(item as RightBox);
+  }
+
+  Widget _adTile(Entry ad) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: gap / 2),
+    child: SeenCounter(
+      adId: ad.id,
+      tracker: widget.tracker,
+      town: widget.town,
+      child: SizedBox.expand(
+        key: ValueKey('android-ad-list-${ad.id}'),
+        child: AdBox(
+          ad: ad,
+          config: widget.config,
+          mobile: true,
+          onTap: (a) {
+            widget.tracker?.tap(a.id, town: widget.town);
+            final target = adTarget(a);
+            if (target.isNotEmpty) widget.onTarget(target);
+          },
+        ),
+      ),
+    ),
+  );
+
+  Widget _boxTile(RightBox box) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: gap / 2),
     child: SeenCounter(
       adId: box.countsViews ? box.adId : '',

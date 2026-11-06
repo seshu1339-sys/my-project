@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
+
 import '../data/store.dart';
 import '../modules/transport/transport_module.dart';
 import 'big_option_tile.dart';
@@ -37,6 +39,7 @@ class VendorHomePage extends StatelessWidget {
 
   Widget _view(BuildContext context, VendorAccountRole role) => VendorHomeView(
     role: role,
+    chatButton: store.live ? vendorAppFlashButton(store) : null,
     onVendor: () {
       Usage.button('vendor_home_vendor');
       _open(context, VendorPage(store: store));
@@ -89,10 +92,12 @@ class VendorHomePage extends StatelessWidget {
 
 /// The three options, laid out for any screen width. An option that does not belong to this account explains why instead of opening.
 class VendorHomeView extends StatelessWidget {
-  const VendorHomeView({super.key, required this.role, required this.onVendor, required this.onServices, required this.onTransport, this.onLogout});
+  const VendorHomeView({super.key, required this.role, required this.onVendor, required this.onServices, required this.onTransport, this.onLogout, this.chatButton});
   final VendorAccountRole role;
   final VoidCallback onVendor, onServices, onTransport;
   final VoidCallback? onLogout;
+  // The floating Help chat button (lib/modules/flash).
+  final Widget? chatButton;
 
   static const vendorBlocked =
       'This account is registered as a service provider. A vendor account must be a separate account: sign out and register as a vendor with a different email address.';
@@ -150,8 +155,9 @@ class VendorHomeView extends StatelessWidget {
       ),
     ];
     return Scaffold(
+      floatingActionButton: chatButton,
       appBar: AppBar(
-        title: const Text('Vendor studio'),
+        title: const Text('Loca Market Vendor'),
         actions: [if (onLogout != null) IconButton(tooltip: 'Log out', onPressed: onLogout, icon: const Icon(Icons.logout))],
       ),
       body: Center(

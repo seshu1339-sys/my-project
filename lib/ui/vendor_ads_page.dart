@@ -6,6 +6,8 @@ import '../domain/ad_reports.dart';
 import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/catalog.dart';
+import '../domain/ist_time.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_reports_page.dart';
 import 'ads_column.dart';
@@ -20,7 +22,7 @@ String vendorAdState(Entry ad, DateTime now) => adStatusLabels[adStatus(ad, now)
 
 /// "12 days left", "ends today", "ended 3 days ago", or '' with no end date.
 String daysRemainingText(Entry ad, DateTime now) {
-  final end = DateTime.tryParse(ad.text('endsAt'));
+  final end = parseIstTime(ad.text('endsAt'));
   if (end == null) return '';
   final left = end.difference(now);
   if (left.isNegative) return 'ended ${(-left.inDays).clamp(0, 9999)} day(s) ago';
@@ -43,7 +45,7 @@ class VendorAdsPage extends StatefulWidget {
 
 class _VendorAdsPageState extends State<VendorAdsPage> {
   Store get store => widget.store;
-  DateTime get now => widget.now ?? DateTime.now();
+  DateTime get now => widget.now ?? ServerClock.now();
 
   void toast(Object m) => message(context, m);
 

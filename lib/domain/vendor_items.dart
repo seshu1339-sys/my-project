@@ -10,10 +10,24 @@ const vendorItemQuantities = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 /// Library items with no category are listed under this id.
 const uncategorizedLibraryItems = '';
 
-/// How many items the vendor may have.
+/// How many items the vendor may have, leaving plans aside (the admin's own number for this vendor, else 2).
 int vendorItemLimit(Map<String, dynamic>? vendor) {
   final limit = vendor?['itemLimit'];
   return limit is int && limit >= 0 && limit <= 100 ? limit : defaultVendorItemLimit;
+}
+
+int? _itemCount(Object? v) => v is num && v == v.roundToDouble() && v >= 0 && v <= 100 ? v.toInt() : null;
+
+/// How many items the vendor may add now, the same rule as the server (functions/plan-gate.js vendorItemLimitNow): the free number
+/// (this vendor's own number, else the admin's free number in planServiceGates/main, else 2), or the running plan's number
+/// (vendorPlanStatus: [planEndsAt] after [now], [planItemLimit], else 10) when that is bigger.
+int vendorItemLimitNow(Map<String, dynamic>? vendor, {Map<String, dynamic>? planGates, DateTime? planEndsAt, Object? planItemLimit, required DateTime now}) {
+  final free = _itemCount(vendor?['itemLimit']) ?? _itemCount(planGates?['freeItemLimit']) ?? defaultVendorItemLimit;
+  final running = planEndsAt != null && planEndsAt.isAfter(now);
+  if (!running) return free;
+  final plan = _itemCount(planItemLimit) ?? 0;
+  final n = plan == 0 ? 10 : plan;
+  return n > free ? n : free;
 }
 
 /// "2 kg", "1 pc", "5 pcs".

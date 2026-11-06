@@ -1,5 +1,6 @@
 import 'catalog.dart';
 import 'home_animations.dart';
+import 'ist_time.dart';
 import 'radius.dart';
 import 'towns.dart';
 
@@ -119,7 +120,9 @@ List<(int, int)> adSlots(Entry ad) {
 
 bool _inSlots(List<(int, int)> slots, DateTime now) {
   if (slots.isEmpty) return true;
-  final minute = now.hour * 60 + now.minute;
+  // The slots are India time, whatever the phone's own time zone is.
+  final india = istWallClock(now);
+  final minute = india.hour * 60 + india.minute;
   return slots.any((s) => s.$1 <= s.$2 ? minute >= s.$1 && minute < s.$2 : minute >= s.$1 || minute < s.$2);
 }
 
@@ -129,8 +132,9 @@ String adStatus(Entry ad, DateTime now) {
   if (approval == 'pending') return 'pending';
   if (approval == 'rejected') return 'rejected';
   if (!ad.active) return 'inactive';
-  final start = DateTime.tryParse(ad.text('startsAt'));
-  final end = DateTime.tryParse(ad.text('endsAt'));
+  // Times without a zone are India time (lib/domain/ist_time.dart); [now] is the server's time (lib/services/server_clock.dart).
+  final start = parseIstTime(ad.text('startsAt'));
+  final end = parseIstTime(ad.text('endsAt'));
   if (end != null && !now.isBefore(end)) return 'expired';
   if (start != null && now.isBefore(start)) return 'scheduled';
   return 'live';
@@ -142,7 +146,7 @@ String adDay(DateTime now) => now.toUtc().add(const Duration(hours: 5, minutes: 
 /// True when the ad may be on a customer's screen at [now]: approved, switched on, inside its dates, its weekdays and its daily time slots.
 bool adLiveNow(Entry ad, DateTime now) =>
     adStatus(ad, now) == 'live' &&
-    adDays(ad).contains(now.weekday) &&
+    adDays(ad).contains(istWallClock(now).weekday) &&
     _inSlots(adSlots(ad), now) &&
     // the server marks an ad that reached its "max times per day" with that day; it is hidden for the rest of it
     ad.text('capDay') != adDay(now);
@@ -170,6 +174,17 @@ List<Entry> liveAds(
   return local;
 }
 
+/// The next moment after [now] at which one of [ads] starts or ends (to show or hide it right then, without a reload), or null.
+DateTime? nextAdChange(List<Entry> ads, DateTime now) {
+  DateTime? next;
+  for (final ad in ads) {
+    for (final t in [parseIstTime(ad.text('startsAt')), parseIstTime(ad.text('endsAt'))]) {
+      if (t != null && t.isAfter(now) && (next == null || t.isBefore(next))) next = t;
+    }
+  }
+  return next;
+}
+
 /// Who an ad is for: customers (the website and the customer app), vendors and/or staff (the bottom box of their apps).
 const adAudienceNames = <String, String>{'customers': 'Customers', 'vendors': 'Vendors', 'staff': 'Staff'};
 
@@ -185,13 +200,14 @@ Set<String> adCategories(Entry ad) => {for (final part in ad.text('categories').
 /// The ads for the customer website and app: those whose audience includes customers.
 List<Entry> customerAds(List<Entry> ads) => [for (final a in ads) if (adAudience(a).contains('customers')) a];
 
-/// The ads for the bottom box of the vendor app ([shopCategory] = the vendor's shop category) or, with [staff], the staff app: live
-/// now, for that audience, and for a vendor only those with no categories or with the vendor's own. Pinned first, then in order.
+/// The ads for the bottom box of the vendor app ([shopCategory] = the vendor's shop category) or, with [staff], the staff app. Live now;
+/// in the vendor app those aimed at vendors, only with no categories or with the vendor's own (a plastic ad reaches plastic vendors
+/// only); in the staff app every live ad, whatever its audience or category (owner, 6 Nov 2026). Pinned first, then in order.
 List<Entry> appAds(List<Entry> ads, DateTime now, {bool staff = false, String shopCategory = ''}) {
   final category = shopCategory.trim().toLowerCase();
   final out = [
     for (final a in ads)
-      if (adLiveNow(a, now) && adAudience(a).contains(staff ? 'staff' : 'vendors') && (staff || adCategories(a).isEmpty || adCategories(a).contains(category))) a,
+      if (adLiveNow(a, now) && (staff || (adAudience(a).contains('vendors') && (adCategories(a).isEmpty || adCategories(a).contains(category))))) a,
   ];
   out.sort((a, b) {
     final pin = (b.text('pinned') == 'true' || b.data['pinned'] == true ? 1 : 0) - (a.text('pinned') == 'true' || a.data['pinned'] == true ? 1 : 0);

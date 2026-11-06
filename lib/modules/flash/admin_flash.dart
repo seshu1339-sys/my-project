@@ -13,18 +13,19 @@ Widget _build(Store store) => AdminFlashPage(store: store);
 /// The Flash tab of the admin panel (listed in module_admin.dart).
 const flashAdminSection = ModuleAdminSection(id: 'flash', title: 'Flash', icon: Icons.support_agent_outlined, hint: 'Chats, tickets and what Flash knows', build: _build);
 
-/// Admin > Flash: the three chats side by side but never mixed, each in its own tab, then the settings.
+/// Admin > Flash: the Support Inbox (every unanswered ticket, by role), then each chat in its own tab, then the settings.
 class AdminFlashPage extends StatelessWidget {
   const AdminFlashPage({super.key, required this.store});
   final Store store;
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: flashChats.length + 1,
+    length: flashChats.length + 2,
     child: Column(children: [
-      TabBar(tabs: [for (final chat in flashChats) Tab(text: chat.adminTitle), const Tab(text: 'Settings')]),
+      TabBar(isScrollable: true, tabs: [const Tab(text: 'Support Inbox'), for (final chat in flashChats) Tab(text: chat.adminTitle), const Tab(text: 'Settings')]),
       Expanded(
         child: TabBarView(children: [
+          _InboxTab(store: store),
           for (final chat in flashChats) _ChatTab(store: store, setup: chat),
           _SettingsTab(store: store),
         ]),
@@ -83,6 +84,35 @@ class _ChatTabState extends State<_ChatTab> {
         },
       ),
     ),
+  );
+}
+
+/// Every open ticket of every chat (flashTickets is the one collection all chats' tickets go to).
+class _InboxTab extends StatelessWidget {
+  const _InboxTab({required this.store});
+  final Store store;
+
+  Future<List<FlashMessage>> _messages(FlashTicket ticket, String chatId) async {
+    final setup = flashChats.firstWhere((c) => c.kind == ticket.kind, orElse: () => flashChats.first);
+    final found = await store.firestore.collection(setup.collection).doc(chatId).collection('messages').orderBy('at').get();
+    return [for (final doc in found.docs) FlashMessage.fromData(doc.data())];
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('flashTickets').where('status', isEqualTo: 'open').snapshots(),
+    builder: (context, found) {
+      if (found.hasError) return const Center(child: Text('The inbox could not load.'));
+      if (!found.hasData) return const Center(child: CircularProgressIndicator());
+      final tickets = [for (final doc in found.data!.docs) FlashTicket.fromData(doc.id, doc.data())];
+      return FlashSupportInboxView(
+        tickets: tickets,
+        roles: {for (final chat in flashChats) chat.kind: chat.adminTitle},
+        triageOf: (id) => store.firestore.collection('flashTicketTriage').doc(id).snapshots().map((doc) => doc.data() == null ? null : FlashTriage.fromData(doc.data()!)),
+        messagesOf: (chatId) => _messages(tickets.firstWhere((t) => t.chatId == chatId), chatId),
+        onClose: (ticketId, reply) => store.call('closeFlashTicket', {'ticketId': ticketId, 'reply': reply}),
+      );
+    },
   );
 }
 

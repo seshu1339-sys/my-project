@@ -1,8 +1,11 @@
 import 'catalog.dart';
+import 'ist_time.dart';
 
 // The "Right Side Ad Boxes" down the right of the home page (settings/rightAdBoxes).
 //   count          how many boxes the admin has (default 15; Add box / Remove box change it)
 //   box<n>Image    the box's JPG/PNG photo (a box with no photo is not shown to customers)
+//   box<n>StartsAt, box<n>EndsAt   optional start / end (India time, lib/domain/ist_time.dart): outside them the photo is not shown,
+//                  the box counts as empty, and a shop ad in it gains no views (functions/ad-tracking.js). Blank = always.
 //   box<n>Target   optional link: category:<id> | shop:<id> | product:<id>
 //   box<n>Color    optional background colour (#RRGGBB) behind the photo
 //   box<n>AdId     the shop ad in the box (rbox-..., set only by functions/shop-ads.js when the admin links the box to a vendor);
@@ -21,9 +24,26 @@ const rightBoxHeight = 240.0;
 const rightBoxAdPrefix = 'rbox-';
 
 class RightBox {
-  const RightBox(this.number, this.imageUrl, this.target, this.color, {this.adId = ''});
+  const RightBox(this.number, this.imageUrl, this.target, this.color, {this.adId = '', this.startsAt = '', this.endsAt = ''});
   final int number;
   final String imageUrl, target, color, adId;
+  // The box's own start / end as saved ('' = none).
+  final String startsAt, endsAt;
+
+  DateTime? get start => parseIstTime(startsAt);
+  DateTime? get end => parseIstTime(endsAt);
+
+  /// live | scheduled | expired | empty (no photo), at [now] (the server's time).
+  String statusAt(DateTime now) {
+    if (imageUrl.isEmpty) return 'empty';
+    final e = end, s = start;
+    if (e != null && !now.isBefore(e)) return 'expired';
+    if (s != null && now.isBefore(s)) return 'scheduled';
+    return 'live';
+  }
+
+  /// The photo is shown at [now]: it has one and is inside its start / end.
+  bool liveAt(DateTime now) => statusAt(now) == 'live';
 
   /// The link only when a category, shop or product was actually chosen ("category:" alone means none yet).
   bool get hasTarget => target.isNotEmpty && !target.endsWith(':');
@@ -43,13 +63,29 @@ RightBox rightBoxAt(Entry record, int number) => RightBox(
   record.text('box${number}Target'),
   record.text('box${number}Color'),
   adId: record.text('box${number}AdId'),
+  startsAt: record.text('box${number}StartsAt'),
+  endsAt: record.text('box${number}EndsAt'),
 );
 
 /// Every box customers see, in number order: the ones with a photo, and the empty ones as placeholders.
 List<RightBox> shownRightBoxes(Entry record) => [for (var n = 1; n <= rightBoxCount(record); n++) rightBoxAt(record, n)];
 
-/// Only the boxes that have a photo.
-List<RightBox> liveRightBoxes(Entry record) => [for (final box in shownRightBoxes(record)) if (box.imageUrl.isNotEmpty) box];
+/// Only the boxes that have a photo (and, given [now], only those inside their start / end).
+List<RightBox> liveRightBoxes(Entry record, [DateTime? now]) => [
+  for (final box in shownRightBoxes(record))
+    if (box.imageUrl.isNotEmpty && (now == null || box.liveAt(now))) box,
+];
+
+/// The next moment one of the boxes starts or ends after [now] (to show / hide it right then), or null.
+DateTime? nextRightBoxChange(Entry record, DateTime now) {
+  DateTime? next;
+  for (final box in shownRightBoxes(record)) {
+    for (final t in [box.start, box.end]) {
+      if (t != null && t.isAfter(now) && (next == null || t.isBefore(next))) next = t;
+    }
+  }
+  return next;
+}
 
 /// The text on an empty box.
 const rightBoxPlaceholder = 'ఇక్కడ మీ ప్రకటన';

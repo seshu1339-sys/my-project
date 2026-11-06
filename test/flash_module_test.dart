@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/modules/flash/admin_flash_chat.dart';
 import 'package:ecommerce_app/modules/flash/admin_flash_settings.dart';
 import 'package:ecommerce_app/modules/flash/flash_chat_page.dart';
@@ -43,24 +44,90 @@ AdminFlashChatView admin({FlashCounts counts = const FlashCounts(), List<FlashTi
 );
 
 void main() {
-  test('the three chats are separate, with the categories the owner chose', () {
+  test('the five chats are separate, with the same categories as the server', () {
     expect(flashRoute, '/flash');
-    expect([for (final chat in flashChats) chat.kind], ['user', 'vendor', 'staff']);
+    expect([for (final chat in flashChats) chat.kind], ['user', 'vendor', 'premium', 'provider', 'staff']);
     expect([for (final chat in flashChats) chat.categories], [
-      ['Orders', 'Offers', 'App', 'Other'],
-      ['Payment', 'Plan', 'Offers', 'Shop', 'Other'],
-      ['Work', 'Account', 'App', 'Other'],
+      ['Search & shops', 'Offers', 'Services', 'App', 'Orders', 'Other'],
+      ['Login', 'Plans & prices', 'Items & photos', 'Offers', 'Payment', 'Shop', 'Other'],
+      ['My plan', 'My stats', 'Ads & offers', 'Wholesale', 'Items & prices', 'Payment', 'Other'],
+      ['Login', 'My listing', 'Charge per hour', 'App', 'Other'],
+      ['My area', 'Targets', 'Missed days', 'Adding offers', 'Terms', 'Account', 'App', 'Other'],
     ]);
-    expect({for (final chat in flashChats) chat.collection}, {'flashUserChats', 'flashVendorChats', 'flashStaffChats'});
-    expect({for (final chat in flashChats) chat.callable}, {'flashUserChat', 'flashVendorChat', 'flashStaffChat'});
-    expect({for (final chat in flashChats) chat.route}.length, 3);
+    expect({for (final chat in flashChats) chat.collection}, {'flashUserChats', 'flashVendorChats', 'flashPremiumChats', 'flashProviderChats', 'flashStaffChats'});
+    expect({for (final chat in flashChats) chat.callable}, {'flashUserChat', 'flashVendorChat', 'flashPremiumChat', 'flashProviderChat', 'flashStaffChat'});
+    expect({for (final chat in flashChats) chat.route}.length, 5);
+    expect([for (final chat in flashChats) if (chat.officeContact) chat.kind], ['premium']);
   });
 
-  test('no screen opens a chat until the owner says where', () {
-    final outside = Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart') && !f.path.replaceAll('\\', '/').contains('lib/modules/flash/'));
-    for (final file in outside) {
-      expect(file.readAsStringSync().contains('flash/flash_module.dart'), isFalse, reason: file.path);
+  test('every app opens its chat from the floating Help button on its main screen (owner decision, 6 Nov 2026)', () {
+    final uses = {
+      'lib/ui/storefront.dart': 'customerFlashButton',
+      'lib/ui/vendor_home.dart': 'vendorAppFlashButton',
+      'lib/ui/vendor_page.dart': 'vendorAppFlashButton',
+      'lib/ui/provider_page.dart': 'vendorAppFlashButton',
+      'lib/ui/field_home_page.dart': 'staffAppFlashButton',
+    };
+    for (final e in uses.entries) {
+      expect(File(e.key).readAsStringSync().contains(e.value), isTrue, reason: e.key);
     }
+  });
+
+  testWidgets('the Help button: signed out it asks to sign in, never opening a chat', (tester) async {
+    var signIn = 0, opened = 0;
+    final store = Store();
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        floatingActionButton: FlashChatButton(store: store, chooseSetup: () async => flashChats.first, open: (_, _) async => opened++, onSignIn: (_) async => signIn++),
+      ),
+    ));
+    await tester.tap(find.byKey(const ValueKey('flash-chat-button')));
+    await tester.pump();
+    expect(signIn, 1);
+    expect(opened, 0);
+    store.dispose();
+  });
+
+  test('the Support Inbox: Premium vendors first, then the oldest', () {
+    final old = FlashTicket(id: 'user_a', chatId: 'a', category: 'App', text: 'x', kind: 'user', at: DateTime(2026, 11, 1));
+    final newer = FlashTicket(id: 'staff_b', chatId: 'b', category: 'App', text: 'x', kind: 'staff', at: DateTime(2026, 11, 3));
+    final premiumNew = FlashTicket(id: 'premium_c', chatId: 'c', category: 'Payment', text: 'x', kind: 'premium', priority: true, at: DateTime(2026, 11, 5));
+    expect([for (final t in inboxOrder([newer, old, premiumNew])) t.id], ['premium_c', 'user_a', 'staff_b']);
+  });
+
+  testWidgets('the Support Inbox filters by role and answers from one place', (tester) async {
+    sized(tester);
+    final closed = <String>[];
+    final tickets = [
+      FlashTicket(id: 'user_a', chatId: 'a', category: 'App', text: 'how to search', kind: 'user', at: DateTime(2026, 11, 1)),
+      FlashTicket(id: 'premium_c', chatId: 'c', category: 'Payment', text: 'money', kind: 'premium', priority: true, at: DateTime(2026, 11, 5)),
+      FlashTicket(id: 'provider_d', chatId: 'd', category: 'Login', text: 'login', kind: 'provider', at: DateTime(2026, 11, 2)),
+    ];
+    await tester.pumpWidget(page(FlashSupportInboxView(
+      tickets: tickets,
+      roles: {for (final chat in flashChats) chat.kind: chat.adminTitle},
+      triageOf: (_) => Stream.value(null),
+      messagesOf: (_) async => talk,
+      onClose: (id, reply) async => closed.add(id),
+    )));
+    expect(find.text('3 unanswered. Premium vendors first, then the oldest.'), findsOneWidget);
+    expect(find.text('Premium vendors • PRIORITY'), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('flash-ticket-premium_c'))).dy, lessThan(tester.getTopLeft(find.byKey(const ValueKey('flash-ticket-user_a'))).dy));
+    await tester.tap(find.byKey(const ValueKey('flash-inbox-provider')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('flash-ticket-provider_d')), findsOneWidget);
+    expect(find.byKey(const ValueKey('flash-ticket-user_a')), findsNothing);
+    expect(find.text('Services (1)'), findsOneWidget);
+  });
+
+  testWidgets("the Premium chat shows the office's Call and WhatsApp", (tester) async {
+    final opened = <Uri>[];
+    await tester.pumpWidget(page(FlashOfficeContactView(phone: '98765 43210', whatsapp: '', launch: (uri) async => opened.add(uri))));
+    await tester.tap(find.byKey(const ValueKey('flash-office-call')));
+    await tester.tap(find.byKey(const ValueKey('flash-office-whatsapp')));
+    expect(opened.map((u) => u.toString()), ['tel:9876543210', 'https://wa.me/919876543210']);
+    await tester.pumpWidget(page(const FlashOfficeContactView(phone: '', whatsapp: '')));
+    expect(find.byKey(const ValueKey('flash-office')), findsNothing);
   });
 
   test('pending is what came in and is not solved', () {
@@ -141,7 +208,7 @@ void main() {
     expect(find.byKey(const ValueKey('flash-text')), findsNothing);
     expect(find.byKey(const ValueKey('flash-solved')), findsNothing);
     await tester.pumpWidget(page(conversation(status: 'closed', messages: const [...talk, FlashMessage(role: 'admin', text: 'We fixed it.')])));
-    expect(find.text('Local Market team'), findsOneWidget);
+    expect(find.text('LOCAMARKET team'), findsOneWidget);
     expect(find.text('We fixed it.'), findsOneWidget);
     expect(find.byKey(const ValueKey('flash-finished')), findsOneWidget);
   });
@@ -213,10 +280,11 @@ void main() {
     expect(find.text('saved help'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey('flash-limit')), '12');
     await tester.enterText(find.byKey(const ValueKey('flash-help-vendor')), 'vendor help');
-    await tester.ensureVisible(find.byKey(const ValueKey('flash-save')));
+    // The longer form scrolls: the Save button is built once it is near.
+    await tester.scrollUntilVisible(find.byKey(const ValueKey('flash-save')), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.byKey(const ValueKey('flash-save')));
     await tester.pumpAndSettle();
-    expect(saved.single, {'dailyMessages': 12, 'helpUser': 'saved help', 'helpVendor': 'vendor help', 'helpStaff': ''});
+    expect(saved.single, {'dailyMessages': 12, 'helpUser': 'saved help', 'helpVendor': 'vendor help', 'helpStaff': '', 'helpPremium': '', 'helpProvider': '', 'supportPhone': '', 'supportWhatsapp': ''});
   });
 
   testWidgets('a limit that is not a number is not saved', (tester) async {

@@ -74,11 +74,27 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
         builder: (context, mine) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           // Photo 1 (the shop itself) is required before items can be added; it may still be waiting for the admin.
           stream: store.firestore.collection('vendorShopPhotos').doc('${uid}_1').snapshots(),
-          builder: (context, photo) => _card(
-            context,
-            itemCount: mine.data?.size ?? 0,
-            itemLimit: vendorItemLimit(vendor.data?.data()),
-            shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status']),
+          builder: (context, photo) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            // The free number and the running plan's number (Admin > Plans); the server checks the same on every new item.
+            stream: store.firestore.collection('planServiceGates').doc('main').snapshots(),
+            builder: (context, gates) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: store.firestore.collection('vendorPlanStatus').doc(uid).snapshots(),
+              builder: (context, plan) {
+                final endsAt = plan.data?.data()?['endsAt'];
+                return _card(
+                  context,
+                  itemCount: mine.data?.size ?? 0,
+                  itemLimit: vendorItemLimitNow(
+                    vendor.data?.data(),
+                    planGates: gates.data?.data(),
+                    planEndsAt: endsAt is Timestamp ? endsAt.toDate() : null,
+                    planItemLimit: plan.data?.data()?['itemLimit'],
+                    now: DateTime.now(),
+                  ),
+                  shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status']),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -96,7 +112,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
       Text('Items: $itemCount of $itemLimit', key: const ValueKey('vendor-item-count'), style: const TextStyle(fontWeight: FontWeight.bold)),
       if (!shopPhotoReady) Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: error),
       if (full)
-        Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, your limit. Ask the admin for permission to add more.', key: const ValueKey('vendor-item-limit-reached'))
+        Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, all your plan allows. You can change their prices any day; Plans shows the plans with more items.', key: const ValueKey('vendor-item-limit-reached'))
       else if (!open)
         FilledButton.icon(
           key: const ValueKey('vendor-add-another'),

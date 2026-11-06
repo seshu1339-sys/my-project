@@ -18,6 +18,7 @@
 // rightBoxAds record (counted while it is live) instead of an ads one; its totals carry kind 'rightBox' and the box number.
 const {createHash} = require('node:crypto');
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
+const {insideWindow} = require('./ist-time');
 
 const VIEW_GAP_MS = 60 * 1000;
 const TIME_WINDOW_MS = 35 * 60 * 1000;
@@ -60,16 +61,29 @@ function ignoredBecause({userAgent, auth, ad, config, visitorId, staffUids = []}
   return '';
 }
 
+/// Whether the ad is running at [now] by the SERVER's clock: switched on and inside its start / end (a Right Side Ad Box's shop ad: the
+/// box's start / end in settings/rightAdBoxes). An expired or not-yet-started ad never gains views, whatever a phone's clock says.
+function runningNow(ad, rightBox, boxes, now) {
+  if (rightBox) {
+    const n = Number(ad.box);
+    return insideWindow(boxes?.[`box${n}StartsAt`], boxes?.[`box${n}EndsAt`], now);
+  }
+  return ad.active !== false && insideWindow(ad.startsAt, ad.endsAt, now);
+}
+
 /// Applies a batch from one device. [context] = {userAgent, auth, staffUids}. Returns what was counted and what was left out.
 async function recordAdEvents(db, batch, context, now = Date.now()) {
   const result = {views: 0, time: 0, missed: 0, taps: 0, duplicates: 0, ignored: 0, reason: ''};
   const config = (await db.collection('settings').doc('adsConfig').get()).data() || {};
   const day = dayKey(now), tk = townKey(batch.town), device = batch.platform;
+  let boxes = null;
   for (const event of batch.events) {
     const rightBox = event.adId.startsWith('rbox-');
     const adSnap = await db.collection(rightBox ? 'rightBoxAds' : 'ads').doc(event.adId).get();
     const ad = adSnap.data();
     if (!adSnap.exists || (rightBox ? ad.status !== 'live' : ad.status && ad.status !== 'approved')) { result.ignored++; continue; }
+    if (rightBox && boxes === null) boxes = (await db.collection('settings').doc('rightAdBoxes').get()).data() || {};
+    if (!runningNow(ad, rightBox, boxes, now)) { result.ignored++; result.reason = 'not running'; continue; }
     const why = ignoredBecause({userAgent: context.userAgent, auth: context.auth, ad, config, visitorId: batch.visitorId, staffUids: context.staffUids});
     if (why) { result.ignored++; result.reason = why; continue; }
     const key = hash(`${event.adId}|${batch.visitorId}`);
@@ -127,4 +141,4 @@ async function recordAdEvents(db, batch, context, now = Date.now()) {
   return result;
 }
 
-module.exports = {normalizeBatch, ignoredBecause, recordAdEvents, dayKey, townKey, VIEW_GAP_MS};
+module.exports = {normalizeBatch, ignoredBecause, recordAdEvents, runningNow, dayKey, townKey, VIEW_GAP_MS};

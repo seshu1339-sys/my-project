@@ -5,6 +5,7 @@
 // onboarding shape (a status-gated `fieldStaff/{uid}` role doc, a pending-then-
 // approved `fieldSubmissions` queue) but is a fully separate pipeline, reviewed
 // in its own admin section, never merged with vendor moderation.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -115,8 +116,11 @@ async function verifyUploadedPhoto(path, label = 'the item photo') {
 // callable verifies every one of them, validates the shop (only when onboarding
 // a brand-new one) and item details, and queues a 'pending' record. Nothing
 // here touches products/shops directly.
+// CLOSED (owner, 6 Nov 2026): staff no longer send "New entry" items with shop prices; they add Today's Offers with live photos
+// (functions/modules/staff-areas). Reviewing old entries (reviewFieldEntry) keeps working.
 exports.submitFieldEntry = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', "New entry is closed. Add Today's Offers with a live photo from your dashboard.");
   const staff = (await db.collection('fieldStaff').doc(uid).get()).data();
   if (!staff || staff.status !== 'active') throw new HttpsError('permission-denied', 'Your field staff access must be approved before you can submit entries.');
   const {shopId = '', shop, item, submissionId, visitLatitude, visitLongitude, photoCount} = request.data || {};
@@ -191,7 +195,7 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
   for (let i = 0; i < photoPaths.length; i++) {
     const publicPath = `catalog/${productRef.id}_${i + 1}.jpg`;
     await bucket.file(photoPaths[i]).copy(bucket.file(publicPath));
-    imageUrls.push(`https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`);
+    imageUrls.push(publicStorageUrl(bucket.name, publicPath));
   }
   batch.set(productRef, {
     name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product', categoryId: data.item.categoryId || '',

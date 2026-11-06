@@ -1,9 +1,9 @@
 'use strict';
-// Flash AI chat and tickets module. Three separate chats, each with its own endpoint, categories, rules and collection (user/, vendor/,
+// Flash AI chat and tickets module. Five separate chats (customers, free vendors, Premium vendors, service providers, staff), each with its own endpoint, categories, rules and collection (user/, vendor/,
 // staff/). Flash answers first; what it cannot solve becomes a ticket for the admin. Requires no other module; it reads only the documents
 // of the person who is signed in.
 //
-//   flashUserChat | flashVendorChat | flashStaffChat   signed in -> {action: send | solved | unsolved, chatId?, category?, text?}
+//   flashUserChat | flashVendorChat | flashPremiumChat | flashProviderChat | flashStaffChat   signed in -> {action: send | solved | unsolved, chatId?, category?, text?}
 //   closeFlashTicket                                   admin     -> answers the person and closes the ticket
 //   verifyFlashChat                                    admin     -> marks a chat Flash solved as checked
 //   saveFlashConfig                                    admin     -> daily limit and what Flash knows about each app
@@ -15,7 +15,7 @@ const {requireAdminSession} = require('../../admin-session');
 const {anthropic, anthropicKey} = require('../ai-core');
 const {saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket} = require('./store');
 
-const chats = {user: require('./user/chat'), vendor: require('./vendor/chat'), staff: require('./staff/chat')};
+const chats = {user: require('./user/chat'), vendor: require('./vendor/chat'), premium: require('./premium/chat'), provider: require('./provider/chat'), staff: require('./staff/chat')};
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
@@ -45,6 +45,8 @@ const chatEndpoint = chat => onCall({...options, secrets: [anthropicKey], timeou
 exports.flashUserChat = chatEndpoint(chats.user);
 exports.flashVendorChat = chatEndpoint(chats.vendor);
 exports.flashStaffChat = chatEndpoint(chats.staff);
+exports.flashPremiumChat = chatEndpoint(chats.premium);
+exports.flashProviderChat = chatEndpoint(chats.provider);
 exports.closeFlashTicket = onCall(options, async request => {
   const uid = await requireAdmin(request);
   try { return await closeTicket(getFirestore(), chats, uid, request.data || {}); } catch (error) { return fail(error); }

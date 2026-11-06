@@ -35,7 +35,7 @@ class AdminPremiumPage extends StatelessWidget {
           shopName: (id) => store.entries('shops').where((s) => s.id == id).firstOrNull?.text('name') ?? id,
           onSave: _save,
           onDelete: (id) => store.call('deleteWholesaleOffer', {'offerId': id}),
-          onRemoveOffer: (vendorId) => store.call('removeTodaysOffer', {'vendorId': vendorId}),
+          onRemoveOffer: (offerId) => store.call('removeTodaysOffer', {'offerId': offerId}),
         );
       },
     ),

@@ -4,13 +4,13 @@ const {initializeApp, getApps} = require('firebase-admin/app');
 if (!getApps().length) initializeApp({projectId: 'demo-neighbourly'});
 const {Timestamp} = require('firebase-admin/firestore');
 const {validatePlan, validateGates, addMonths, planPeriod} = require('./rules');
-const {savePlan, saveGates, startPurchase, activatePlan} = require('./store');
-const {planAllows, requirePlan} = require('../../plan-gate');
+const {savePlan, saveGates, startPurchase, activatePlan, adminActivatePlan, adminStopPlan} = require('./store');
+const {planAllows, requirePlan, vendorItemLimitNow} = require('../../plan-gate');
 
 const good = (extra = {}) => ({name: '1 Year', price: 4999, durationMonths: 12, ...extra});
 
 test('what the admin may save as a plan is checked', () => {
-  assert.deepEqual(validatePlan(good({name: '  Gold   plan '})), {name: 'Gold plan', price: 4999, durationMonths: 12, active: true});
+  assert.deepEqual(validatePlan(good({name: '  Gold   plan '})), {name: 'Gold plan', tier: 'premium', price: 4999, durationMonths: 12, itemLimit: 10, extraPhotos: 10, radiusKm: 25, offerBoxes: 5, active: true});
   assert.equal(validatePlan(good({active: false})).active, false);
   assert.equal(validatePlan(good({price: 99.5})).price, 99.5);
   assert.throws(() => validatePlan(good({name: 'x'})), /name/);
@@ -20,6 +20,30 @@ test('what the admin may save as a plan is checked', () => {
   assert.throws(() => validatePlan(good({durationMonths: 0})), /duration/);
   assert.throws(() => validatePlan(good({durationMonths: 1.5})), /duration/);
   assert.throws(() => validatePlan(good({durationMonths: 121})), /duration/);
+});
+
+test("a plan allows 10 items unless the admin sets its own number; the free number is the admin's too", () => {
+  assert.equal(validatePlan(good()).itemLimit, 10);
+  assert.equal(validatePlan(good({itemLimit: 25})).itemLimit, 25);
+  assert.throws(() => validatePlan(good({itemLimit: 0})), /items/);
+  assert.throws(() => validatePlan(good({itemLimit: 2.5})), /items/);
+  assert.throws(() => validatePlan(good({itemLimit: 101})), /items/);
+  assert.deepEqual(validateGates({freeItemLimit: 3}), {freeItemLimit: 3});
+  assert.deepEqual(validateGates({freeItemLimit: 0, vendorAds: true}), {vendorAds: true, freeItemLimit: 0});
+  assert.throws(() => validateGates({freeItemLimit: -1}), /free vendor/);
+});
+
+test('Silver, Gold and Premium differ only in extra photos and km, which the admin sets', () => {
+  const silver = validatePlan(good({name: 'Silver', tier: 'silver', extraPhotos: 4, radiusKm: 10}));
+  assert.deepEqual([silver.tier, silver.extraPhotos, silver.radiusKm, silver.offerBoxes], ['silver', 4, 10, 1]);
+  // Today's Offers boxes: Silver 1, Gold 3, Premium 5 unless the admin sets the plan's own number (owner, 7 Nov 2026).
+  assert.equal(validatePlan(good({tier: 'gold'})).offerBoxes, 3);
+  assert.equal(validatePlan(good({tier: 'premium', offerBoxes: 8})).offerBoxes, 8);
+  assert.throws(() => validatePlan(good({offerBoxes: 21})), /Today's Offers boxes/);
+  assert.throws(() => validatePlan(good({offerBoxes: 1.5})), /Today's Offers boxes/);
+  assert.throws(() => validatePlan(good({tier: 'diamond'})), /Silver, Gold or Premium/);
+  assert.throws(() => validatePlan(good({extraPhotos: 31})), /extra photos/);
+  assert.throws(() => validatePlan(good({radiusKm: 0})), /km/);
 });
 
 test('only known services can be gated', () => {
@@ -62,6 +86,20 @@ test('a switched-on gate needs a running plan, and stops when the plan ends', as
   assert.equal(await planAllows(fakeDb({vendorAds: true}, endsAt(now + 1000)), 'v1', 'vendorAds', now), true);
   assert.equal(await planAllows(fakeDb({vendorAds: true}, endsAt(now - 1000)), 'v1', 'vendorAds', now), false);
   await assert.rejects(requirePlan(fakeDb({vendorAds: true}, undefined), 'v1', 'vendorAds', now), /active plan/);
+});
+
+test("the item limit: free 2 (or the admin's free number, or this vendor's own), a running plan's number when bigger", async () => {
+  const now = Date.parse('2027-06-01T00:00:00Z');
+  const plan = (ms, itemLimit) => ({endsAt: Timestamp.fromMillis(ms), itemLimit});
+  assert.equal(await vendorItemLimitNow(fakeDb(undefined, undefined), 'v1', {}, now), 2);
+  assert.equal(await vendorItemLimitNow(fakeDb({freeItemLimit: 3}, undefined), 'v1', {}, now), 3);
+  assert.equal(await vendorItemLimitNow(fakeDb({freeItemLimit: 3}, undefined), 'v1', {itemLimit: 5}, now), 5, 'the admin gave this vendor 5');
+  assert.equal(await vendorItemLimitNow(fakeDb(undefined, plan(now + 1000, 10)), 'v1', {}, now), 10);
+  assert.equal(await vendorItemLimitNow(fakeDb(undefined, plan(now + 1000, undefined)), 'v1', {}, now), 10, 'a plan made before limits');
+  assert.equal(await vendorItemLimitNow(fakeDb(undefined, plan(now - 1000, 10)), 'v1', {}, now), 2, 'the plan ended');
+  assert.equal(await vendorItemLimitNow(fakeDb(undefined, plan(now + 1000, 10)), 'v1', {itemLimit: 20}, now), 20);
+  const broken = {collection: () => ({doc: () => ({get: async () => { throw Error('offline'); }})})};
+  assert.equal(await vendorItemLimitNow(broken, 'v1', {}, now), 2);
 });
 
 test('a failed gate read never stops a service', async () => {
@@ -166,4 +204,60 @@ test('a renewal adds to the running plan; the gate follows the end date', emulat
   assert.equal(renewed.endsAt, Date.parse('2033-03-05T10:00:00+05:30'));
   assert.equal(await planAllows(db, 'v1', 'vendorAds', renewed.endsAt - 1000), true);
   assert.equal(await planAllows(db, 'v1', 'vendorAds', renewed.endsAt + 1000), false);
+});
+
+test('the admin starts a plan by Vendor ID: full duration from now, the item limit and the vendor told', emulator, async () => {
+  const db = await setup();
+  await db.collection('vendors').doc('v1').set({vendorCode: 'VEN-NRPM-116-325'}, {merge: true});
+  const {planId} = await savePlan(db, good({name: 'Premium', price: 2000, durationMonths: 36}), t0);
+  const result = await adminActivatePlan(db, {vendorCode: ' ven-nrpm-116-325 ', planId}, 'admin1', t0);
+  assert.equal(result.uid, 'v1');
+  assert.equal(result.startsAt, t0);
+  assert.equal(result.endsAt, Date.parse('2034-03-05T10:00:00+05:30'));
+  const status = (await db.collection('vendorPlanStatus').doc('v1').get()).data();
+  assert.equal(status.planName, 'Premium');
+  assert.equal(status.itemLimit, 10);
+  assert.equal(status.vendorCode, 'VEN-NRPM-116-325');
+  assert.equal(status.source, 'admin');
+  assert.equal(await vendorItemLimitNow(db, 'v1', {}, t0 + 1000), 10);
+  assert.equal(await planAllows(db, 'v1', 'vendorAds', t0 + 1000), true);
+  const periods = (await db.collection('vendorPlanPeriods').where('uid', '==', 'v1').get()).docs.map(d => d.data());
+  assert.deepEqual(periods.map(p => [p.status, p.source, p.activatedBy]), [['active', 'admin', 'admin1']]);
+  assert.equal((await db.collection('vendorNotices').where('vendorId', '==', 'v1').get()).size, 1);
+  await assert.rejects(adminActivatePlan(db, {uid: 'v2', planId}, 'admin1', t0), /approved/);
+  await assert.rejects(adminActivatePlan(db, {vendorCode: 'VEN-XXXX-000-000', planId}, 'admin1', t0), /No vendor/);
+  await assert.rejects(adminActivatePlan(db, {uid: 'v1', planId: 'nope'}, 'admin1', t0), /not found/);
+});
+
+test('the admin stops a running plan: it ends now, the items limit and the gate follow, the shop stays', emulator, async () => {
+  const db = await setup();
+  await saveGates(db, {vendorAds: true}, t0);
+  const {planId} = await savePlan(db, good(), t0);
+  await adminActivatePlan(db, {uid: 'v1', planId}, 'admin1', t0);
+  await adminActivatePlan(db, {uid: 'v1', planId}, 'admin1', t0 + 1000);
+  const stopAt = t0 + 86400000;
+  await adminStopPlan(db, {uid: 'v1'}, 'admin1', stopAt);
+  assert.equal((await db.collection('vendorPlanStatus').doc('v1').get()).data().endsAt.toMillis(), stopAt);
+  const periods = (await db.collection('vendorPlanPeriods').where('uid', '==', 'v1').get()).docs.map(d => d.data().status);
+  assert.deepEqual(periods, ['stopped', 'stopped'], 'the renewal waiting after it stops too');
+  assert.equal(await planAllows(db, 'v1', 'vendorAds', stopAt + 1), false);
+  assert.equal(await vendorItemLimitNow(db, 'v1', {}, stopAt + 1), 2);
+  assert.equal((await db.collection('shops').doc('v1').get()).data().active, true);
+  await assert.rejects(adminStopPlan(db, {uid: 'v1'}, 'admin1', stopAt + 1), /no running plan/);
+});
+
+test('a plan bought by payment carries its item limit too', emulator, async () => {
+  const db = await setup();
+  const {planId} = await savePlan(db, good({itemLimit: 15}), t0);
+  const {requestId} = await startPurchase(db, 'v1', {planId}, t0);
+  await verified(db, requestId, t0);
+  assert.equal((await db.collection('vendorPlanStatus').doc('v1').get()).data().itemLimit, 15);
+});
+
+test("the plan kind, extra photos and km go onto the vendor's plan status", emulator, async () => {
+  const db = await setup();
+  const {planId} = await savePlan(db, good({name: 'Gold', tier: 'gold', extraPhotos: 6, radiusKm: 15}), t0);
+  await adminActivatePlan(db, {uid: 'v1', planId}, 'admin1', t0);
+  const status = (await db.collection('vendorPlanStatus').doc('v1').get()).data();
+  assert.deepEqual([status.tier, status.extraPhotos, status.radiusKm, status.offerBoxes], ['gold', 6, 15, 3]);
 });

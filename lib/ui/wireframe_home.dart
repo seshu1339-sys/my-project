@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/fresh_strip.dart';
+import '../domain/today_offers.dart' show todayOfferBoxCount;
 import '../domain/towns.dart';
 import '../services/ad_tracker.dart';
 import '../services/search.dart';
@@ -320,7 +322,19 @@ class WireframeHome extends StatelessWidget {
                     );
                     // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
                     // A box with a vendor's shop ad counts its views (only in the customer app, which has the tracker).
-                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town);
+                    // The live ads of the Ads list for this customer (approved, inside their dates by the server's clock, their radius
+                    // and their towns): they fill the boxes that have no photo of their own, and go round in Today's Offers too.
+                    List<Entry> adsAt(DateTime now) => liveAds(
+                      customerAds(store.entries('ads')),
+                      now,
+                      town: store.town,
+                      district: store.district,
+                      state: store.state,
+                      showAll: showAllLocations,
+                      latitude: store.latitude,
+                      longitude: store.longitude,
+                    );
+                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt, store: store);
                     final hasRightBoxes = !android && shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final orderedSectionKeys = [...reorderableHomeSections]
@@ -351,6 +365,11 @@ class WireframeHome extends StatelessWidget {
                         // The 6 boxes of Today's Offers, going through all live offers (home_today_offers.dart).
                         child: TodayOffersSection(
                           store: store,
+                          adsAt: adsAt,
+                          // Owner, 6 Nov 2026: 2 boxes at a time in the Android app, 6 on the website; each paid vendor's box stays the
+                          // admin's seconds (Ads settings, shared with the right-side ad boxes).
+                          visible: android ? 2 : todayOfferBoxCount,
+                          seconds: AdsConfig.from(store.entries('settings')).seconds,
                           empty: offers.isEmpty && (store.hasPlace || offersForTown.hiddenForLocation > 0) ? NoOffersNotice(store: store, onLocation: onLocation) : null,
                           boxes: offers,
                           // Android: two offer cards side by side
@@ -456,7 +475,7 @@ class WireframeHome extends StatelessWidget {
                     Widget androidParts() {
                       final home = AndroidHomeConfig.from(settings);
                       final parts = <String, Widget>{
-                        'ads': Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town)),
+                        'ads': Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt)),
                         'scrollingText': wrapSection('tickerMarquee', notice),
                         'notice': noticeRow,
                         'quickFresh': QuickFreshToday(store: store),

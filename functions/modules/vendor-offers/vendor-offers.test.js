@@ -150,3 +150,26 @@ test('a vendor runs at most the limit of offers, and a finished one does not cou
   await saveOffer(db, bucket, uid, offer({offerId: made[0], title: 'Still fine to edit'}), NOW);
   assert.equal((await saveOffer(db, bucket, uid, offer(), NOW + 8 * DAY_MS)).status, 'live');
 });
+
+test('the nearby alert: on or off (the plan km decides how far); kept on a new offer; an edit of a running offer never asks again', emulated, async () => {
+  assert.equal(validateOffer(good(), 'v1').alert, false);
+  assert.equal(validateOffer(good({alert: true}), 'v1').alert, true);
+  assert.equal(validateOffer(good({alertRadiusKm: 50}), 'v1').alert, true, 'an older app sending 50 km means on');
+  assert.throws(() => validateOffer(good({alert: 'yes'}), 'v1'), /on or off/);
+  const {db, uid, bucket, offer} = await setup();
+  const {offerId} = await saveOffer(db, bucket, uid, offer({alert: true}), NOW);
+  const ref = db.doc(`vendorOffers/${offerId}`);
+  assert.equal((await ref.get()).data().alert, true);
+  await ref.update({alertClaimedAt: Timestamp.fromMillis(NOW), alertStatus: 'sent', alertRadiusKm: 25}); // what the Offer Alerts module writes
+  await saveOffer(db, bucket, uid, offer({offerId, title: 'New name', alert: false, days: undefined}), NOW + 1000);
+  const edited = (await ref.get()).data();
+  assert.equal(edited.alert, true, 'unchanged');
+  assert.equal(edited.alertStatus, 'sent', 'not asked again');
+  // Run again after it ended: a fresh choice, and it may alert again.
+  await saveOffer(db, bucket, uid, offer({offerId, days: 3, alert: true}), NOW + 8 * DAY_MS);
+  const again = (await ref.get()).data();
+  assert.equal(again.alert, true);
+  assert.equal(again.alertRadiusKm, undefined);
+  assert.equal(again.alertClaimedAt, undefined);
+  assert.equal(again.alertStatus, undefined);
+});

@@ -6,6 +6,7 @@ import 'admin_android_home.dart';
 import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
+import 'admin_samples.dart';
 import 'admin_entry_list.dart';
 import 'admin_fresh_strip.dart';
 import 'admin_shops_location.dart';
@@ -43,6 +44,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('androidHome', 'Android App', Icons.phone_android_outlined, 'Android app only: how many ad boxes show at the top, and whether they show'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
+  _SettingsSection('samples', 'Sample data', Icons.science_outlined, 'Records labelled SAMPLE, and the button that deletes them all'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
 ];
@@ -82,6 +84,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminAndroidHomePage(store: widget.store);
       case 'cityCodes':
         return AdminCityCodesPage(store: widget.store);
+      case 'samples':
+        return ScreenView('admin_samples', child: AdminNeedsFirebase(store: widget.store, child: AdminSamplesPage(store: widget.store)));
       case 'rightBoxes':
         return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: widget.store));
       // One record each: the form opens directly, with no list and no "Add new".

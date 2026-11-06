@@ -5,6 +5,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/ads.dart';
 import 'package:ecommerce_app/domain/ads_admin.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
+import 'package:ecommerce_app/domain/ist_time.dart';
 import 'package:ecommerce_app/ui/admin_ads.dart';
 
 final now = DateTime(2026, 10, 26, 10, 30);
@@ -64,10 +65,11 @@ void main() {
       expect(adsEndingSoon([soon, later, done], now).map((a) => a.id), ['1']);
       expect(adDaysLeft(soon, now), 3);
       expect(adDaysLeft(done, now), 0);
-      expect(renewedEnd(soon, now, by: 'week'), '2026-11-04T12:00:00.000');
-      expect(renewedEnd(soon, now, by: 'month'), '2026-11-28T12:00:00.000');
-      expect(renewedEnd(done, now, by: 'week'), '2026-11-02T10:30:00.000', reason: 'an expired ad starts again from now');
-      expect(renewedEnd(ad('4', {'endsAt': '2026-01-31T00:00:00'}), DateTime(2026, 1, 20), by: 'month'), '2026-02-28T00:00:00.000');
+      // Renewals are saved in India time with the zone, so every phone reads the same moment (lib/domain/ist_time.dart).
+      expect(renewedEnd(soon, now, by: 'week'), '2026-11-04T12:00:00+05:30');
+      expect(renewedEnd(soon, now, by: 'month'), '2026-11-28T12:00:00+05:30');
+      expect(renewedEnd(done, now, by: 'week'), istIso(now.add(const Duration(days: 7))), reason: 'an expired ad starts again from now');
+      expect(renewedEnd(ad('4', {'endsAt': '2026-01-31T00:00:00'}), DateTime(2026, 1, 20), by: 'month'), '2026-02-28T00:00:00+05:30');
     });
 
     test('a package fills rounds, seconds and the daily limit; a copy is switched off and goes to the end', () {

@@ -18,6 +18,7 @@ import '../services/usage.dart';
 import 'store_consent.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
+import '../services/server_clock.dart';
 
 // Store's upload methods and vendor/complaint RPC-wrapper methods live in
 // their own extension files (zero call-site change — an extension method
@@ -174,8 +175,9 @@ class Store extends ChangeNotifier {
   List<Entry> entries(String collection) =>
       List<Entry>.from(catalog[collection] ?? [])
         ..sort((a, b) => a.number('order').compareTo(b.number('order')));
+  // Start / end times are decided by the server's clock, never the phone's (lib/services/server_clock.dart).
   List<Entry> visible(String collection) =>
-      entries(collection).where((e) => e.visibleAt(DateTime.now())).toList();
+      entries(collection).where((e) => e.visibleAt(ServerClock.now())).toList();
   /// The town a product is sold in: its own, else its shop's (older products have no town of their own).
   String productTown(Entry product) {
     final own = product.text('town');
@@ -198,8 +200,10 @@ class Store extends ChangeNotifier {
 
   /// Visible products for the customer's chosen town. Services are not products: they live in their own collection
   /// (see [visibleServices]), and a service record that is still in products is never listed here.
-  List<Entry> visibleProducts({bool all = false}) =>
-      _inTown(visible('products').where((e) => e.text('kind') != 'service').toList(), all);
+  List<Entry> visibleProducts({bool all = false}) => _inTown(
+    visible('products').where((e) => e.text('kind') != 'service' && inSearchAt(e, ServerClock.now())).toList(),
+    all,
+  );
 
   /// Visible service listings (the services collection, without the service-type records) for the chosen town.
   List<Entry> visibleServices({bool all = false}) =>

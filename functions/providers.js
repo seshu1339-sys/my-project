@@ -3,6 +3,7 @@
 // two email addresses). A provider registers like a vendor (verified email, location on, admin approval) with a name, mobile number,
 // photo, one service from the admin's list (the service types in the services collection) and their own charge per hour. Once the
 // admin approves, the provider's listing is created in the services collection (never in products), with the photo made public.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -108,7 +109,7 @@ exports.approveProvider = onCall(options, async request => {
   const bucket = getStorage().bucket();
   const publicPath = `catalog/provider_${providerId}.jpg`;
   await bucket.file(data.photoPath).copy(bucket.file(publicPath));
-  const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
+  const imageUrl = publicStorageUrl(bucket.name, publicPath);
   const listingId = `prov-${providerId}`;
   const digits = String(data.phone || '').replace(/[^0-9]/g, '');
   // Applications from before the Provider ID get one now.

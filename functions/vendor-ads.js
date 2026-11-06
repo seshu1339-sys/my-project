@@ -15,6 +15,7 @@ const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore'
 const {requireAdminSession} = require('./admin-session');
 const {OPTIONS, areaFullMessage} = require('./radius');
 const {requirePlan} = require('./plan-gate');
+const {isStorageUrl} = require('./storage-url');
 
 const PLANS = {normal: {rounds: 1, seconds: 5}, silver: {rounds: 2, seconds: 7}, gold: {rounds: 3, seconds: 10}};
 const CONTENT = ['image', 'text', 'imageText'];
@@ -38,7 +39,7 @@ function validateSubmission(data = {}, uid) {
   const imageUrl = text(data.imageUrl, 1000, 'the picture link');
   if (imageUrl) {
     // Only a picture the vendor uploaded to their own folder in this project's storage.
-    const ok = /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/vendorProducts%2F/.test(imageUrl) && imageUrl.includes(`vendorProducts%2F${uid}%2F`);
+    const ok = isStorageUrl(imageUrl) && /\/o\/vendorProducts%2F/.test(imageUrl) && imageUrl.includes(`vendorProducts%2F${uid}%2F`);
     if (!ok) throw Error('Upload the picture again; it has to come from your own uploads.');
   }
   const title = text(data.title, 80, 'the title');

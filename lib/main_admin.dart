@@ -11,12 +11,15 @@ import 'services/firebase_startup.dart';
 import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 
 // A separate entry point so the admin panel compiles into its own web
 // bundle, reachable only at its own build/deploy target, never from the
 // customer app. Build with: flutter build web -t lib/main_admin.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'admin');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');

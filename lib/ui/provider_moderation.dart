@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -6,6 +7,7 @@ import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
 import 'shop_map.dart';
+import '../modules/stafflinks/stafflinks_module.dart' show RegisteredByLine;
 import 'text_prompt_dialog.dart';
 
 /// Admin > Vendors > Service providers: the service-provider applications (a separate kind of account from vendors). The admin sees
@@ -51,7 +53,7 @@ class ProviderModerationPage extends StatelessWidget {
       child: ExpansionTile(
         key: ValueKey('provider-application-${doc.id}'),
         initiallyExpanded: status == 'pending',
-        title: Text('${data['name'] ?? doc.id} • ${data['serviceName'] ?? ''}'),
+        title: SampleTitle('${data['name'] ?? doc.id} • ${data['serviceName'] ?? ''}', id: doc.id, data: data),
         subtitle: Text('₹${data['hourlyRate'] ?? ''} per hour • ${switch (status) { 'pending' => 'Pending approval', 'approved' => 'Approved, live', 'rejected' => 'Rejected', _ => status }}'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -60,6 +62,7 @@ class ProviderModerationPage extends StatelessWidget {
           if ('${data['photoPath'] ?? ''}'.isNotEmpty && status == 'pending') PhotoCheck(store: store, path: '${data['photoPath']}'),
           const SizedBox(height: 8),
           if ('${data['providerCode'] ?? ''}'.isNotEmpty) Text('Provider ID: ${data['providerCode']}'),
+          RegisteredByLine(store: store, accountUid: doc.id, provider: true),
           Text('Mobile: ${data['phone'] ?? ''}'),
           if ('${data['email'] ?? ''}'.isNotEmpty) Text('Email: ${data['email']}'),
           Text('House address: ${data['address'] ?? ''} ${data['pincode'] ?? ''}'),

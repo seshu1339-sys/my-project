@@ -17,6 +17,7 @@ import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import '../modules/services/services_module.dart';
+import '../modules/flash/flash_module.dart' show customerFlashButton;
 import '../services/usage.dart';
 import '../services/strings.dart';
 
@@ -224,6 +225,8 @@ class _StorefrontState extends State<Storefront> {
       final mobile = MediaQuery.sizeOf(context).width < 700;
       return Scaffold(
         appBar: null,
+        // The Help chat (lib/modules/flash); signed out, it opens the account page to sign in first.
+        floatingActionButton: store.live ? customerFlashButton(store, onSignIn: (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountPage(store: store)))) : null,
         bottomNavigationBar: mobile
             ? NavigationBar(
                 selectedIndex: navigationIndex,

@@ -22,20 +22,20 @@ test('vendor shop photos: pending, approve/reject, and 15-day expiry', {skip: !p
   await db.collection('vendors').doc('notApproved').set({vendorId: 'notApproved', name: 'Pending Shop', status: 'payment_required'});
   await db.collection('settings').doc('business').set({});
 
-  // ---- validation and access: default limit (settings/business.vendorPhotoLimit unset) is 3 (photo 1 the shop, 2-3 the vendor's choice)
+  // ---- validation and access: a free vendor has 3 slots (photo 1 the shop, not counted, and 2 extra photos)
   await assert.rejects(() => submit({slot: 4}), /slot from 1 to 3/);
   await assert.rejects(() => submit({slot: 1}, {auth: {uid: 'notApproved', token: {email_verified: true}}}), /approved/);
   await assert.rejects(() => submit({slot: 1}), /Upload the photo/); // nothing uploaded to Storage yet
 
-  // ---- raising vendorPhotoLimit allows a 4th slot, independently of fieldPhotoLimit
-  await db.collection('settings').doc('business').set({vendorPhotoLimit: 4, fieldPhotoLimit: 7}, {merge: true});
+  // ---- a paid plan (6 Nov 2026: the photos follow the plan) allows more extra slots; a photo sent then can still be reviewed after
+  await db.collection('vendorPremium').doc('spV').set({active: true, endsAt: Timestamp.fromMillis(Date.now() + 86400000), extraPhotos: 3});
   await upload('spV', 4);
   const slot4 = await submit({slot: 4});
-  assert.equal(slot4.status, 'pending', 'raising vendorPhotoLimit to 4 allows slot 4');
-  // a photo submitted under a higher limit can still be reviewed after the limit is lowered back
-  await db.collection('settings').doc('business').set({vendorPhotoLimit: 3}, {merge: true});
+  assert.equal(slot4.status, 'pending', 'a plan with 3 extra photos allows slot 4');
+  await db.collection('vendorPremium').doc('spV').delete();
   await review({vendorId: 'spV', slot: 4, approved: true});
-  assert.equal((await db.collection('vendorShopPhotos').doc('spV_4').get()).data().status, 'approved', 'review is not re-gated by a since-lowered limit');
+  assert.equal((await db.collection('vendorShopPhotos').doc('spV_4').get()).data().status, 'approved', 'review is not re-gated after the plan ended');
+  await db.collection('vendorShopPhotos').doc('spV_4').delete();
   await db.collection('settings').doc('business').set({});
 
   // ---- submit slot 1: upload first, then submit

@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -6,12 +7,15 @@ import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/radius.dart';
 import '../domain/catalog.dart';
+import '../domain/ist_time.dart';
 import '../domain/towns.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_reports_page.dart';
 import 'admin_list_labels.dart';
 import 'ads_column.dart';
 import 'color_picker_field.dart';
+import 'ist_date_time_picker.dart';
 import 'shared.dart';
 
 /// The number the Ads section carries everywhere (the old "Advertisement boxes" number); each ad is a sub-number, e.g. 23.2.
@@ -158,14 +162,15 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
   }
 
   Future<void> _renew(Entry ad, String by) async {
-    var end = renewedEnd(ad, DateTime.now(), by: by);
+    final now = ServerClock.now();
+    var end = renewedEnd(ad, now, by: by);
     if (by == 'custom') {
-      final picked = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 30)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 1500)));
+      final picked = await pickIstDateTime(context, initial: now.add(const Duration(days: 30)), helpText: 'Run until (India time)', endOfDay: true);
       if (picked == null) return;
-      end = DateTime(picked.year, picked.month, picked.day, 23, 59).toIso8601String();
+      end = istIso(picked);
     }
     await store.updateFields('ads', ad.id, {'endsAt': end, 'active': true});
-    if (mounted) message(context, 'Renewed: now runs until ${end.substring(0, 10)}.');
+    if (mounted) message(context, 'Renewed: now runs until ${istLabel(parseIstTime(end))}.');
   }
 
   /// Copies the old ad boxes into the unified list (the old ones stay where they are). Switched on as they were.
@@ -194,7 +199,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
   Widget _body(BuildContext context, List<Entry> pendingSubmissions) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
-      final now = DateTime.now();
+      // The server's time decides Live / Scheduled / Expired, as for customers (lib/services/server_clock.dart).
+      final now = ServerClock.now();
       final all = sortedByOrder(store.entries('ads'));
       final shown = status == 'pending' ? <Entry>[] : filterAds(all, now, status: status, query: search.text);
       final adsConfig = AdsConfig.from(store.entries('settings'));
@@ -239,7 +245,7 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
             key: const ValueKey('ads-common-settings'),
             tilePadding: EdgeInsets.zero,
             title: Text('Common settings for all ads  ·  $adsSectionNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Slots, box size, corners, gap, border, shadow, animation, speed, seconds'),
+            subtitle: const Text('Seconds each box shows (also Today\'s Offers), slots, box size, corners, gap, border, shadow, animation, speed'),
             children: [AdsConfigForm(store: store)],
           ),
           const Divider(),
@@ -327,11 +333,12 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
             ],
           ),
         ),
-        title: Text(ad.text('title', ad.text('name', '(no title)'))),
+        title: SampleTitle(ad.text('title', ad.text('name', '(no title)')), id: ad.id, data: ad.data),
         subtitle: Text([
           if (ad.text('shopName').isNotEmpty) ad.text('shopName'),
           if (ad.text('vendorCode').isNotEmpty) ad.text('vendorCode'),
-          if (left != null) st == 'expired' ? 'ended' : '$left day(s) left',
+          if (left != null) st == 'expired' ? 'ended ${istLabel(parseIstTime(ad.text('endsAt')))}' : '$left day(s) left, until ${istLabel(parseIstTime(ad.text('endsAt')))}',
+          if (st == 'scheduled') 'starts ${istLabel(parseIstTime(ad.text('startsAt')))}',
           adPackages[ad.text('package')] ?? 'Normal',
         ].join('  ·  ')),
         trailing: Wrap(
@@ -456,7 +463,7 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
                 _number('gap', 'Gap between boxes', c.gap.round(), suffix: 'px'),
                 _number('borderWidth', 'Border thickness', c.borderWidth.round(), suffix: 'px'),
                 _number('shadow', 'Shadow strength (0–1)', c.shadow),
-                _number('seconds', 'Seconds each ad stays (default)', c.seconds),
+                _number('seconds', "Seconds each box shows before the next one (ads, Today's Offers boxes and right-side boxes)", c.seconds),
                 _number('maxPerArea', 'Maximum ads or offers over the same area (0 = no limit)', c.maxPerArea),
                 _number('animationSpeed', 'Animation speed (1 slow – 10 fast)', c.animationSpeed),
                 SizedBox(
@@ -609,11 +616,12 @@ class _AdEditorPageState extends State<AdEditorPage> {
     }
   }
 
+  /// The start or end: a date and then a time, both India time, saved with the zone (+05:30) so every phone reads the same moment.
   Future<void> _pickDate(String key, {required bool end}) async {
-    final initial = DateTime.tryParse(s(key)) ?? DateTime.now();
-    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: DateTime(2024), lastDate: DateTime(2100));
+    final initial = parseIstTime(s(key)) ?? ServerClock.now();
+    final picked = await pickIstDateTime(context, initial: initial, helpText: end ? 'Ends (India time)' : 'Starts (India time)', endOfDay: end && s(key).isEmpty);
     if (picked == null) return;
-    _set(key, (end ? DateTime(picked.year, picked.month, picked.day, 23, 59) : DateTime(picked.year, picked.month, picked.day)).toIso8601String());
+    _set(key, istIso(picked));
   }
 
   Future<void> _addSlot() async {
@@ -661,8 +669,8 @@ class _AdEditorPageState extends State<AdEditorPage> {
 
   String? _validate() {
     if (s('title').isEmpty && s('imageUrl').isEmpty) return 'Add a title or a picture.';
-    final start = DateTime.tryParse(s('startsAt')), end = DateTime.tryParse(s('endsAt'));
-    if (start != null && end != null && end.isBefore(start)) return 'The end date is before the start date.';
+    final start = parseIstTime(s('startsAt')), end = parseIstTime(s('endsAt'));
+    if (start != null && end != null && !end.isAfter(start)) return 'The end is not after the start.';
     final action = s('tapAction');
     if ((action == 'call' || action == 'whatsapp') && s('tapValue').replaceAll(RegExp(r'[^0-9]'), '').length < 10) return 'Enter a 10-digit phone number for the tap action.';
     if ((action == 'link') && !s('tapValue').startsWith('https://')) return 'A link must start with https://';
@@ -873,13 +881,13 @@ class _AdEditorPageState extends State<AdEditorPage> {
             ],
             if (!audience.contains('customers')) const Text('Places and radius below apply to customers only.', style: TextStyle(fontSize: 12)),
             Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              OutlinedButton.icon(key: const ValueKey('ad-start'), onPressed: () => _pickDate('startsAt', end: false), icon: const Icon(Icons.event), label: Text(s('startsAt').isEmpty ? 'Start date: from now' : 'Start: ${s('startsAt').substring(0, 10)}')),
+              OutlinedButton.icon(key: const ValueKey('ad-start'), onPressed: () => _pickDate('startsAt', end: false), icon: const Icon(Icons.event), label: Text(s('startsAt').isEmpty ? 'Start: from now' : 'Start: ${istLabel(parseIstTime(s('startsAt')))}')),
               if (s('startsAt').isNotEmpty) TextButton(onPressed: () => _set('startsAt', null), child: const Text('Clear')),
-              OutlinedButton.icon(key: const ValueKey('ad-end'), onPressed: () => _pickDate('endsAt', end: true), icon: const Icon(Icons.event_busy), label: Text(s('endsAt').isEmpty ? 'End date: never' : 'End: ${s('endsAt').substring(0, 10)}')),
+              OutlinedButton.icon(key: const ValueKey('ad-end'), onPressed: () => _pickDate('endsAt', end: true), icon: const Icon(Icons.event_busy), label: Text(s('endsAt').isEmpty ? 'End: never' : 'End: ${istLabel(parseIstTime(s('endsAt')))}')),
               if (s('endsAt').isNotEmpty) TextButton(onPressed: () => _set('endsAt', null), child: const Text('Clear')),
               if (widget.ad != null) ...[
-                TextButton(key: const ValueKey('ad-renew-week'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), DateTime.now(), by: 'week')), child: const Text('Renew +1 week')),
-                TextButton(key: const ValueKey('ad-renew-month'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), DateTime.now(), by: 'month')), child: const Text('Renew +1 month')),
+                TextButton(key: const ValueKey('ad-renew-week'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), ServerClock.now(), by: 'week')), child: const Text('Renew +1 week')),
+                TextButton(key: const ValueKey('ad-renew-month'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), ServerClock.now(), by: 'month')), child: const Text('Renew +1 month')),
               ],
             ]),
             Text(_label('Days of the week', days.length == 7 ? 'every day' : days.map((d) => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]).join(', ')), style: const TextStyle(fontWeight: FontWeight.w600)),

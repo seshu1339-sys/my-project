@@ -2,9 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// One of the three separate chats: its own box, categories, collection and server endpoint.
 class FlashChatSetup {
-  const FlashChatSetup({required this.kind, required this.title, required this.collection, required this.callable, required this.route, required this.categories, required this.adminTitle});
+  const FlashChatSetup({required this.kind, required this.title, required this.collection, required this.callable, required this.route, required this.categories, required this.adminTitle, this.officeContact = false});
   final String kind, title, collection, callable, route, adminTitle;
   final List<String> categories;
+  // Shows the office's phone and WhatsApp on the chat page (the Premium vendors' chat).
+  final bool officeContact;
 }
 
 class FlashMessage {
@@ -41,7 +43,7 @@ class FlashChat {
 }
 
 class FlashTicket {
-  const FlashTicket({required this.id, required this.chatId, required this.category, required this.text, this.who = '', this.email = '', this.summary = '', this.reason = '', this.at});
+  const FlashTicket({required this.id, required this.chatId, required this.category, required this.text, this.who = '', this.email = '', this.summary = '', this.reason = '', this.at, this.kind = '', this.priority = false});
 
   factory FlashTicket.fromData(String id, Map<String, dynamic> data) => FlashTicket(
     id: id,
@@ -53,10 +55,15 @@ class FlashTicket {
     summary: data['summary']?.toString() ?? '',
     reason: data['reason']?.toString() ?? '',
     at: (data['createdAt'] as Timestamp?)?.toDate(),
+    kind: data['kind']?.toString() ?? '',
+    priority: data['priority'] == true,
   );
 
   final String id, chatId, category, text, who, email, summary, reason;
   final DateTime? at;
+  // Which chat it came from (user, vendor, premium, provider, staff); Premium vendors' tickets have priority.
+  final String kind;
+  final bool priority;
 
   String get reasonLabel => switch (reason) {
     'person' => 'The person said Flash did not solve it',
@@ -94,17 +101,30 @@ class FlashCounts {
 }
 
 class FlashConfig {
-  const FlashConfig({this.dailyMessages = 30, this.helpUser = '', this.helpVendor = '', this.helpStaff = ''});
+  const FlashConfig({
+    this.dailyMessages = 30,
+    this.helpUser = '',
+    this.helpVendor = '',
+    this.helpStaff = '',
+    this.helpPremium = '',
+    this.helpProvider = '',
+    this.supportPhone = '',
+    this.supportWhatsapp = '',
+  });
 
   factory FlashConfig.fromData(Map<String, dynamic>? data) => FlashConfig(
     dailyMessages: (data?['dailyMessages'] as num?)?.toInt() ?? 30,
     helpUser: data?['helpUser']?.toString() ?? '',
     helpVendor: data?['helpVendor']?.toString() ?? '',
     helpStaff: data?['helpStaff']?.toString() ?? '',
+    helpPremium: data?['helpPremium']?.toString() ?? '',
+    helpProvider: data?['helpProvider']?.toString() ?? '',
+    supportPhone: data?['supportPhone']?.toString() ?? '',
+    supportWhatsapp: data?['supportWhatsapp']?.toString() ?? '',
   );
 
   final int dailyMessages;
-  final String helpUser, helpVendor, helpStaff;
+  final String helpUser, helpVendor, helpStaff, helpPremium, helpProvider, supportPhone, supportWhatsapp;
 }
 
 /// A time as the apps show it: 02/11/2026 14:05.

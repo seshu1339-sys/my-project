@@ -127,72 +127,79 @@ void main() {
   });
 
   group('the vendor screen', () {
-    Future<void> openForm(WidgetTester tester, void Function(OfferFormResult) sent) async {
+    const items = [
+      OfferItemChoice(id: 'p1', name: 'Tomato', photoUrl: 'https://example.com/t.webp', price: 40),
+      OfferItemChoice(id: 'p2', name: 'Onion', photoUrl: 'https://example.com/o.webp'),
+    ];
+    Future<void> openForm(WidgetTester tester, Future<void> Function(OfferFormResult) sent, {int boxes = 3, List<RunningOffer> offers = const []}) async {
       setSize(tester, const Size(1000, 1400));
-      await tester.pumpWidget(page(TodaysOfferPanel(
-        offer: null,
-        hourOptions: todaysOfferHours,
-        pickPhoto: () async => OfferPhoto(null, pixel),
-        onSubmit: (result) async => sent(result),
-      )));
-      await tester.tap(find.byKey(const ValueKey('todays-offer-create')));
+      await tester.pumpWidget(page(TodaysOfferPanel(offers: offers, boxes: boxes, items: items, dayOptions: todaysOfferDays, onSubmit: sent)));
+      await tester.tap(find.byKey(const ValueKey('todays-offer-fill-1')));
       await tester.pumpAndSettle();
     }
 
-    testWidgets('the form takes only a photo, a price and 24 or 48 hours, and each is needed', (tester) async {
+    testWidgets('the plan decides the number of boxes; each empty box says so', (tester) async {
+      setSize(tester, const Size(1000, 1400));
+      await tester.pumpWidget(page(TodaysOfferPanel(offers: const [], boxes: 3, items: items, dayOptions: todaysOfferDays, onSubmit: (_) async {})));
+      expect(find.text("Your plan gives 3 Today's Offers boxes. Customers within your plan's km see them."), findsOneWidget);
+      for (final slot in [1, 2, 3]) expect(find.byKey(ValueKey('todays-offer-empty-$slot')), findsOneWidget);
+      expect(find.byKey(const ValueKey('todays-offer-box-4')), findsNothing);
+    });
+
+    testWidgets('the form takes an item, a price and 1 week to 3 months, and each is needed', (tester) async {
       OfferFormResult? sent;
-      await openForm(tester, (r) => sent = r);
+      await openForm(tester, (r) async => sent = r);
       expect(find.byType(TextFormField), findsOneWidget, reason: 'the price is the only typed field');
-      expect(find.text('24 hours'), findsOneWidget);
-      expect(find.text('48 hours'), findsOneWidget);
+      for (final words in ['1 week', '1 month', '2 months', '3 months']) expect(find.text(words), findsOneWidget, reason: words);
       await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
       await tester.pump();
       expect(find.text('Enter a price above 0'), findsOneWidget);
-      expect(find.text('Add a photo of the item'), findsOneWidget);
-      await tester.enterText(find.byKey(const ValueKey('todays-offer-price')), '99.5');
-      await tester.tap(find.byKey(const ValueKey('todays-offer-photo')));
-      await tester.pumpAndSettle();
+      expect(find.text('Choose an item'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('todays-offer-item-p1')));
+      await tester.pump();
+      expect(tester.widget<TextFormField>(find.byKey(const ValueKey('todays-offer-price'))).controller!.text, '40', reason: 'the item price is offered to start from');
+      await tester.enterText(find.byKey(const ValueKey('todays-offer-price')), '35.5');
       await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
       await tester.pump();
-      expect(find.text('Choose how long the offer runs'), findsOneWidget, reason: 'no time is chosen for the vendor');
-      await tester.tap(find.byKey(const ValueKey('todays-offer-hours-48')));
+      expect(find.text('Choose how long it shows'), findsOneWidget, reason: 'no time is chosen for the vendor');
+      await tester.tap(find.byKey(const ValueKey('todays-offer-days-60')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
       await tester.pumpAndSettle();
-      expect(sent?.price, 99.5);
-      expect(sent?.hours, 48);
+      expect([sent?.productId, sent?.price, sent?.days, sent?.slot], ['p1', 35.5, 60, 1]);
       expect(find.text('Your offer is live'), findsOneWidget);
     });
 
     testWidgets('a refused offer shows the server\'s reason', (tester) async {
-      setSize(tester, const Size(1000, 1400));
-      await tester.pumpWidget(page(TodaysOfferPanel(
-        offer: null,
-        hourOptions: todaysOfferHours,
-        pickPhoto: () async => OfferPhoto(null, pixel),
-        onSubmit: (_) async => throw StateError('needs an active plan'),
-      )));
-      await tester.tap(find.byKey(const ValueKey('todays-offer-create')));
-      await tester.pumpAndSettle();
+      await openForm(tester, (_) async => throw StateError('needs a Silver, Gold or Premium plan'));
       await tester.enterText(find.byKey(const ValueKey('todays-offer-price')), '99');
-      await tester.tap(find.byKey(const ValueKey('todays-offer-photo')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('todays-offer-hours-24')));
+      await tester.tap(find.byKey(const ValueKey('todays-offer-item-p2')));
+      await tester.tap(find.byKey(const ValueKey('todays-offer-days-7')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('needs an active plan'), findsOneWidget);
+      expect(find.textContaining('needs a Silver, Gold or Premium plan'), findsOneWidget);
     });
 
-    testWidgets('a running offer shows its price and end, with Replace', (tester) async {
+    testWidgets('a running box shows LIVE in its colour, the item, price and end, with Change and Remove', (tester) async {
+      final removed = <int>[];
       await tester.pumpWidget(page(TodaysOfferPanel(
-        offer: RunningOffer(photoUrl: 'https://example.com/a.webp', price: 99, endsAt: DateTime(2026, 11, 3, 9, 5)),
-        hourOptions: todaysOfferHours,
+        offers: [RunningOffer(photoUrl: 'https://example.com/a.webp', price: 99, endsAt: DateTime(2026, 12, 3, 9, 5), slot: 2, productId: 'p1', name: 'Tomato', days: 30)],
+        boxes: 2,
+        items: items,
+        dayOptions: todaysOfferDays,
         onSubmit: (_) async {},
+        onRemove: (slot) async => removed.add(slot),
       )));
+      expect(find.byKey(const ValueKey('todays-offer-empty-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('todays-offer-live-2')), findsOneWidget);
+      expect(find.text('Tomato'), findsOneWidget);
       expect(find.text('₹99'), findsOneWidget);
-      expect(find.text('Live until 3/11/2026 09:05'), findsOneWidget);
-      expect(find.text('Replace'), findsOneWidget);
+      expect(find.text('Shows until 3/12/2026'), findsOneWidget);
+      expect(find.text('Change'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('todays-offer-remove-2')));
+      await tester.pumpAndSettle();
+      expect(removed, [2]);
     });
 
     testWidgets('the large box fills the screen below the offer box, down to the bottom', (tester) async {

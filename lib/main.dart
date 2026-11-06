@@ -13,6 +13,7 @@ import 'ui/storefront.dart';
 import 'ui/details.dart';
 import 'ui/admin_auth.dart';
 import 'domain/catalog.dart';
+import 'ui/shop_route_map.dart' show ShopStop, showShopRoute;
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/usage_start.dart';
@@ -20,6 +21,7 @@ import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/push_opens.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 import 'services/admin_route.dart';
 import 'services/location.dart';
 import 'services/location_town.dart';
@@ -31,6 +33,8 @@ final _messenger = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: kIsWeb && isAdminRoute ? 'admin' : 'customer');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -155,6 +159,11 @@ Future<void> _refreshLocationOnOpen(Store store) async {
 Future<void> _openAlert(Store store, RemoteMessage message) async {
   // Counted for the admin's push centre: which notification (or which kind) was opened.
   unawaited(reportPushOpen(nid: message.data['nid'], type: message.data['type'], title: message.notification?.title ?? ''));
+  // A vendor's nearby offer (functions/modules/offer-alerts): the shop, its photo, phone and the route.
+  if (message.data['type'] == 'shopOffer' && message.data['shopId'] is String) {
+    await _openShopRoute(store, message.data['shopId'] as String);
+    return;
+  }
   final id = message.data['productId'];
   if (id == null) {
     _navigator.currentState?.popUntil((route) => route.isFirst);
@@ -179,6 +188,17 @@ Future<void> _openAlert(Store store, RemoteMessage message) async {
   }
 }
 
+Future<void> _openShopRoute(Store store, String shopId) async {
+  try {
+    final doc = await store.firestore.collection('shops').doc(shopId).get();
+    final context = _navigator.currentContext;
+    if (context == null || !context.mounted) return;
+    await showShopRoute(context, ShopStop.shop(doc.exists ? Entry(doc.id, doc.data()!) : null, shopId: shopId));
+  } catch (_) {
+    _messenger.currentState?.showSnackBar(const SnackBar(content: Text('Could not open this shop. Please try searching for it.')));
+  }
+}
+
 class MarketApp extends StatelessWidget {
   const MarketApp({super.key, required this.store});
   final Store store;
@@ -189,7 +209,7 @@ class MarketApp extends StatelessWidget {
       navigatorKey: _navigator,
       scaffoldMessengerKey: _messenger,
       debugShowCheckedModeBanner: false,
-      title: 'Local Market • Everyday shopping made easy',
+      title: 'LOCAMARKET • Everyday shopping made easy',
       locale: AppLocale.fromCode(store.language),
       supportedLocales: AppLocale.enabled(
         store.business.text('enabledLanguages'),

@@ -52,6 +52,9 @@ void main() {
           )
           .first,
     );
+    // The category form has the "Own photo required" switch too: scroll the form to its end so Save is fully in view.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -2000));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

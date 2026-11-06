@@ -1,5 +1,5 @@
 'use strict';
-// The users' chat: its own categories, rules and data. A service provider is treated as a user here. Each fact is read with this person's
+// The users' chat: its own categories, rules and data. Service providers have their own chat (provider/chat.js). Each fact is read with this person's
 // uid from the server, and only what the chosen category needs. Only offers are public; everything else is the person's own.
 const {Timestamp} = require('firebase-admin/firestore');
 const {dateText} = require('../rules');
@@ -31,12 +31,24 @@ async function offerFacts(db, now) {
   };
 }
 
+/// The services customers can choose (the admin's list) and how many providers are live in each.
+async function serviceFacts(db) {
+  const found = await db.collection('services').where('active', '==', true).limit(500).get();
+  const types = new Map(), providers = new Map();
+  for (const doc of found.docs) {
+    const s = doc.data();
+    if (s.kind === 'serviceType') types.set(s.typeId || doc.id, s.name);
+    else if (s.kind === 'service') providers.set(s.typeId, (providers.get(s.typeId) || 0) + 1);
+  }
+  return {services: [...types].map(([id, name]) => ({service: name, providersLive: providers.get(id) || 0})), howTo: 'Tap Services, choose the service, see the providers near you with photo, charge per hour and distance, and tap Call.'};
+}
+
 module.exports = {
   kind: 'user',
   collection: 'flashUserChats',
-  categories: ['Orders', 'Offers', 'App', 'Other'],
+  categories: ['Search & shops', 'Offers', 'Services', 'App', 'Orders', 'Other'],
   helpField: 'helpUser',
-  rules: 'You are talking with a customer. Help with their own orders, the offers in the app and using the app. Order status comes only from FACTS. A refund, a cancellation or a problem with a delivered item needs the team.',
+  rules: 'You are talking with a customer. Help with searching for items and finding the cheapest shop near them, the offers in the app, finding services such as a plumber, and using the app. Customers buy at the shop in person; there is no online payment for them. Order status, when asked about an older order, comes only from FACTS. A complaint about a shop, a refund or a wrong price needs the team.',
 
   /// Any signed-in person may use this chat.
   allowed: async () => true,
@@ -44,6 +56,7 @@ module.exports = {
   facts: async (db, uid, category, now) => {
     if (category === 'Orders') return orderFacts(db, uid);
     if (category === 'Offers') return offerFacts(db, now);
+    if (category === 'Services') return serviceFacts(db);
     return {};
   },
 };

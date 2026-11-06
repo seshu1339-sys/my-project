@@ -8,6 +8,7 @@ import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/right_boxes.dart' show rightBoxPlaceholder;
 import '../services/ad_tracker.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_visibility.dart';
 
@@ -47,7 +48,8 @@ class _AppBottomAdState extends State<AppBottomAd> {
   String? viewedId;
   DateTime? viewedAt;
 
-  DateTime get now => (widget.now ?? DateTime.now)();
+  // The server's time, never the phone's: an ad leaves the box exactly when it ends (lib/services/server_clock.dart).
+  DateTime get now => (widget.now ?? ServerClock.now)();
   AdsTracker? get tracker => widget.tracker ?? AdsTracker.instance;
 
   String get shopCategory {

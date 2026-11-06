@@ -2,12 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
+import '../modules/photolimits/photolimits_module.dart' show PhotoAllowance;
+
 import '../data/store.dart';
 import 'vendor_section_kit.dart';
 
 /// Shop photos: up to the admin's limit per vendor, each held for review. This section only needs the store and the vendor id.
 class VendorShopPhotosSection extends StatefulWidget {
-  const VendorShopPhotosSection({super.key, required this.store, required this.uid});
+  const VendorShopPhotosSection({super.key, required this.store, required this.uid, this.allowance});
+  // The vendor's extra photos (lib/modules/photolimits); null while loading.
+  final PhotoAllowance? allowance;
   final Store store;
   final String uid;
   @override
@@ -25,11 +29,12 @@ class _VendorShopPhotosSectionState extends State<VendorShopPhotosSection> with 
       final bySlot = <int, Map<String, dynamic>>{
         for (final doc in snapshot.data?.docs ?? const []) (doc.data()['slot'] as num).toInt(): doc.data(),
       };
-      // Admin-configurable (settings/business.vendorPhotoLimit), default 3: photo 1 is the shop (required), 2-3 the vendor's choice.
-      final limit = store.business.number('vendorPhotoLimit', 3).round().clamp(1, 9);
+      // Photo 1 is the shop (required, never counted); then one slot per extra photo of the vendor's plan (free 2, paid the plan's
+      // number), shared with own item photos (lib/modules/photolimits). Until it loads, the free plan's 3 slots.
+      final limit = (widget.allowance?.shopSlots ?? 3).clamp(1, 31);
       return vendorCard('Shop photos', [
         Wrap(spacing: 16, runSpacing: 12, children: [for (var slot = 1; slot <= limit; slot++) _slot(slot, bySlot[slot])]),
-      ], note: 'Photo 1 must be a photo of your shop: it is required before you can add items. ${limit > 1 ? 'The other ${limit == 2 ? 'photo is' : 'photos are'} your choice. ' : ''}Each stays pending until the administrator approves it, and is hidden from customers until then.');
+      ], note: 'Photo 1 is your profile photo: your shop with its name board, or you, the owner. It is required before you can add items and is not counted. ${limit > 1 ? 'The other ${limit == 2 ? 'photo is' : 'photos are'} your extra photos${widget.allowance == null ? '' : ' (${widget.allowance!.used} of ${widget.allowance!.extras} used, with your own item photos)'}. ' : ''}A new photo replaces the old one. Each stays pending until the administrator approves it, and is hidden from customers until then.');
     },
   );
 

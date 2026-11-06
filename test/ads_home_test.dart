@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
-import 'package:ecommerce_app/ui/ad_box.dart';
 import 'package:ecommerce_app/ui/ads_column.dart';
 
 Entry _ad(String id, int order) => Entry(id, {'title': 'Ad $id', 'contentType': 'text', 'backgroundColor': '#FFEEAA', 'order': order});
@@ -29,7 +28,7 @@ void main() {
       await tester.pump();
       expect(find.byType(AdsColumn), findsNothing, reason: 'width $width');
       expect(find.byType(AdsPager), findsNothing, reason: 'width $width');
-      expect(find.byType(AdBox), findsNothing, reason: 'width $width');
+      // Live ads now appear inside the Right Side Ad Boxes and Today's Offers (as AdBox), never in the old column or pager.
       expect(find.byKey(const ValueKey('open-offers-ads')), findsNothing, reason: 'customers see only the photo boxes');
       await tester.pumpWidget(const SizedBox());
       store.dispose();

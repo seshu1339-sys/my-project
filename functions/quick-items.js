@@ -4,6 +4,7 @@
 // Every item waits as 'pending' for the admin; only an approved item is public, and only between
 // startsAt and expiresAt (the clock starts at the later of approval and the requested start).
 // Expired items are hidden, never deleted. All writes go through these callables.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
@@ -45,8 +46,13 @@ async function nextCode(kind, prefix) {
 /// (ST001.. / VN001..) and a password-reset link to set their own password -- no password is ever
 /// chosen or shared by the admin. A vendor's shop location is NOT typed in: the vendor takes GPS
 /// at the shop (setQuickShopLocation) and the nearest town and pincode are found automatically.
+// CLOSED (owner, 6 Nov 2026): Quick Add is closed on the server. Making accounts, shop locations and items is refused; the admin's
+// calls for what already exists (update, switch off, cancel, review, expiry) keep working.
+const QUICK_CLOSED = "Quick Add is closed. Vendors register and add their own items in the vendor app; staff add Today's Offers with live photos.";
+
 exports.createQuickAccount = onCall(options, async request => {
   await requireAdmin(request);
+  throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const {role, name, phone, email, photoUrl = '', shopName = ''} = request.data || {};
   if (!['staff', 'vendor'].includes(role)) throw new HttpsError('invalid-argument', 'Choose Staff or Vendor.');
   const cleanName = clean(name, 100), cleanPhone = clean(phone, 20), cleanEmail = clean(email, 200).toLowerCase();
@@ -128,6 +134,7 @@ const placeFields = place => ({locationId: '', locationName: place.town, locatio
 /// and are then locked for good (only the admin can unlock it).
 exports.setQuickShopLocation = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   if (account.role !== 'vendor') throw new HttpsError('permission-denied', 'Only vendors have a shop location.');
   if (account.shopLocked === true) throw new HttpsError('failed-precondition', 'Your shop location is already set and cannot be changed. Contact admin.');
@@ -190,6 +197,7 @@ async function categoryFor(categoryId) {
 /// for the admin. Only a NEW item counts toward the daily limit. A vendor must be at their shop.
 exports.saveQuickItem = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const {itemId, submissionId} = request.data || {};
@@ -237,6 +245,7 @@ async function createItems(uid, account, items, now) {
 /// vendor's GPS is checked once for the whole batch. Everything or nothing is saved.
 exports.saveQuickItems = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const list = request.data?.items;
@@ -269,6 +278,7 @@ exports.saveQuickItems = onCall(options, async request => {
 /// Show an expired / cancelled / rejected item again: new start and duration, back to the admin.
 exports.reactivateQuickItem = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const ref = db.collection('quickItems').doc(String(request.data?.itemId || ''));
@@ -318,7 +328,7 @@ exports.reviewQuickItems = onCall({...options, timeoutSeconds: 120}, async reque
     const window = approvedWindow(now, item.requestedStartAt.toMillis(), item.durationMs);
     const publicPath = `catalog/quick_${id}.jpg`;
     await bucket.file(item.photoPath).copy(bucket.file(publicPath));
-    const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
+    const imageUrl = publicStorageUrl(bucket.name, publicPath);
     await ref.update({
       status: 'approved', imageUrl, startsAt: Timestamp.fromMillis(window.startsAtMs), expiresAt: Timestamp.fromMillis(window.expiresAtMs),
       approvedAt: Timestamp.fromMillis(now), decisionReason: clean(reason, 500), decidedAt: FieldValue.serverTimestamp(), decidedBy: request.auth.uid, updatedAt: FieldValue.serverTimestamp(),

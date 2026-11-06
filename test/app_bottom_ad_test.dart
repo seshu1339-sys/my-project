@@ -30,7 +30,7 @@ void main() {
     expect([for (final a in customerAds([ad('c', {}), ad('v', {'audience': 'vendors'}), ad('cv', {'audience': 'customers,vendors'})])) a.id], ['c', 'cv']);
   });
 
-  test('vendor ads reach every vendor, or only the chosen shop categories (any spelling case); staff ads reach staff', () {
+  test('vendor ads reach every vendor, or only the chosen shop categories (any spelling case); the staff app shows every live ad', () {
     final ads = [
       ad('all-vendors', {'audience': 'vendors'}),
       ad('grocery', {'audience': 'vendors', 'categories': 'grocery, Bakery'}),
@@ -40,7 +40,7 @@ void main() {
     ];
     expect([for (final a in appAds(ads, now, shopCategory: ' Grocery ')) a.id], ['all-vendors', 'grocery']);
     expect([for (final a in appAds(ads, now, shopCategory: 'Dairy')) a.id], ['all-vendors']);
-    expect([for (final a in appAds(ads, now, staff: true)) a.id], ['staff']);
+    expect([for (final a in appAds(ads, now, staff: true)) a.id], ['all-vendors', 'grocery', 'staff', 'customers'], reason: 'owner, 6 Nov 2026: all ads to all staff; never an ended one');
   });
 
   test('the admin switch for vendors seeing their views is on unless turned off', () {
@@ -68,13 +68,13 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('the staff app box takes turns between the staff ads, each for its seconds', (tester) async {
-    final s = await store([ad('s1', {'audience': 'staff', 'seconds': 3, 'order': 1}), ad('s2', {'audience': 'staff', 'seconds': 3, 'order': 2}), ad('v', {'audience': 'vendors'})]);
+  testWidgets('the staff app box takes turns between all the ads, each for its seconds', (tester) async {
+    final s = await store([ad('s1', {'audience': 'staff', 'seconds': 3, 'order': 1}), ad('s2', {'audience': 'vendors', 'seconds': 3, 'order': 2}), ad('ended', {'audience': 'staff', 'endsAt': '2026-11-01T00:00:00', 'order': 3})]);
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: AppBottomAd(store: s, staff: true, now: () => now))));
     expect(find.byKey(const ValueKey('app-bottom-ad-s1')), findsOneWidget);
     await tester.pump(const Duration(seconds: 3));
     expect(find.byKey(const ValueKey('app-bottom-ad-s2')), findsOneWidget);
-    expect(find.byKey(const ValueKey('app-bottom-ad-v')), findsNothing);
+    expect(find.byKey(const ValueKey('app-bottom-ad-ended')), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 

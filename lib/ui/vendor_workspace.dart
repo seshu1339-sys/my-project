@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/offers/offers_module.dart';
+import '../modules/photolimits/photolimits_module.dart';
+import '../modules/showcase/showcase_module.dart';
 import 'my_numbers_card.dart';
-import 'quick_add.dart';
 import 'vendor_ads_page.dart';
 import 'vendor_plans_payment.dart';
 import 'vendor_premium_entry.dart';
@@ -43,21 +44,28 @@ class VendorWorkspace extends StatelessWidget {
     ),
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
-    QuickAddHome(store: store),
     const SizedBox(height: 12),
     // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).
     MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
     const SizedBox(height: 20),
     VendorPremiumEntry(store: store, uid: uid),
+    // Paid vendors: their right-side ad box photo and reach (lib/modules/showcase).
+    VendorShowcaseSection(store: store, uid: uid),
     VendorPlansWithPayment(store: store, uid: uid),
     VendorOffersSection(store: store, uid: uid),
-    VendorShopPhotosSection(store: store, uid: uid),
-    VendorShopAdSection(store: store, uid: uid),
+    // The shop photo slots follow the vendor's extra photos (free 2, or the paid plan's number).
+    StreamBuilder<PhotoAllowance>(
+      stream: watchPhotoAllowance(store, uid),
+      builder: (context, allowance) => VendorShopPhotosSection(store: store, uid: uid, allowance: allowance.data),
+    ),
+    VendorShopAdSection(store: store, uid: uid, uploadPhotoPage: (_) => VendorAdEditor(store: store, uid: uid)),
     VendorMyAdsCard(store: store, uid: uid),
     const SizedBox(height: 20),
     VendorAddProductSection(store: store, uid: uid),
     // The vendor's own shop's products (including ones the office added for the shop), not only the ones the vendor submitted itself.
     VendorMyProductsSection(store: store, uid: uid),
+    // Our standard photo or the vendor's own, per item (lib/modules/photolimits).
+    ItemPhotosSection(store: store, uid: uid),
     VendorChangeRequestSection(store: store, uid: uid),
     VendorVerifyPurchaseSection(store: store),
     VendorExclusivesSection(store: store, uid: uid),

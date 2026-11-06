@@ -1,7 +1,18 @@
 import 'catalog.dart';
+import 'ist_time.dart';
 
 // Vendor spec section 8: the customer searches an item by name and chooses it; every shop in their town selling it shows on a map
 // (the shop's small photo and its price on each pin) and in a list from the lowest price up (photo, name, price, distance).
+
+/// Whether a vendor set this product's price today (India date, by [now], normally the server's clock): the customer list shows
+/// "Updated today" next to it. A price older than 24 hours is never shown at all (vendor-prices.js expires it), so a price without the
+/// tag is from yesterday. Products without priceSetAt (the admin's own) never carry the tag.
+bool priceUpdatedToday(Entry product, DateTime now) {
+  final set = DateTime.tryParse(product.text('priceSetAt'));
+  if (set == null) return false;
+  final a = istWallClock(set), b = istWallClock(now);
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
 
 /// An item name as compared: "  Tomato " and "tomato" are the same item.
 String itemNameKey(String name) => name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -18,15 +29,17 @@ class ItemChoice {
   final double lowest;
 }
 
-/// The items whose name has every word the customer typed, one per item, the ones starting with the words first, then the ones most
-/// shops sell. Only items with a price (a vendor's price runs out after 24 hours) count.
-List<ItemChoice> itemChoices(List<Entry> products, String query, {String pincode = '', int max = 8}) {
+/// The items whose name (or category name, [categoryNames] by category id) has every word the customer typed, one per item, the ones
+/// starting with the words first, then the ones most shops sell. Searching "sarees" offers every saree item. Only items with a price
+/// (a vendor's price runs out after 24 hours) count.
+List<ItemChoice> itemChoices(List<Entry> products, String query, {String pincode = '', int max = 8, Map<String, String> categoryNames = const {}}) {
   final words = itemNameKey(query).split(' ').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return const [];
   final groups = <String, List<Entry>>{};
   for (final p in products) {
     final key = itemNameKey(p.text('name'));
-    if (key.isEmpty || p.price(pincode) <= 0 || !words.every(key.contains)) continue;
+    final category = itemNameKey(categoryNames[p.text('categoryId')] ?? '');
+    if (key.isEmpty || p.price(pincode) <= 0 || !words.every((w) => key.contains(w) || category.contains(w))) continue;
     groups.putIfAbsent(key, () => []).add(p);
   }
   final choices = [

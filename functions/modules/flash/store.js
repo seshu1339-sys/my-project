@@ -2,13 +2,14 @@
 // What Flash reads and writes. The three chats run through the same steps, each with its own definition (user/, vendor/, staff/) and its
 // own collection, so one chat's records are never mixed with another's.
 //
-//   flashUserChats|flashVendorChats|flashStaffChats/<id>  {uid, who, email, kind, category, status, verified, createdAt, updatedAt}
+//   flashUserChats|flashVendorChats|flashPremiumChats|flashProviderChats|flashStaffChats/<id>  {uid, who, email, kind, category, status, ...}
 //                                                         status: open -> solved, or open -> ticket -> closed
 //     .../messages/<id>                                   {role: user | flash | admin, text, at}
 //   flashTickets/<kind>_<chatId>                          {kind, chatId, uid, who, email, category, text, summary, reason, status: open | closed, ...}
 //   flashTicketTriage/<ticketId>                          Sonnet's suggestion for the admin, or {failed: true}
 //   flashStats/<kind>                                     {cameIn, solved, verified}; pending is cameIn - solved
-//   flashConfig/main                                      {dailyMessages, helpUser, helpVendor, helpStaff}
+//   flashConfig/main                                      {dailyMessages, helpUser, helpVendor, helpPremium, helpProvider, helpStaff, supportPhone, supportWhatsapp}
+//   flashPublic/main                                      {supportPhone, supportWhatsapp}: the office number the Premium chat shows (signed-in read)
 //
 // The ticket id comes from the chat, so a chat can never make two tickets. Tickets are read only to close and to triage: nothing that talks
 // to a person reads them. uid and role come from the sign-in and the server's own records, never from the request.
@@ -16,7 +17,7 @@ const {FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {SONNET, HAIKU, logAiCall, takeDailyUse} = require('../ai-core');
 const {askFlash} = require('./answer');
 const {readTicket} = require('./triage');
-const {DEFAULT_CONFIG, cleanText, historyFor, ticketId, ticketReply, ticketText, validId, validateConfig} = require('./rules');
+const {DEFAULT_CONFIG, cleanText, helpFor, historyFor, ticketId, ticketReply, ticketText, validId, validateConfig} = require('./rules');
 
 const configRef = db => db.collection('flashConfig').doc('main');
 const statsRef = (db, kind) => db.collection('flashStats').doc(kind);
@@ -29,6 +30,7 @@ async function readConfig(db) {
 async function saveConfig(db, data = {}) {
   const fields = validateConfig(data);
   await configRef(db).set(fields, {merge: true});
+  await db.collection('flashPublic').doc('main').set({supportPhone: fields.supportPhone, supportWhatsapp: fields.supportWhatsapp}, {merge: true});
   return fields;
 }
 
@@ -74,7 +76,8 @@ async function openTicket(db, chat, ref, data, {summary, reason, lastText}, now)
     addMessage(tx, ref, 'flash', reply, now);
     tx.create(db.collection('flashTickets').doc(id), {
       kind: chat.kind, chatId: ref.id, uid: data.uid, who: data.who, email: data.email, category: data.category, text, summary, reason,
-      status: 'open', createdAt: Timestamp.fromMillis(now),
+      // Premium vendors' tickets come first in the admin's Support Inbox.
+      priority: chat.priority === true, status: 'open', createdAt: Timestamp.fromMillis(now),
     });
     return 'ticket';
   });
@@ -86,8 +89,10 @@ async function flashAnswer(db, client, chat, {uid, category}, ref, help, now) {
   try {
     const facts = await chat.facts(db, uid, category, now);
     const history = historyFor(await readMessages(ref));
-    const {answer, response} = await askFlash(client(), {rules: chat.rules, help, facts, history});
-    await logAiCall(db, {feature: `flash_${chat.kind}`, model: HAIKU, usage: response.usage, uid, stopReason: response.stop_reason}, now);
+    // A chat may ask for the stronger model (the Premium vendors' advanced chat); the others use Haiku.
+    const model = chat.model ?? HAIKU;
+    const {answer, response} = await askFlash(client(), {rules: chat.rules, help, facts, history, model, effort: chat.effort ?? 'low'});
+    await logAiCall(db, {feature: `flash_${chat.kind}`, model, usage: response.usage, uid, stopReason: response.stop_reason}, now);
     return answer;
   } catch (error) {
     console.warn('Flash could not answer', chat.kind, error.status ?? error.name);
@@ -111,7 +116,7 @@ async function sendMessage(db, client, chat, person, data = {}, now = Date.now()
     tx.update(ref, {updatedAt: Timestamp.fromMillis(now)});
   });
 
-  const answer = await flashAnswer(db, client, chat, chatData, ref, config[chat.helpField], now);
+  const answer = await flashAnswer(db, client, chat, chatData, ref, helpFor(config, chat.helpField), now);
   const later = now + 1;
   if (!answer || answer.needsTeam) {
     return openTicket(db, chat, ref, chatData, {summary: answer?.summary ?? '', reason: answer ? 'flash' : 'no_answer', lastText: text}, later);

@@ -26,6 +26,16 @@ service cloud.firestore {
     match /adsPrivate/{id} {
       allow read, write: if admin();
     }
+    // Sample data (functions/samples.js): the accounts the sample data belongs to and the log of "Delete all samples". Only the admin
+    // reads them (for the SAMPLE label); only functions and the sample script write them.
+    match /_sampleAccounts/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /_sampleDeletions/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
     // Ad view counts are written only by functions/ad-tracking.js. The admin reads everything (including the view-by-view log);
     // a vendor reads the totals of their own ads. adViewGuard and adUniques are internal and never readable.
     match /adStats/{id} {
@@ -163,6 +173,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+    // Showcase module (functions/modules/showcase): the paid vendors' box photo and reach (km), public like shops; only functions write.
+    match /vendorShowcase/{uid} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // Photo limits module (functions/modules/photo-limits): a vendor's own item photo waiting for the admin's check.
+    match /vendorItemPhotos/{productId} {
+      allow read: if admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
+      allow write: if false;
+    }
     // Field Assistant: a staff role doc (mirrors vendors/{uid}) and a pending-
     // then-approved submission queue (mirrors vendorChanges). Kept entirely
     // separate from the vendor collections above — a different role, reviewed
@@ -287,6 +307,46 @@ service cloud.firestore {
       allow read: if resource.data.status == 'live' || admin() || (signedIn() && resource.data.vendorId == request.auth.uid);
       allow write: if false;
     }
+    // Staff Area System (functions/modules/staff-areas): areas and towns for signed-in staff (green / red on the map); who holds an area is
+    // admin only; a staff member reads their own record and days. Only functions write.
+    match /staffAreaTowns/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /staffAreas/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /staffAreaHolders/{id} {
+      allow read: if admin();
+      allow write: if false;
+    }
+    match /staffAreaStaff/{uid} {
+      allow read: if owner(uid) || admin();
+      allow write: if false;
+    }
+    match /staffAreaSettings/{id} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /staffAreaDays/{id} {
+      allow read: if admin() || (signedIn() && resource.data.staffUid == request.auth.uid);
+      allow write: if false;
+    }
+    // Staff Links module (functions/modules/staff-links): who registered a vendor / provider; read only for the staff member and the person.
+    match /staffLinks/{id} {
+      allow read: if admin() || (signedIn() && (resource.data.staffUid == request.auth.uid || resource.data.accountUid == request.auth.uid));
+      allow write: if false;
+    }
+    // Offer Alerts module (functions/modules/offer-alerts): the one-alert-a-day limit and how many each alert reached; admin only.
+    match /vendorOfferAlerts/{vendorId} {
+      allow read: if admin();
+      allow write: if false;
+      match /sent/{offerId} {
+        allow read: if admin();
+        allow write: if false;
+      }
+    }
     match /vendorOffersConfig/{id} {
       allow read: if admin();
       allow write: if false;
@@ -345,6 +405,27 @@ service cloud.firestore {
         allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashVendorChats/$(id)).data.uid == request.auth.uid);
         allow write: if false;
       }
+    }
+    match /flashPremiumChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashPremiumChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    match /flashProviderChats/{id} {
+      allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if false;
+      match /messages/{messageId} {
+        allow read: if admin() || (signedIn() && get(/databases/$(database)/documents/flashProviderChats/$(id)).data.uid == request.auth.uid);
+        allow write: if false;
+      }
+    }
+    // The office phone / WhatsApp the Premium vendors' chat shows (written by saveFlashConfig).
+    match /flashPublic/{id} {
+      allow read: if signedIn();
+      allow write: if false;
     }
     match /flashStaffChats/{id} {
       allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid);

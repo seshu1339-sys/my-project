@@ -191,3 +191,59 @@ class _AnswerDialogState extends State<_AnswerDialog> {
     ],
   );
 }
+
+/// The order of the Support Inbox: Premium vendors' tickets first, then the oldest first (the longest unanswered on top).
+List<FlashTicket> inboxOrder(Iterable<FlashTicket> tickets) => [...tickets]
+  ..sort((a, b) {
+    if (a.priority != b.priority) return a.priority ? -1 : 1;
+    return (a.at ?? DateTime(0)).compareTo(b.at ?? DateTime(0));
+  });
+
+/// Admin > Flash > Support Inbox: every unanswered ticket of every chat in one place, filtered by role (customers, vendors, Premium
+/// vendors, staff, services). The answer goes into the person's chat and closes the ticket.
+class FlashSupportInboxView extends StatefulWidget {
+  const FlashSupportInboxView({super.key, required this.tickets, required this.roles, required this.triageOf, required this.messagesOf, required this.onClose});
+  final List<FlashTicket> tickets;
+  // kind -> the name shown on its filter (Users, Vendors, Premium vendors, Services, Staff).
+  final Map<String, String> roles;
+  final Stream<FlashTriage?> Function(String ticketId) triageOf;
+  final Future<List<FlashMessage>> Function(String chatId) messagesOf;
+  final Future<void> Function(String ticketId, String reply) onClose;
+
+  @override
+  State<FlashSupportInboxView> createState() => _FlashSupportInboxViewState();
+}
+
+class _FlashSupportInboxViewState extends State<FlashSupportInboxView> {
+  String? role;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = inboxOrder(widget.tickets.where((t) => role == null || t.kind == role));
+    int count(String kind) => widget.tickets.where((t) => t.kind == kind).length;
+    return ListView(padding: const EdgeInsets.all(20), children: [
+      Text('Support Inbox', style: Theme.of(context).textTheme.titleLarge),
+      Text('${widget.tickets.length} unanswered. Premium vendors first, then the oldest.'),
+      const SizedBox(height: 8),
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        ChoiceChip(key: const ValueKey('flash-inbox-all'), label: Text('All (${widget.tickets.length})'), selected: role == null, onSelected: (_) => setState(() => role = null)),
+        for (final r in widget.roles.entries)
+          ChoiceChip(key: ValueKey('flash-inbox-${r.key}'), label: Text('${r.value} (${count(r.key)})'), selected: role == r.key, onSelected: (_) => setState(() => role = r.key)),
+      ]),
+      const SizedBox(height: 8),
+      if (shown.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Nothing is waiting.', key: ValueKey('flash-inbox-empty')))),
+      for (final ticket in shown)
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Text(
+              '${widget.roles[ticket.kind] ?? ticket.kind}${ticket.priority ? ' • PRIORITY' : ''}',
+              key: ValueKey('flash-inbox-role-${ticket.id}'),
+              style: TextStyle(fontWeight: FontWeight.bold, color: ticket.priority ? Theme.of(context).colorScheme.error : null),
+            ),
+          ),
+          _TicketCard(key: ValueKey('flash-ticket-${ticket.id}'), ticket: ticket, triageOf: widget.triageOf, messagesOf: widget.messagesOf, onClose: widget.onClose),
+        ]),
+    ]);
+  }
+}

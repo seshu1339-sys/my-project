@@ -22,6 +22,7 @@
 // shops/<id>, products) with public copies of the photos; the private originals are removed. The items follow the vendor rules:
 // at most the vendor's item limit (2 unless the admin allows more), and each price lasts 24 hours (vendor-prices.js), after which the
 // staff member who added the vendor enters a new one (renewStaffVendorPrice).
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -137,8 +138,17 @@ async function verifyPhoto(path, label) {
   if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', `${label[0].toUpperCase()}${label.slice(1)} is not a valid photo.`);
 }
 
+// CLOSED (owner decision, 6 November 2026): staff no longer create vendors or service providers, and never change their prices.
+// Vendors and providers register themselves in the vendor app; staff link them by ID within 30 minutes (functions/modules/staff-links).
+// These callables stay only to answer old staff apps with a clear message; the admin can still reject an old waiting addition, and
+// disableOldStaffAdded (staff-links) suspends the ones made the old way. The code below each guard is kept for the history it explains.
+const OLD_WAY_CLOSED = 'Staff no longer add vendors or service providers. They register themselves in the vendor app; then enter their ID under Add within 30 minutes to link them to you.';
+const PRICES_CLOSED = 'Staff no longer change vendor prices. Vendors update their own items and prices in the vendor app.';
+
 exports.submitStaffVendor = onCall({...options, timeoutSeconds: 300}, async request => {
   const uid = requireUser(request);
+  throw new HttpsError('failed-precondition', OLD_WAY_CLOSED);
+  // eslint-disable-next-line no-unreachable
   const staff = await requireActiveStaff(uid);
   const additionId = request.data?.additionId;
   if (typeof additionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(additionId)) throw new HttpsError('invalid-argument', 'Invalid addition id.');
@@ -185,6 +195,8 @@ exports.submitStaffVendor = onCall({...options, timeoutSeconds: 300}, async requ
 
 exports.submitStaffProvider = onCall({...options, timeoutSeconds: 300}, async request => {
   const uid = requireUser(request);
+  throw new HttpsError('failed-precondition', OLD_WAY_CLOSED);
+  // eslint-disable-next-line no-unreachable
   const staff = await requireActiveStaff(uid);
   const additionId = request.data?.additionId;
   if (typeof additionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(additionId)) throw new HttpsError('invalid-argument', 'Invalid addition id.');
@@ -217,7 +229,7 @@ exports.submitStaffProvider = onCall({...options, timeoutSeconds: 300}, async re
   return {status: 'pending', additionId, providerCode};
 });
 
-const publicUrl = (bucket, path) => `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(path)}?alt=media`;
+const publicUrl = (bucket, path) => publicStorageUrl(bucket.name, path);
 
 /// Puts an approved vendor addition live: public copies of the photos, the vendor record, the shop and the items. Returns the ids.
 async function publishStaffVendor(ref, addition, decidedBy) {
@@ -338,6 +350,9 @@ async function autoApprove(ref, staffUid) {
 // Admin: switch auto-approve on or off for one staff member (off by default). On: what they add goes live without the admin.
 exports.setStaffAutoApprove = onCall(options, async request => {
   await requireAdmin(request);
+  // Removed (owner, 6 Nov 2026): staff no longer add vendors, so there is nothing to auto-approve.
+  throw new HttpsError('failed-precondition', 'Auto-approve was removed: staff no longer add vendors or providers.');
+  // eslint-disable-next-line no-unreachable
   const {staffUid, enabled} = request.data || {};
   if (typeof staffUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(staffUid) || typeof enabled !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the staff member and on or off.');
   const ref = db.collection('fieldStaff').doc(staffUid);
@@ -364,6 +379,9 @@ exports.reviewStaffAddition = onCall({...options, timeoutSeconds: 120}, async re
     await removePrivatePhotos(addition);
     return {status: 'rejected'};
   }
+  // Closed: an old waiting addition can only be rejected now (or closed for all by disableOldStaffAdded).
+  throw new HttpsError('failed-precondition', 'Adding by staff is closed: the vendor or provider registers in the vendor app. You can only reject this old addition.');
+  // eslint-disable-next-line no-unreachable
   if (!['vendor', 'provider'].includes(addition.kind)) throw new HttpsError('failed-precondition', 'Unknown kind of addition.');
   // Every photo is checked with Google first (functions/photo-check.js), so the admin approves knowing what the check found.
   const photos = photosOf(addition);
@@ -377,6 +395,8 @@ exports.reviewStaffAddition = onCall({...options, timeoutSeconds: 120}, async re
 // The staff member who added a vendor enters a new price for one of its items (a price lasts 24 hours, like a vendor's own).
 exports.renewStaffVendorPrice = onCall(options, async request => {
   const uid = requireUser(request);
+  throw new HttpsError('failed-precondition', PRICES_CLOSED);
+  // eslint-disable-next-line no-unreachable
   await requireActiveStaff(uid);
   const {productId} = request.data || {};
   if (typeof productId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(productId)) throw new HttpsError('invalid-argument', 'Choose the item.');
@@ -392,4 +412,4 @@ exports.renewStaffVendorPrice = onCall(options, async request => {
   return {price};
 });
 
-exports._staffAdditions = {staffVendorDetails, staffProviderDetails, autoApproveProblem, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS, MIN_WORK_PHOTOS, MAX_WORK_PHOTOS};
+exports._staffAdditions = {OLD_WAY_CLOSED, PRICES_CLOSED, staffVendorDetails, staffProviderDetails, autoApproveProblem, VENDOR_PHOTOS, MIN_ITEM_PHOTOS, MAX_ITEM_PHOTOS, MIN_WORK_PHOTOS, MAX_WORK_PHOTOS};

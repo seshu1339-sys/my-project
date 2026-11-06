@@ -3,10 +3,12 @@
 // shop itself and is required before the vendor can add items; photos 2-3 are the vendor's choice). Each stays 'pending' until the admin approves or rejects it;
 // a scheduled cleanup (functions/storage-maintenance.js) deletes anything still pending after
 // 15 days. Mirrors the existing vendorApplications photo-approval shape.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
+const {vendorPhotoAllowance, vendorPhotosUsed, MAX_SHOP_SLOT} = require('./plan-gate');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
@@ -21,14 +23,8 @@ async function requireAdmin(request) {
 }
 const slotFile = slot => `shopPhoto${slot}`;
 const photoDocId = (uid, slot) => `${uid}_${slot}`;
-// Configurable, admin-set max shop photos per vendor — defaults to 3. Deliberately not shared with Field
-// Assistant's own equivalent in field-assistant.js: the two are independent
-// settings and must never affect each other.
-async function vendorPhotoLimit() {
-  const business = (await db.collection('settings').doc('business').get()).data() || {};
-  const limit = Number(business.vendorPhotoLimit);
-  return Number.isInteger(limit) && limit >= 1 && limit <= 9 ? limit : 3;
-}
+// The number of shop photos follows the vendor's plan now (functions/plan-gate.js vendorPhotoAllowance); settings/business
+// .vendorPhotoLimit is no longer used.
 async function verifyUploadedImage(path) {
   const file = getStorage().bucket().file(path);
   const [exists] = await file.exists();
@@ -44,8 +40,17 @@ async function verifyUploadedImage(path) {
 exports.submitShopPhoto = onCall(options, async request => {
   const uid = requireUser(request);
   const {slot} = request.data || {};
-  const limit = await vendorPhotoLimit();
-  if (!Number.isInteger(slot) || slot < 1 || slot > limit) throw new HttpsError('invalid-argument', `Choose a photo slot from 1 to ${limit}.`);
+  // Photo 1 is the shop and never counted; slots 2+ are extra photos within the vendor's allowance (free 2, or the paid plan's number,
+  // shared with own item photos: functions/plan-gate.js). Replacing a photo in a slot that is in use needs no new room.
+  const {extras} = await vendorPhotoAllowance(db, uid);
+  if (!Number.isInteger(slot) || slot < 1 || slot > Math.min(1 + extras, MAX_SHOP_SLOT)) throw new HttpsError('invalid-argument', `Choose a photo slot from 1 to ${1 + extras}.`);
+  if (slot >= 2) {
+    const current = (await db.collection('vendorShopPhotos').doc(photoDocId(uid, slot)).get()).data();
+    const replacing = current && ['pending', 'approved'].includes(current.status);
+    if (!replacing && (await vendorPhotosUsed(db, uid, {shopSlot: slot})) >= extras) {
+      throw new HttpsError('resource-exhausted', `You have used all ${extras} extra photos of your plan. Change or remove one first.`);
+    }
+  }
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('permission-denied', 'Your vendor application must be approved before you can add shop photos.');
   const path = `vendorShopPhotos/${uid}/${slotFile(slot)}`;
@@ -67,7 +72,7 @@ exports.reviewShopPhoto = onCall(options, async request => {
   // fixed storage-rules ceiling (1-9), not the live, possibly-since-lowered
   // vendorPhotoLimit — a photo submitted under a higher limit must still be
   // reviewable afterwards.
-  if (typeof vendorId !== 'string' || !Number.isInteger(slot) || slot < 1 || slot > 9 || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor, slot and decision.');
+  if (typeof vendorId !== 'string' || !Number.isInteger(slot) || slot < 1 || slot > MAX_SHOP_SLOT || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the vendor, slot and decision.');
   const ref = db.collection('vendorShopPhotos').doc(photoDocId(vendorId, slot));
   const path = await db.runTransaction(async tx => {
     const snapshot = await tx.get(ref);
@@ -83,7 +88,7 @@ exports.reviewShopPhoto = onCall(options, async request => {
     const bucket = getStorage().bucket();
     const publicPath = `catalog/shop_${vendorId}_${slot}.jpg`;
     await bucket.file(path).copy(bucket.file(publicPath));
-    const url = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media&v=${Date.now()}`;
+    const url = publicStorageUrl(bucket.name, publicPath, `&v=${Date.now()}`);
     const shopId = (await db.collection('vendors').doc(vendorId).get()).data()?.shopId || vendorId;
     await db.collection('shops').doc(shopId).set({[slot === 1 ? 'imageUrl' : `photo${slot}Url`]: url, ownerId: vendorId}, {merge: true});
   }

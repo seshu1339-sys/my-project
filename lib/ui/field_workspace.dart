@@ -2,23 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
+import '../modules/stafflinks/stafflinks_module.dart';
 import 'field_add_page.dart';
-import 'field_add_provider_form.dart';
-import 'field_add_vendor_form.dart';
-import 'field_my_additions.dart';
-import 'my_numbers_card.dart';
-import 'field_entry_form.dart';
-import 'quick_add.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
 
-/// Shown only once the staff member's fieldStaff doc is 'active'. Lists past
-/// submissions and starts a new one; the server independently re-checks
-/// 'active' status for every submission regardless of what this screen shows.
+/// Shown only once the staff member's fieldStaff doc is 'active'. The staff member's ID, Add (link a vendor or service provider who
+/// registered themselves, by their ID within 30 minutes), and "Vendors I registered", read only. Staff never create vendors or change
+/// their items or prices (owner decision, 6 November 2026); the server re-checks everything whatever this screen shows.
+/// [areaDashboard] is the Staff Area part (my area, today's offers, the daily target), given by the app.
 class FieldWorkspace extends StatefulWidget {
-  const FieldWorkspace({super.key, required this.store, required this.uid});
+  const FieldWorkspace({super.key, required this.store, required this.uid, this.areaDashboard});
   final Store store;
   final String uid;
+  final Widget? areaDashboard;
   @override
   State<FieldWorkspace> createState() => _FieldWorkspaceState();
 }
@@ -33,89 +30,28 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
   Widget _page(BuildContext context) => ListView(
     padding: const EdgeInsets.all(20),
     children: [
-      Text('Field entries', style: Theme.of(context).textTheme.headlineSmall),
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: store.firestore.collection('fieldStaff').doc(uid).snapshots(),
         builder: (context, snapshot) {
           final code = snapshot.data?.data()?['staffCode'] as String?;
-          final auto = snapshot.data?.data()?['autoApprove'] == true;
-          if (code == null && !auto) return const SizedBox.shrink();
-          return Padding(padding: const EdgeInsets.only(top: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            if (code != null) Text('Staff ID: $code', style: Theme.of(context).textTheme.bodyMedium),
-            // Trusted staff (the admin switched it on): what they add goes live at once.
-            if (auto) Text('Auto-approve is on: what you add goes live once every photo passes the Google check.', key: const ValueKey('staff-auto-approve-on'), style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w600)),
-          ]));
+          if (code == null) return const SizedBox.shrink();
+          return Text('Staff ID: $code', key: const ValueKey('staff-id'), style: Theme.of(context).textTheme.titleMedium);
         },
       ),
-      const SizedBox(height: 8),
-      QuickAddHome(store: store),
-      // Add a vendor, a service provider or (later) transport. Nothing goes live until an administrator approves it.
+      const SizedBox(height: 12),
+      if (widget.areaDashboard != null) ...[widget.areaDashboard!, const SizedBox(height: 16)],
       FilledButton.icon(
         key: const ValueKey('field-add'),
         style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
         onPressed: () {
           Usage.button('staff_add_button');
-          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(
-          store: store,
-          vendorForm: (_) => FieldAddVendorForm(store: store),
-          serviceForm: (_, type) => FieldAddProviderForm(store: store, serviceType: type),
-        )));
+          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldAddPage(store: store)));
         },
-        icon: const Icon(Icons.add_circle_outline),
-        label: const Text('Add', style: TextStyle(fontSize: 18)),
+        icon: const Icon(Icons.link),
+        label: const Text('Add (link a vendor or service)', style: TextStyle(fontSize: 18)),
       ),
       const SizedBox(height: 16),
-      // How many this staff member added, and the calls and directions to the vendors they added (Analytics).
-      MyNumbersCard(store: store, ownerId: uid, events: const ['staff_added', 'shop_call', 'shop_whatsapp', 'shop_directions', 'price_changed']),
-      const SizedBox(height: 16),
-      FieldMyAdditions(store: store, uid: uid),
-      const SizedBox(height: 24),
-      const Text('Capture an item at a vendor shop. Nothing you submit is visible to customers until an administrator approves it.'),
-      const SizedBox(height: 16),
-      FilledButton.icon(
-        onPressed: () {
-          Usage.button('staff_new_entry');
-          Navigator.push(context, MaterialPageRoute<void>(builder: (_) => FieldEntryForm(store: store)));
-        },
-        icon: const Icon(Icons.add_a_photo_outlined),
-        label: const Text('New entry'),
-      ),
-      const SizedBox(height: 24),
-      Text('My submissions', style: Theme.of(context).textTheme.titleLarge),
-      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: store.firestore.collection('fieldSubmissions').where('staffUid', isEqualTo: uid).limit(100).snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) return const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('Submissions could not load.'));
-          final docs = [...snapshot.data?.docs ?? const []]..sort((a, b) {
-            final ta = a.data()['submittedAt'] as Timestamp?;
-            final tb = b.data()['submittedAt'] as Timestamp?;
-            if (ta == null || tb == null) return 0;
-            return tb.compareTo(ta);
-          });
-          if (docs.isEmpty) return const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('No submissions yet.'));
-          return Column(children: [for (final doc in docs) _submissionTile(doc)]);
-        },
-      ),
+      StaffLinkedList(store: store, uid: uid),
     ],
   );
-
-  Widget _submissionTile(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data();
-    final item = data['item'] as Map<String, dynamic>? ?? const {};
-    final shop = data['shop'] as Map<String, dynamic>?;
-    final shopId = data['shopId']?.toString() ?? '';
-    final shopLabel = shopId.isNotEmpty ? 'Existing shop' : (shop?['name']?.toString() ?? 'New shop');
-    final status = data['status']?.toString() ?? 'pending';
-    final reason = data['decisionReason']?.toString() ?? '';
-    final statusText = switch (status) {
-      'approved' => 'Approved',
-      'rejected' => 'Rejected${reason.isEmpty ? '' : ': $reason'}',
-      _ => 'Pending admin review',
-    };
-    return Card(child: ListTile(
-      title: Text('${item['name']}'),
-      subtitle: Text('₹${item['price']} • Stock ${item['stock']} • $shopLabel\n$statusText'),
-      isThreeLine: true,
-    ));
-  }
 }

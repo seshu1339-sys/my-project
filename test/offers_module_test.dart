@@ -153,8 +153,38 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('offer-add-photo')));
     await tester.pumpAndSettle();
     await _save(tester);
-    expect(draft?.fields, {'title': 'Diwali box', 'details': '', 'offerPrice': 199, 'regularPrice': 299, 'days': 7});
+    expect(draft?.fields, {'title': 'Diwali box', 'details': '', 'offerPrice': 199, 'regularPrice': 299, 'days': 7, 'alert': false});
     expect(draft?.newPhotos, hasLength(1));
+  });
+
+  testWidgets('a new offer may alert customers within the plan km (a switch); editing a running one never asks again', (tester) async {
+    OfferDraft? draft;
+    await _openEditor(tester, done: (d) => draft = d);
+    await _fill(tester);
+    await tester.tap(find.byKey(const ValueKey('offer-take-photo')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('offer-alert')));
+    await tester.tap(find.byKey(const ValueKey('offer-alert')));
+    await tester.pumpAndSettle();
+    await _save(tester);
+    expect(draft?.fields['alert'], isTrue);
+    expect(draft?.newPhotos, hasLength(1), reason: 'Take photo adds a photo too');
+
+    await _openEditor(tester, offer: offer(photos: const ['https://example.com/a.webp']), done: (d) => draft = d);
+    expect(find.byKey(const ValueKey('offer-alert')), findsNothing);
+    await _save(tester);
+    expect(draft?.fields.containsKey('alert'), isFalse);
+  });
+
+  test('the vendor reads what happened to the alert, never a number', () {
+    VendorOffer withAlert(String status, {int km = 25, String offerStatus = 'live'}) =>
+        VendorOffer.fromData('o', {'title': 'T', 'offerPrice': 10, 'status': offerStatus, 'alertRadiusKm': km, 'alertStatus': status});
+    expect(offerAlertText(withAlert('', km: 0)), isNull);
+    expect(offerAlertText(VendorOffer.fromData('o', {'title': 'T', 'offerPrice': 10, 'status': 'live', 'alert': true})), 'Alert within your plan km');
+    expect(offerAlertText(withAlert('sent')), 'Alert sent to customers within 25 km');
+    expect(offerAlertText(withAlert('daily-limit', km: 50)), 'Alert not sent: one alert a day. Your offer is live.');
+    expect(offerAlertText(withAlert('no-shop-location')), startsWith('Alert not sent: your shop has no map location'));
+    expect(offerAlertText(withAlert('', offerStatus: 'pending')), 'The alert within 25 km goes when the offer is approved');
   });
 
   testWidgets('photos stop at three', (tester) async {

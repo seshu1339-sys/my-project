@@ -49,19 +49,28 @@ class _VendorOffersSectionState extends State<VendorOffersSection> {
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: stream,
-    builder: (context, snapshot) => VendorOffersView(
-      offers: [for (final doc in snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) VendorOffer.fromData(doc.id, doc.data())],
-      onSave: _save,
-      onDelete: (id) => store.call('deleteVendorOffer', {'offerId': id}),
+  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    // A running paid plan (Silver, Gold or Premium) unlocks the nearby alert.
+    stream: store.firestore.collection('vendorPremium').doc(widget.uid).snapshots(),
+    builder: (context, premium) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: stream,
+      builder: (context, snapshot) => VendorOffersView(
+        offers: [for (final doc in snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[]) VendorOffer.fromData(doc.id, doc.data())],
+        onSave: _save,
+        onDelete: (id) => store.call('deleteVendorOffer', {'offerId': id}),
+        canAlert: premium.data?.data()?['active'] == true,
+        planKm: (premium.data?.data()?['radiusKm'] as num?)?.toDouble(),
+      ),
     ),
   );
 }
 
 /// The card itself: the Add button and the vendor's own offers.
 class VendorOffersView extends StatefulWidget {
-  const VendorOffersView({super.key, required this.offers, required this.onSave, required this.onDelete, this.now});
+  const VendorOffersView({super.key, required this.offers, required this.onSave, required this.onDelete, this.now, this.canAlert = false, this.planKm});
+  // Paid vendors only: the nearby alert choice in the editor. It reaches the plan's km.
+  final bool canAlert;
+  final double? planKm;
   final List<VendorOffer> offers;
   final Future<void> Function(OfferDraft draft) onSave;
   final Future<void> Function(String offerId) onDelete;
@@ -88,7 +97,7 @@ class _VendorOffersViewState extends State<VendorOffersView> {
   }
 
   Future<void> _edit([VendorOffer? offer]) async {
-    final draft = await showDialog<OfferDraft>(context: context, builder: (_) => OfferEditorDialog(offer: offer, now: now));
+    final draft = await showDialog<OfferDraft>(context: context, builder: (_) => OfferEditorDialog(offer: offer, now: now, canAlert: widget.canAlert, planKm: widget.planKm));
     if (draft != null && mounted) await _run(() => widget.onSave(draft), 'Offer saved');
   }
 
@@ -126,6 +135,7 @@ class _VendorOffersViewState extends State<VendorOffersView> {
               title: Text(offer.title),
               subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('${offerPriceText(offer.offerPrice)} • ${offerStatusText(offer, now)}'),
+                if (offerAlertText(offer) case final alert?) Text(alert, key: ValueKey('offer-alert-status-${offer.id}'), style: const TextStyle(fontSize: 12)),
                 Wrap(spacing: 4, children: [
                   if (!offer.removed) TextButton(key: ValueKey('offer-edit-${offer.id}'), onPressed: busy ? null : () => _edit(offer), child: Text(offer.endedAt(now) ? 'Run again' : 'Edit')),
                   TextButton(key: ValueKey('offer-delete-${offer.id}'), onPressed: busy ? null : () => _delete(offer), child: const Text('Delete')),
@@ -140,7 +150,10 @@ class _VendorOffersViewState extends State<VendorOffersView> {
 
 /// Name, prices, days and photos of an offer. Pops an [OfferDraft], or null when cancelled.
 class OfferEditorDialog extends StatefulWidget {
-  const OfferEditorDialog({super.key, this.offer, required this.now, this.pickPhoto});
+  const OfferEditorDialog({super.key, this.offer, required this.now, this.pickPhoto, this.canAlert = true, this.planKm});
+  // Paid vendors (a running plan) may alert customers nearby; free vendors see no alert choice. The alert reaches the plan's km.
+  final bool canAlert;
+  final double? planKm;
   final VendorOffer? offer;
   final DateTime now;
 
@@ -151,6 +164,8 @@ class OfferEditorDialog extends StatefulWidget {
   State<OfferEditorDialog> createState() => _OfferEditorDialogState();
 }
 
+String _km(double km) => km == km.roundToDouble() ? '${km.toInt()}' : '$km';
+
 class _OfferEditorDialogState extends State<OfferEditorDialog> {
   final formKey = GlobalKey<FormState>();
   late final title = TextEditingController(text: widget.offer?.title ?? '');
@@ -160,6 +175,9 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
   late final running = widget.offer != null && !widget.offer!.endedAt(widget.now);
   // null keeps the end date of an offer that is still running.
   late int? days = running ? null : 7;
+  // The nearby alert (on or off; it reaches the plan km): chosen for a new offer or one that runs again; a running offer's edit keeps
+  // its own.
+  bool alertOn = false;
   late final kept = [...?widget.offer?.photos];
   final added = <NewOfferPhoto>[];
   String? photoError;
@@ -175,14 +193,14 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
     super.dispose();
   }
 
-  Future<NewOfferPhoto?> _gallery() async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+  Future<NewOfferPhoto?> _pick(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
     return file == null ? null : NewOfferPhoto(file, await file.readAsBytes());
   }
 
-  Future<void> _addPhoto() async {
+  Future<void> _addPhoto({bool camera = false}) async {
     try {
-      final photo = await (widget.pickPhoto ?? _gallery)();
+      final photo = await (widget.pickPhoto ?? () => _pick(camera ? ImageSource.camera : ImageSource.gallery))();
       if (photo != null && mounted) {
         setState(() {
           added.add(photo);
@@ -208,6 +226,7 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
         'offerPrice': num.parse(offerPrice.text.trim()),
         if (regular.isNotEmpty) 'regularPrice': num.parse(regular),
         if (days != null) 'days': days,
+        if (!running && widget.canAlert) 'alert': alertOn,
       }, kept, added),
     );
   }
@@ -273,9 +292,27 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final url in kept) _thumb(offerPhoto(url), () => setState(() => kept.remove(url))),
               for (final photo in added) _thumb(Image.memory(photo.bytes, fit: BoxFit.cover), () => setState(() => added.remove(photo))),
-              if (photoCount < maxOfferPhotos) OutlinedButton.icon(key: const ValueKey('offer-add-photo'), onPressed: _addPhoto, icon: const Icon(Icons.add_a_photo_outlined), label: const Text('Add photo')),
+              if (photoCount < maxOfferPhotos) ...[
+                OutlinedButton.icon(key: const ValueKey('offer-take-photo'), onPressed: () => _addPhoto(camera: true), icon: const Icon(Icons.photo_camera_outlined), label: const Text('Take photo')),
+                OutlinedButton.icon(key: const ValueKey('offer-add-photo'), onPressed: _addPhoto, icon: const Icon(Icons.add_a_photo_outlined), label: const Text('Add photo')),
+              ],
             ]),
             if (photoError != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(photoError!, key: const ValueKey('offer-photo-error'), style: const TextStyle(color: Colors.red))),
+            if (!running && widget.canAlert) ...[
+              const SizedBox(height: 12),
+              SwitchListTile(
+                key: const ValueKey('offer-alert'),
+                contentPadding: EdgeInsets.zero,
+                value: alertOn,
+                onChanged: (v) => setState(() => alertOn = v),
+                title: const Text('Alert customers nearby', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  'Customers with notifications on get one alert, up to ${widget.planKm == null ? 'your plan km' : '${_km(widget.planKm!)} km (your plan)'} from your shop. One alert a day.',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ] else if (offerAlertText(widget.offer!) case final alert?)
+              Padding(padding: const EdgeInsets.only(top: 8), child: Text(alert, style: const TextStyle(fontSize: 12))),
           ]),
         ),
       ),

@@ -80,6 +80,11 @@ let webDetection = async bytes => {
   if (result.error) throw Error(result.error.message || 'Cloud Vision could not check the photo.');
   return result.webDetection || {};
 };
+// Local testing only: the Firebase emulators have no Google credentials, so with PHOTO_CHECK_FAKE set (and only inside the emulators)
+// Google's answer is made up: 'none' = not found online, 'full' = the same picture is online. Never active in production.
+if (process.env.FUNCTIONS_EMULATOR === 'true' && process.env.PHOTO_CHECK_FAKE) {
+  webDetection = async () => (process.env.PHOTO_CHECK_FAKE === 'full' ? {fullMatchingImages: [{url: 'https://example.com/the-same-picture.jpg'}]} : {});
+}
 
 /// What Google's answer means for the admin.
 function onlineVerdict(web = {}) {

@@ -7,6 +7,7 @@ import '../domain/shop_ads.dart';
 import '../domain/vendor_items.dart';
 import 'moderation_dialogs.dart';
 import 'shop_map.dart';
+import '../modules/stafflinks/stafflinks_module.dart' show RegisteredByLine;
 import 'text_prompt_dialog.dart';
 
 /// One vendor's full admin profile, reached from the unified admin search
@@ -80,6 +81,8 @@ class VendorDetailPage extends StatelessWidget {
                 Text(name, style: Theme.of(context).textTheme.headlineSmall),
                 if (code != null) Text('Vendor ID: $code', style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text('UID: $vendorUid', style: Theme.of(context).textTheme.bodySmall),
+                // Self-registered, or linked by a staff member (with the Staff ID).
+                RegisteredByLine(store: store, accountUid: vendorUid),
                 const SizedBox(height: 16),
                 if (application != null) Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('Photos', style: TextStyle(fontWeight: FontWeight.bold)),

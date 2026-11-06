@@ -48,17 +48,17 @@ android {
         create("customer") {
             dimension = "app"
             applicationId = "in.locamarket.locamark"
-            resValue("string", "app_name", "Loca Market")
+            resValue("string", "app_name", "LOCAMARKET")
         }
         create("vendor") {
             dimension = "app"
             applicationId = "in.locamarket.vendor"
-            resValue("string", "app_name", "V Loca Market")
+            resValue("string", "app_name", "Loca Market Vendor")
         }
         create("staff") {
             dimension = "app"
             applicationId = "in.locamarket.staff"
-            resValue("string", "app_name", "S Loca Market")
+            resValue("string", "app_name", "Loca Market staff")
         }
     }
 

@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/ads.dart';
+import '../domain/ist_time.dart';
+import '../domain/right_boxes.dart';
 import '../domain/shop_ads.dart';
+import '../services/server_clock.dart';
 import '../services/shop_ad_payment.dart';
 import 'vendor_section_kit.dart';
 import '../services/usage.dart';
@@ -13,8 +16,11 @@ import '../services/usage.dart';
 /// Ad Box of the website. Then the vendor sees their ad and its total views since it started (not who is watching now).
 /// This section only needs the store and the vendor id.
 class VendorShopAdSection extends StatelessWidget {
-  const VendorShopAdSection({super.key, required this.store, required this.uid, this.payment = const OfflineShopAdPayment()});
+  const VendorShopAdSection({super.key, required this.store, required this.uid, this.payment = const OfflineShopAdPayment(), this.uploadPhotoPage});
   final Store store;
+  // The page where the vendor sends their own ad photo for approval (My Ads), given by the workspace so this section
+  // does not import another vendor section; null = no "Upload your ad photo" button.
+  final WidgetBuilder? uploadPhotoPage;
   final String uid;
   final ShopAdPayment payment;
 
@@ -32,6 +38,10 @@ class VendorShopAdSection extends StatelessWidget {
           payment: payment,
           showViews: AdsConfig.from(store.entries('settings')).vendorSeesViews,
           onInterest: store.setAdInterest,
+          // Each box's own start / end (Settings > Right Side Ad Boxes), to show when the ad ends or that it has expired.
+          boxes: rightBoxesRecord(store.entries('settings')),
+          // The vendor's own ad photo goes through My Ads: the administrator checks it before it is shown.
+          onUploadPhoto: uploadPhotoPage == null ? null : () => Navigator.push(context, MaterialPageRoute<void>(builder: uploadPhotoPage!)),
         ),
       ),
     ),
@@ -40,8 +50,14 @@ class VendorShopAdSection extends StatelessWidget {
 
 /// The card itself: the tick, what happens next, the live ad with its total views, and earlier ads.
 class ShopAdView extends StatefulWidget {
-  const ShopAdView({super.key, required this.interested, required this.ads, required this.views, required this.onInterest, this.payment = const OfflineShopAdPayment(), this.showViews = true});
+  const ShopAdView({super.key, required this.interested, required this.ads, required this.views, required this.onInterest, this.payment = const OfflineShopAdPayment(), this.showViews = true, this.boxes, this.onUploadPhoto, this.now});
   final bool interested;
+  // The Right Side Ad Boxes record (settings/rightAdBoxes), for each box's start / end; null = not shown.
+  final Entry? boxes;
+  // Opens the form to send the vendor's own ad photo for approval; null = no button.
+  final VoidCallback? onUploadPhoto;
+  // The clock (the server's time by default).
+  final DateTime Function()? now;
   // False when the admin hides view numbers from vendors.
   final bool showViews;
   final List<ShopAd> ads;
@@ -84,6 +100,19 @@ class _ShopAdViewState extends State<ShopAdView> {
         onChanged: saving != null ? null : (v) => _tick(v ?? false),
         title: const Text('I want an ad for my shop'),
       ),
+      if (interested && widget.onUploadPhoto != null)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: OutlinedButton.icon(
+            key: const ValueKey('shop-ad-upload-photo'),
+            onPressed: () {
+              Usage.button('vendor_shop_ad_upload');
+              widget.onUploadPhoto!();
+            },
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: const Text('Upload your ad photo'),
+          ),
+        ),
       if (interested && live.isEmpty) ...[
         Text(widget.payment.howItWorks, key: const ValueKey('shop-ad-how')),
         if (payLabel != null)
@@ -107,6 +136,9 @@ class _ShopAdViewState extends State<ShopAdView> {
 
   Widget _live(BuildContext context, ShopAd ad) {
     final since = shopAdDate(ad.startedAt);
+    final box = widget.boxes == null ? null : rightBoxAt(widget.boxes!, ad.box);
+    final status = box?.statusAt((widget.now ?? ServerClock.now)());
+    final expired = status == 'expired';
     return Container(
       key: ValueKey('shop-ad-live-${ad.id}'),
       margin: const EdgeInsets.only(top: 8),
@@ -117,7 +149,13 @@ class _ShopAdViewState extends State<ShopAdView> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Your ad is live on the website', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              expired ? 'Your ad has expired' : status == 'scheduled' ? 'Your ad starts soon' : 'Your ad is live on the website',
+              key: ValueKey('shop-ad-state-${ad.id}-${status ?? 'live'}'),
+              style: TextStyle(fontWeight: FontWeight.bold, color: expired ? Theme.of(context).colorScheme.error : null),
+            ),
+            if (box?.end != null) Text(expired ? 'Ended ${istLabel(box!.end)} (India time). Contact our office to renew it; views stop while it is expired.' : 'Runs until ${istLabel(box!.end)} (India time)'),
+            if (status == 'scheduled' && box?.start != null) Text('Starts ${istLabel(box!.start)} (India time)'),
             if (widget.showViews) ...[
               Text(
                 shopAdCount(widget.views[ad.id] ?? 0),

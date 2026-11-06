@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -338,7 +339,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
               : reorderable
               ? ReorderableDragStartListener(index: i, child: const Icon(Icons.drag_indicator))
               : Icon(e.active ? Icons.check_circle_outline : Icons.pause_circle_outline),
-          title: Text(_title(e)),
+          title: SampleTitle(_title(e), id: e.id, data: e.data),
           subtitle: Text(_subtitle(e)),
           trailing: Wrap(
             spacing: 2,

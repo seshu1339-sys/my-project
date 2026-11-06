@@ -8,5 +8,5 @@ const staffFlashChat = FlashChatSetup(
   collection: 'flashStaffChats',
   callable: 'flashStaffChat',
   route: '/flash-staff-chat',
-  categories: ['Work', 'Account', 'App', 'Other'],
+  categories: ['My area', 'Targets', 'Missed days', 'Adding offers', 'Terms', 'Account', 'App', 'Other'],
 );

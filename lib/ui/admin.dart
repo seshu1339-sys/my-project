@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../modules/module_admin.dart';
 import '../services/admin_route.dart';
 import 'admin_entry_list.dart';
+import 'sample_tag.dart';
 import 'admin_frame.dart';
 import 'admin_insights.dart';
 import 'admin_settings.dart';
@@ -38,6 +39,8 @@ class _AdminPageState extends State<AdminPage> {
   @override
   void initState() {
     super.initState();
+    // The sample accounts, for the SAMPLE label on their records (lib/ui/sample_tag.dart).
+    if (widget.store.live) SampleOwners.watch(() => widget.store.firestore);
     // A Home Screen shortcut to `<admin route>?open=ai-agent` lands here straight after the normal password+OTP login; this is
     // the only effect of that query param -- nothing about login itself changes. Scheduled for after the first frame since
     // Navigator needs a built context.

@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 
 import 'admin_frame.dart';
@@ -10,7 +11,6 @@ import 'admin_staff_report.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
 import 'screen_view.dart';
-import 'staff_auto_approve_switch.dart';
 import 'shop_map.dart';
 
 /// Field Assistant approvals — a separate admin tool from Vendor moderation,
@@ -148,7 +148,7 @@ class FieldModerationPage extends StatelessWidget {
     if (pending) {
       return Card(child: ListTile(
         key: ValueKey('pending-staff-${doc.id}'),
-        title: Text(name),
+        title: SampleTitle(name, id: doc.id, data: data),
         subtitle: Text([email, if (details.isNotEmpty) details].join('\n')),
         isThreeLine: details.isNotEmpty,
         trailing: Wrap(children: [
@@ -162,21 +162,13 @@ class FieldModerationPage extends StatelessWidget {
     final reason = data['decisionReason']?.toString() ?? '';
     return Card(child: Column(children: [
       ListTile(
-        title: Text(name),
+        title: SampleTitle(name, id: doc.id, data: data),
         subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
         isThreeLine: details.isNotEmpty,
         trailing: suspended
             ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))
             : FilledButton.tonal(onPressed: () => _setSuspension(context, doc.id, name, suspend: true), child: const Text('Suspend')),
       ),
-      // Trusted staff: what they add goes live without approval (off by default).
-      if (!suspended)
-        StaffAutoApproveSwitch(
-          key: ValueKey('auto-approve-${doc.id}'),
-          staffName: name,
-          value: data['autoApprove'] == true,
-          onChanged: (enabled) => store.call('setStaffAutoApprove', {'staffUid': doc.id, 'enabled': enabled}),
-        ),
     ]));
   }
 

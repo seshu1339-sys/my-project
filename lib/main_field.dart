@@ -11,6 +11,7 @@ import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 import 'ui/app_bottom_ad.dart';
 import 'ui/consent_checkbox.dart';
 import 'ui/sign_in_panel.dart';
@@ -18,6 +19,8 @@ import 'ui/field.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'staff');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -59,7 +62,7 @@ class FieldAssistantApp extends StatelessWidget {
         listenable: store,
         builder: (context, _) => MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Field Assistant',
+          title: 'Loca Market staff',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff1b5e20))),
           // The ads box at the bottom of every page, once signed in.
           builder: (context, child) => withConsentGate(context, withAppBottomAd(context, child, store, staff: true), store),
@@ -76,7 +79,7 @@ class FieldDemoPage extends StatelessWidget {
   const FieldDemoPage({super.key});
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Field Assistant')),
+        appBar: AppBar(title: const Text('Loca Market staff')),
         body: const Center(child: Text('Connect Firebase to sign in and submit field entries.')),
       );
 }
@@ -88,7 +91,7 @@ class FieldLoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Field Assistant')),
+        appBar: AppBar(title: const Text('Loca Market staff')),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),

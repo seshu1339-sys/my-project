@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
 
 import '../data/store.dart';
 import 'my_numbers_card.dart';
@@ -20,7 +21,7 @@ class ServiceProviderPage extends StatelessWidget {
   Widget _page(BuildContext context) {
     final user = store.user;
     final actions = [if (store.live) IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
-    Widget page(Widget body) => Scaffold(appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
+    Widget page(Widget body) => Scaffold(floatingActionButton: store.live ? vendorAppFlashButton(store) : null, appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
     if (!store.live || user == null) return page(const _Message(title: 'Services', body: 'Connect Firebase to register as a service provider.'));
     if (!user.emailVerified) {
       return page(const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The service-provider registration opens after that.'));
