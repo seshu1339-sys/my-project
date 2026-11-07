@@ -17,6 +17,7 @@
 const {Timestamp, FieldValue} = require('firebase-admin/firestore');
 const {publicStorageUrl} = require('../../storage-url');
 const R = require('./rules');
+const B = require('./blocks');
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const settingsRef = db => db.collection('staffAreaSettings').doc('main');
@@ -101,11 +102,7 @@ async function claimArea(db, staffUid, data = {}, now = Date.now()) {
     if (!staff || !['pending', 'active'].includes(staff.status)) throw Error('Register as staff first.');
     const area = areaDoc.data();
     if (!area) throw Error('That area was not found.');
-    const mine = mineDoc.data();
-    if (mine?.areaId) {
-      const held = (await tx.get(db.collection('staffAreas').doc(mine.areaId))).data();
-      if (held && held.status !== 'free') throw Error('You already have an area. One staff member has one area.');
-    }
+    if (await heldArea(ref => tx.get(ref), db, mineDoc.data())) throw Error('You already have an area. One staff member has one area.');
     if (area.status !== 'free') throw Error('This area is already taken. Choose a green (free) area.');
     if (!R.inside(area, data.latitude, data.longitude)) throw Error('Please go to this area to register it. Turn on GPS and stand inside the area.');
     const at = Timestamp.fromMillis(now);
@@ -121,6 +118,97 @@ async function claimArea(db, staffUid, data = {}, now = Date.now()) {
       ...(status === 'booked' ? {bookedAt: at} : {}),
     }, {merge: true});
     return {areaId: data.areaId, status};
+  });
+}
+
+/// One staff member (one email ID) has one area, ever at a time: a held, pending or booked area blocks a second one.
+async function heldArea(get, db, mine) {
+  if (!mine?.areaId) return null;
+  const held = (await get(db.collection('staffAreas').doc(mine.areaId))).data();
+  return held && held.status !== 'free' ? held : null;
+}
+
+/// Whether two areas may not both exist: an automatic area that is free again (its staff member left) never blocks a new one.
+const blocks = (area, candidateId) => area.id !== candidateId && !(area.auto === true && area.status === 'free');
+
+const PREVIEWS_A_DAY = 30;
+
+/// The automatic area for a tapped centre (no database writes except the staff member's daily preview count): the block, the
+/// buildings counted in OpenStreetMap, the density and the radius. [countBuildings] (lat, lng, radiusM) -> number asks Overpass.
+async function autoArea(db, data, countBuildings, settings) {
+  const block = B.blockOf(data.latitude, data.longitude);
+  const known = (await db.collection('staffAreaBlocks').doc(block.blockId).get()).data();
+  const buildings = Number.isInteger(known?.buildings) ? known.buildings : await countBuildings(block.latitude, block.longitude, B.SAMPLE_RADIUS_M);
+  const density = B.densityPerKm2(buildings);
+  return {...block, buildings, densityPerKm2: density, radiusKm: B.radiusFor(density, settings.densityBands), counted: !known};
+}
+
+/// Staff: "what area would this be?" before registering. Says the radius, and whether it is free or too close to another area.
+async function previewAutoArea(db, staffUid, data = {}, countBuildings, now = Date.now()) {
+  const [staff, mine] = await Promise.all([
+    db.collection('fieldStaff').doc(staffUid).get().then(d => d.data()),
+    db.collection('staffAreaStaff').doc(staffUid).get().then(d => d.data()),
+  ]);
+  if (!staff || !['pending', 'active'].includes(staff.status)) throw Error('Register as staff first.');
+  if (await heldArea(ref => ref.get(), db, mine)) throw Error('You already have an area. One staff member has one area.');
+  const day = R.istDay(now);
+  const used = mine?.previewDay === day ? mine.previews || 0 : 0;
+  if (used >= PREVIEWS_A_DAY) throw Error(`You checked ${PREVIEWS_A_DAY} places today. Try again tomorrow.`);
+  const settings = await readSettings(db);
+  const area = await autoArea(db, data, countBuildings, settings);
+  await db.collection('staffAreaStaff').doc(staffUid).set({staffUid, previewDay: day, previews: used + 1}, {merge: true});
+  const candidate = {id: area.blockId, latitude: area.latitude, longitude: area.longitude, radiusKm: area.radiusKm};
+  const others = (await allAreas(db)).filter(a => blocks(a, area.blockId));
+  const existing = (await db.collection('staffAreas').doc(area.blockId).get()).data();
+  const taken = existing && existing.status !== 'free';
+  const near = taken ? null : others.find(a => R.overlaps(candidate, a));
+  return {
+    blockId: area.blockId, latitude: area.latitude, longitude: area.longitude, buildings: area.buildings, densityPerKm2: area.densityPerKm2, radiusKm: area.radiusKm,
+    free: !taken && !near, problem: taken ? 'This block is already taken. Tap another place.' : near ? `Too close to "${near.name}". Tap a place further away.` : '',
+  };
+}
+
+/// Staff: registers the automatic area of a tapped centre, standing inside it with GPS on, having accepted the Terms. The radius is
+/// always the server's (any radius sent is ignored). Only the picked block is saved (staffAreaBlocks keeps its building count).
+async function claimAutoArea(db, staffUid, data = {}, countBuildings, now = Date.now()) {
+  if (data.termsAccepted !== true) throw Error('Tick "I accept the Terms & Conditions" to finish.');
+  const settings = await readSettings(db);
+  const area = await autoArea(db, data, countBuildings, settings);
+  const name = B.label(data.name, `Area ${area.blockId}`, 80);
+  const town = B.label(data.town, name);
+  const staffRef = db.collection('fieldStaff').doc(staffUid);
+  const mineRef = db.collection('staffAreaStaff').doc(staffUid);
+  const areaRef = db.collection('staffAreas').doc(area.blockId);
+  const holderRef = db.collection('staffAreaHolders').doc(area.blockId);
+  const blockRef = db.collection('staffAreaBlocks').doc(area.blockId);
+  const others = (await allAreas(db)).filter(a => blocks(a, area.blockId));
+  return db.runTransaction(async tx => {
+    const [staffDoc, mineDoc, areaDoc, termsDoc] = await Promise.all([tx.get(staffRef), tx.get(mineRef), tx.get(areaRef), tx.get(settingsRef(db))]);
+    const staff = staffDoc.data();
+    if (!staff || !['pending', 'active'].includes(staff.status)) throw Error('Register as staff first.');
+    if (await heldArea(ref => tx.get(ref), db, mineDoc.data())) throw Error('You already have an area. One staff member has one area.');
+    const existing = areaDoc.data();
+    if (existing && existing.status !== 'free') throw Error('This block is already taken. Tap another place.');
+    const candidate = {id: area.blockId, latitude: area.latitude, longitude: area.longitude, radiusKm: area.radiusKm};
+    const near = others.find(a => R.overlaps(candidate, a));
+    if (near) throw Error(`Too close to "${near.name}". Tap a place further away.`);
+    if (!R.inside(candidate, data.gpsLatitude, data.gpsLongitude)) throw Error('Please go to this area to register it. Turn on GPS and stand inside the area.');
+    const at = Timestamp.fromMillis(now);
+    const status = staff.status === 'active' ? 'booked' : 'pending';
+    if (area.counted) tx.set(blockRef, {blockId: area.blockId, latitude: area.latitude, longitude: area.longitude, buildings: area.buildings, sampleRadiusM: B.SAMPLE_RADIUS_M, countedAt: at});
+    tx.set(areaRef, {
+      name, town, townKey: R.townKey(town), latitude: area.latitude, longitude: area.longitude, radiusKm: area.radiusKm, status, auto: true,
+      blockId: area.blockId, buildings: area.buildings, densityPerKm2: area.densityPerKm2, createdAt: existing?.createdAt ?? at, updatedAt: at,
+    });
+    tx.set(holderRef, {
+      staffUid, staffCode: staff.staffCode || '', staffName: staff.name || staff.displayName || '', staffPhone: staff.phone || '',
+      claimedAt: at, ...(status === 'booked' ? {bookedAt: at} : {}),
+    });
+    tx.set(mineRef, {
+      staffUid, areaId: area.blockId, areaName: name, town, termsAcceptedAt: at, termsVersion: termsDoc.data()?.updatedAt ?? null, claimedAt: at,
+      ...(status === 'booked' ? {bookedAt: at} : {}),
+    }, {merge: true});
+    return {areaId: area.blockId, status, radiusKm: area.radiusKm};
   });
 }
 
@@ -477,6 +565,7 @@ async function report(db, data = {}, now = Date.now()) {
 }
 
 module.exports = {
+  previewAutoArea, claimAutoArea,
   readSettings, saveSettings, saveTown, saveArea, deleteArea, claimArea, onStaffStatus, freeArea,
   shopsInArea, dayCounts, workProgress, myToday, addStaffOffer, removeStaffOffer, nightlyCheck, lastChanceReminder, reactivate, report, WARN_TEXT,
 };

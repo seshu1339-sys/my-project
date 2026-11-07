@@ -64,8 +64,13 @@ const staffTargetMeasures = <String, String>{'Photo': 'Live photos', 'Shop': 'Sh
 const _measureNames = <String, String>{'Photo': 'photos', 'Shop': 'shops', 'Vendor': 'vendors', 'PaidVendor': 'paidVendors'};
 const _defaultTargets = <String, int>{'monthlyPhoto': defaultMonthlyPhotoTarget, 'monthlyVendor': defaultMonthlyVendorTarget, 'monthlyPaidVendor': defaultMonthlyPaidVendorTarget};
 
+/// The automatic area size (functions/modules/staff-areas/blocks.js DEFAULT_BANDS): at least [minPerKm2] buildings per km² gives
+/// [radiusKm]; the last band is everything below.
+const defaultDensityBands = <(int, double)>[(1000, 1), (300, 2), (50, 4), (0, 15)];
+
 class StaffAreaSettings {
   const StaffAreaSettings({
+    this.densityBands = defaultDensityBands,
     this.targets = const {},
     this.rateDaysPerWeek = defaultRateDaysPerWeek,
     this.maxMissedDays = defaultMaxMissedDays,
@@ -81,8 +86,16 @@ class StaffAreaSettings {
       rateDaysPerWeek: n('rateDaysPerWeek', defaultRateDaysPerWeek),
       maxMissedDays: n('maxMissedDays', defaultMaxMissedDays),
       terms: (d?['terms'] as String?)?.trim().isNotEmpty == true ? d!['terms'] as String : defaultStaffTerms,
+      densityBands: switch (d?['densityBands']) {
+        final List list when list.length == 4 => [
+          for (final b in list) (((b as Map)['minPerKm2'] as num?)?.toInt() ?? 0, (b['radiusKm'] as num?)?.toDouble() ?? 1),
+        ],
+        _ => defaultDensityBands,
+      },
     );
   }
+  // Buildings per km² -> radius, densest first.
+  final List<(int, double)> densityBands;
   // Every target by its settings key ('dailyPhotoTarget' ...); a missing one is its default.
   final Map<String, int> targets;
   final int rateDaysPerWeek, maxMissedDays;

@@ -10,7 +10,9 @@
 //   saveStaffAreaSettings  admin  -> daily target, max missed days a month, Terms & Conditions
 //   reactivateAreaStaff    admin  -> reactivate a staff member the system deactivated (their area must still be free)
 //   staffAreaReport        admin  -> per staff and per town, for a month
-//   claimStaffArea         staff  -> take a free area, standing inside it, Terms accepted
+//   claimStaffArea         staff  -> take a free area the admin made, standing inside it, Terms accepted
+//   previewAutoStaffArea   staff  -> a tapped centre: its block, the buildings counted in OpenStreetMap, the radius (automatic)
+//   claimAutoStaffArea     staff  -> register that automatic area (radius by the server only; one area per staff member)
 //   myStaffAreaToday       staff  -> my area, today's count, missed days, my area's shops
 //   addStaffTodayOffer     staff  -> a rate update (Today's Offer) for a shop in my area, with a live photo within 100 m
 //   removeStaffTodayOffer  staff  -> remove my own offer
@@ -56,6 +58,19 @@ async function pushToStaff(uid, title, body) {
   await getMessaging().sendEachForMulticast({tokens: tokens.docs.map(d => d.data().token), notification: {title, body}, data: {type: 'staffArea'}, android: {priority: 'high'}});
 }
 
+/// How many buildings OpenStreetMap has within [radiusM] metres of a place (the free Overpass service; not Google).
+async function countBuildings(lat, lng, radiusM) {
+  const B = require('./blocks');
+  const response = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: {'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'LOCAMARKET-staff-areas/1.0'},
+    body: `data=${encodeURIComponent(B.overpassQuery(lat, lng, radiusM))}`,
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) throw Error('The building count is busy just now. Try again in a minute.');
+  return B.parseCount(await response.json());
+}
+
 exports.saveStaffAreaTown = admin((db, data) => S.saveTown(db, data));
 exports.saveStaffArea = admin((db, data) => S.saveArea(db, data));
 exports.deleteStaffArea = admin((db, data) => S.deleteArea(db, data));
@@ -64,6 +79,8 @@ exports.saveStaffAreaSettings = admin((db, data) => S.saveSettings(db, data));
 exports.reactivateAreaStaff = admin((db, data, uid) => S.reactivate(db, data, uid));
 exports.staffAreaReport = admin((db, data) => S.report(db, data));
 exports.claimStaffArea = staff((db, uid, data) => S.claimArea(db, uid, data));
+exports.previewAutoStaffArea = staff((db, uid, data) => S.previewAutoArea(db, uid, data, countBuildings));
+exports.claimAutoStaffArea = staff((db, uid, data) => S.claimAutoArea(db, uid, data, countBuildings));
 exports.myStaffAreaToday = staff((db, uid) => S.myToday(db, uid));
 exports.addStaffTodayOffer = staff((db, uid, data) => S.addStaffOffer(db, getStorage().bucket(), uid, data));
 exports.removeStaffTodayOffer = staff((db, uid, data) => S.removeStaffOffer(db, uid, data));

@@ -340,6 +340,9 @@ class _StaffAreaSettingsFormState extends State<StaffAreaSettingsForm> {
     for (final p in staffTargetPeriods.keys)
       for (final m in staffTargetMeasures.keys) '$p${m}Target': TextEditingController(text: '${widget.settings.target(p, m)}'),
   };
+  // The automatic area size: 4 bands of buildings per km² and their radius (the last band is "fewer than the band above").
+  late final bandMin = [for (final b in widget.settings.densityBands) TextEditingController(text: '${b.$1}')];
+  late final bandKm = [for (final b in widget.settings.densityBands) TextEditingController(text: b.$2 == b.$2.roundToDouble() ? '${b.$2.toInt()}' : '${b.$2}')];
   late final rateDays = TextEditingController(text: '${widget.settings.rateDaysPerWeek}');
   late final missed = TextEditingController(text: '${widget.settings.maxMissedDays}');
   late final terms = TextEditingController(text: widget.settings.terms);
@@ -347,7 +350,7 @@ class _StaffAreaSettingsFormState extends State<StaffAreaSettingsForm> {
 
   @override
   void dispose() {
-    for (final c in [...targets.values, rateDays, missed]) {
+    for (final c in [...targets.values, ...bandMin, ...bandKm, rateDays, missed]) {
       c.dispose();
     }
     terms.dispose();
@@ -362,8 +365,24 @@ class _StaffAreaSettingsFormState extends State<StaffAreaSettingsForm> {
     if (r == null || r < 1 || r > 7) return setState(() => error = 'Enter 1 to 7 rate update days a week.');
     if (m == null || m < 1 || m > 31) return setState(() => error = 'Enter 1 to 31 missed days.');
     if (terms.text.trim().length < 20) return setState(() => error = 'Write the Terms & Conditions.');
+    final mins = [for (var i = 0; i < 3; i++) int.tryParse(bandMin[i].text.trim()), 0];
+    final kms = [for (final c in bandKm) double.tryParse(c.text.trim())];
+    if (mins.any((v) => v == null || v < 0) || !(mins[0]! > mins[1]! && mins[1]! > mins[2]! && mins[2]! > 0)) {
+      return setState(() => error = 'Area size: each band needs fewer buildings than the band above it (whole numbers).');
+    }
+    if (kms.any((v) => v == null || v < 0.5 || v > 30)) return setState(() => error = 'Area size: enter each radius from 0.5 to 30 km.');
     setState(() => error = null);
-    await _run(context, () => widget.onSave({...values, 'rateDaysPerWeek': r, 'maxMissedDays': m, 'terms': terms.text.trim()}), 'Saved');
+    await _run(
+      context,
+      () => widget.onSave({
+        ...values,
+        'rateDaysPerWeek': r,
+        'maxMissedDays': m,
+        'terms': terms.text.trim(),
+        'densityBands': [for (var i = 0; i < 4; i++) {'minPerKm2': mins[i], 'radiusKm': kms[i]}],
+      }),
+      'Saved',
+    );
   }
 
   Widget _cell(String period, String measure) => Padding(
@@ -413,6 +432,40 @@ class _StaffAreaSettingsFormState extends State<StaffAreaSettingsForm> {
         ),
       ),
     ),
+    const SizedBox(height: 16),
+    Text('Automatic area size', style: Theme.of(context).textTheme.titleMedium),
+    const Text(
+      'When a staff member taps the centre of their area, the app counts the houses and buildings within 1 km (free OpenStreetMap data) '
+      'and gives the area this radius. Staff cannot change it. Areas already registered keep their size.',
+    ),
+    for (var i = 0; i < 4; i++)
+      Padding(
+        key: ValueKey('staff-density-band-$i'),
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(children: [
+          Expanded(
+            flex: 3,
+            child: i < 3
+                ? TextField(
+                    key: ValueKey('staff-density-min-$i'),
+                    controller: bandMin[i],
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: i == 0 ? 'Buildings per km²: this many or more' : 'or more (and fewer than above)', isDense: true, border: const OutlineInputBorder()),
+                  )
+                : const Text('Fewer than the band above', key: ValueKey('staff-density-last')),
+          ),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.arrow_forward)),
+          Expanded(
+            flex: 2,
+            child: TextField(
+              key: ValueKey('staff-density-km-$i'),
+              controller: bandKm[i],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Radius (km)', isDense: true, border: OutlineInputBorder()),
+            ),
+          ),
+        ]),
+      ),
     const SizedBox(height: 16),
     Text('Rate days and missed days', style: Theme.of(context).textTheme.titleMedium),
     TextField(

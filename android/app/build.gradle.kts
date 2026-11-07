@@ -11,6 +11,13 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
+// The Google Maps key of the staff app's area map (Maps SDK for Android), kept out of git in android/local.properties as
+// MAPS_API_KEY=... . Without it the apps build as before and the staff app uses its free OpenStreetMap map.
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
 
 android {
     namespace = "in.locamarket.locamark"
@@ -34,6 +41,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
     }
 
     // Three Android apps from this one project, all on the same Firebase backend. Each flavor has its own

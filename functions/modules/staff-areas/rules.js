@@ -17,6 +17,7 @@
 //   5 PM if they have not yet). The area is free again after a stop, and the vendors of the area stay live.
 // - Staff never choose dates for an offer (owner, 7 Nov 2026): a staff rate update is that day's rate and ends at midnight. How long a
 //   vendor's own offers show is the vendor's choice, in the vendor app.
+const B = require('./blocks');
 const IST = 19800000;
 const DAY_MS = 86400000;
 const RADIUS_OPTIONS = [1, 2, 3, 5];
@@ -120,6 +121,8 @@ function validateSettings(data = {}) {
   }
   whole(data, out, 'rateDaysPerWeek', 1, 7, 'Enter 1 to 7 rate days a week.');
   whole(data, out, 'maxMissedDays', 1, 31, 'Enter 1 to 31 missed days (the account stops on that day).');
+  // The automatic area size: buildings per km2 -> radius (owner, 7 Nov 2026).
+  if (data.densityBands !== undefined) out.densityBands = B.validateBands(data.densityBands);
   if (data.terms !== undefined) {
     const terms = typeof data.terms === 'string' ? data.terms.trim() : '';
     if (terms.length < 20 || terms.length > 8000) throw Error('Write the Terms & Conditions (20 to 8000 characters).');
@@ -132,6 +135,7 @@ function validateSettings(data = {}) {
 const settingsOf = data => ({
   ...Object.fromEntries(Object.entries(DEFAULTS).map(([k, v]) => [k, Number.isInteger(data?.[k]) ? data[k] : v])),
   terms: typeof data?.terms === 'string' && data.terms.trim() ? data.terms : DEFAULT_TERMS,
+  densityBands: B.bandsOf(data?.densityBands),
 });
 
 /// The Monday (India date) of the week of [day].

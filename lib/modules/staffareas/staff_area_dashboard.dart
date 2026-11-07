@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import 'area_map.dart';
-import 'staff_area_claim_page.dart';
+import 'staff_auto_area_page.dart';
 import 'staff_area_model.dart';
 import 'staff_offer_form.dart';
 import 'staff_terms.dart';
@@ -82,7 +82,7 @@ class _StaffAreaDashboardState extends State<StaffAreaDashboard> {
       return StaffAreaDashboardView(
         today: snapshot.data!,
         onRefresh: _refresh,
-        onChoose: () => _open(Scaffold(appBar: AppBar(title: const Text('Your area')), body: StaffAreaClaimPage(store: widget.store))),
+        onChoose: () => _open(Scaffold(appBar: AppBar(title: const Text('Your area')), body: StaffAutoAreaPage(store: widget.store))),
         onAddOffer: () => _open(StaffOfferForm(store: widget.store, shops: snapshot.data!.shops)),
         onTerms: () => _open(StaffTermsPage(store: widget.store)),
       );
