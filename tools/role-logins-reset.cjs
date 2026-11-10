@@ -1,8 +1,10 @@
 // One-off clean-up for the switch to a separate login per role (functions/role-logins.js), run once at deploy time with the owner.
-// Run from the repository root in a trusted shell with Application Default Credentials (gcloud auth application-default login):
+// Run in a trusted shell, signed in with the Firebase CLI (firebase login; add --firebase-login) or with Application Default
+// Credentials (gcloud auth application-default login):
 //
-//   node tools/role-logins-reset.cjs PROJECT_ID                       DRY RUN: lists everything and writes role-logins-reset-plan.json
-//   node tools/role-logins-reset.cjs PROJECT_ID --apply PLAN.json     deletes exactly what that plan lists, nothing else
+//   node tools/role-logins-reset.cjs PROJECT_ID [--firebase-login]                    DRY RUN: lists everything and writes
+//                                                                                       role-logins-reset-plan.json (current folder)
+//   node tools/role-logins-reset.cjs PROJECT_ID [--firebase-login] --apply PLAN.json  deletes exactly what that plan lists, nothing else
 //
 // What it lists (and --apply deletes):
 //   - every emailRoles/<email> document (the old "one email = one role" lock; it held only test data);
@@ -25,8 +27,30 @@ const projectId = args[0];
 const applyIndex = args.indexOf('--apply');
 const keep = new Set(args.flatMap((a, i) => (args[i - 1] === '--keep' ? [a.toLowerCase()] : [])));
 if (!projectId || projectId.startsWith('--')) throw Error('Usage: node tools/role-logins-reset.cjs PROJECT_ID [--keep ADMIN_EMAIL ...] [--apply PLAN.json]');
-initializeApp({credential: applicationDefault(), projectId});
-const db = getFirestore();
+/// The Firebase CLI's own login (firebase login), so gcloud is not needed. Kept in memory only, never written to a file.
+function firebaseCliLogin() {
+  const cli = process.env.FIREBASE_TOOLS_LIB || path.join(process.env.APPDATA || '', 'npm/node_modules/firebase-tools/lib');
+  const {getProjectDefaultAccount, getGlobalDefaultAccount} = require(path.join(cli, 'auth'));
+  const api = require(path.join(cli, 'api'));
+  const account = getProjectDefaultAccount(path.join(__dirname, '..')) || getGlobalDefaultAccount();
+  const refreshToken = account?.tokens?.refresh_token;
+  if (!refreshToken) throw Error('Sign in with the Firebase CLI first: firebase login');
+  return {type: 'authorized_user', client_id: api.clientId(), client_secret: api.clientSecret(), refresh_token: refreshToken, quota_project_id: projectId};
+}
+const cliLogin = args.includes('--firebase-login') ? firebaseCliLogin() : null;
+let credential = applicationDefault();
+if (cliLogin) {
+  const {GoogleAuth} = req('google-auth-library');
+  const google = new GoogleAuth({credentials: cliLogin, scopes: ['https://www.googleapis.com/auth/cloud-platform']});
+  credential = {
+    async getAccessToken() {
+      const {token} = await (await google.getClient()).getAccessToken();
+      return {access_token: token, expires_in: 1800};
+    },
+  };
+}
+initializeApp({credential, projectId});
+const db = cliLogin ? new (req('@google-cloud/firestore').Firestore)({projectId, credentials: cliLogin}) : getFirestore();
 
 async function dryRun() {
   const emailRoles = (await db.collection('emailRoles').get()).docs.map(d => ({id: d.id, role: d.data().role || ''}));
