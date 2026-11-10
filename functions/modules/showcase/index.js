@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole} = require('../../role-auth');
 // Showcase module: the paid vendors' boxes in Today's Offers and in the website's right-side ad boxes, seen only within the plan's km
 // (store.js). Removing its one line from functions/index.js removes the records; offers and ads keep working as before.
 //
@@ -13,7 +14,7 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 exports.chooseShowcasePhoto = onCall(options, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   try { return await choosePhoto(getFirestore(), request.auth.uid, request.data || {}); } catch (error) { throw new HttpsError('failed-precondition', error.message); }
 });
 exports.syncShowcaseOnPlan = onDocumentWritten({document: 'vendorPremium/{uid}', region: 'asia-south1', maxInstances: 3}, async event => {

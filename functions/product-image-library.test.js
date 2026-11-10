@@ -5,7 +5,7 @@ test('new vendor items come only from the admin library; the library switch stil
   const {getFirestore} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const vendor = {auth: {uid: 'libV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'libV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('libV').set({vendorId: 'libV', name: 'Lib Vendor', shopId: 'libShop', status: 'approved'});
   await db.collection('vendorShopPhotos').doc('libV_1').set({vendorId: 'libV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('productImageLibrary').doc('approvedImg').set({name: 'Approved lamp', imageUrl: 'https://example.test/approved.jpg', active: true, order: 0});

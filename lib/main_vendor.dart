@@ -76,7 +76,8 @@ class VendorApp extends StatelessWidget {
       );
 }
 
-/// Vendors and service providers sign in with Google (or an emailed code); the registration form opens once the email is in.
+/// Vendors and service providers sign in with Google (or an emailed code); the registration form opens once the email is in. The
+/// first time, the person then chooses Vendor or Service provider (two separate accounts of the same email; the home screen switches).
 class VendorLoginPage extends StatelessWidget {
   const VendorLoginPage({super.key, required this.store});
   final Store store;
@@ -89,13 +90,15 @@ class VendorLoginPage extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 420),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Become a vendor', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                const Text('Sign in with your Google account. Once you are in you can register your shop or service for approval.'),
-                const SizedBox(height: 16),
-                SignInPanel(store: store),
-              ]),
+              child: store.choosingVendorRole
+                  ? VendorRoleChooser(store: store)
+                  : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Text('Become a vendor', style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 8),
+                      const Text('Sign in with your Google account. Once you are in you can register your shop or service for approval.'),
+                      const SizedBox(height: 16),
+                      SignInPanel(store: store),
+                    ]),
             ),
           ),
         ),

@@ -14,6 +14,7 @@ import '../domain/delivery.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
 import '../domain/towns.dart';
+import '../services/google_account.dart';
 import '../services/usage.dart';
 import 'store_consent.dart';
 import '../services/localization.dart';
@@ -97,9 +98,34 @@ class Store extends ChangeNotifier {
   bool followsGps = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
-  /// Which app this is: 'user' (customers, open to every email), 'vendor' (vendors and service providers) or 'staff'. The server
-  /// (functions/login.js claimAppRole) refuses a vendor/staff app login whose email holds the other role.
+  /// Which app this is: 'user' (customers), 'vendor' (vendors and service providers), 'staff', or 'admin' (the admin panel). Each
+  /// app signs in with the email's OWN login for its role (functions/role-logins.js): the person uses the same email (and Google
+  /// account) everywhere, and gets a separate account, with its own ID, records and block, in each app.
   String appRole = 'user';
+
+  /// The roles this app signs in as. The vendor app holds both the vendor and the service-provider login of an email.
+  List<String> get appRoles => switch (appRole) {
+    'vendor' => const ['vendor', 'provider'],
+    'staff' => const ['staff'],
+    'admin' => const ['admin'],
+    _ => const ['user'],
+  };
+
+  /// The role of the signed-in login ('user', 'vendor', 'provider', 'staff' or 'admin'); '' when nobody is signed in to this app.
+  String sessionRole = '';
+
+  /// The email the signed-in login belongs to (a role login has no email of its own in Firebase Auth).
+  String sessionEmail = '';
+  String? _sessionUid;
+
+  /// The last email that signed in on this phone: the email-code field starts with it.
+  String lastSignInEmail = '';
+
+  /// Vendor app only: the email is proven, and the person chooses Vendor or Service provider now.
+  bool choosingVendorRole = false;
+
+  /// The role a sign-in was refused for because it is blocked ([roleBlock] says so); null otherwise.
+  String? blockedRole;
 
   /// Agreement to the Terms & Conditions and the Privacy Policy (store_consent.dart). Only the customer, vendor and staff apps ask for it.
   bool requiresConsent = false;
@@ -122,10 +148,26 @@ class Store extends ChangeNotifier {
   /// Lets the consent extension (store_consent.dart) tell the screens that the agreement state changed.
   void consentChanged() => notifyListeners();
 
-  /// Why the last sign-in was refused (the email holds another role); shown on the login screen, null otherwise.
+  /// Why the last sign-in could not finish (that role is blocked, or no connection); shown on the login screen, null otherwise.
   String? roleBlock;
-  String? _gatedUid;
-  User? get user => live ? FirebaseAuth.instance.currentUser : null;
+
+  /// The signed-in login of this app: its role login once entered, or (customer app) the email's own login while its email waits for
+  /// verification. The email's own verified login is never "signed in" here: it only proves the email, and the app swaps it for its
+  /// role login straight away.
+  User? get user {
+    if (!live) return null;
+    final current = FirebaseAuth.instance.currentUser;
+    if (current == null) return null;
+    if (sessionRole.isNotEmpty && current.uid == _sessionUid) return current;
+    if (current.email != null && !current.emailVerified) return current;
+    return null;
+  }
+
+  /// The signed-in person's email is proven (always true for a role login).
+  bool get emailConfirmed => sessionRole.isNotEmpty || (user?.emailVerified ?? false);
+
+  /// The signed-in person's email, for display.
+  String get signedInEmail => sessionEmail.isNotEmpty ? sessionEmail : (user?.email ?? '');
   /// Completes the stored place from the places directory: the town (and its
   /// district/state) of a typed pincode, or the district/state of a town that
   /// came from a place-name search. Only ever fills what is missing, never
@@ -247,6 +289,16 @@ class Store extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     if (live) {
+      // The app opens straight inside: the role of the login this phone is still signed in with is known before the first screen,
+      // without waiting for the network (the claims are checked again as soon as Firebase reports the login).
+      lastSignInEmail = prefs.getString('lastSignInEmail') ?? '';
+      final saved = (prefs.getString('sessionRole') ?? '').split('|');
+      final current = FirebaseAuth.instance.currentUser;
+      if (saved.length == 3 && current != null && current.uid == saved[0] && appRoles.contains(saved[1])) {
+        _sessionUid = saved[0];
+        sessionRole = saved[1];
+        sessionEmail = saved[2];
+      }
     }
     pincode = prefs.getString('pincode') ?? '';
     await loadConsentDevice();
@@ -292,14 +344,13 @@ class Store extends ChangeNotifier {
     } else {
       _subscriptions.add(
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
-          if (u == null) _gatedUid = null;
-          if (u != null && u.emailVerified && _gatedUid != u.uid && !await _roleAllowed(u)) return;
-          if (u == null) consentNeeded = false;
-          if (u != null && u.emailVerified) await syncConsent();
-          admin =
-              u != null &&
-              u.emailVerified &&
-              (await u.getIdTokenResult()).claims?['admin'] == true;
+          if (u != null && !await _adoptLogin(u)) return;
+          if (u == null) {
+            if (FirebaseAuth.instance.currentUser != null) return;
+            await _setSession(null);
+            consentNeeded = false;
+          }
+          if (u != null && emailConfirmed) await syncConsent();
           profileName = u?.displayName ?? '';
           if (u != null) {
             try {
@@ -677,7 +728,7 @@ class Store extends ChangeNotifier {
     if (user == null) {
       throw StateError('Please sign in first.');
     }
-    if (!user!.emailVerified) {
+    if (!emailConfirmed) {
       throw StateError('Verify your email in Your account before ordering.');
     }
     final result = await FirebaseFunctions.instance
@@ -705,44 +756,149 @@ class Store extends ChangeNotifier {
     return Map<String, dynamic>.from(result.data as Map);
   }
 
+  /// Password sign-in (the customer app's form and the admin panel): proves the email, then enters this app's role login.
   Future<void> login(String email, String password) async {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
+    roleBlock = null;
+    final signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
+    if (signedIn.user?.emailVerified == true) await enterAppRole();
   }
 
-  /// Asks the server whether this app may let [u] in (one email is only one of vendor / service provider / staff; customers are
-  /// open to everyone). A refused email is signed out at once and [roleBlock] says why. A network failure does not lock anyone out:
-  /// the server checks again when they register or act.
-  Future<bool> _roleAllowed(User u) async {
+  /// Who [u] is, from its claims. True when [u] is this app's own role login (the session is set); false when it is the email's own
+  /// login (a verified one is swapped for the role login right away, an unverified one waits for the email check) or another app's
+  /// login (signed out: on the web the shop and the admin panel share the browser).
+  Future<bool> _adoptLogin(User u) async {
+    // A late event for a login that has already been swapped for another one.
+    if (FirebaseAuth.instance.currentUser?.uid != u.uid) return false;
+    Map<String, dynamic> claims;
     try {
-      await call('claimAppRole', {'app': appRole});
-      _gatedUid = u.uid;
-      return true;
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code != 'failed-precondition') return true;
-      roleBlock = e.message ?? 'This email is already registered in another role. Please use a different email.';
-      await _forgetGoogle();
+      claims = (await u.getIdTokenResult()).claims ?? const {};
+    } catch (_) {
+      // No connection to refresh the token: keep the session this phone already knows for this login.
+      return sessionRole.isNotEmpty && _sessionUid == u.uid;
+    }
+    if (FirebaseAuth.instance.currentUser?.uid != u.uid) return false;
+    final role = claims['role']?.toString() ?? '';
+    if (role.isEmpty) {
+      await _setSession(null);
+      if (u.emailVerified) unawaited(_enterRoleQuietly());
+      notifyListeners();
+      return false;
+    }
+    if (!appRoles.contains(role)) {
+      await _setSession(null);
       await FirebaseAuth.instance.signOut();
       notifyListeners();
       return false;
-    } catch (_) {
-      return true;
     }
+    await _setSession(u.uid, role: role, email: claims['loginEmail']?.toString() ?? '', isAdmin: role == 'admin' && claims['admin'] == true);
+    return true;
   }
 
-  bool _googleReady = false;
-  Future<void> _forgetGoogle() async {
-    if (kIsWeb || !_googleReady) return;
+  /// Remembers (or, with a null [uid], forgets) the signed-in role login, so the app opens straight inside next time.
+  Future<void> _setSession(String? uid, {String role = '', String email = '', bool isAdmin = false}) async {
+    _sessionUid = uid;
+    sessionRole = uid == null ? '' : role;
+    sessionEmail = uid == null ? '' : email;
+    admin = uid != null && isAdmin;
+    final prefs = await SharedPreferences.getInstance();
+    if (uid == null) {
+      await prefs.remove('sessionRole');
+      return;
+    }
+    roleBlock = null;
+    blockedRole = null;
+    choosingVendorRole = false;
+    await prefs.setString('sessionRole', '$uid|$role|$email');
+    if (email.isNotEmpty) {
+      lastSignInEmail = email;
+      await prefs.setString('lastSignInEmail', email);
+    }
+    if (appRoles.length > 1) await prefs.setString('vendorAppRole', role);
+  }
+
+  Future<void>? _entering;
+
+  /// Swaps the email's own (proven) login for this app's login in [role] (the app's own role, or in the vendor app the remembered
+  /// choice): functions/role-logins.js enterRole makes it the first time. Throws, with [roleBlock] set, when that role is blocked or
+  /// the server cannot be reached.
+  Future<void> enterAppRole([String? role]) => _entering ??= _enterRole(role).whenComplete(() => _entering = null);
+
+  Future<void> _enterRoleQuietly() async {
     try {
-      await GoogleSignIn.instance.signOut();
+      await enterAppRole();
     } catch (_) {
-      /* Nothing to forget. */
+      /* roleBlock already says why; the sign-in screen shows it. */
     }
   }
 
-  /// Main sign-in: the phone's own Google account list; one tap, no typing, and Google has already verified the email.
+  Future<void> _enterRole(String? wanted) async {
+    final role = wanted ?? await _defaultRole();
+    if (role == null) {
+      // Vendor app, first sign-in: "Vendor or Service provider?" decides.
+      choosingVendorRole = true;
+      notifyListeners();
+      return;
+    }
+    try {
+      final result = await call('enterRole', {'role': role});
+      await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
+      final u = FirebaseAuth.instance.currentUser;
+      if (u != null) await _adoptLogin(u);
+    } catch (e) {
+      final refused = e is FirebaseFunctionsException && e.code == 'permission-denied';
+      roleBlock = e is FirebaseFunctionsException && (e.message ?? '').isNotEmpty
+          ? e.message
+          : 'Could not finish signing in. Check your connection and try again.';
+      final details = e is FirebaseFunctionsException ? e.details : null;
+      blockedRole = details is Map ? details['blocked']?.toString() : null;
+      if (appRoles.length > 1) {
+        // The vendor app offers the email's other login (Vendor or Service provider), which a block on this one never touches.
+        choosingVendorRole = true;
+      } else if (refused) {
+        await _forgetGoogle();
+        await FirebaseAuth.instance.signOut();
+      }
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<String?> _defaultRole() async {
+    if (appRoles.length == 1) return appRoles.first;
+    final saved = (await SharedPreferences.getInstance()).getString('vendorAppRole');
+    return appRoles.contains(saved) ? saved : null;
+  }
+
+  /// Vendor app: the answer to "Vendor or Service provider?" after the first sign-in (remembered on this phone).
+  Future<void> chooseVendorRole(String role) async {
+    choosingVendorRole = false;
+    roleBlock = null;
+    blockedRole = null;
+    notifyListeners();
+    await enterAppRole(role);
+  }
+
+  /// Vendor app: moves to the same email's other login (Vendor <-> Service provider), each with its own ID, records and block.
+  Future<void> switchVendorRole(String to) async {
+    if (sessionRole == to) return;
+    final result = await call('switchRole', {'to': to});
+    await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null) await _adoptLogin(u);
+    notifyListeners();
+  }
+
+  /// Signs Google out on this phone (lib/services/google_account.dart).
+  Future<void> _forgetGoogle() async {
+    if (!kIsWeb) await forgetGoogleAccount();
+  }
+
+  /// Main sign-in: "Continue with Google", one tap on an account already on the phone, no typing; Google has already verified the
+  /// email. Signing in and registering are the same step: the app's own account for this email is made on the first sign-in.
   /// Returns false when the person closed the account list without choosing.
   Future<bool> signInWithGoogle() async {
     roleBlock = null;
@@ -750,14 +906,11 @@ class Store extends ChangeNotifier {
       if (kIsWeb) {
         await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
       } else {
-        if (!_googleReady) {
-          await GoogleSignIn.instance.initialize();
-          _googleReady = true;
-        }
-        final account = await GoogleSignIn.instance.authenticate();
-        await FirebaseAuth.instance.signInWithCredential(
-          GoogleAuthProvider.credential(idToken: account.authentication.idToken),
-        );
+        final account = await pickGoogleAccount();
+        if (account == null) return false;
+        final idToken = account.authentication.idToken;
+        if (idToken == null) throw StateError('Google did not send a sign-in token. Please try again, or use an email code.');
+        await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
       }
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) return false;
@@ -766,6 +919,7 @@ class Store extends ChangeNotifier {
       if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return false;
       rethrow;
     }
+    await enterAppRole();
     return true;
   }
 
@@ -774,12 +928,13 @@ class Store extends ChangeNotifier {
     await call('requestEmailLoginCode', {'email': email});
   }
 
-  /// Checks the code the person typed; the server marks the email verified and hands back a sign-in token.
+  /// Checks the code the person typed; the server marks the email verified and hands back a sign-in token for the email's own login,
+  /// which is then swapped for this app's role login.
   Future<void> verifyEmailCode(String email, String code) async {
     roleBlock = null;
     final result = await call('verifyEmailLoginCode', {'email': email, 'code': code});
     await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
-    await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    await enterAppRole();
   }
 
   Future<void> registerEmail(String email, String password) async {
@@ -797,17 +952,22 @@ class Store extends ChangeNotifier {
     await current.sendEmailVerification();
   }
 
+  /// After the person opened the verification link: once the email is verified, the app's role login is entered.
   Future<bool> refreshEmailVerification() async {
-    await user?.reload();
-    final current = user;
-    if (current == null) {
+    if (sessionRole.isNotEmpty) {
+      notifyListeners();
+      return true;
+    }
+    await FirebaseAuth.instance.currentUser?.reload();
+    final current = FirebaseAuth.instance.currentUser;
+    if (current == null || !current.emailVerified) {
       notifyListeners();
       return false;
     }
-    final token = await current.getIdTokenResult(true);
-    admin = current.emailVerified && token.claims?['admin'] == true;
+    await current.getIdToken(true);
+    await enterAppRole();
     notifyListeners();
-    return current.emailVerified;
+    return sessionRole.isNotEmpty;
   }
 
   Future<void> resetPassword(String email) async {
@@ -825,8 +985,11 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    if (live && user?.emailVerified == true) await notifications.disable();
+    if (live && emailConfirmed) await notifications.disable();
+    await _forgetGoogle();
     await FirebaseAuth.instance.signOut();
+    await _setSession(null);
+    choosingVendorRole = false;
     cart.clear();
     // Clear per-account local caches so a different account signing in next
     // on this device never inherits this account's wishlist/payment display

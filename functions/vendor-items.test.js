@@ -17,10 +17,10 @@ test('a vendor item goes live on save at the shop\'s place; 2 items by default (
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('settings').doc('business').set({name: 'Test', autoPublishVendorChanges: false});
-  const vendor = {auth: {uid: 'itemV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'itemV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('itemV').set({vendorId: 'itemV', name: 'Ravi Stores', shopId: 'itemShop', status: 'approved'});
   await db.collection('shops').doc('itemShop').set({name: 'Ravi Stores', pincode: '531116', latitude: 17.668, longitude: 82.612, ownerId: 'itemV', active: true});
   await db.collection('vendorShopPhotos').doc('itemV_1').set({vendorId: 'itemV', slot: 1, status: 'approved'});

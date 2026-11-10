@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Vendor Offers module. Its own files, callables, collections and Storage folder (see store.js). It knows nothing about plans or payments.
 // Removing its one line from functions/index.js removes all of it, and nothing else notices.
 //
@@ -16,12 +17,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
 }
 

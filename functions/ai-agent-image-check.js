@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole} = require('./role-auth');
 // Advisory-only image licensing check for AI-suggested content. This is
 // deliberately NOT a real reverse-image-search/licensing API integration
 // (that is a separate, future, paid-API decision) — it only checks whether
@@ -14,7 +15,7 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {

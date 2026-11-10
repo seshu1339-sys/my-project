@@ -23,7 +23,7 @@ class ServiceProviderPage extends StatelessWidget {
     final actions = [if (store.live) IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     Widget page(Widget body) => Scaffold(floatingActionButton: store.live ? vendorAppFlashButton(store) : null, appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
     if (!store.live || user == null) return page(const _Message(title: 'Services', body: 'Connect Firebase to register as a service provider.'));
-    if (!user.emailVerified) {
+    if (!store.emailConfirmed) {
       return page(const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The service-provider registration opens after that.'));
     }
     return page(
@@ -34,7 +34,7 @@ class ServiceProviderPage extends StatelessWidget {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final application = snapshot.data!.data();
           final status = application?['status'];
-          if (application == null || status == 'rejected') return ProviderRegistrationForm(store: store, email: user.email ?? '', previous: application);
+          if (application == null || status == 'rejected') return ProviderRegistrationForm(store: store, email: store.signedInEmail, previous: application);
           if (status == 'pending') return ProviderStatusView(application: application);
           // Live: the provider's own numbers (calls and WhatsApp from customers) under the status.
           return ListView(children: [

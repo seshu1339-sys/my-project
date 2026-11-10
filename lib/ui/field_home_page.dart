@@ -7,21 +7,6 @@ import '../modules/staffareas/staffareas_module.dart';
 import '../modules/flash/flash_module.dart' show staffAppFlashButton;
 import 'field_workspace.dart';
 
-/// Why this login cannot register as field staff: vendor, service-provider and field-staff accounts are completely separate, so an
-/// account that is already a vendor or a service provider is told to use another email address. Null when it may register.
-String? fieldAccountBlock({
-  Map<String, dynamic>? vendorApplication,
-  Map<String, dynamic>? vendor,
-  Map<String, dynamic>? quickAccount,
-  Map<String, dynamic>? providerApplication,
-  Map<String, dynamic>? provider,
-}) {
-  const after = 'Field staff must use a separate account: sign out and register as staff with a different email address.';
-  if (vendorApplication != null || vendor != null || quickAccount?['role'] == 'vendor') return 'This account is a vendor account. $after';
-  if (providerApplication != null || provider != null) return 'This account is a service-provider account. $after';
-  return null;
-}
-
 /// Streams the signed-in staff member's own fieldStaff/{uid} doc and shows the
 /// right screen for its status. Unlike before, no fieldStaff/{uid} doc existing
 /// yet no longer auto-requests access: it shows FieldRegistrationForm instead,
@@ -42,7 +27,7 @@ class _FieldHomePageState extends State<FieldHomePage> {
     final user = store.user;
     if (user == null) return const SizedBox.shrink();
     final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
-    if (!user.emailVerified) {
+    if (!store.emailConfirmed) {
       return Scaffold(
         appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),
         body: const _Message(
@@ -72,7 +57,10 @@ class _FieldHomePageState extends State<FieldHomePage> {
     {
       {
         {
-          if (!snapshot.exists) return _SeparateAccountCheck(store: store);
+          // The staff app signs in with the email's own staff login (functions/role-logins.js), so the same email may also be a
+          // customer, vendor or service provider: those are separate logins with their own records. Sending this form makes the
+          // pending staff record; nothing can be submitted until an administrator approves it.
+          if (!snapshot.exists) return FieldRegistrationForm(store: store, displayName: store.user?.displayName ?? '');
           if (status == 'suspended') {
             return const _Message(title: 'Access suspended', body: 'Your field staff access has been suspended by the administrator. Contact them to have it reinstated.');
           }
@@ -87,31 +75,6 @@ class _FieldHomePageState extends State<FieldHomePage> {
       }
     }
   }
-}
-
-/// No staff record yet: the registration form, unless this login is already a vendor or a service-provider account.
-class _SeparateAccountCheck extends StatelessWidget {
-  const _SeparateAccountCheck({required this.store});
-  final Store store;
-
-  Future<String?> _block() async {
-    final uid = store.user!.uid;
-    Future<Map<String, dynamic>?> read(String collection) async => (await store.firestore.collection(collection).doc(uid).get()).data();
-    final docs = await Future.wait([for (final c in ['vendorApplications', 'vendors', 'quickAccounts', 'providerApplications', 'providers']) read(c)]);
-    return fieldAccountBlock(vendorApplication: docs[0], vendor: docs[1], quickAccount: docs[2], providerApplication: docs[3], provider: docs[4]);
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<String?>(
-    future: _block(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-      // When the check itself fails the form still opens; the server refuses a second kind of account anyway.
-      final block = snapshot.hasError ? null : snapshot.data;
-      if (block != null) return _Message(title: 'Use a separate account', body: block);
-      return FieldRegistrationForm(store: store, displayName: store.user?.displayName ?? '');
-    },
-  );
 }
 
 class _Message extends StatelessWidget {

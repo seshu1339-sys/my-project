@@ -1,4 +1,6 @@
 'use strict';
+const {isAdminToken} = require('./role-auth');
+const {loginEmailOf} = require('./role-logins');
 const {onDocumentUpdated, onDocumentWritten} = require('firebase-functions/v2/firestore');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
@@ -215,7 +217,7 @@ exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asi
 const adminOptions = {region: 'us-central1', maxInstances: 5, invoker: 'public'};
 async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 async function loadAudience(productId) {
@@ -228,7 +230,7 @@ async function loadAudience(productId) {
   const emails = new Map();
   for (let i = 0; i < viewers.length; i += 100) {
     const found = await getAuth().getUsers(viewers.slice(i, i + 100).map(v => ({uid: v.id})));
-    for (const user of found.users) emails.set(user.uid, user.email || '');
+    for (const user of found.users) emails.set(user.uid, loginEmailOf(user));
   }
   const now = Date.now();
   const rows = [];

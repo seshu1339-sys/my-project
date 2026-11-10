@@ -73,7 +73,7 @@ test('counts by day and key, the shop owner\'s and the staff member\'s own numbe
 
   // through a callable: the "Ad for your shop" tick
   await db.collection('vendors').doc('uVendorAd').set({status: 'approved', name: 'Ravi Stores', town: 'Tuni'});
-  await fns.setAdInterest.run({auth: {uid: 'uVendorAd', token: {email_verified: true}}, data: {interested: true}});
+  await fns.setAdInterest.run({auth: {uid: 'uVendorAd', token: {role: 'user', email_verified: true}}, data: {interested: true}});
   const interest = (await db.collection('usageDaily').doc(`${dayKey()}~ad_interest`).get()).data();
   assert.equal(interest.keys[shortKey('uVendorAd')].label, 'Ravi Stores');
 });
@@ -93,5 +93,5 @@ test('the people report says who an account is: email, name and kind', {skip: !p
   assert.deepEqual([labels.labStaff.name, labels.labStaff.kind], ['Kiran', 'staff']);
   assert.equal(labels.labGone.missing, true);
   const fns = require('./index');
-  await assert.rejects(() => fns.accountLabels.run({auth: {uid: 'x', token: {email_verified: true}}, data: {uids: ['labCustomer']}}), /Administrator/);
+  await assert.rejects(() => fns.accountLabels.run({auth: {uid: 'x', token: {role: 'user', email_verified: true}}, data: {uids: ['labCustomer']}}), /Administrator/);
 });

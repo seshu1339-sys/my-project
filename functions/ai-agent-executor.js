@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole: requireRoleLogin, isAdminToken} = require('./role-auth');
 // The propose -> confirm -> (client executes) -> report pipeline, mirroring
 // the existing vendorChanges pending/approved/rejected pattern. This file
 // NEVER performs a vendor/staff/content/layout write itself: confirmAgentAction
@@ -26,12 +27,12 @@ const integrationModules = {github, playConsole};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRoleLogin(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }

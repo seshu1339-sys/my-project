@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Voice "speaker verification" — honestly, this is a passphrase-knowledge
 // check (the browser transcribes speech to text; this compares the
 // normalized transcript to a stored hash), not true biometric voiceprint
@@ -17,12 +18,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }

@@ -14,9 +14,9 @@ test('offers: anyone reads a live one, a vendor their own, the admin all; nobody
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly-offers', firestore: {rules: readFileSync(resolve(root, 'firestore.rules'), 'utf8')}});
   try {
     const anonymous = env.unauthenticatedContext().firestore();
-    const vendor = env.authenticatedContext('vendor1', {email_verified: true}).firestore();
-    const other = env.authenticatedContext('vendor2', {email_verified: true}).firestore();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const vendor = env.authenticatedContext('vendor1', {role: 'user', email_verified: true}).firestore();
+    const other = env.authenticatedContext('vendor2', {role: 'user', email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).firestore();
     const endsAt = Timestamp.fromMillis(Date.now() + 86400000);
     await env.withSecurityRulesDisabled(async ctx => {
       const db = ctx.firestore();
@@ -59,8 +59,8 @@ test('offer photos: only an approved vendor into their own folder; everyone can 
       await setDoc(doc(ctx.firestore(), 'vendors/offerVendor'), {status: 'approved'});
       await setDoc(doc(ctx.firestore(), 'vendors/waitingVendor'), {status: 'pending'});
     });
-    const vendor = env.authenticatedContext('offerVendor', {email_verified: true}).storage();
-    const waiting = env.authenticatedContext('waitingVendor', {email_verified: true}).storage();
+    const vendor = env.authenticatedContext('offerVendor', {role: 'user', email_verified: true}).storage();
+    const waiting = env.authenticatedContext('waitingVendor', {role: 'user', email_verified: true}).storage();
     const anonymous = env.unauthenticatedContext().storage();
     const put = (s, path, meta = jpegMeta) => uploadBytes(ref(s, path), jpeg, meta);
     await assertSucceeds(put(vendor, 'vendorOffers/offerVendor/1.webp'));

@@ -38,7 +38,7 @@ extension StoreConsent on Store {
   /// A network failure never locks anyone out; it is checked again the next time.
   Future<void> syncConsent() async {
     final current = user;
-    if (!live || !requiresConsent || current == null || !current.emailVerified) return;
+    if (!live || !requiresConsent || current == null || !emailConfirmed) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getString(_uidKey(current.uid)) == policyVersion) {

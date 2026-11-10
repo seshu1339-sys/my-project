@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Staff Area System module. Own folder, rules (rules.js), collections (store.js) and schedule. It reads fieldStaff, shops, the admin's
 // item list and vendorOffers, and imports no other module. Removing its one line from functions/index.js removes areas, targets and the
 // nightly check; staff accounts, vendors and offers keep working.
@@ -33,12 +34,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }
@@ -46,8 +47,9 @@ const admin = action => onCall(options, async request => {
   const uid = await requireAdmin(request);
   try { return await action(getFirestore(), request.data || {}, uid); } catch (error) { return fail(error); }
 });
+// Only the email's staff login (functions/role-logins.js); approval is checked by each action (store.js).
 const staff = action => onCall(options, async request => {
-  const uid = requireVerified(request);
+  const uid = requireRole(request, ['staff']);
   try { return await action(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
 });
 

@@ -7,7 +7,7 @@ test('AI Agent backup: rollback is instructions-only, never an automated restore
   const fns = require('./index');
   const db = getFirestore();
   const uid = 'agentBackupAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentbackup1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentbackup1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentConfig').doc('global').set({enabled: true, modules: {}, llmProvider: 'none', voiceProvider: 'text-match'});
 

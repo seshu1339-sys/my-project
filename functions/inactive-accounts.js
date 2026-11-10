@@ -1,4 +1,5 @@
 'use strict';
+const {isAdminToken} = require('./role-auth');
 // Inactive accounts (Admin > Insights > Analytics > Inactive accounts): the accounts that have not used any app for 7, 30 or 90
 // days, with Disable / Enable and Delete, and an automatic daily sweep that is OFF until the admin switches it on.
 //   inactiveAccounts      admin -> the accounts inactive for at least N days (not the admin's), most inactive first
@@ -16,7 +17,7 @@ const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getAuth} = require('firebase-admin/auth');
 const {requireAdminSession} = require('./admin-session');
-const {accountKinds} = require('./accounts');
+const {forgetRoleLogin, loginEmailOf} = require('./role-logins');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 3, invoker: 'public', timeoutSeconds: 300};
 
@@ -26,7 +27,7 @@ const DAY = 86400000;
 
 async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -37,10 +38,12 @@ const millis = value => {
   return Number.isFinite(t) ? t : 0;
 };
 
-/// The kind of account, in words (customer unless it is a vendor, provider or staff account).
+/// The kind of account, in words, from the login's own role (each role of one email is a separate login). '' for a login that is not
+/// a role login: the email's own login only proves the email and holds nothing, so it is never listed or acted on here.
+const KIND_WORDS = {user: 'customer', vendor: 'vendor', provider: 'service provider', staff: 'staff'};
+const kindOfUser = user => KIND_WORDS[user?.customClaims?.role] || '';
 async function kindOf(uid) {
-  const k = await accountKinds(db, uid);
-  return k.vendor ? 'vendor' : k.provider ? 'service provider' : k.staff ? 'staff' : 'customer';
+  return kindOfUser(await getAuth().getUser(uid).catch(() => null));
 }
 
 /// Every account (not an admin) inactive for at least [days] days at [now], the most inactive first.
@@ -52,17 +55,15 @@ async function findInactive({days, now = Date.now(), limit = MAX_LIST}) {
     const page = await getAuth().listUsers(1000, pageToken);
     const activity = page.users.length ? await db.getAll(...page.users.map(u => db.collection('userActivity').doc(u.uid))) : [];
     page.users.forEach((user, i) => {
-      if (user.customClaims?.admin === true) return;
+      if (user.customClaims?.admin === true || !kindOfUser(user)) return;
       const last = Math.max(millis(activity[i]?.data()?.lastActiveAt), millis(user.metadata.lastRefreshTime), millis(user.metadata.lastSignInTime), millis(user.metadata.creationTime));
       if (last > cutoff) return;
-      rows.push({uid: user.uid, email: user.email || '', name: user.displayName || '', disabled: user.disabled === true, lastActiveAt: last, inactiveDays: Math.floor((now - last) / DAY)});
+      rows.push({uid: user.uid, email: loginEmailOf(user), kind: kindOfUser(user), name: user.displayName || '', disabled: user.disabled === true, lastActiveAt: last, inactiveDays: Math.floor((now - last) / DAY)});
     });
     pageToken = page.pageToken;
   } while (pageToken && rows.length < limit * 2);
   rows.sort((a, b) => a.lastActiveAt - b.lastActiveAt);
-  const out = rows.slice(0, limit);
-  for (const row of out) row.kind = await kindOf(row.uid);
-  return out;
+  return rows.slice(0, limit);
 }
 
 async function setDisabled(uid, disabled, by) {
@@ -70,7 +71,8 @@ async function setDisabled(uid, disabled, by) {
   await db.collection('accountStates').doc(uid).set({uid, disabled, ...(disabled ? {disabledAt: FieldValue.serverTimestamp(), disabledBy: by} : {enabledAt: FieldValue.serverTimestamp(), enabledBy: by})}, {merge: true});
 }
 
-/// Deletes a customer account and its personal data; orders are kept (with the account id only).
+/// Deletes a customer login and its personal data; orders are kept (with the account id only). Only that one login goes: the same
+/// email's vendor, provider and staff logins, and the email's own login, are separate and stay as they are.
 async function deleteCustomer(uid) {
   if ((await kindOf(uid)) !== 'customer') throw new HttpsError('failed-precondition', 'Only customer accounts are deleted here. Disable a vendor, provider or staff account, or suspend it.');
   const userRef = db.collection('users').doc(uid);
@@ -81,6 +83,8 @@ async function deleteCustomer(uid) {
   for (const ref of [db.collection('notificationSubscribers').doc(uid), db.collection('userActivity').doc(uid)]) await ref.delete();
   for (const doc of (await db.collection('usagePersonDaily').where('uid', '==', uid).limit(500).get()).docs) await doc.ref.delete();
   try { await getAuth().deleteUser(uid); } catch (error) { if (error.code !== 'auth/user-not-found') throw error; }
+  // The next customer sign-in with this email starts a new, empty customer login.
+  await forgetRoleLogin(uid);
   await db.collection('accountStates').doc(uid).set({uid, deleted: true, deletedAt: FieldValue.serverTimestamp()}, {merge: true});
 }
 
@@ -99,6 +103,9 @@ exports.setAccountDisabled = onCall(options, async request => {
   const user = await getAuth().getUser(uid).catch(() => null);
   if (!user) throw new HttpsError('not-found', 'Account not found.');
   if (user.customClaims?.admin === true) throw new HttpsError('failed-precondition', 'An administrator account is not disabled here.');
+  // Only one role login at a time: blocking a vendor never blocks the same email's customer, provider or staff login. The email's own
+  // login (which every app uses to prove the email) is never disabled here, since that would lock the person out of every role.
+  if (!kindOfUser(user)) throw new HttpsError('failed-precondition', 'This is not an app account. Choose the customer, vendor, provider or staff account.');
   await setDisabled(uid, disabled, request.auth.uid);
   return {uid, disabled};
 });

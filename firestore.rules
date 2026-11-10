@@ -1,7 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    // Every app signs in with its OWN login for its role (functions/role-logins.js), with the claims {role, loginEmail}: one email has
+    // a separate login, and so a separate uid, as a customer ('user'), vendor, service provider, staff member and administrator. All
+    // the "own record" checks below compare uids, so one role never reads another role's records, even for the same email. The
+    // email's own login (Google, email code, password) only proves the email: it has no role and reads or writes nothing here.
+    function signedIn() { return request.auth != null && request.auth.token.role in ['user', 'vendor', 'provider', 'staff', 'admin']; }
+    function signedInAs(role) { return signedIn() && request.auth.token.role == role; }
     // Password + admin claim alone no longer grants admin access: a recent,
     // successful email-OTP verification (functions/admin-otp.js, which is the
     // only writer of _adminSessions) must also exist and not have expired.
@@ -11,7 +16,8 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/_adminSessions/$(request.auth.uid))
         && get(/databases/$(database)/documents/_adminSessions/$(request.auth.uid)).data.expiresAt > request.time;
     }
-    function admin() { return signedIn() && request.auth.token.admin == true && adminSessionValid(); }
+    // Admin power is only on the administrator's own login (role 'admin'), never on the same email's other logins.
+    function admin() { return signedInAs('admin') && request.auth.token.admin == true && adminSessionValid(); }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     match /{collection}/{id} {
       allow read: if collection in ['products', 'services', 'categories', 'shops', 'promotions', 'settings', 'productImageLibrary', 'locations'];
@@ -132,6 +138,8 @@ service cloud.firestore {
         || (signedIn() && resource.data.ownerUid == request.auth.uid) || admin();
       allow write: if false;
     }
+    // Each login's own profile and preferences (name, language, wishlist). Every role login has its own uid, so a customer's profile is
+    // never read by the same email's vendor or staff login, and the reverse.
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || admin());
       // Client saves merge one or two of these fields at a time (profile name,
@@ -145,20 +153,20 @@ service cloud.firestore {
         && (!('wishlist' in request.resource.data) || (request.resource.data.wishlist is list && request.resource.data.wishlist.size() <= 500));
     }
     match /vendorApplications/{uid} {
-      allow read: if owner(uid) || admin();
+      allow read: if (signedInAs('vendor') && owner(uid)) || admin();
       allow write: if false;
     }
     match /vendors/{uid} {
-      allow read: if owner(uid) || admin();
+      allow read: if (signedInAs('vendor') && owner(uid)) || admin();
       allow write: if false;
     }
-    // Service providers (a separate kind of account from vendors): written only by functions/providers.js.
+    // Service providers (the email's provider login, separate from its vendor login): written only by functions/providers.js.
     match /providerApplications/{uid} {
-      allow read: if owner(uid) || admin();
+      allow read: if (signedInAs('provider') && owner(uid)) || admin();
       allow write: if false;
     }
     match /providers/{uid} {
-      allow read: if owner(uid) || admin();
+      allow read: if (signedInAs('provider') && owner(uid)) || admin();
       allow write: if false;
     }
     match /vendorChanges/{changeId} {
@@ -188,7 +196,7 @@ service cloud.firestore {
     // separate from the vendor collections above — a different role, reviewed
     // in its own admin section, never merged with vendor moderation.
     match /fieldStaff/{uid} {
-      allow read: if owner(uid) || admin();
+      allow read: if (signedInAs('staff') && owner(uid)) || admin();
       allow write: if false;
     }
     match /fieldSubmissions/{id} {
@@ -274,9 +282,11 @@ service cloud.firestore {
       allow read: if true;
       allow delete: if admin() || (signedIn() && request.auth.uid == uid);
     }
+    // A customer login reads its own orders; a vendor login reads the orders of its own shop. The same email's other login never does.
     match /orders/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin()
-        || (get(/databases/$(database)/documents/vendors/$(request.auth.uid)).data.shopId in resource.data.shopIds));
+      allow read: if admin()
+        || (signedInAs('user') && resource.data.userId == request.auth.uid)
+        || (signedInAs('vendor') && get(/databases/$(database)/documents/vendors/$(request.auth.uid)).data.shopId in resource.data.shopIds);
       allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['submitted', 'confirmed', 'fulfilled', 'cancelled'];
     }

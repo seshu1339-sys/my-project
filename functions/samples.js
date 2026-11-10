@@ -1,4 +1,5 @@
 'use strict';
+const {isAdminToken} = require('./role-auth');
 // Sample data, so the whole system can be tried with made-up records and then emptied again before real data is added by hand.
 //
 // What counts as sample data:
@@ -243,7 +244,7 @@ async function deleteSamples(db, bucket, auth, {by = ''} = {}) {
 const options = {region: 'us-central1', maxInstances: 2, invoker: 'public', timeoutSeconds: 540, memory: '512MiB'};
 async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 

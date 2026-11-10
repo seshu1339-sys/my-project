@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Face ID via browser WebAuthn/passkeys (the admin panel is used as a web app
 // in Safari on the registered iPhone, not a native install). Registration
 // happens once; Safari then prompts Face ID because authenticatorAttachment
@@ -29,12 +30,12 @@ const ORIGINS = (process.env.AI_AGENT_WEBAUTHN_ORIGINS || 'https://locamarket.in
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }
@@ -46,7 +47,7 @@ exports.beginWebauthnRegistration = onCall(options, async request => {
     rpName: 'Locamarket Admin',
     rpID: RP_ID,
     userID: Buffer.from(uid, 'utf8'),
-    userName: request.auth.token.email || uid,
+    userName: loginEmail(request) || uid,
     attestationType: 'none',
     authenticatorSelection: {authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred'},
   });

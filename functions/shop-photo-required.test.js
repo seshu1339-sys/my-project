@@ -5,7 +5,7 @@ test('a vendor cannot add an item before photo 1 (the shop) is uploaded; pending
   const {getFirestore} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const vendor = {auth: {uid: 'photoV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'photoV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('photoV').set({vendorId: 'photoV', name: 'Photo Shop', shopId: 'photoShop', status: 'approved'});
   await db.collection('productImageLibrary').doc('lib-tomato').set({name: 'Tomato', imageUrl: 'https://example.test/tomato.jpg', active: true});
   const add = () => fns.submitVendorChange.run({...vendor, data: {type: 'newProduct', collection: 'products', docId: '', changes: {libraryItemId: 'lib-tomato', unitType: 'kg', quantity: 1, price: 30}}});

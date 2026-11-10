@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Field Assistant: staff visit vendor shops in person and submit a photo + item
 // name/price/stock + the shop's GPS (an existing shop by id, or a brand-new one).
 // Nothing reaches customers until an admin approves — mirrors the vendor
@@ -12,19 +13,18 @@ const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
-const {otherAccountMessage, claimEmailRole} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -38,28 +38,27 @@ async function requireAdmin(request) {
 // fieldStaffApplications/{uid}/staffPhoto (storage.rules only allows that
 // upload before this doc exists, or again after a rejection, matching the
 // vendor application photo's own lifecycle).
-// Registration is by location (GPS on, its pincode), and a field-staff account is never also a vendor or a service-provider account.
+// Registration is by location (GPS on, its pincode). The staff login is the email's own staff login (functions/role-logins.js): the same
+// email may also be a customer, vendor or service provider, each with its own login, ID and records.
 // The Staff ID (STF-NRPM-116-001, functions/vendor-id.js) is made from the pincode right here; staff who registered before this keep
 // their earlier STF00001-style ID (functions/ids.js).
 exports.requestFieldStaffAccess = onCall(options, async request => {
-  const uid = requireUser(request);
+  // Only the email's staff login asks for staff access; the request stays 'pending' until an administrator approves it.
+  const uid = requireRole(request, ['staff']);
   const ref = db.collection('fieldStaff').doc(uid);
   const existing = await ref.get();
   if (existing.exists) return {status: existing.data().status, staffCode: existing.data().staffCode || null};
   let details;
   try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  const taken = await otherAccountMessage(db, uid, 'staff', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
   await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
   const staffCode = await accountCodeFor(db, 'STF', {pincode: details.pincode, existing: '', owner: uid});
   await ref.set({
-    uid, name: details.name, phone: details.phone, email: request.auth.token.email || null,
+    uid, name: details.name, phone: details.phone, email: loginEmail(request) || null,
     staffPhotoPath: `fieldStaffApplications/${uid}/staffPhoto`, staffCode,
     ...locationStamp({pincode: details.pincode, latitude: details.latitude, longitude: details.longitude}),
     ...(details.gpsAddress ? {gpsAddress: details.gpsAddress} : {}),
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
-  await claimEmailRole(db, request.auth.token.email, 'staff');
   return {status: 'pending', staffCode};
 });
 
@@ -119,7 +118,7 @@ async function verifyUploadedPhoto(path, label = 'the item photo') {
 // CLOSED (owner, 6 Nov 2026): staff no longer send "New entry" items with shop prices; they add Today's Offers with live photos
 // (functions/modules/staff-areas). Reviewing old entries (reviewFieldEntry) keeps working.
 exports.submitFieldEntry = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['staff']);
   if (uid) throw new HttpsError('failed-precondition', "New entry is closed. Add Today's Offers with a live photo from your dashboard.");
   const staff = (await db.collection('fieldStaff').doc(uid).get()).data();
   if (!staff || staff.status !== 'active') throw new HttpsError('permission-denied', 'Your field staff access must be approved before you can submit entries.');

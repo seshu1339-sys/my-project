@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Permanent, sequential, human-readable IDs for vendors, field staff and shops
 // (e.g. "V-000001"), kept in NEW fields (vendorCode/staffCode/shopCode) so they
 // never collide with the existing `vendorId` field on `vendors/{uid}` (which is
@@ -18,12 +19,12 @@ const triggerOptions = {region: 'asia-south1', maxInstances: 5};
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 

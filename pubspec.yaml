@@ -61,6 +61,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # A fake Google account sheet for test/google_one_tap_test.dart (already installed with google_sign_in).
+  google_sign_in_platform_interface: ^3.1.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

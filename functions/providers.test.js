@@ -23,10 +23,11 @@ test('a service provider registers (separately from vendors), the admin approves
   const fns = require('./index');
   const db = getFirestore();
   const bucket = getStorage().bucket();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('services').doc('type-plumber').set({kind: 'serviceType', typeId: 'plumber', name: 'Plumber', imageFileName: 'plumber.webp', order: 1, active: true});
-  const as = uid => ({auth: {uid, token: {email_verified: true, email: `${uid}@example.test`}}});
+  // The email's service-provider login (functions/role-logins.js).
+  const as = (uid, role = 'provider') => ({auth: {uid, token: {role, loginEmail: `${uid}@example.test`}}});
   const register = (uid, data = ok) => fns.registerProvider.run({...as(uid), data});
   const photo = uid => bucket.file(`providerApplications/${uid}/photo`).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
 
@@ -43,11 +44,10 @@ test('a service provider registers (separately from vendors), the admin approves
   assert.equal(app.hourlyRate, 250);
   await assert.rejects(() => register('provA'), /already under review/);
 
-  // ---- one login is never both: a vendor account cannot become a provider, a provider account cannot become a vendor
-  await db.collection('vendorApplications').doc('vendX').set({status: 'pending'});
+  // ---- the provider login registers a service only; the same email's vendor login is a separate login (role-logins.test.js)
   await photo('vendX');
-  await assert.rejects(() => register('vendX'), /already registered in another role/);
-  await assert.rejects(() => fns.registerVendor.run({...as('provA'), data: {ownerName: 'S K', phone: '9876543210', name: 'Shop', shopCategory: 'Kirana', address: 'Main Road, Narsipatnam', pincode: '531116', description: 'A shop for testing here', latitude: 17.668, longitude: 82.612}}), /already registered in another role/);
+  await assert.rejects(() => fns.registerProvider.run({...as('vendX', 'vendor'), data: ok}), /as a service provider/);
+  await assert.rejects(() => fns.registerVendor.run({...as('provA'), data: {ownerName: 'S K', phone: '9876543210', name: 'Shop', shopCategory: 'Kirana', address: 'Main Road, Narsipatnam', pincode: '531116', description: 'A shop for testing here', latitude: 17.668, longitude: 82.612}}), /vendor app .as a vendor/);
 
   // ---- only the admin decides; a rejection needs a reason
   await assert.rejects(() => fns.approveProvider.run({...as('provA'), data: {providerId: 'provA', approved: true}}), /Administrator/);

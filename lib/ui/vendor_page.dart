@@ -35,7 +35,7 @@ class _VendorPageState extends State<VendorPage> {
     if (user == null) return const SizedBox.shrink();
     final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     // The registration form only exists for a verified email address.
-    if (!user.emailVerified) {
+    if (!store.emailConfirmed) {
       return Scaffold(
         appBar: AppBar(title: const Text('Loca Market Vendor'), actions: actions),
         body: const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The vendor registration form opens after your email is verified.'),
@@ -67,7 +67,7 @@ class _VendorPageState extends State<VendorPage> {
     {
       {
         {
-          if (application == null || status == 'rejected') return VendorRegistrationForm(store: store, email: user.email ?? '', previous: application);
+          if (application == null || status == 'rejected') return VendorRegistrationForm(store: store, email: store.signedInEmail, previous: application);
           if (status == 'pending') return _pending(application);
           if (status == 'payment_required') return _feePayment(application);
           if (status == 'payment_submitted') return const _Message(title: 'Payment submitted', body: 'Your payment reference was submitted for administrator confirmation.');

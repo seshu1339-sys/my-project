@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Ads for a vendor's shop in the Right Side Ad Boxes of the website (settings/rightAdBoxes, lib/domain/right_boxes.dart).
 // For now an ad is arranged offline: the vendor ticks "Ad for your shop", the office calls them, takes the payment and the photo, uploads
 // the photo into a box and links the box to the vendor here.
@@ -25,12 +26,12 @@ const MAX_BOXES = 60;
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 

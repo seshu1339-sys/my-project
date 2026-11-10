@@ -68,6 +68,8 @@ Future<void> main() async {
   final store = Store(live: live, database: firestore);
   // The customer app asks people to agree to the Terms and the Privacy Policy; the admin panel (same entry point on the web) does not.
   store.requiresConsent = !(kIsWeb && isAdminRoute);
+  // The admin panel signs in with the email's own administrator login (functions/role-logins.js), never the customer one.
+  if (kIsWeb && isAdminRoute) store.appRole = 'admin';
   await store.init();
   if (kIsWeb && isAdminRoute) {
     // Usage analytics (lib/services/usage.dart): the admin panel counts as the admin app.

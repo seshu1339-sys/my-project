@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Quick Add Item. Staff (any town in the pincode directory) and Vendors (their own shop, locked by GPS)
 // add short-lived items from a phone: photo, rate, category, start time and how long to show it.
 // Every item waits as 'pending' for the admin; only an approved item is public, and only between
@@ -9,7 +10,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
-const {getAuth} = require('firebase-admin/auth');
+const {roleLoginFor} = require('./role-logins');
 const {requireAdminSession} = require('./admin-session');
 const {quickItemDetails, approvedWindow, dailyLimit, dayKey} = require('./quick-domain');
 const {nearestPlace, findPlace} = require('./places');
@@ -22,12 +23,12 @@ const MAX_BATCH = 5;
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 const clean = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
@@ -61,23 +62,18 @@ exports.createQuickAccount = onCall(options, async request => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new HttpsError('invalid-argument', 'Enter a valid email address.');
   const photo = clean(photoUrl, 1000);
   if (!/^https:\/\//.test(photo)) throw new HttpsError('invalid-argument', 'Add the person\'s photo.');
-  const auth = getAuth();
-  let user;
-  try { user = await auth.getUserByEmail(cleanEmail); }
-  catch (error) {
-    if (error.code !== 'auth/user-not-found') throw error;
-    user = await auth.createUser({email: cleanEmail, displayName: cleanName, emailVerified: true});
-  }
+  // The email's own login for that role (functions/role-logins.js): the person later signs in to the staff or vendor app with the
+  // same email (Google or an email code) and lands in this login. Their other roles stay separate logins.
+  const user = {uid: await roleLoginFor(role, cleanEmail)};
   if ((await db.collection('quickAccounts').doc(user.uid).get()).exists) throw new HttpsError('already-exists', 'This email already has a Quick Add account.');
-  if (!user.emailVerified) await auth.updateUser(user.uid, {emailVerified: true});
   const code = await nextCode(role === 'staff' ? 'quickStaff' : 'quickVendor', role === 'staff' ? 'ST' : 'VN');
   await db.collection('quickAccounts').doc(user.uid).set({
     uid: user.uid, role, code, name: cleanName, phone: cleanPhone, email: cleanEmail, photoUrl: photo,
     shopLocked: false, shopName: role === 'vendor' ? clean(shopName, 120) || cleanName : '',
     active: true, createdAt: FieldValue.serverTimestamp(), createdBy: request.auth.uid,
   });
-  const resetLink = await auth.generatePasswordResetLink(cleanEmail);
-  return {uid: user.uid, code, resetLink};
+  // No password: the person signs in with Google or an emailed code, as in every app.
+  return {uid: user.uid, code, resetLink: null};
 });
 
 /// Admin: change an account's details, or unlock a vendor's shop location so it can be set again.

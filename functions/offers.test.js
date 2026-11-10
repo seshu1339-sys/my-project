@@ -7,7 +7,7 @@ test('offers reach every subscriber once; admin can switch off or send manually'
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const wipe = async name => { for (const d of (await db.collection(name).get()).docs) await d.ref.delete(); };
@@ -67,7 +67,7 @@ test('offers reach every subscriber once; admin can switch off or send manually'
     await fns.notifyNewOffers.run({});
     pushes = await dry(); assert.equal(byPromo('held').length, 0, 'automatic offers are off');
     await assert.rejects(() => fns.sendOfferNotification.run({data: {promotionId: 'held'}}), /Sign in/);
-    await assert.rejects(() => fns.sendOfferNotification.run({auth: {uid: 'u', token: {email_verified: true}}, data: {promotionId: 'held'}}), /Administrator/);
+    await assert.rejects(() => fns.sendOfferNotification.run({auth: {uid: 'u', token: {role: 'user', email_verified: true}}, data: {promotionId: 'held'}}), /Administrator/);
     await assert.rejects(() => fns.sendOfferNotification.run({...admin, data: {promotionId: 'nope'}}), /not found/i);
     await assert.rejects(() => fns.sendOfferNotification.run({...admin, data: {promotionId: 'later'}}), /live right now/);   // not live yet
     await assert.rejects(() => fns.sendOfferNotification.run({...admin, data: {promotionId: '../x'}}), /Choose an offer/);
@@ -82,7 +82,7 @@ test('offers reach every subscriber once; admin can switch off or send manually'
 
     // ---- how many people would receive it
     assert.deepEqual(await fns.offerAudienceSize.run({...admin, data: {}}), {subscribers: 61});
-    await assert.rejects(() => fns.offerAudienceSize.run({auth: {uid: 'u', token: {email_verified: true}}, data: {}}), /Administrator/);
+    await assert.rejects(() => fns.offerAudienceSize.run({auth: {uid: 'u', token: {role: 'user', email_verified: true}}, data: {}}), /Administrator/);
   } finally {
     await wipe('_pushDryRun'); await wipe('_notificationDeliveries'); await wipe('notificationSubscribers'); await wipe('promotions');
     await db.collection('settings').doc('business').set({offerNotificationsEnabled: 'true'}, {merge: true});

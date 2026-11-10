@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Razorpay payment module. Its own files, callables and collections (see store.js). Any module can ask for a payment by making a
 // paymentRequests document; plans is the only one today, and this module never imports it. Vendors pay on a Razorpay Payment Link,
 // which opens in the browser on the website and in the Android app alike.
@@ -28,12 +29,12 @@ const withKeys = {...options, secrets: [keyId, keySecret]};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
 }
 

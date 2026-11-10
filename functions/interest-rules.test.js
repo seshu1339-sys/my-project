@@ -8,10 +8,10 @@ test('product interest: counted views, no tampering, server-only alert fields, a
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
   try {
     await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), 'products/p1'), {name: 'Lamp', price: 10}); });
-    const alice = env.authenticatedContext('alice', {email_verified: true}).firestore();
-    const bob = env.authenticatedContext('bob', {email_verified: true}).firestore();
+    const alice = env.authenticatedContext('alice', {role: 'user', email_verified: true}).firestore();
+    const bob = env.authenticatedContext('bob', {role: 'user', email_verified: true}).firestore();
     const anon = env.unauthenticatedContext().firestore();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).firestore();
     // Admin reads now also require a fresh OTP-verified session (see admin-otp.js / firestore.rules' adminSessionValid()).
     await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), '_adminSessions/owner'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)}); });
     const ref = db => doc(db, 'products/p1/viewers/alice');

@@ -6,7 +6,7 @@ test('AI Agent confirmation: Agent PIN set/validate and gate a sensitive action'
   const fns = require('./index');
   const db = getFirestore();
   const uid = 'agentPinAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentpin1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentpin1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc(uid).set({role: 'owner'});
 

@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Service providers: a separate kind of account from vendors (one login is never both; a person who wants both registers twice, with
 // two email addresses). A provider registers like a vendor (verified email, location on, admin approval) with a name, mobile number,
 // photo, one service from the admin's list (the service types in the services collection) and their own charge per hour. Once the
@@ -9,19 +10,19 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
-const {accountKinds, otherAccountMessage, claimEmailRole} = require('./accounts');
+const {accountKinds} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -63,12 +64,10 @@ const photoPath = uid => `providerApplications/${uid}/photo`;
 const approximate = value => Math.round(value * 100) / 100;
 
 exports.registerProvider = onCall(options, async request => {
-  const uid = requireUser(request);
+  // Only the email's service-provider login registers a service (its other roles have their own IDs and records).
+  const uid = requireRole(request, ['provider']);
   let details;
   try { details = providerApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'provider', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
   const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
   if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose a service from the list.');
   const ref = db.collection('providerApplications').doc(uid);
@@ -83,11 +82,10 @@ exports.registerProvider = onCall(options, async request => {
   const providerCode = await accountCodeFor(db, 'SRV', {pincode: details.pincode, existing: existing.exists ? existing.data().providerCode : '', owner: uid});
   await ref.set({
     providerId: uid, ...details, serviceName: String(type.name || ''), serviceTypeKey: String(type.typeId || details.serviceTypeId.replace(/^type-/, '')),
-    photoPath: file.name, email: request.auth.token.email || null, status: 'pending', providerCode,
+    photoPath: file.name, email: loginEmail(request) || null, status: 'pending', providerCode,
     submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     decisionReason: FieldValue.delete(), decidedAt: FieldValue.delete(),
   }, {merge: true});
-  await claimEmailRole(db, request.auth.token.email, 'provider');
   return {status: 'pending', providerCode};
 });
 
@@ -134,7 +132,7 @@ exports.approveProvider = onCall(options, async request => {
 
 // An approved provider changes their charge per hour; the listing shows it at once.
 exports.updateProviderRate = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['provider']);
   let rate;
   try { rate = hourlyRate(request.data?.hourlyRate); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const provider = (await db.collection('providers').doc(uid).get()).data();

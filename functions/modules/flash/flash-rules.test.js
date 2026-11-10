@@ -22,11 +22,11 @@ test('a person reads only their own chats; tickets are for the admin; only funct
       await setDoc(doc(db, 'flashConfig/main'), {dailyMessages: 30});
       await setDoc(doc(db, '_adminSessions/admin'), {expiresAt: new Date(Date.now() + 3600000)});
     });
-    const p1 = env.authenticatedContext('p1', {email_verified: true}).firestore();
-    const p2 = env.authenticatedContext('p2', {email_verified: true}).firestore();
+    const p1 = env.authenticatedContext('p1', {role: 'user', email_verified: true}).firestore();
+    const p2 = env.authenticatedContext('p2', {role: 'user', email_verified: true}).firestore();
     const unverified = env.authenticatedContext('p1', {email_verified: false}).firestore();
     const anonymous = env.unauthenticatedContext().firestore();
-    const admin = env.authenticatedContext('admin', {email_verified: true, admin: true}).firestore();
+    const admin = env.authenticatedContext('admin', {role: 'admin', email_verified: true, admin: true}).firestore();
 
     for (const name of CHATS) {
       await assertSucceeds(getDoc(doc(p1, `${name}/c1`)));

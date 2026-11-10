@@ -43,6 +43,8 @@ Future<void> main() async {
   }
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
+  // The admin panel signs in with the email's own administrator login (functions/role-logins.js), never the customer one.
+  store.appRole = 'admin';
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) unawaited(startUsage(app: 'admin'));

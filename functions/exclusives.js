@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // "Special Category Exclusives": a per-vendor permission (granted by the admin, with a maximum
 // active duration) that lets that one vendor publish its own one-off design/product entries
 // directly, without going through the normal submitVendorChange moderation queue. Items are
@@ -12,12 +13,12 @@ const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 const ARCHIVE_WINDOW_MS = 15 * 86400000;

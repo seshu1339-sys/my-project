@@ -7,7 +7,7 @@ test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {ski
   const db = getFirestore();
 
   const uid = 'agentExecAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentexec1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentexec1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000)});
   // Explicit, not relying on the RBAC bootstrap carve-out — other test files
   // (ai-agent-rbac.test.js) also write to aiAgentRoles, so this cannot assume
@@ -51,7 +51,7 @@ test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {ski
   assert.equal(rejectResult.status, 'rejected');
 
   // ---- only the admin who proposed an action may decide it.
-  const other = {auth: {uid: 'agentExecAdmin2', token: {admin: true, email_verified: true, email: 'agentexec2@example.test'}}};
+  const other = {auth: {uid: 'agentExecAdmin2', token: {role: 'admin', admin: true, email_verified: true, email: 'agentexec2@example.test'}}};
   await db.collection('_adminSessions').doc('agentExecAdmin2').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc('agentExecAdmin2').set({role: 'owner'});
   const anotherProposal = await fns.proposeAgentAction.run({...admin, data: {action: 'resizeSection', params: {layoutKey: 'popular', height: 400}}});
@@ -66,7 +66,7 @@ test('AI Agent executor: serverAction branch calls the integration write functio
   const github = require('./ai-agent-github');
 
   const uid = 'agentServerActionAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentserveraction1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentserveraction1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc(uid).set({role: 'owner'});
   await db.collection('aiAgentConfig').doc('global').set({enabled: true, modules: {}, llmProvider: 'none', voiceProvider: 'text-match'});

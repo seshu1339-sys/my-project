@@ -1,7 +1,9 @@
 'use strict';
 // Email code sign-in: the backup for people with no Google account (or whose Google sign-in fails). A 6-digit code is emailed to the
-// address; typing it in proves the address, so the account is created (or found) with the email marked verified and the app signs in
-// with a custom token. Same hashing, expiry and attempt limits as the admin code (admin-otp.js): the code is kept only as an HMAC.
+// address; typing it in proves the address, so the email's own login is created (or found) with the email marked verified and the app
+// signs in with a custom token. That login only proves the email: the app then asks enterRole (functions/role-logins.js) for the
+// email's login in its own role. Same hashing, expiry and attempt limits as the admin code (admin-otp.js): the code is kept only as an
+// HMAC.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {defineSecret} = require('firebase-functions/params');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');

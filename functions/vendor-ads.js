@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Vendor ads. A vendor submits an ad (or a change to one of their ads) from the vendor app; NOTHING goes live by itself: no automatic
 // publishing and no automatic scanner. Every new ad and every change, including a new photo, waits in adSubmissions as 'pending' until the
 // admin approves it by hand. While a change is pending, the approved ad on the site keeps showing its old photo and text.
@@ -202,12 +203,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
 }
 exports.submitVendorAd = onCall(options, async request => {

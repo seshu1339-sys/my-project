@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Today's Offer module: a paid vendor's Today's Offers boxes (see store.js). It knows the plan only through vendorPremium, never plans
 // or payments.
 //
@@ -17,7 +18,7 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 
@@ -31,7 +32,7 @@ exports.removeMyTodaysOffer = onCall(options, async request => {
 });
 exports.removeTodaysOffer = onCall(options, async request => {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   try { return await removeOffer(getFirestore(), getStorage().bucket(), request.data?.offerId ?? request.data?.vendorId); } catch (error) { return fail(error); }
 });

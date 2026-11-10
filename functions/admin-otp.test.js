@@ -13,18 +13,18 @@ test('admin OTP: request/verify success, wrong code, reuse, expiry, resend coold
   const codeFor = async email => (await db.collection('_emailDryRun').where('to', '==', email).get()).docs[0].data().code;
   const wrongCodeFor = real => (real === '000000' ? '111111' : '000000');
 
-  const admin = {auth: {uid: 'otpAdmin1', token: {admin: true, email_verified: true, email: 'otpadmin1@example.test'}}};
-  const notAdmin = {auth: {uid: 'plainUser1', token: {email_verified: true, email: 'plain1@example.test'}}};
+  const admin = {auth: {uid: 'otpAdmin1', token: {role: 'admin', admin: true, loginEmail: 'otpadmin1@example.test'}}};
+  const notAdmin = {auth: {uid: 'plainUser1', token: {role: 'user', loginEmail: 'plain1@example.test'}}};
   const unverified = {auth: {uid: 'unverified1', token: {admin: true, email_verified: false, email: 'unverified1@example.test'}}};
 
   // ---- only a verified admin may request or verify a code
   await assert.rejects(() => fns.requestAdminOtp.run({...notAdmin, data: {}}), /Administrator/);
-  await assert.rejects(() => fns.requestAdminOtp.run({...unverified, data: {}}), /Verify your email/);
+  await assert.rejects(() => fns.requestAdminOtp.run({...unverified, data: {}}), /Sign in again/);
   await assert.rejects(() => fns.requestAdminOtp.run({data: {}}), /Sign in/);
 
   // ---- a wrong code is rejected, and a requireAdmin()-gated callable stays locked out
   await fns.requestAdminOtp.run({...admin, data: {}});
-  const code = await codeFor(admin.auth.token.email);
+  const code = await codeFor(admin.auth.token.loginEmail);
   await assert.rejects(() => fns.verifyAdminOtp.run({...admin, data: {code: wrongCodeFor(code)}}), /Incorrect code/);
   await assert.rejects(() => fns.offerAudienceSize.run({...admin, data: {}}), /verification expired/);
 
@@ -54,16 +54,16 @@ test('admin OTP: request/verify success, wrong code, reuse, expiry, resend coold
   await assert.rejects(() => fns.verifyAdminOtp.run({...admin, data: {code: 'abc'}}), /6-digit/);
 
   // ---- expiry: a code past its expiresAt is rejected even if it is correct
-  const expired = {auth: {uid: 'otpAdmin2', token: {admin: true, email_verified: true, email: 'otpadmin2@example.test'}}};
+  const expired = {auth: {uid: 'otpAdmin2', token: {role: 'admin', admin: true, loginEmail: 'otpadmin2@example.test'}}};
   await fns.requestAdminOtp.run({...expired, data: {}});
-  const expiredCode = await codeFor(expired.auth.token.email);
+  const expiredCode = await codeFor(expired.auth.token.loginEmail);
   await db.collection('_adminOtps').doc(expired.auth.uid).update({expiresAt: Timestamp.fromMillis(Date.now() - 1000)});
   await assert.rejects(() => fns.verifyAdminOtp.run({...expired, data: {code: expiredCode}}), /expired/);
 
   // ---- too many wrong attempts locks the code out, even though the real code would still work
-  const locked = {auth: {uid: 'otpAdmin3', token: {admin: true, email_verified: true, email: 'otpadmin3@example.test'}}};
+  const locked = {auth: {uid: 'otpAdmin3', token: {role: 'admin', admin: true, loginEmail: 'otpadmin3@example.test'}}};
   await fns.requestAdminOtp.run({...locked, data: {}});
-  const lockedCode = await codeFor(locked.auth.token.email);
+  const lockedCode = await codeFor(locked.auth.token.loginEmail);
   const guess = wrongCodeFor(lockedCode);
   for (let i = 0; i < 5; i++) await assert.rejects(() => fns.verifyAdminOtp.run({...locked, data: {code: guess}}));
   await assert.rejects(() => fns.verifyAdminOtp.run({...locked, data: {code: lockedCode}}), /Request a new code/);

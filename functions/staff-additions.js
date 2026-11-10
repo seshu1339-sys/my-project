@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Staff "Add": approved field staff add vendors and service providers for people who have no account of their own.
 // The staff member is at the place: their GPS is the vendor's (or provider's) location (nothing is added without it). Everything waits
 // for the admin as staffAdditions/<id>:
@@ -45,12 +46,12 @@ const ITEM_STOCK = 99;
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 async function requireActiveStaff(uid) {

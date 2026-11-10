@@ -49,7 +49,7 @@ test('the admin\'s Google check: online matches, the same photo used before, and
   for (const c of ['photoChecks', 'photoFingerprints', 'photoCheckUsage']) for (const d of (await db.collection(c).get()).docs) await d.ref.delete();
   await db.collection('settings').doc('photoCheck').delete();
   await db.collection('_adminSessions').doc('checker').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const admin = {auth: {uid: 'checker', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'checker', token: {role: 'admin', admin: true, email_verified: true}}};
   const check = path => fns.checkPhoto.run({...admin, data: {path}});
   const save = async (path, bytes) => bucket.file(path).save(bytes, {metadata: {contentType: 'image/jpeg'}});
   let googleSays = {};
@@ -61,7 +61,7 @@ test('the admin\'s Google check: online matches, the same photo used before, and
   });
 
   // ---- only the admin, only the photos under review
-  await assert.rejects(() => fns.checkPhoto.run({auth: {uid: 'u1', token: {email_verified: true}}, data: {path: 'vendorShopPhotos/v1/shopPhoto1'}}), /Administrator/);
+  await assert.rejects(() => fns.checkPhoto.run({auth: {uid: 'u1', token: {role: 'user', email_verified: true}}, data: {path: 'vendorShopPhotos/v1/shopPhoto1'}}), /Administrator/);
   await assert.rejects(() => check('catalog/x.jpg'), /cannot be checked/);
   await assert.rejects(() => check('vendorShopPhotos/nobody/shopPhoto1'), /not there/);
 

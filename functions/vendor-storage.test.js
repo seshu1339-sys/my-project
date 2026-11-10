@@ -19,10 +19,10 @@ test('vendor photos: private application photos, approved-only product photos', 
   });
   try {
     const anonymous = env.unauthenticatedContext().storage();
-    const vendor = env.authenticatedContext('vendor1', {email_verified: true}).storage();
+    const vendor = env.authenticatedContext('vendor1', {role: 'vendor', email_verified: true}).storage();
     const unverifiedVendor = env.authenticatedContext('vendor1', {email_verified: false}).storage();
-    const other = env.authenticatedContext('vendor2', {email_verified: true}).storage();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).storage();
+    const other = env.authenticatedContext('vendor2', {role: 'vendor', email_verified: true}).storage();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).storage();
     const app = (s, path = 'vendorApplications/vendor1/vendorPhoto', meta = jpegMeta, bytes = jpeg()) => uploadBytes(ref(s, path), bytes, meta);
     // Admin Storage access now also requires a fresh OTP-verified session (see admin-otp.js / storage.rules' adminSessionValid()).
     await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), '_adminSessions/owner'), {expiresAt: Timestamp.fromMillis(Date.now() + 3600000)}));

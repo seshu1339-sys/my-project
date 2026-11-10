@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, loginEmail} = require('./role-auth');
 // Agreement to the Terms & Conditions and the Privacy Policy, kept on the server: who agreed, when, and to which version.
 //   consentStatus  -> has this signed-in person agreed to the current version?
 //   recordConsent  -> the person ticked the box in an app: remember it.
@@ -14,7 +15,7 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function signedIn(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 
@@ -30,7 +31,7 @@ exports.recordConsent = onCall(options, async request => {
   if (!APPS.includes(app)) throw new HttpsError('invalid-argument', 'Unknown app.');
   if (version !== POLICY_VERSION) throw new HttpsError('failed-precondition', 'The terms were updated. Open the app again and read them.');
   const db = getFirestore();
-  const record = {uid, email: request.auth.token.email ?? '', version, app, acceptedAt: FieldValue.serverTimestamp()};
+  const record = {uid, email: loginEmail(request) ?? '', version, app, acceptedAt: FieldValue.serverTimestamp()};
   const batch = db.batch();
   batch.set(db.collection('consents').doc(uid), record);
   batch.set(db.collection('consents').doc(uid).collection('log').doc(), record);

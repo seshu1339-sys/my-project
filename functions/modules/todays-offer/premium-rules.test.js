@@ -16,10 +16,10 @@ test('premium data: own status only, live offers public, wholesale for active Pr
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly-premium', firestore: {rules: readFileSync(resolve(root, 'firestore.rules'), 'utf8')}});
   try {
     const anonymous = env.unauthenticatedContext().firestore();
-    const premium = env.authenticatedContext('paid', {email_verified: true}).firestore();
-    const lapsed = env.authenticatedContext('lapsed', {email_verified: true}).firestore();
-    const free = env.authenticatedContext('free', {email_verified: true}).firestore();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const premium = env.authenticatedContext('paid', {role: 'user', email_verified: true}).firestore();
+    const lapsed = env.authenticatedContext('lapsed', {role: 'user', email_verified: true}).firestore();
+    const free = env.authenticatedContext('free', {role: 'user', email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).firestore();
     await env.withSecurityRulesDisabled(async ctx => {
       const db = ctx.firestore();
       await setDoc(doc(db, '_adminSessions/owner'), {expiresAt: later()});
@@ -63,7 +63,7 @@ test('offer photos: only an active Premium vendor into their own folder; wholesa
       await setDoc(doc(db, 'vendors/lapsedVendor'), {status: 'approved'});
       await setDoc(doc(db, 'vendorPremium/lapsedVendor'), {active: true, endsAt: earlier()});
     });
-    const context = (uid, claims = {}) => env.authenticatedContext(uid, {email_verified: true, ...claims}).storage();
+    const context = (uid, claims = {}) => env.authenticatedContext(uid, {role: 'vendor', loginEmail: `${uid}@example.test`, ...claims}).storage();
     const paid = context('paidVendor');
     const anonymous = env.unauthenticatedContext().storage();
     const put = (s, path, meta = jpegMeta) => uploadBytes(ref(s, path), jpeg, meta);
@@ -73,7 +73,9 @@ test('offer photos: only an active Premium vendor into their own folder; wholesa
     await assertFails(put(paid, 'vendorTodaysOffers/paidVendor/a.html', {contentType: 'text/html'}));
     await assertFails(put(context('freeVendor'), 'vendorTodaysOffers/freeVendor/1.webp'));
     await assertFails(put(context('lapsedVendor'), 'vendorTodaysOffers/lapsedVendor/1.webp'));
-    await assertSucceeds(put(context('storeOwner', {admin: true}), 'wholesaleOffers/1.webp'));
+    await assertSucceeds(put(context('storeOwner', {role: 'admin', admin: true}), 'wholesaleOffers/1.webp'));
+    await assertFails(put(context('storeOwner', {role: 'user', admin: true}), 'wholesaleOffers/3.webp'), 'the admin claim counts only on the admin login');
+    await assertFails(put(env.authenticatedContext('paidVendor', {email_verified: true, email: 'paid@example.test'}).storage(), 'vendorTodaysOffers/paidVendor/2.webp'), 'the email\'s own login has no role');
     await assertFails(put(paid, 'wholesaleOffers/2.webp'));
   } finally { await env.cleanup(); }
 });

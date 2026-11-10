@@ -1,6 +1,6 @@
 'use strict';
 const {vendorCodeFor} = require('./vendor-id');
-const {otherAccountMessage, claimEmailRole} = require('./accounts');
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
@@ -26,7 +26,9 @@ Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
-Object.assign(exports, require('./login'));
+// A separate login per role of one email: enterRole after the email is proven, switchRole between Vendor and Service provider.
+const {enterRole, switchRole} = require('./role-logins');
+Object.assign(exports, {enterRole, switchRole});
 Object.assign(exports, require('./email-login'));
 Object.assign(exports, require('./consent'));
 exports.describeImageForSearch = require('./image-search').describeImageForSearch;
@@ -121,12 +123,12 @@ async function rateLimit(key, limit, windowMs) {
 }
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 function requireCoordinate(value, name) {
@@ -192,7 +194,8 @@ exports.pinLogin = retiredPhoneAuth;
 exports.setPin = retiredPhoneAuth;
 exports.placeOrder = onCall(options, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email before ordering.');
+  // Orders belong to the email's customer login only.
+  requireRole(request, ['user']);
   const {items, pincode, address, requestId} = request.data || {};
   const requestedPaymentMethod = request.data?.paymentMethod;
   const customer = {latitude: request.data?.latitude, longitude: request.data?.longitude};
@@ -260,8 +263,8 @@ exports.addComplaintMessage = onCall(options, async request => {
   if (!complaint || complaint.status === 'closed') throw new HttpsError('failed-precondition', 'This complaint is closed.');
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   const allowed = complaint.customerId === uid || complaint.vendorId === uid || vendor?.shopId === complaint.vendorId;
-  if (!allowed && request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'You cannot reply to this complaint.');
-  await complaintRef.collection('messages').add({authorId: uid, authorRole: request.auth.token.admin === true ? 'admin' : complaint.customerId === uid ? 'customer' : 'vendor', body: body.trim(), createdAt: FieldValue.serverTimestamp()});
+  if (!allowed && !isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'You cannot reply to this complaint.');
+  await complaintRef.collection('messages').add({authorId: uid, authorRole: isAdminToken(request.auth.token) ? 'admin' : complaint.customerId === uid ? 'customer' : 'vendor', body: body.trim(), createdAt: FieldValue.serverTimestamp()});
   await complaintRef.update({updatedAt: FieldValue.serverTimestamp()});
   return {sent: true};
 });
@@ -274,12 +277,10 @@ exports.reviewComplaint = onCall(options, async request => {
   return {status};
 });
 exports.registerVendor = onCall(options, async request => {
-  const uid = requireUser(request);
+  // Only the email's vendor login registers a shop (its customer, provider or staff login has its own ID and records).
+  const uid = requireRole(request, ['vendor']);
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'vendor', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
@@ -287,13 +288,12 @@ exports.registerVendor = onCall(options, async request => {
   // The Vendor ID (VEN-NRPM-116-325, functions/vendor-id.js): made once, kept on a resubmission while the pincode still fits it.
   const vendorCode = await vendorCodeFor(db, {pincode: details.pincode, existing: existing.exists ? existing.data().vendorCode : '', owner: uid});
   await applicationRef.set({
-    vendorId: uid, ...details, ...photos, vendorCode, email: request.auth.token.email || null,
+    vendorId: uid, ...details, ...photos, vendorCode, email: loginEmail(request) || null,
     status: 'pending', submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
   await countUsage(db, 'vendor_register', {key: locationStamp({pincode: details.pincode}).town || details.pincode, label: locationStamp({pincode: details.pincode}).town || details.pincode, town: locationStamp({pincode: details.pincode}).town || '', uid});
-  await claimEmailRole(db, request.auth.token.email, 'vendor');
   return {status: 'pending', vendorCode};
 });
 /// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec
@@ -371,7 +371,7 @@ exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async re
   return {status: suspended ? 'suspended' : 'approved', itemsChanged: items};
 });
 exports.submitVendorFeePayment = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {paymentReference = ''} = request.data || {};
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const application = (await applicationRef.get()).data();
@@ -419,7 +419,7 @@ exports.setVendorItemLimit = onCall(options, async request => {
   return {itemLimit};
 });
 exports.submitVendorChange = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {type, collection, docId, changes} = request.data || {};
   const isNew = type === 'newProduct';
   // A shop change targets shops. A new vendor item is a product (services are offered from a separate service-provider account);
@@ -510,7 +510,7 @@ exports.reviewVendorChange = onCall(options, async request => {
   });
 });
 exports.issuePurchaseCode = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['user']);
   const {orderId, latitude, longitude} = request.data || {};
   requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
   if (typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide an order.');
@@ -522,7 +522,7 @@ exports.issuePurchaseCode = onCall(options, async request => {
   return {code, expiresInSeconds: 300};
 });
 exports.redeemPurchaseCode = onCall(options, async request => {
-  const vendorId = requireUser(request);
+  const vendorId = requireRole(request, ['vendor']);
   const {code, orderId, latitude, longitude} = request.data || {};
   requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
   if (typeof code !== 'string' || !/^\d{6}$/.test(code) || typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide a valid code and order.');
@@ -545,7 +545,7 @@ exports.redeemPurchaseCode = onCall(options, async request => {
   return {verified: true};
 });
 exports.submitVerifiedReview = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['user']);
   const {productId, rating, text, name} = request.data || {};
   if (typeof productId !== 'string' || !Number.isInteger(rating) || rating < 1 || rating > 5 || typeof text !== 'string' || !text.trim() || text.length > 1000) throw new HttpsError('invalid-argument', 'Provide a valid review.');
   const purchases = await db.collection('verifiedPurchases').where('customerId', '==', uid).where('status', '==', 'verified').limit(20).get();
@@ -576,7 +576,7 @@ exports.submitVerifiedReview = onCall(options, async request => {
   return {created: true};
 });
 exports.updateVendorOrder = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {orderId, status} = request.data || {};
   if (typeof orderId !== 'string' || !['confirmed', 'fulfilled', 'cancelled'].includes(status)) throw new HttpsError('invalid-argument', 'Provide a valid order status.');
   const vendor = (await db.collection('vendors').doc(uid).get()).data();

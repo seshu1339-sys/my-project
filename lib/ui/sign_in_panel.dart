@@ -2,15 +2,18 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../data/store.dart';
 import '../services/strings.dart';
 import 'consent_checkbox.dart';
 import 'policy_links.dart';
 
-/// The one sign-in used by the customer, vendor and staff apps: "Continue with Google" (the phone's own account list, one tap, no
-/// typing) and, as a backup for people with no Google account, a 6-digit code emailed to them. Both end with a verified email; the
-/// app's own gate (Store.appRole, functions/login.js) then decides whether that email may come in.
+/// The one sign-in used by the customer, vendor and staff apps: "Continue with Google" (the Google accounts already on the phone,
+/// one tap, no typing) and, as a backup for people with no Google account, a 6-digit code emailed to them (the field starts with the
+/// last email used on this phone). Both prove the email; the app then signs in with that email's own account for this app's role
+/// (Store.enterAppRole, functions/role-logins.js), made on the first sign-in, so signing in and registering are one step. The same
+/// email may have an account in every app, each separate.
 class SignInPanel extends StatefulWidget {
   const SignInPanel({super.key, required this.store});
   final Store store;
@@ -22,6 +25,12 @@ class _SignInPanelState extends State<SignInPanel> {
   final email = TextEditingController(), code = TextEditingController();
   bool busy = false, emailOpen = false, sent = false;
   String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    email.text = widget.store.lastSignInEmail;
+  }
 
   Future<void> run(Future<void> Function() action) async {
     setState(() {
@@ -36,6 +45,9 @@ class _SignInPanelState extends State<SignInPanel> {
       if (mounted) setState(() => error = e.message ?? 'Something went wrong. Please try again.'.tr(context));
     } on FirebaseAuthException catch (e) {
       if (mounted) setState(() => error = e.message ?? 'Sign-in failed. Please try again.'.tr(context));
+    } on GoogleSignInException catch (e) {
+      // The code (for example clientConfigurationError) tells support what to fix; the words stay the same for everyone.
+      if (mounted) setState(() => error = '${'Google sign-in did not work. Please try again, or use an email code.'.tr(context)} (${e.code.name})');
     } catch (e) {
       if (mounted) setState(() => error = 'Google sign-in did not work. Please try again, or use an email code.'.tr(context));
     } finally {

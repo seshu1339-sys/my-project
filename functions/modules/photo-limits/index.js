@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Photo limits module (owner, 6 Nov 2026). Every vendor has one shop photo (not counted); free vendors 2 extra photos, paid vendors
 // their plan's number. Extra shop photos and own item photos share the allowance. When a paid plan ends, the first 2 extra photos stay
 // and the others are deleted. Own folder (store.js). It reads vendorPremium (premium-status) and never imports another module.
@@ -20,12 +21,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
 }
 

@@ -124,11 +124,22 @@ void main() {
     expect(store.codeTyped, '123456');
     expect(store.submittedEmail, 'customer@example.com');
   });
-  testWidgets('an email refused for holding another role is told so', (tester) async {
-    final store = EmailTestStore()..roleBlock = 'This email is already registered in another role. Please use a different email.';
+  testWidgets('a blocked role is told so on the sign-in screen (the same email\x27s other roles are not affected)', (tester) async {
+    final store = EmailTestStore()..roleBlock = 'Your staff account is blocked. Contact LOCAMARKET support.';
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store))));
     expect(find.byKey(const ValueKey('sign-in-error')), findsOneWidget);
-    expect(find.textContaining('already registered in another role'), findsOneWidget);
+    expect(find.textContaining('staff account is blocked'), findsOneWidget);
+    expect(find.textContaining('another role'), findsNothing);
+  });
+  testWidgets('the email code starts with the last email used on this phone', (tester) async {
+    final store = EmailTestStore()..lastSignInEmail = 'same.person@example.com';
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SignInPanel(store: store)))));
+    await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.byKey(const ValueKey('code-email'))).controller!.text, 'same.person@example.com');
+    await tester.tap(find.byKey(const ValueKey('send-code')));
+    await tester.pumpAndSettle();
+    expect(store.codeSentTo, 'same.person@example.com', reason: 'no typing needed');
   });
   testWidgets('email login and reset use entered address without SMS fields', (
     tester,

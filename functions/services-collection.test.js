@@ -7,9 +7,9 @@ test('a vendor\'s new item is a product; an existing vendor service is changed i
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const vendor = {auth: {uid: 'svcV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'svcV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('svcV').set({vendorId: 'svcV', name: 'Fix It', shopId: 'svcShop', status: 'approved', verified: true});
   await db.collection('vendorShopPhotos').doc('svcV_1').set({vendorId: 'svcV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('shops').doc('svcShop').set({name: 'Fix It', address: 'Main Road', pincode: '533101', ownerId: 'svcV', active: true});
@@ -39,7 +39,7 @@ test('a service can be ordered (stock goes down) and cancelling the order gives 
   await db.collection('settings').doc('business').set({name: 'Local Market', defaultPaymentMethod: 'direct_vendor'});
   await db.collection('services').doc('order-svc-1').set({name: 'Plumbing visit', kind: 'service', price: 300, stock: 10, active: true, shopId: 'orderShop'});
   await db.collection('products').doc('order-prod-1').set({name: 'Soap', kind: 'product', price: 20, stock: 10, active: true, shopId: 'orderShop'});
-  const customer = {auth: {uid: 'orderCustomer', token: {email_verified: true}}};
+  const customer = {auth: {uid: 'orderCustomer', token: {role: 'user', email_verified: true}}};
   const placed = await fns.placeOrder.run({...customer, data: {
     items: [{productId: 'order-svc-1', quantity: 2}, {productId: 'order-prod-1', quantity: 3}],
     pincode: '533101', address: '12 Main Road, Rajahmundry', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-services-1',

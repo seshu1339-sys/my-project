@@ -104,7 +104,7 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   Text('Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.'.tr(context)),
                 ] else if (widget.store.user != null &&
-                    !widget.store.user!.emailVerified) ...[
+                    !widget.store.emailConfirmed) ...[
                   Text(
                     'Verify your email'.tr(context),
                     style: const TextStyle(fontSize: 24),
@@ -145,7 +145,7 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                 ] else if (widget.store.user != null) ...[
                   Text(
-                    widget.store.user!.email ?? 'Your profile'.tr(context),
+                    widget.store.signedInEmail.isNotEmpty ? widget.store.signedInEmail : 'Your profile'.tr(context),
                     style: const TextStyle(fontSize: 24),
                   ),
                   const SizedBox(height: 20),
@@ -184,7 +184,7 @@ class _AccountPageState extends State<AccountPage> {
                         : () => run(() async {
                             await sendPasswordReset(
                               widget.store,
-                              currentUserEmail: widget.store.user?.email,
+                              currentUserEmail: widget.store.signedInEmail,
                               typedEmail: '',
                             );
                             if (context.mounted) {

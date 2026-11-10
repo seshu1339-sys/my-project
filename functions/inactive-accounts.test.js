@@ -13,11 +13,16 @@ test('inactive accounts: the list, disable and enable, deleting a customer (not 
   await db.collection('settings').doc('inactiveAccounts').delete();
   // every account in the emulator is new; "now" is moved 40 days ahead instead
   const later = Date.now() + 40 * 86400000;
-  for (const uid of ['inCust', 'inVendor', 'inBoss', 'inFresh']) {
+  // role logins (no email of their own: the email is in the loginEmail claim), plus one email's own login that is never listed
+  const roles = {inCust: 'user', inVendor: 'vendor', inBoss: 'admin', inFresh: 'user'};
+  for (const uid of [...Object.keys(roles), 'inProof']) {
     try { await auth.deleteUser(uid); } catch (_) { /* not there */ }
-    await auth.createUser({uid, email: `${uid.toLowerCase()}@example.test`});
   }
-  await auth.setCustomUserClaims('inBoss', {admin: true});
+  for (const [uid, role] of Object.entries(roles)) {
+    await auth.createUser({uid});
+    await auth.setCustomUserClaims(uid, {role, loginEmail: `${uid.toLowerCase()}@example.test`, ...(role === 'admin' ? {admin: true} : {})});
+  }
+  await auth.createUser({uid: 'inProof', email: 'inproof@example.test'});
   await db.collection('vendors').doc('inVendor').set({status: 'approved'});
   await db.collection('userActivity').doc('inFresh').set({lastActiveAt: Timestamp.fromMillis(later - 86400000)});
   await db.collection('users').doc('inCust').set({name: 'Old customer'});
@@ -30,13 +35,15 @@ test('inactive accounts: the list, disable and enable, deleting a customer (not 
   assert.ok(ids.includes('inCust') && ids.includes('inVendor'));
   assert.ok(!ids.includes('inBoss'), 'never the admin');
   assert.ok(!ids.includes('inFresh'), 'used the app yesterday');
+  assert.ok(!ids.includes('inProof'), 'never the email\'s own login (it holds no role)');
   assert.equal(list.find(r => r.uid === 'inVendor').kind, 'vendor');
+  assert.equal(list.find(r => r.uid === 'inCust').email, 'incust@example.test');
   assert.ok(list.find(r => r.uid === 'inCust').inactiveDays >= 39);
 
   // ---- the admin's actions
   await db.collection('_adminSessions').doc('inBoss').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const boss = {auth: {uid: 'inBoss', token: {admin: true, email_verified: true}}};
-  await assert.rejects(() => fns.setAccountDisabled.run({auth: {uid: 'inCust', token: {email_verified: true}}, data: {uid: 'inVendor', disabled: true}}), /Administrator/);
+  const boss = {auth: {uid: 'inBoss', token: {role: 'admin', admin: true, email_verified: true}}};
+  await assert.rejects(() => fns.setAccountDisabled.run({auth: {uid: 'inCust', token: {role: 'user', email_verified: true}}, data: {uid: 'inVendor', disabled: true}}), /Administrator/);
   assert.deepEqual(await fns.setAccountDisabled.run({...boss, data: {uid: 'inVendor', disabled: true}}), {uid: 'inVendor', disabled: true});
   assert.equal((await auth.getUser('inVendor')).disabled, true);
   await fns.setAccountDisabled.run({...boss, data: {uid: 'inVendor', disabled: false}});

@@ -78,8 +78,8 @@ test('Quick Add is closed on the server (owner, 6 Nov 2026): no new accounts, sh
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
-  const someone = {auth: {uid: 'quickUser', token: {email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
+  const someone = {auth: {uid: 'quickUser', token: {role: 'user', email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await assert.rejects(() => fns.createQuickAccount.run({...admin, data: {email: 'a@example.test', role: 'staff'}}), /Quick Add is closed/);
   await assert.rejects(() => fns.setQuickShopLocation.run({...someone, data: {latitude: 17.0, longitude: 81.8}}), /Quick Add is closed/);
@@ -123,9 +123,9 @@ test('Quick Add rules: only approved items are public; accounts are private; no 
       await setDoc(doc(f, 'locations/l1'), {name: 'Rajahmundry', active: true});
     });
     const anonymous = env.unauthenticatedContext().firestore();
-    const ravi = env.authenticatedContext('ravi', {email_verified: true}).firestore();
-    const sita = env.authenticatedContext('sita', {email_verified: true}).firestore();
-    const admin = env.authenticatedContext('boss', {admin: true, email_verified: true}).firestore();
+    const ravi = env.authenticatedContext('ravi', {role: 'user', email_verified: true}).firestore();
+    const sita = env.authenticatedContext('sita', {role: 'user', email_verified: true}).firestore();
+    const admin = env.authenticatedContext('boss', {role: 'admin', admin: true, email_verified: true}).firestore();
     await assertSucceeds(getDoc(doc(anonymous, 'quickItems/live')));
     await assertFails(getDoc(doc(anonymous, 'quickItems/wait')));
     await assertSucceeds(getDocs(query(collection(anonymous, 'quickItems'), where('status', '==', 'approved'))));

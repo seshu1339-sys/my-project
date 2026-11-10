@@ -7,7 +7,7 @@ test('a vendor price lasts 24 hours: then it is removed, the item hides and cann
   const {expireVendorPricesNow, VENDOR_PRICE_VALID_MS} = require('./vendor-prices');
   const db = getFirestore();
   assert.equal(typeof fns.expireVendorPrices, 'function', 'the scheduled job is deployed with the functions');
-  const vendor = {auth: {uid: 'priceV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'priceV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('priceV').set({vendorId: 'priceV', name: 'Price Shop', shopId: 'priceShop', status: 'approved'});
   await db.collection('vendorShopPhotos').doc('priceV_1').set({vendorId: 'priceV', slot: 1, status: 'approved'});
   await db.collection('productImageLibrary').doc('lib-price-tomato').set({name: 'Tomato', imageUrl: 'https://example.test/t.jpg', active: true});
@@ -38,7 +38,7 @@ test('a vendor price lasts 24 hours: then it is removed, the item hides and cann
 
   // ---- an item past its 24 hours cannot be ordered
   await ref.update({price: 50, endsAt: new Date(Date.now() - 1000).toISOString()});
-  const customer = {auth: {uid: 'priceCustomer', token: {email_verified: true}}};
+  const customer = {auth: {uid: 'priceCustomer', token: {role: 'user', email_verified: true}}};
   await assert.rejects(() => fns.placeOrder.run({...customer, data: {items: [{productId: made.docId, quantity: 1}], pincode: '531116', address: '12 Main Road, Narsipatnam', phone: '9876543210', latitude: 17, longitude: 82, requestId: 'req-price-1'}}), /no longer available/);
 
   // ---- the vendor enters a new price: valid for another 24 hours, shown again, can be ordered

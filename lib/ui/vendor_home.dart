@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
@@ -11,138 +11,113 @@ import 'vendor_page.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
 
-/// What a signed-in account of the vendor app is. Vendor, service-provider and field-staff accounts are completely separate: one login
-/// is only ever one of them. A person who wants more than one registers each with a different email address.
-enum VendorAccountRole { none, vendor, provider, staff }
+/// The words for the vendor app's two logins of one email.
+String vendorRoleName(String role) => role == 'provider' ? 'Service provider' : 'Vendor';
 
-/// The account's role from its records: a vendor application or vendor record (or an admin-made Quick Add vendor account) makes it a
-/// vendor account; a service-provider application makes it a provider account. Neither yet: it may become either.
-VendorAccountRole vendorAccountRole({
-  Map<String, dynamic>? vendorApplication,
-  Map<String, dynamic>? vendor,
-  Map<String, dynamic>? quickAccount,
-  Map<String, dynamic>? providerApplication,
-  Map<String, dynamic>? staff,
-}) {
-  if (vendorApplication != null || vendor != null || quickAccount?['role'] == 'vendor') return VendorAccountRole.vendor;
-  if (providerApplication != null) return VendorAccountRole.provider;
-  if (staff != null || quickAccount?['role'] == 'staff') return VendorAccountRole.staff;
-  return VendorAccountRole.none;
-}
-
-/// The vendor app's home after sign-in: Vendor, Services and Transport.
+/// The vendor app's home after sign-in: Vendor, Services and Transport. One email has a separate login as a vendor and as a service
+/// provider (functions/role-logins.js), each with its own ID, records and approval; the app is signed in as one of them at a time, and
+/// Vendor / Services move to the other one (the Switch button too).
 class VendorHomePage extends StatelessWidget {
   const VendorHomePage({super.key, required this.store});
   final Store store;
 
   void _open(BuildContext context, Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
 
-  Widget _view(BuildContext context, VendorAccountRole role) => VendorHomeView(
-    role: role,
-    chatButton: store.live ? vendorAppFlashButton(store) : null,
-    onVendor: () {
-      Usage.button('vendor_home_vendor');
-      _open(context, VendorPage(store: store));
-    },
-    onServices: () {
-      Usage.button('vendor_home_services');
-      _open(context, ServiceProviderPage(store: store));
-    },
-    onTransport: () {
-      Usage.button('vendor_home_transport');
-      openTransport(context, store);
-    },
-    onLogout: store.live ? store.logout : null,
-  );
+  /// Moves to the email's [role] login (when signed in as the other one). False, after saying why, when that login is blocked.
+  Future<bool> _switchTo(BuildContext context, String role) async {
+    if (!store.live || store.sessionRole == role) return true;
+    try {
+      await store.switchVendorRole(role);
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        final text = e is FirebaseFunctionsException ? (e.message ?? 'Could not switch. Please try again.') : 'Could not switch. Check your connection and try again.';
+        await showDialog<void>(
+          context: context,
+          builder: (dialog) => AlertDialog(
+            title: Text(vendorRoleName(role)),
+            content: Text(text),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('OK'))],
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _openAs(BuildContext context, String role, Widget Function() page) async {
+    if (!await _switchTo(context, role)) return;
+    if (context.mounted) _open(context, page());
+  }
 
   @override
-  Widget build(BuildContext context) => ScreenView('vendor_home', child: _page(context));
-
-  Widget _page(BuildContext context) {
-    final uid = store.user?.uid;
-    if (!store.live || uid == null) return _view(context, VendorAccountRole.none);
-    DocumentReference<Map<String, dynamic>> doc(String collection) => store.firestore.collection(collection).doc(uid);
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: doc('vendorApplications').snapshots(),
-      builder: (context, application) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: doc('vendors').snapshots(),
-        builder: (context, vendor) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: doc('quickAccounts').snapshots(),
-          builder: (context, quick) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: doc('providerApplications').snapshots(),
-            builder: (context, provider) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: doc('fieldStaff').snapshots(),
-              builder: (context, staff) => _view(
-                context,
-                vendorAccountRole(
-                  vendorApplication: application.data?.data(),
-                  vendor: vendor.data?.data(),
-                  quickAccount: quick.data?.data(),
-                  providerApplication: provider.data?.data(),
-                  staff: staff.data?.data(),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ScreenView(
+    'vendor_home',
+    child: VendorHomeView(
+      signedInAs: store.live ? store.sessionRole : '',
+      email: store.live ? store.signedInEmail : '',
+      chatButton: store.live ? vendorAppFlashButton(store) : null,
+      onVendor: () {
+        Usage.button('vendor_home_vendor');
+        _openAs(context, 'vendor', () => VendorPage(store: store));
+      },
+      onServices: () {
+        Usage.button('vendor_home_services');
+        _openAs(context, 'provider', () => ServiceProviderPage(store: store));
+      },
+      onTransport: () {
+        Usage.button('vendor_home_transport');
+        openTransport(context, store);
+      },
+      onSwitch: store.live ? (to) => _switchTo(context, to) : null,
+      onLogout: store.live ? store.logout : null,
+    ),
+  );
 }
 
-/// The three options, laid out for any screen width. An option that does not belong to this account explains why instead of opening.
+/// The three options, laid out for any screen width, with which login the app is signed in as and a Switch button.
 class VendorHomeView extends StatelessWidget {
-  const VendorHomeView({super.key, required this.role, required this.onVendor, required this.onServices, required this.onTransport, this.onLogout, this.chatButton});
-  final VendorAccountRole role;
+  const VendorHomeView({
+    super.key,
+    this.signedInAs = '',
+    this.email = '',
+    required this.onVendor,
+    required this.onServices,
+    required this.onTransport,
+    this.onSwitch,
+    this.onLogout,
+    this.chatButton,
+  });
+
+  /// 'vendor' or 'provider': the login the app is signed in as ('' in the demo).
+  final String signedInAs;
+  final String email;
   final VoidCallback onVendor, onServices, onTransport;
+  final void Function(String to)? onSwitch;
   final VoidCallback? onLogout;
   // The floating Help chat button (lib/modules/flash).
   final Widget? chatButton;
 
-  static const vendorBlocked =
-      'This account is registered as a service provider. A vendor account must be a separate account: sign out and register as a vendor with a different email address.';
-  static const servicesBlocked =
-      'This account is registered as a vendor. A service-provider account must be a separate account: sign out and register as a service provider with a different email address.';
-  static const staffBlocked =
-      'This account is a field-staff account. Vendor and service-provider accounts must be separate accounts: sign out and register with a different email address.';
-
-  void _explain(BuildContext context, String title, String body) => showDialog<void>(
-    context: context,
-    builder: (dialog) => AlertDialog(
-      title: Text(title),
-      content: Text(body),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('OK'))],
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
+    final asProvider = signedInAs == 'provider', asVendor = signedInAs == 'vendor';
+    final other = asProvider ? 'vendor' : 'provider';
     final options = [
       _Option(
         key: 'vendor',
         title: 'Vendor',
-        subtitle: role == VendorAccountRole.provider || role == VendorAccountRole.staff ? 'Not for this account' : 'Sell your shop\'s items',
+        subtitle: asProvider ? 'Switch to your vendor account' : 'Sell your shop\'s items',
         icon: Icons.storefront_outlined,
         color: const Color(0xff8c4a22),
-        enabled: role != VendorAccountRole.provider && role != VendorAccountRole.staff,
-        onTap: role == VendorAccountRole.provider
-            ? () => _explain(context, 'Vendor', vendorBlocked)
-            : role == VendorAccountRole.staff
-            ? () => _explain(context, 'Vendor', staffBlocked)
-            : onVendor,
+        onTap: onVendor,
       ),
       _Option(
         key: 'services',
         title: 'Services',
-        subtitle: role == VendorAccountRole.vendor || role == VendorAccountRole.staff ? 'Not for this account' : 'Offer your service by the hour',
+        subtitle: asVendor ? 'Switch to your service-provider account' : 'Offer your service by the hour',
         icon: Icons.home_repair_service_outlined,
         color: const Color(0xFFD97706),
-        enabled: role != VendorAccountRole.vendor && role != VendorAccountRole.staff,
-        onTap: role == VendorAccountRole.vendor
-            ? () => _explain(context, 'Services', servicesBlocked)
-            : role == VendorAccountRole.staff
-            ? () => _explain(context, 'Services', staffBlocked)
-            : onServices,
+        onTap: onServices,
       ),
       _Option(
         key: 'transport',
@@ -150,7 +125,6 @@ class VendorHomeView extends StatelessWidget {
         subtitle: 'Coming soon',
         icon: Icons.local_shipping_outlined,
         color: const Color(0xFF0F766E),
-        enabled: true,
         onTap: onTransport,
       ),
     ];
@@ -168,6 +142,29 @@ class VendorHomeView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (signedInAs.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'Signed in as ${vendorRoleName(signedInAs)}${email.isEmpty ? '' : ' ($email)'}',
+                          key: const ValueKey('vendor-signed-in-as'),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        if (onSwitch != null)
+                          OutlinedButton.icon(
+                            key: const ValueKey('vendor-switch-role'),
+                            onPressed: () => onSwitch!(other),
+                            icon: const Icon(Icons.swap_horiz),
+                            label: Text('Switch to ${vendorRoleName(other)}'),
+                          ),
+                      ],
+                    ),
+                  ),
                 Text('What would you like to do?', style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 16),
                 for (final option in options) Padding(padding: const EdgeInsets.only(bottom: 14), child: option),
@@ -180,15 +177,78 @@ class VendorHomeView extends StatelessWidget {
   }
 }
 
+/// After the first sign-in in the vendor app: "Vendor or Service provider?". The answer is remembered on this phone, and the home
+/// screen switches later. A login that is blocked says so here; the other one still works.
+class VendorRoleChooser extends StatefulWidget {
+  const VendorRoleChooser({super.key, required this.store});
+  final Store store;
+  @override
+  State<VendorRoleChooser> createState() => _VendorRoleChooserState();
+}
+
+class _VendorRoleChooserState extends State<VendorRoleChooser> {
+  bool busy = false;
+
+  Future<void> _choose(String role) async {
+    setState(() => busy = true);
+    try {
+      await widget.store.chooseVendorRole(role);
+    } catch (_) {
+      /* store.roleBlock says why; it is shown below. */
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    Widget option(String role, String subtitle, IconData icon, Color color) {
+      final blocked = store.blockedRole == role;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: BigOptionTile(
+          key: ValueKey('choose-$role'),
+          title: vendorRoleName(role),
+          subtitle: blocked ? 'This account is blocked' : subtitle,
+          icon: icon,
+          color: color,
+          enabled: !blocked,
+          onTap: busy ? () {} : () => _choose(role),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Continue as', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text(
+          'Your vendor account and your service-provider account are separate, each with its own ID and approval. You can switch at any time.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        option('vendor', 'Sell your shop\'s items', Icons.storefront_outlined, const Color(0xff8c4a22)),
+        option('provider', 'Offer your service by the hour', Icons.home_repair_service_outlined, const Color(0xFFD97706)),
+        if (store.roleBlock != null)
+          Text(store.roleBlock!, key: const ValueKey('role-block'), style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        if (busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+        TextButton(onPressed: busy ? null : store.logout, child: const Text('Use another email')),
+      ],
+    );
+  }
+}
+
 class _Option extends StatelessWidget {
-  _Option({required String key, required this.title, required this.subtitle, required this.icon, required this.color, required this.enabled, required this.onTap})
+  _Option({required String key, required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap})
     : super(key: ValueKey('vendor-home-$key'));
   final String title, subtitle;
   final IconData icon;
   final Color color;
-  final bool enabled;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => BigOptionTile(title: title, subtitle: subtitle, icon: icon, color: color, enabled: enabled, onTap: onTap);
+  Widget build(BuildContext context) => BigOptionTile(title: title, subtitle: subtitle, icon: icon, color: color, onTap: onTap);
 }

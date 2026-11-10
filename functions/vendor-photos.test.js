@@ -7,8 +7,8 @@ test('vendor shop photos: pending, approve/reject, and 15-day expiry', {skip: !p
   const fns = require('./index');
   const db = getFirestore();
   const bucket = getStorage().bucket();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
-  const vendor = {auth: {uid: 'spV', token: {email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
+  const vendor = {auth: {uid: 'spV', token: {role: 'user', email_verified: true}}};
   const submit = (data, ctx = vendor) => fns.submitShopPhoto.run({...ctx, data});
   const review = (data, ctx = admin) => fns.reviewShopPhoto.run({...ctx, data});
   const upload = (uid, slot) => bucket.file(`vendorShopPhotos/${uid}/shopPhoto${slot}`).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
@@ -24,7 +24,7 @@ test('vendor shop photos: pending, approve/reject, and 15-day expiry', {skip: !p
 
   // ---- validation and access: a free vendor has 3 slots (photo 1 the shop, not counted, and 2 extra photos)
   await assert.rejects(() => submit({slot: 4}), /slot from 1 to 3/);
-  await assert.rejects(() => submit({slot: 1}, {auth: {uid: 'notApproved', token: {email_verified: true}}}), /approved/);
+  await assert.rejects(() => submit({slot: 1}, {auth: {uid: 'notApproved', token: {role: 'user', email_verified: true}}}), /approved/);
   await assert.rejects(() => submit({slot: 1}), /Upload the photo/); // nothing uploaded to Storage yet
 
   // ---- a paid plan (6 Nov 2026: the photos follow the plan) allows more extra slots; a photo sent then can still be reviewed after

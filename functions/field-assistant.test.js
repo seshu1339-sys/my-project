@@ -13,11 +13,11 @@ test('field staff access and suspension; New entry is closed, an old entry can s
   const fns = require('./index');
   const db = getFirestore();
   const bucket = getStorage().bucket();
-  const adminAuth = {auth: {uid: 'fieldAdmin', token: {admin: true, email_verified: true}}};
+  const adminAuth = {auth: {uid: 'fieldAdmin', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('fieldAdmin').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('settings').doc('business').set({});
 
-  const staffAuth = (uid, extra = {}) => ({auth: {uid, token: {email_verified: true, email: `${uid}@example.test`, name: `Staff ${uid}`, ...extra}}});
+  const staffAuth = (uid, extra = {}) => ({auth: {uid, token: {role: 'staff', loginEmail: `${uid}@example.test`, name: `Staff ${uid}`, ...extra}}});
   const stagePhoto = async path => bucket.file(path).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
   // Stages `count` photos at fieldSubmissions/{uid}/{submissionId}_1..count.
   const stagePhotos = (uid, submissionId, count) => Promise.all(

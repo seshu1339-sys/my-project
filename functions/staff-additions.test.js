@@ -54,8 +54,8 @@ test('closed (6 Nov 2026): staff can no longer add vendors or providers, approve
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const as = uid => ({auth: {uid, token: {email_verified: true}}});
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const as = uid => ({auth: {uid, token: {role: 'user', email_verified: true}}});
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('fieldStaff').doc('closedStaff').set({status: 'active', name: 'Kiran Kumar', staffCode: 'STF-NRPM-116-482'});
   await assert.rejects(() => fns.submitStaffVendor.run({...as('closedStaff'), data: {additionId: 'addition0001', ...ok}}), /no longer add vendors/);

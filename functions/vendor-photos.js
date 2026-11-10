@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Up to settings/business.vendorPhotoLimit shop photos per approved vendor (default 3: photo 1 is the
 // shop itself and is required before the vendor can add items; photos 2-3 are the vendor's choice). Each stays 'pending' until the admin approves or rejects it;
 // a scheduled cleanup (functions/storage-maintenance.js) deletes anything still pending after
@@ -13,12 +14,12 @@ const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 const slotFile = slot => `shopPhoto${slot}`;

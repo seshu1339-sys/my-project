@@ -8,7 +8,7 @@ test('AI Agent query: unknown query, module gating, role gating, successful read
   const {queries} = require('./ai-agent-read-queries');
 
   const uid = 'agentQueryAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentquery1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentquery1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentConfig').doc('global').set({enabled: true, modules: {}, llmProvider: 'none', voiceProvider: 'text-match'});
   await db.collection('aiAgentRoles').doc(uid).set({role: 'owner'});

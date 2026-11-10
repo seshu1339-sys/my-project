@@ -1,4 +1,6 @@
 'use strict';
+const {isAdminToken} = require('./role-auth');
+const {loginEmailOf} = require('./role-logins');
 // The admin's push notification centre (Admin > Insights > Analytics > Push notifications):
 //   sendPushNotification  admin -> a notification to everyone with notifications on, to one town, or to one person; each send is a
 //                          pushLog/<nid> record (who it went to, how many devices got it) with pushLog/<nid>/recipients/<uid>
@@ -26,7 +28,7 @@ const townKey = town => {
 
 async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -39,11 +41,13 @@ async function* subscribers(query) {
   } while (cursor);
 }
 
-/// The people a notification goes to: everyone with notifications on, those in [town], or the one [uid].
-async function recipients({audience, town, uid}) {
+/// The people a notification goes to: everyone with notifications on, those in [town], or the person's logins [personUids] (one email
+/// has a separate login for each app it uses; each login turns notifications on or off for itself).
+async function recipients({audience, town, personUids = []}) {
   if (audience === 'person') {
-    const sub = (await db.collection('notificationSubscribers').doc(uid).get()).data();
-    return {uids: sub?.enabled ? [uid] : [], off: sub?.enabled ? 0 : 1};
+    const subs = await Promise.all(personUids.map(uid => db.collection('notificationSubscribers').doc(uid).get()));
+    const on = personUids.filter((_, i) => subs[i].data()?.enabled === true);
+    return {uids: on, off: personUids.length - on.length};
   }
   const uids = [];
   const wanted = townKey(town);
@@ -98,12 +102,21 @@ exports.sendPushNotification = onCall({...options, timeoutSeconds: 540}, async r
   let m;
   try { m = message(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   let uid = '';
+  let personUids = [];
   if (m.audience === 'person') {
-    try { uid = m.person.includes('@') ? (await getAuth().getUserByEmail(m.person)).uid : (await getAuth().getUser(m.person)).uid; } catch (_) { throw new HttpsError('not-found', 'No account with that email or id.'); }
+    if (m.person.includes('@')) {
+      // An email: every app login of that email (customer, vendor, service provider, staff), never the admin login.
+      const logins = await db.collection('roleLogins').where('email', '==', m.person.toLowerCase()).get();
+      personUids = logins.docs.filter(d => d.data().role !== 'admin').map(d => d.data().uid);
+      if (!personUids.length) throw new HttpsError('not-found', 'No account with that email or id.');
+    } else {
+      try { personUids = [(await getAuth().getUser(m.person)).uid]; } catch (_) { throw new HttpsError('not-found', 'No account with that email or id.'); }
+    }
+    uid = personUids.length === 1 ? personUids[0] : '';
   }
   const ref = db.collection('pushLog').doc();
   const nid = ref.id;
-  const {uids, off} = await recipients({audience: m.audience, town: m.town, uid});
+  const {uids, off} = await recipients({audience: m.audience, town: m.town, personUids});
   await ref.set({
     nid, title: m.title, body: m.body, audience: m.audience, town: m.town, uid: uid || null, person: m.person || null,
     recipients: uids.length, sent: 0, devices: 0, noToken: 0, failed: 0, off, opened: 0, status: 'sending',
@@ -174,7 +187,7 @@ exports.pushNotOpened = onCall(options, async request => {
   for (let i = 0; i < waiting.length; i += 100) {
     const found = await getAuth().getUsers(waiting.slice(i, i + 100).map(uid => ({uid})));
     const byUid = new Map(found.users.map(u => [u.uid, u]));
-    for (const uid of waiting.slice(i, i + 100)) people.push({uid, email: byUid.get(uid)?.email || '', name: byUid.get(uid)?.displayName || ''});
+    for (const uid of waiting.slice(i, i + 100)) people.push({uid, email: loginEmailOf(byUid.get(uid)), name: byUid.get(uid)?.displayName || ''});
   }
   return {people, total: waiting.length};
 });
