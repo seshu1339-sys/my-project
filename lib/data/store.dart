@@ -136,11 +136,44 @@ class Store extends ChangeNotifier {
   /// This phone has already had an agreement saved, so the sign-in screen does not show the tick box again.
   bool deviceConsented = false;
 
-  /// The box was ticked on the sign-in screen; the agreement is saved right after sign-in.
+  /// The person continued on the sign-in screen, under "By continuing, you agree to ...": the agreement is saved right after sign-in.
   bool pendingConsent = false;
 
-  /// The sign-in screen shows the tick box (nobody has agreed on this phone yet).
+  /// The sign-in screen shows the agreement sentence (nobody has agreed on this phone yet).
   bool get asksConsentBeforeSignIn => requiresConsent && !deviceConsented;
+
+  /// The sign-in screen offers the 6-digit email code. Google always comes first: the code is offered only once Google did not work,
+  /// is not possible on this device, or the person closed the Google sheet without choosing an account. Hidden again after Log out.
+  bool emailCodeOffered = false;
+
+  /// Offers the email code on the sign-in screen (Google did not work or was closed).
+  void offerEmailCode() {
+    if (emailCodeOffered) return;
+    emailCodeOffered = true;
+    notifyListeners();
+  }
+
+  /// The Google sheet has already opened by itself in this run of the app (or the person just logged out), so it does not again.
+  bool _autoGoogleDone = false;
+
+  /// The customer app opened its sign-in sheet by itself once on this phone (the first open after install); never again after that.
+  bool _firstOpenOffered = false;
+
+  /// The sign-in screen may open the Google sheet by itself: live, nobody signed in, and not yet in this run of the app.
+  bool get opensGoogleByItself => live && user == null && !_autoGoogleDone;
+
+  /// The customer app's first open after install: its sign-in sheet opens by itself, once (customers may also shop without signing in).
+  bool get offersSignInOnFirstOpen => live && appRole == 'user' && user == null && !_firstOpenOffered && !_autoGoogleDone;
+
+  /// The sign-in screen opened the Google sheet by itself; it does not do so again in this run.
+  void googleOpenedByItself() => _autoGoogleDone = true;
+
+  /// The customer app's first-open sign-in sheet was shown; remembered on this phone.
+  Future<void> firstOpenSignInShown() async {
+    _firstOpenOffered = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('firstOpenSignInShown', true);
+  }
 
   /// The agreement screen covers the app: signed in, and no saved agreement for the current version.
   bool get showsConsentScreen => live && requiresConsent && user != null && consentNeeded;
@@ -289,9 +322,13 @@ class Store extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     if (live) {
+      // The website reads its saved login from the browser a moment after the start; without this wait every open would show the
+      // sign-in screen first (and, with no connection then, stay signed out). A phone has it at once. Never blocks for long.
+      if (kIsWeb) await _savedLoginLoaded();
       // The app opens straight inside: the role of the login this phone is still signed in with is known before the first screen,
       // without waiting for the network (the claims are checked again as soon as Firebase reports the login).
       lastSignInEmail = prefs.getString('lastSignInEmail') ?? '';
+      _firstOpenOffered = prefs.getBool('firstOpenSignInShown') ?? false;
       final saved = (prefs.getString('sessionRole') ?? '').split('|');
       final current = FirebaseAuth.instance.currentUser;
       if (saved.length == 3 && current != null && current.uid == saved[0] && appRoles.contains(saved[1])) {
@@ -378,6 +415,10 @@ class Store extends ChangeNotifier {
           notifyListeners();
         }),
       );
+      // The website's One Tap prompt answers here, whenever the person clicks their account (lib/services/google_account.dart).
+      if (kIsWeb && appRole != 'admin') {
+        _subscriptions.add(googleIdTokens().listen((idToken) => unawaited(_finishGoogleQuietly(idToken))));
+      }
       for (final collection in collections) {
         _subscriptions.add(
           firestore
@@ -892,21 +933,38 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Signs Google out on this phone (lib/services/google_account.dart).
+  /// Signs Google out on this phone or in this browser (lib/services/google_account.dart).
   Future<void> _forgetGoogle() async {
-    if (!kIsWeb) await forgetGoogleAccount();
+    if (kIsWeb && appRole == 'admin') return;
+    await forgetGoogleAccount();
   }
 
-  /// Main sign-in: "Continue with Google", one tap on an account already on the phone, no typing; Google has already verified the
-  /// email. Signing in and registering are the same step: the app's own account for this email is made on the first sign-in.
-  /// Returns false when the person closed the account list without choosing.
-  Future<bool> signInWithGoogle() async {
+  /// Waits (at most a few seconds) until Firebase has read the website's saved login from the browser.
+  Future<void> _savedLoginLoaded() async {
+    try {
+      await FirebaseAuth.instance.authStateChanges().first.timeout(const Duration(seconds: 4));
+    } catch (_) {
+      /* Slow or no storage: the app starts and the login, if any, follows a moment later. */
+    }
+  }
+
+  /// Main sign-in: "Continue with Google", one tap on an account already on the phone (its email shown), no typing; Google has already
+  /// verified the email. Signing in and registering are the same step: the app's own account for this email is made on the first
+  /// sign-in. [automatic] is the sheet that opens by itself: only the sheet, never Google's full picker; on the website, the One Tap
+  /// prompt, whose answer comes later through [googleIdTokens].
+  /// Returns true when signed in, false when the person closed Google without choosing (or there is nothing to show), and null while
+  /// the website's One Tap prompt is waiting for a click.
+  Future<bool?> signInWithGoogle({bool automatic = false}) async {
     roleBlock = null;
     try {
       if (kIsWeb) {
+        if (automatic) {
+          await showWebOneTap();
+          return null;
+        }
         await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
       } else {
-        final account = await pickGoogleAccount();
+        final account = await pickGoogleAccount(sheetOnly: automatic);
         if (account == null) return false;
         final idToken = account.authentication.idToken;
         if (idToken == null) throw StateError('Google did not send a sign-in token. Please try again, or use an email code.');
@@ -921,6 +979,22 @@ class Store extends ChangeNotifier {
     }
     await enterAppRole();
     return true;
+  }
+
+  /// The website: the person clicked their account in the One Tap prompt, which only opens on a sign-in screen, under the agreement
+  /// sentence ("By continuing, you agree to ...").
+  Future<void> _finishGoogleQuietly(String idToken) async {
+    if (sessionRole.isNotEmpty) return;
+    try {
+      roleBlock = null;
+      if (asksConsentBeforeSignIn) pendingConsent = true;
+      await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
+      await enterAppRole();
+    } catch (_) {
+      // roleBlock (when set) says why on the sign-in screen; Google did not work, so the email code is offered.
+      emailCodeOffered = true;
+      notifyListeners();
+    }
   }
 
   /// Backup sign-in: the server emails a 6-digit code to [email].
@@ -990,6 +1064,9 @@ class Store extends ChangeNotifier {
     await FirebaseAuth.instance.signOut();
     await _setSession(null);
     choosingVendorRole = false;
+    // Signed out on purpose: the sign-in screen shows Google first again, and does not pop the Google sheet up by itself.
+    emailCodeOffered = false;
+    _autoGoogleDone = true;
     cart.clear();
     // Clear per-account local caches so a different account signing in next
     // on this device never inherits this account's wishlist/payment display

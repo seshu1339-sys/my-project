@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data/store.dart';
 import 'ui/consent_checkbox.dart';
+import 'ui/first_open_sign_in.dart';
 import 'ui/storefront.dart';
 import 'ui/details.dart';
 import 'ui/admin_auth.dart';
@@ -230,7 +231,8 @@ class MarketApp extends StatelessWidget {
       theme: buildAppTheme(store, dark: false),
       darkTheme: buildAppTheme(store, dark: true),
       themeMode: resolveThemeMode(store),
-      home: Storefront(store: store),
+      // First open after install: the sign-in sheet with Google's one-tap sheet over the shop, once (lib/ui/first_open_sign_in.dart).
+      home: FirstOpenSignIn(store: store, child: Storefront(store: store)),
     ),
   );
 }

@@ -11,7 +11,8 @@
 // Nothing is deleted without --apply and a plan file the owner has looked at.
 const path = require('node:path');
 const fs = require('node:fs');
-const req = name => require(path.join(__dirname, '..', 'functions', 'node_modules', name));
+// Resolved from functions/ (its node_modules), so package subpaths like firebase-admin/app go through the package's exports map.
+const req = require('node:module').createRequire(path.join(__dirname, '..', 'functions', 'package.json'));
 const {initializeApp, applicationDefault} = req('firebase-admin/app');
 const {getAuth} = req('firebase-admin/auth');
 const {getFirestore} = req('firebase-admin/firestore');

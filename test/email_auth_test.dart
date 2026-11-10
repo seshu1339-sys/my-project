@@ -40,6 +40,9 @@ class EmailTestStore extends Store {
     notifyListeners();
   }
 
+  /// What Log out leaves behind for the sign-in screen (Store.logout itself needs Firebase).
+  void loggedOutForTest() => googleOpenedByItself();
+
   @override
   Future<void> resetPassword(String email) async {
     action = 'reset';
@@ -57,11 +60,16 @@ class EmailTestStore extends Store {
     return false;
   }
 
-  bool googleResult = true;
+  bool? googleResult = true;
+  Object? googleError;
+  /// Each Google sign-in asked for: true when it was the sheet opening by itself.
+  final googleCalls = <bool>[];
   String? codeSentTo, codeTyped;
   @override
-  Future<bool> signInWithGoogle() async {
+  Future<bool?> signInWithGoogle({bool automatic = false}) async {
     action = 'google';
+    googleCalls.add(automatic);
+    if (googleError != null) throw googleError!;
     return googleResult;
   }
 
@@ -89,21 +97,63 @@ void tallScreen(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+Future<void> _panel(WidgetTester tester, EmailTestStore store) async {
+  await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SignInPanel(store: store)))));
+  await tester.pumpAndSettle();
+}
+
+/// The email code once Google was closed: the link, then the code form.
+Future<void> _openEmailCode(WidgetTester tester, EmailTestStore store) async {
+  store.googleResult = false;
+  await _panel(tester, store);
+  await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('Google is the main sign-in; the email code is only a backup', (tester) async {
+  testWidgets('first open: the Google sheet opens by itself, and while Google works there is no email code', (tester) async {
     final store = EmailTestStore();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store))));
+    await _panel(tester, store);
+    expect(store.googleCalls, [true], reason: "the sheet with the phone's account opened by itself: one tap to sign in");
     expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.byKey(const ValueKey('email-code-toggle')), findsNothing);
     expect(find.byKey(const ValueKey('code-email')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('google-sign-in')));
     await tester.pumpAndSettle();
-    expect(store.action, 'google');
+    expect(store.googleCalls, [true, false], reason: "the button asks again, with Google's full picker when needed");
+    expect(find.byKey(const ValueKey('email-code-toggle')), findsNothing);
+  });
+  testWidgets('the sheet opens by itself once per run of the app, and not right after Log out', (tester) async {
+    final store = EmailTestStore();
+    await _panel(tester, store);
+    await tester.pumpWidget(const SizedBox());
+    await _panel(tester, store);
+    expect(store.googleCalls, [true], reason: 'a second sign-in screen in the same run does not pop Google up again');
+    final fresh = EmailTestStore()..loggedOutForTest();
+    await _panel(tester, fresh);
+    expect(fresh.googleCalls, isEmpty, reason: 'after Log out the person taps Google themselves');
+  });
+  testWidgets('closing the Google sheet offers the email code', (tester) async {
+    final store = EmailTestStore()..googleResult = false;
+    await _panel(tester, store);
+    expect(store.emailCodeOffered, isTrue);
+    expect(find.byKey(const ValueKey('email-code-toggle')), findsOneWidget);
+  });
+  testWidgets('Google not working offers the email code, with the reason', (tester) async {
+    final store = EmailTestStore()..googleError = StateError('Google did not send a sign-in token. Please try again, or use an email code.');
+    await _panel(tester, store);
+    expect(find.byKey(const ValueKey('sign-in-error')), findsOneWidget);
+    expect(find.byKey(const ValueKey('email-code-toggle')), findsOneWidget);
+  });
+  testWidgets("the website's One Tap prompt waiting for a click offers nothing else yet", (tester) async {
+    final store = EmailTestStore()..googleResult = null;
+    await _panel(tester, store);
+    expect(store.googleCalls, [true]);
+    expect(find.byKey(const ValueKey('email-code-toggle')), findsNothing);
   });
   testWidgets('the email code backup sends a code, then signs in with the 6 digits', (tester) async {
     final store = EmailTestStore();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SignInPanel(store: store)))));
-    await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
-    await tester.pumpAndSettle();
+    await _openEmailCode(tester, store);
     await tester.enterText(find.byKey(const ValueKey('code-email')), 'not an email');
     await tester.tap(find.byKey(const ValueKey('send-code')));
     await tester.pumpAndSettle();
@@ -124,95 +174,32 @@ void main() {
     expect(store.codeTyped, '123456');
     expect(store.submittedEmail, 'customer@example.com');
   });
-  testWidgets('a blocked role is told so on the sign-in screen (the same email\x27s other roles are not affected)', (tester) async {
+  testWidgets("a blocked role is told so on the sign-in screen (the same email's other roles are not affected)", (tester) async {
     final store = EmailTestStore()..roleBlock = 'Your staff account is blocked. Contact LOCAMARKET support.';
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store))));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SignInPanel(store: store, opensGoogle: false))));
     expect(find.byKey(const ValueKey('sign-in-error')), findsOneWidget);
     expect(find.textContaining('staff account is blocked'), findsOneWidget);
     expect(find.textContaining('another role'), findsNothing);
   });
   testWidgets('the email code starts with the last email used on this phone', (tester) async {
     final store = EmailTestStore()..lastSignInEmail = 'same.person@example.com';
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: SignInPanel(store: store)))));
-    await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
-    await tester.pumpAndSettle();
+    await _openEmailCode(tester, store);
     expect(tester.widget<TextField>(find.byKey(const ValueKey('code-email'))).controller!.text, 'same.person@example.com');
     await tester.tap(find.byKey(const ValueKey('send-code')));
     await tester.pumpAndSettle();
     expect(store.codeSentTo, 'same.person@example.com', reason: 'no typing needed');
   });
-  testWidgets('email login and reset use entered address without SMS fields', (
-    tester,
-  ) async {
+  testWidgets('the customer Account page: Google sign-in only, no password form, no registration, no reset email', (tester) async {
     tallScreen(tester);
     final store = EmailTestStore();
     await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(field('Password'), findsNothing);
+    expect(field('Email address'), findsNothing, reason: 'the email-code field only appears once Google did not work');
+    expect(find.text('Create an account'), findsNothing);
+    expect(find.text('Forgot password?'), findsNothing);
     expect(find.text('Send SMS code'), findsNothing);
-    await tester.enterText(field('Email address'), 'customer@example.com');
-    await tester.enterText(field('Password'), 'example-password');
-    await tester.tap(find.text('Sign in'));
-    await tester.pumpAndSettle();
-    expect(store.action, 'login');
-    expect(store.submittedEmail, 'customer@example.com');
-      await tester.ensureVisible(find.text('Forgot password?'));
-      await tester.drag(find.byType(ListView), const Offset(0, -180));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Forgot password?'));
-    await tester.pumpAndSettle();
-    expect(store.action, 'reset');
-  });
-  testWidgets(
-    'registration validates confirmation and shows verification gate',
-    (tester) async {
-    tallScreen(tester);
-      final store = EmailTestStore();
-      await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
-      await tester.tap(find.text('Create an account'));
-      await tester.pumpAndSettle();
-      await tester.enterText(field('Email address'), 'owner@example.com');
-      await tester.enterText(field('Password'), 'example-password');
-      await tester.enterText(field('Confirm password'), 'different');
-      await tester.ensureVisible(find.text('Create account'));
-      await tester.tap(find.text('Create account'));
-      await tester.pumpAndSettle();
-      expect(store.action, isNull);
-      expect(find.textContaining('Passwords do not match'), findsOneWidget);
-      await tester.enterText(field('Confirm password'), 'example-password');
-      await tester.tap(find.text('Create account'));
-      await tester.pumpAndSettle();
-      expect(store.action, 'register');
-      expect(find.text('Verify your email'), findsOneWidget);
-      expect(find.text('Your orders'), findsNothing);
-      await tester.tap(find.text('Resend verification email'));
-      await tester.pumpAndSettle();
-      expect(store.action, 'resend');
-      await tester.tap(find.text('I have verified my email'));
-      await tester.pumpAndSettle();
-      expect(store.action, 'refresh');
-      expect(find.text('Verify your email'), findsOneWidget);
-      expect(find.text('Your orders'), findsNothing);
-    },
-  );
-  testWidgets('after registering and signing out, the sign-in form is shown, not registration', (
-    tester,
-  ) async {
-    tallScreen(tester);
-    final store = EmailTestStore();
-    await tester.pumpWidget(MaterialApp(home: AccountPage(store: store)));
-    await tester.tap(find.text('Create an account'));
-    await tester.pumpAndSettle();
-    await tester.enterText(field('Email address'), 'owner@example.com');
-    await tester.enterText(field('Password'), 'example-password');
-    await tester.enterText(field('Confirm password'), 'example-password');
-    await tester.ensureVisible(find.text('Create account'));
-    await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
-    expect(store.action, 'register');
-    store.signOutForTest();
-    await tester.pumpAndSettle();
-    expect(find.text('Create your account'), findsNothing);
-    expect(find.text('Welcome to your neighbourhood'), findsOneWidget);
-    expect(field('Confirm password'), findsNothing);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(store.googleCalls, isEmpty, reason: 'Account does not pop Google up by itself; only the first open does');
   });
 }

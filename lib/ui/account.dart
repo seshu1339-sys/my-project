@@ -178,21 +178,6 @@ class _AccountPageState extends State<AccountPage> {
                     cardBrand: cardBrand,
                     cardLast4: cardLast4,
                   ),
-                  OutlinedButton(
-                    onPressed: busy
-                        ? null
-                        : () => run(() async {
-                            await sendPasswordReset(
-                              widget.store,
-                              currentUserEmail: widget.store.signedInEmail,
-                              typedEmail: '',
-                            );
-                            if (context.mounted) {
-                              message(context, 'If an account exists, a password reset email has been sent.'.tr(context));
-                            }
-                          }),
-                    child: Text('Reset password by email'.tr(context)),
-                  ),
                   TextButton(
                     onPressed: () => run(widget.store.logout),
                     child: Text('Log out'.tr(context)),

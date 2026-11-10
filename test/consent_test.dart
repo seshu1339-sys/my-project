@@ -1,4 +1,4 @@
-// Agreement to the Terms & Conditions and the Privacy Policy: a tick before signing up, links that open the right pages, the one-time
+// Agreement to the Terms & Conditions and the Privacy Policy: "By continuing, you agree ..." on the sign-in screens (no tick), links that open the right pages, the one-time
 // agreement screen for people already signed in, and no asking once it is saved.
 import 'dart:io';
 
@@ -19,9 +19,17 @@ class _GateStore extends Store {
   bool get showsConsentScreen => needsScreen;
 }
 
-Future<Store> _store({String role = 'user', bool consentRequired = true, Map<String, Object> prefs = const {}}) async {
+/// Google that is closed without choosing (no phone in a test).
+class _QuietGoogleStore extends Store {
+  @override
+  Future<bool?> signInWithGoogle({bool automatic = false}) async => false;
+  @override
+  Future<void> requestEmailCode(String email) async {}
+}
+
+Future<Store> _store({String role = 'user', bool consentRequired = true, Map<String, Object> prefs = const {}, Store? google}) async {
   SharedPreferences.setMockInitialValues(prefs);
-  final store = Store()
+  final store = (google ?? Store())
     ..appRole = role
     ..requiresConsent = consentRequired;
   await store.init();
@@ -63,27 +71,46 @@ void main() {
     expect((await _store(consentRequired: false)).asksConsentBeforeSignIn, isFalse, reason: 'the admin app does not ask');
   });
 
-  testWidgets('Google and email-code sign-in wait for the tick, then work', (tester) async {
-    final store = await _store();
+  testWidgets('the sign-in screen says "By continuing, you agree ..." (no tick box), and continuing with Google is the agreement', (tester) async {
+    final store = await _store(google: _QuietGoogleStore());
     await _pump(tester, SignInPanel(store: store));
-    expect(find.byKey(const ValueKey('consent-checkbox')), findsOneWidget);
-    expect(find.text('Tick the box to agree before you continue.'), findsOneWidget);
-    expect(_enabled(tester, 'google-sign-in'), isFalse);
-    await tester.tap(find.byKey(const ValueKey('consent-checkbox')));
-    await tester.pump();
-    expect(store.pendingConsent, isTrue);
+    expect(find.byKey(const ValueKey('consent-checkbox')), findsNothing, reason: 'no tick box: Google stays one tap');
+    final notice = tester.widget<Text>(find.byKey(const ValueKey('consent-notice'))).textSpan!.toPlainText();
+    expect(notice, 'By continuing, you agree to the Terms & Conditions and the Privacy Policy.');
     expect(_enabled(tester, 'google-sign-in'), isTrue);
-    expect(find.text('Tick the box to agree before you continue.'), findsNothing);
-    await tester.tap(find.byKey(const ValueKey('consent-checkbox')));
-    await tester.pump();
-    expect(_enabled(tester, 'google-sign-in'), isFalse, reason: 'unticking closes it again');
+    expect(store.pendingConsent, isFalse);
+    await tester.tap(find.byKey(const ValueKey('google-sign-in')));
+    await tester.pumpAndSettle();
+    expect(store.pendingConsent, isTrue, reason: 'saved on the server right after sign-in, as a tick was');
   });
 
-  testWidgets('the tick box is not shown again once an agreement is saved on the phone', (tester) async {
+  testWidgets('sending an email code under the sentence is the agreement too', (tester) async {
+    final store = await _store(google: _QuietGoogleStore());
+    await _pump(tester, SignInPanel(store: store));
+    await tester.tap(find.byKey(const ValueKey('google-sign-in')));
+    await tester.pumpAndSettle();
+    store.pendingConsent = false;
+    await tester.tap(find.byKey(const ValueKey('email-code-toggle')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('code-email')), 'new.person@example.com');
+    await tester.tap(find.byKey(const ValueKey('send-code')));
+    await tester.pumpAndSettle();
+    expect(store.pendingConsent, isTrue);
+  });
+
+  testWidgets('the sentence is not shown again once an agreement is saved on the phone', (tester) async {
     final store = await _store(prefs: {'consent_device': policyVersion});
     await _pump(tester, SignInPanel(store: store));
+    expect(find.byKey(const ValueKey('consent-notice')), findsNothing);
     expect(find.byKey(const ValueKey('consent-checkbox')), findsNothing);
     expect(_enabled(tester, 'google-sign-in'), isTrue);
+  });
+
+  testWidgets('the sign-in sentence in Telugu names both pages', (tester) async {
+    final store = await _store();
+    await _pump(tester, ConsentNotice(store: store), language: 'te');
+    final telugu = tester.widget<Text>(find.byKey(const ValueKey('consent-notice'))).textSpan!.toPlainText();
+    expect(telugu, 'కొనసాగించడం ద్వారా మీరు నియమాలు & షరతులు మరియు గోప్యతా విధానం ఒప్పుకుంటున్నారు.');
   });
 
   testWidgets('the sentence names both pages as links, in English by default and in Telugu in simple words', (tester) async {
