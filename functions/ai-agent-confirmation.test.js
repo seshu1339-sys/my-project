@@ -1,7 +1,7 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-test('AI Agent confirmation: Agent PIN set/validate and gate a sensitive action', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent confirmation: Agent PIN set/validate and gate a sensitive action', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();

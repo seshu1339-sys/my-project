@@ -18,7 +18,7 @@ Future<Store> _store({List<Entry> ads = const [], List<Entry> promotions = const
   await store.init();
   store.catalog['ads'] = [...ads];
   store.catalog['promotions'] = [...promotions];
-  store.catalog['shops'] = const [Entry('shop-a', {'name': 'Suma Fresh Mart', 'order': 1})];
+  store.catalog['shops'] = const [Entry('shop-a', {'name': 'Suma Fresh Mart', 'order': 1, 'latitude': 17.667, 'longitude': 82.612})];
   return store;
 }
 
@@ -206,6 +206,12 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('ad-field-title')), 'Diwali sale');
       await tester.enterText(find.byKey(const ValueKey('ad-field-shopName')), 'Suma Fresh Mart');
       await tester.enterText(find.byKey(const ValueKey('ad-field-vendorCode')), 'VN1001');
+      // Customers see the ad only near its shop (distance only): the shop is chosen.
+      await tester.ensureVisible(find.byKey(const ValueKey('ad-radius-shop-')));
+      await tester.tap(find.byKey(const ValueKey('ad-radius-shop-')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Suma Fresh Mart').last);
+      await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('ad-field-phone')), '9876543210');
       await tester.enterText(find.byKey(const ValueKey('ad-field-amount')), '1500');
       await tester.ensureVisible(find.byKey(const ValueKey('ad-package-normal')));

@@ -1,6 +1,6 @@
-// Location-based offers: the town rules themselves, then the real customer
-// page (MarketApp) switching offers, ads and the ticker's town name, and the
-// admin Content "Location" field.
+// Location-based offers: the town-name helpers, then the real customer page (MarketApp) switching offers, ads and the banner's area
+// name. Since 11 Nov 2026 who sees an offer is decided by its SHOP's distance only (lib/domain/reach.dart): no town lists, no
+// district or state offers, no offers "for everyone".
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,20 +8,29 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/towns.dart';
 import 'package:ecommerce_app/main.dart';
-import 'package:ecommerce_app/ui/entry_editor.dart';
 import 'package:ecommerce_app/ui/location_picker_dialog.dart';
 import 'places_fixture.dart';
 
-Entry _promo(String id, String placement, {String locations = ''}) => Entry(
+Entry _promo(String id, String placement, {String locations = '', String shop = ''}) => Entry(
   id,
   {
     'name': id,
     'placement': placement,
     'locations': locations,
+    if (shop.isNotEmpty) 'radiusShopId': shop,
     'active': true,
     'order': 0,
   },
 );
+
+// A shop in each town, and each town's point.
+const _shops = [
+  Entry('narsi', {'name': 'Narsipatnam shop', 'latitude': 17.667, 'longitude': 82.612}),
+  Entry('anaka', {'name': 'Anakapalle shop', 'latitude': 17.691, 'longitude': 83.003}),
+];
+const _points = {'Narsipatnam': (17.668, 82.613), 'Anakapalle': (17.690, 83.002), 'Visakhapatnam': (17.734, 83.279)};
+Future<void> _goTo(Store store, String town) =>
+    store.setLocation('', '', lat: _points[town]!.$1, lng: _points[town]!.$2, town: town, area: town);
 
 Future<Store> _store({
   String towns = 'Narsipatnam=531116|531115, Anakapalle=531001, Visakhapatnam',
@@ -37,6 +46,12 @@ Future<Store> _store({
     ...business,
   }));
   store.catalog['promotions']!.clear();
+  store.catalog['shops'] = [..._shops];
+  // One discounted item in each shop, for the banner's price chips.
+  store.catalog['products'] = const [
+    Entry('p-narsi', {'name': 'Narsipatnam rice', 'price': 40, 'compareAtPrice': 50, 'shopId': 'narsi', 'stock': 5}),
+    Entry('p-anaka', {'name': 'Anakapalle jaggery', 'price': 60, 'compareAtPrice': 80, 'shopId': 'anaka', 'stock': 5}),
+  ];
   for (final promotion in promotions) {
     await store.save('promotions', promotion);
   }
@@ -144,30 +159,30 @@ void main() {
   });
 
   group('customer page', () {
-    testWidgets('offers, ads and the ticker follow the chosen town', (
-      tester,
-    ) async {
+    testWidgets("offers and ads follow the place: only those of shops within the km; the banner names the area", (tester) async {
       await _wide(tester);
       final store = await _store(
         promotions: [
-          _promo('Narsipatnam special', 'carousel', locations: 'Narsipatnam'),
-          _promo('Anakapalle special', 'carousel', locations: 'Anakapalle'),
-          _promo('Narsipatnam ad', 'ad', locations: 'Narsipatnam'),
-          _promo('Anakapalle ad', 'ad', locations: 'Anakapalle'),
+          // The old town lists no longer count: the shop does.
+          _promo('Narsipatnam special', 'carousel', locations: 'Anakapalle', shop: 'narsi'),
+          _promo('Anakapalle special', 'carousel', shop: 'anaka'),
+          _promo('Narsipatnam ad', 'ad', shop: 'narsi'),
           _promo('Everyone ad', 'ad'),
+          _promo('Everyone offer', 'carousel'),
         ],
       );
       await tester.pumpWidget(MarketApp(store: store));
       await tester.pump();
 
-      await store.setLocation('', '', town: 'Narsipatnam');
+      await _goTo(store, 'Narsipatnam');
       await tester.pump();
       expect(find.text("Today's Narsipatnam Offers"), findsOneWidget);
       expect(find.text('Narsipatnam special'), findsWidgets);
       expect(find.text('Anakapalle special'), findsNothing);
+      expect(find.text('Everyone offer'), findsNothing, reason: 'an offer without a shop is shown to nobody');
 
       // Changing the location changes the name and the offers at once.
-      await store.setLocation('', '', town: 'Anakapalle');
+      await _goTo(store, 'Anakapalle');
       await tester.pump();
       expect(find.text("Today's Anakapalle Offers"), findsOneWidget);
       expect(find.text("Today's Narsipatnam Offers"), findsNothing);
@@ -175,57 +190,29 @@ void main() {
       expect(find.text('Narsipatnam special'), findsNothing);
       expect(find.text('Narsipatnam ad'), findsNothing);
 
-      // A town with no offers of its own falls back to the general ones.
-      await store.setLocation('', '', town: 'Visakhapatnam');
+      // No shop with an offer within the km: a message, never another place's offers or "general" ones, never empty boxes.
+      await _goTo(store, 'Visakhapatnam');
       await tester.pump();
-      expect(find.text("Today's Visakhapatnam Offers"), findsOneWidget);
-      expect(find.text('Narsipatnam ad'), findsNothing);
-      // ...and with no general offers either, a message, never empty boxes.
+      expect(find.text("Today's Narsipatnam Offers"), findsNothing);
+      expect(find.text("Today's Anakapalle Offers"), findsNothing);
+      expect(find.text('Everyone offer'), findsNothing);
       expect(find.byKey(const ValueKey('no-offers-notice')), findsOneWidget);
-      expect(
-        find.text('No offers in Visakhapatnam yet. Check back soon!'),
-        findsOneWidget,
-      );
+      expect(find.text('No offers near you right now.'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       store.dispose();
     });
 
-    testWidgets('a town with no offers shows the admin\'s own message', (
-      tester,
-    ) async {
+    testWidgets("a place with no offers near it shows the admin's own message, with the area name", (tester) async {
       await _wide(tester);
       final store = await _store(
-        business: {'noOffersMessage': 'Nothing in {town} today'},
-        promotions: [_promo('Narsipatnam special', 'carousel', locations: 'Narsipatnam')],
+        business: {'noOffersMessage': 'Nothing near {town} today'},
+        promotions: [_promo('Narsipatnam special', 'carousel', shop: 'narsi')],
       );
       await tester.pumpWidget(MarketApp(store: store));
-      await store.setLocation('', '', town: 'Anakapalle');
+      await _goTo(store, 'Visakhapatnam');
       await tester.pump();
-      expect(find.text('Nothing in Anakapalle today'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
-
-    testWidgets('with no location chosen a town\'s offers stay hidden and the customer is asked to choose', (tester) async {
-      await _wide(tester);
-      final store = await _store(
-        promotions: [
-          _promo('Narsipatnam special', 'carousel', locations: 'Narsipatnam'),
-          _promo('Narsipatnam ad', 'ad', locations: 'Narsipatnam'),
-        ],
-      );
-      await tester.pumpWidget(MarketApp(store: store));
-      await tester.pump();
-      expect(find.text('Narsipatnam special'), findsNothing);
-      expect(find.text('Narsipatnam ad'), findsNothing);
-      expect(find.byKey(const ValueKey('no-offers-notice')), findsOneWidget);
-      expect(find.text('Choose your location to see offers for your town.'), findsOneWidget);
-      // ...and a general offer is still shown to everyone.
-      await store.save('promotions', _promo('Everyone offer', 'carousel'));
-      await tester.pump();
-      expect(find.text('Everyone offer'), findsWidgets);
-      expect(find.byKey(const ValueKey('no-offers-notice')), findsNothing);
+      expect(find.text('Nothing near Visakhapatnam today'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       store.dispose();
     });
@@ -257,51 +244,5 @@ void main() {
     });
   });
 
-  group('admin content', () {
-    testWidgets('an offer\'s Location is chosen from the towns and saved', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(1000, 2400);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await _store();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: EntryEditor(store: store, collection: 'promotions'),
-        ),
-      );
-      await tester.pump();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Headline / ticker text'),
-        'Diwali sale',
-      );
-      for (final town in ['Narsipatnam', 'Anakapalle']) {
-        final chip = find.byKey(ValueKey('location-chip-$town'));
-        expect(chip, findsOneWidget);
-        tester.widget<FilterChip>(chip).onSelected!(true);
-        await tester.pump();
-      }
-      await tester.scrollUntilVisible(
-        find.text('Save changes'),
-        300,
-        scrollable: find
-            .byWidgetPredicate(
-              (widget) =>
-                  widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.down,
-            )
-            .first,
-      );
-      await tester.tap(find.text('Save changes'));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      final saved = store
-          .entries('promotions')
-          .firstWhere((e) => e.text('name') == 'Diwali sale');
-      expect(saved.text('locations'), 'Narsipatnam, Anakapalle');
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
-  });
+  // The offer form's town Location field is gone (owner, 11 Nov 2026): an offer is shown near its shop only (test/radius_test.dart).
 }

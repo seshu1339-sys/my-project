@@ -1,16 +1,18 @@
 'use strict';
-// A vendor's item price lasts 24 hours (set when the item is saved or the price is changed, see submitVendorChange in index.js:
+// A vendor's item price lasts the admin's post duration, 24 hours by default (post-duration.js; set when the item is saved or the price is changed, see submitVendorChange in index.js:
 // priceSetAt / priceExpiresAt, and endsAt so the site hides the item and an order is refused the moment it passes). Every half hour
 // this removes the expired prices, so the vendor's app shows "price expired, enter today's price" until the vendor sets a new one.
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const db = getFirestore();
 
 const VENDOR_PRICE_VALID_MS = 24 * 60 * 60 * 1000;
 
 /// The fields a fresh vendor price carries: when it was set, when it expires (also endsAt, which the site and placeOrder already obey).
-function freshPriceFields(now = Date.now()) {
-  const expires = new Date(now + VENDOR_PRICE_VALID_MS).toISOString();
+/// durationMs is the admin's post duration (post-duration.js, 24 hours when not set).
+function freshPriceFields(now = Date.now(), durationMs = VENDOR_PRICE_VALID_MS) {
+  const expires = new Date(now + durationMs).toISOString();
   return {priceSetAt: new Date(now).toISOString(), priceExpiresAt: expires, endsAt: expires, priceExpired: false};
 }
 
@@ -33,7 +35,7 @@ async function expireVendorPrices(now = Date.now()) {
   return removed;
 }
 
-exports.expireVendorPrices = onSchedule({schedule: 'every 30 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300}, () => expireVendorPrices());
+exports.expireVendorPrices = task(() => expireVendorPrices());
 
 exports.freshPriceFields = freshPriceFields;
 exports.expireVendorPricesNow = expireVendorPrices;

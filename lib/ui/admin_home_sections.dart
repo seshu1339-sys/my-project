@@ -28,7 +28,7 @@ class HomeSectionInfo {
 
 const homeSectionInfos = <String, HomeSectionInfo>{
   'scrollingText': HomeSectionInfo('scrollingText', 'Scrolling Text', 'The moving line across the very top of the home page.', Icons.text_rotation_none),
-  'notice': HomeSectionInfo('notice', "Today's Offers", "The banner under it that says \"Today's <your town> Offers\" with the price chips. The town changes with the customer's location.", Icons.campaign_outlined),
+  'notice': HomeSectionInfo('notice', "Today's Offers", "The banner under it that says \"Today's <customer's area> Offers\" with the price chips. The area name always follows the customer's place; no fixed text is used.", Icons.campaign_outlined),
   'promo': HomeSectionInfo('promo', "Today's Offers Box", 'The "Today\'s Offers" heading and its 6 coloured boxes below the banner, each showing an item offer.', Icons.view_carousel_outlined),
   'ads': HomeSectionInfo('ads', 'Right Side Ads', 'The boxes down the right-hand side of the home page.', Icons.ad_units_outlined),
   'boxes': HomeSectionInfo('boxes', 'Boxes below the ads', 'The boxes under the ads on the right ("Curated for you" ...).', Icons.dashboard_outlined),

@@ -52,6 +52,15 @@ class RightBox {
   bool get countsViews => imageUrl.isNotEmpty && adId.startsWith(rightBoxAdPrefix);
 }
 
+/// The shop a box's photo belongs to (customers see it only within the admin's km of that shop, lib/domain/reach.dart): the shop it
+/// opens, or the shop of the product it opens ([shopOfProduct]); '' when it opens neither, and then no customer sees the photo.
+String rightBoxShopId(RightBox box, {String Function(String productId)? shopOfProduct}) {
+  final target = box.target.trim();
+  if (target.startsWith('shop:')) return target.substring(5).trim();
+  if (target.startsWith('product:')) return shopOfProduct?.call(target.substring(8).trim()) ?? '';
+  return '';
+}
+
 Entry rightBoxesRecord(List<Entry> settings) => settings.where((e) => e.id == rightBoxesDoc).firstOrNull ?? const Entry(rightBoxesDoc, {});
 
 int rightBoxCount(Entry record) => record.number('count', defaultRightBoxCount.toDouble()).round().clamp(0, maxRightBoxCount);

@@ -36,12 +36,14 @@ void main() {
     expect(find.byKey(const ValueKey('responsive-search-box')), findsOneWidget);
     expect(find.byTooltip('Voice search'), findsOneWidget);
     expect(find.byTooltip('Camera search'), findsOneWidget);
-    expect(find.text('Welcome'), findsNothing);
+    // The greeting is under the top row, as on the website (no place and no name yet: the welcome text).
+    expect(find.byKey(const ValueKey('home-greeting')), findsOneWidget);
+    expect(find.text('Welcome'), findsOneWidget);
     expect(find.byKey(const ValueKey('right-ad-boxes')), findsNothing);
     // the top row, then the ads straight under it
     final header = tester.getRect(find.byKey(const ValueKey('android-header')));
     final ads = tester.getRect(find.byKey(const ValueKey('android-ads')));
-    expect(header.height, lessThan(64));
+    expect(header.height, lessThan(96), reason: 'one small row and the greeting under it');
     // (the test store is not live, so its one-line "Demo marketplace" notice sits between them)
     expect(ads.top, lessThan(header.bottom + 60));
     // two whole boxes of one size side by side
@@ -105,26 +107,17 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('Android: "Where are you shopping?" comes only the first time the app opens, never again', (tester) async {
+  // The first open's location question (GPS, else the picker at once; asked once) is the real app's and website's, with Firebase:
+  // test/area_location_test.dart covers it. The demo below never asks by itself; the pin at the top opens the picker any time.
+  testWidgets('Android: the pin at the top opens "Where are you shopping?" any time; the demo never opens it by itself', (tester) async {
     debugAndroidApp = true;
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    var store = await _store(prefs: {});
-    await open(tester, store);
-    expect(find.text('Where are you shopping?'), findsOneWidget);
-    await tester.tapAt(const Offset(5, 5)); // dismiss without choosing
-    await tester.pumpAndSettle();
-    expect(find.text('Where are you shopping?'), findsNothing);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-    // the app is opened again: no dialog
-    store = Store();
-    await store.init();
+    final store = await _store(prefs: {});
     await open(tester, store);
     expect(find.text('Where are you shopping?'), findsNothing);
-    // only the pin opens it
     await tester.tap(find.byKey(const ValueKey('android-location')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -139,15 +132,17 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final store = await _store(prefs: {'pincode': '531116', 'address': 'Narsipatnam', 'town': 'Narsipatnam'});
+    final store = await _store(prefs: {'pincode': '531116', 'address': 'Door 4, Main Road', 'town': 'Narsipatnam', 'area': 'Krishna Bazar', 'latitude': 17.667, 'longitude': 82.612});
     await open(tester, store);
     expect(find.text('Where are you shopping?'), findsNothing);
-    expect(find.text('Narsipatnam'), findsWidgets);
+    expect(find.text('Krishna Bazar'), findsWidgets, reason: 'the area name, at the top and in the greeting');
+    expect(find.text('Hello, Krishna Bazar People'), findsOneWidget);
+    expect(find.text('Door 4, Main Road'), findsNothing, reason: 'the typed address is for delivery only');
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
 
-  testWidgets('the website never opens the location dialog by itself', (tester) async {
+  testWidgets('the demo website never opens the location dialog by itself either', (tester) async {
     debugAndroidApp = false;
     tester.view.physicalSize = const Size(1400, 1400);
     tester.view.devicePixelRatio = 1;

@@ -9,6 +9,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
 const {planAllows, PLAN_NEEDED} = require('./plan-gate');
+const {readPostDurationMs, cappedEnd} = require('./post-duration');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 function requireUser(request) {
@@ -69,11 +70,14 @@ exports.submitExclusiveItem = onCall(options, async request => {
   const {name, price, imageUrl, durationDays} = request.data || {};
   const safe = {name: validName(name), price: validPrice(price), imageUrl: validImageUrl(imageUrl), days: validDuration(durationDays, vendor)};
   const ref = db.collection('products').doc();
-  const expiresAt = new Date(Date.now() + safe.days * 86400000).toISOString();
+  // The days chosen are the item's own end; the admin's post duration (post-duration.js) caps it for everyone. endsAt hides it on the
+  // website and in the apps at that moment.
+  const now = Date.now(), ownEndsAt = now + safe.days * 86400000;
+  const expiresAt = new Date(cappedEnd(now, await readPostDurationMs(db), ownEndsAt)).toISOString();
   await ref.set({
     name: safe.name, price: safe.price, imageUrl: safe.imageUrl, stock: 1, kind: 'product',
     shopId: vendor.shopId || '', ownerId: uid, isExclusive: true, active: true,
-    durationDays: safe.days, expiresAt,
+    durationDays: safe.days, expiresAt, endsAt: expiresAt, postedAt: new Date(now).toISOString(), ownEndsAt: new Date(ownEndsAt).toISOString(),
     createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
   });
   return {status: 'active', productId: ref.id, expiresAt};
@@ -92,7 +96,8 @@ exports.reactivateExclusiveItem = onCall(options, async request => {
   if (data.active === true) throw new HttpsError('failed-precondition', 'This item is already active.');
   const archivedAtMs = Date.parse(data.archivedAt || '');
   if (!Number.isFinite(archivedAtMs) || Date.now() - archivedAtMs > ARCHIVE_WINDOW_MS) throw new HttpsError('failed-precondition', 'The 15-day archive window for this item has passed.');
-  const expiresAt = new Date(Date.now() + days * 86400000).toISOString();
-  await ref.update({active: true, durationDays: days, expiresAt, archivedAt: FieldValue.delete(), notifiedExpiryAt: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp()});
+  const now = Date.now(), ownEndsAt = now + days * 86400000;
+  const expiresAt = new Date(cappedEnd(now, await readPostDurationMs(db), ownEndsAt)).toISOString();
+  await ref.update({active: true, durationDays: days, expiresAt, endsAt: expiresAt, postedAt: new Date(now).toISOString(), ownEndsAt: new Date(ownEndsAt).toISOString(), archivedAt: FieldValue.delete(), notifiedExpiryAt: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp()});
   return {status: 'active', expiresAt};
 });

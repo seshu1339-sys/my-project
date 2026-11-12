@@ -32,6 +32,7 @@ const {locationStamp} = require('./places');
 const {validCoordinate, vendorItemUnit, DEFAULT_VENDOR_ITEM_LIMIT} = require('./domain');
 const {accountCodeFor} = require('./vendor-id');
 const {freshPriceFields} = require('./vendor-prices');
+const {readPostDurationMs} = require('./post-duration');
 const {_photoCheck} = require('./photo-check');
 const {countUsage} = require('./usage');
 const db = getFirestore();
@@ -265,7 +266,7 @@ async function publishStaffVendor(ref, addition, decidedBy) {
     batch.set(productRef, {
       name: item.name, imageUrl: photos[0] || item.libraryImageUrl || '', images: photos.slice(1), libraryImageUrl: item.libraryImageUrl || '',
       categoryId: item.categoryId || '', libraryItemId: item.libraryItemId, unitType: item.unitType, quantity: item.quantity, unit: item.unit,
-      price: item.price, ...freshPriceFields(), kind: 'product', stock: ITEM_STOCK, ownerId: id, shopId: id, ...place, active: true, ...added,
+      price: item.price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)), kind: 'product', stock: ITEM_STOCK, ownerId: id, shopId: id, ...place, active: true, ...added,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     });
     productIds.push(productRef.id);
@@ -408,7 +409,7 @@ exports.renewStaffVendorPrice = onCall(options, async request => {
   if (!product || product.addedByStaffUid !== uid) throw new HttpsError('permission-denied', 'You can change the prices only of the vendors you added.');
   const vendor = (await db.collection('vendors').doc(product.ownerId).get()).data();
   if (!vendor || vendor.status !== 'approved') throw new HttpsError('failed-precondition', 'This vendor is not active.');
-  await productRef.update({price, ...freshPriceFields(), updatedAt: FieldValue.serverTimestamp()});
+  await productRef.update({price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)), updatedAt: FieldValue.serverTimestamp()});
   await countUsage(db, 'price_changed', {key: productId, label: product.name || '', town: product.town || '', owners: [product.ownerId, uid], uid});
   return {price};
 });

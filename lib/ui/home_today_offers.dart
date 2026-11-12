@@ -7,7 +7,7 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/today_offers.dart';
-import '../domain/towns.dart';
+import '../domain/reach.dart';
 import '../modules/offerdisplay/offerdisplay_module.dart';
 import '../modules/offerrotation/offerrotation_module.dart';
 import '../modules/offerstore/offerstore_module.dart';
@@ -44,6 +44,7 @@ class TodayOffersSection extends StatefulWidget {
     super.key,
     required this.store,
     required this.boxes,
+    this.looks,
     this.appearance = const Entry('', {}),
     this.reverse = false,
     this.speed = 600,
@@ -76,8 +77,12 @@ class TodayOffersSection extends StatefulWidget {
   /// Opens a promotion's target (the boxes before any item offer is set).
   final void Function(String target)? onPromotion;
 
-  /// The Today's Offers Box promotions (the boxes' look), in their order.
+  /// The Today's Offers Box promotions this customer may see (of a shop within reach), shown in boxes no offer fills.
   final List<Entry> boxes;
+
+  /// The Today's Offers Box promotions whose colours the 6 boxes take, in their order, whether or not they are shown ([boxes] when
+  /// null): a box's look is not an offer.
+  final List<Entry>? looks;
   final Entry appearance;
   final bool reverse, showAll;
   final double speed;
@@ -107,11 +112,11 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
     });
   }
 
-  /// The paid vendors' offers this customer may see: within the vendor's plan km of the shop (owner, 6 Nov 2026). Without the
-  /// customer's place, the vendors of the customer's town (the circle of Nearby shops), as before.
+  /// The paid vendors' offers this customer may see: within the vendor's plan km of the shop (owner, 6 Nov 2026; the plans keep
+  /// their own km, 11 Nov 2026). Without the plans' records, the vendors within the admin's km; without the customer's place, none.
   List<TodaysOffer> _reachable(List<TodaysOffer> running, Map<String, ShowcaseEntry>? reach, DateTime now) {
     final lat = widget.store.latitude, lng = widget.store.longitude;
-    if (reach == null || lat == 0 || lng == 0) return vendorOffersForCustomer(running, {for (final shop in widget.store.nearby()) shop.id}, now);
+    if (reach == null || !widget.store.located) return vendorOffersForCustomer(running, widget.store.shopsInReach(), now);
     final shops = {for (final s in widget.store.entries('shops')) s.id: s};
     return [
       for (final o in running)
@@ -139,10 +144,8 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
     });
   }
 
-  bool _inTown(Entry offer) {
-    final town = widget.store.town;
-    return widget.showAll || town.isEmpty || offer.text('town').isEmpty || townKey(offer.text('town')) == townKey(town);
-  }
+  /// Distance only (lib/domain/reach.dart): the admin's item offers of the shops within the admin's km; one without a shop never.
+  bool _inReach(Entry offer, Set<String> shops) => widget.showAll || widget.store.showsEverything || shops.contains(linkedShopId(offer));
 
   void _open(Entry offer) {
     Analytics.click(offer);
@@ -207,7 +210,8 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
         builder: (context, _) {
           // The server's time, never the phone's (lib/services/server_clock.dart).
           final now = ServerClock.now();
-          final adminOffers = widget.store.entries('promotions').where((o) => isTodayOffer(o) && o.active && _inTown(o)).toList();
+          final shops = widget.store.shopsInReach();
+          final adminOffers = widget.store.entries('promotions').where((o) => isTodayOffer(o) && o.active && _inReach(o, shops)).toList();
           final vendorOffers = _reachable(running, _showcase == null ? null : reach.data, now);
           final ads = widget.adsAt?.call(now) ?? const <Entry>[];
           _wake(_nextChange(adminOffers, vendorOffers, now), now);
@@ -231,7 +235,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
             widget.visible,
           );
           if (boxes.isEmpty && widget.empty != null) return widget.empty!;
-          final looks = todayOfferBoxLooks(widget.boxes);
+          final looks = todayOfferBoxLooks(widget.looks ?? widget.boxes);
           return Column(
             key: const ValueKey('today-offers'),
             crossAxisAlignment: CrossAxisAlignment.start,

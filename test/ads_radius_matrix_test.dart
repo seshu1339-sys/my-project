@@ -4,11 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ecommerce_app/domain/ads.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/ist_time.dart';
+import 'package:ecommerce_app/domain/reach.dart';
 
-// The ten sample ads of scripts/seed-samples.cjs ("Ad Sample 1".."Ad Sample 10"): 25 and 50 km circles over five towns, with
-// different timers. Checks, with the code the website and the apps use (liveAds), that each ad is shown ONLY inside its own circle and
-// only between its start and end: at the centre, just inside and just outside the edge in 16 directions, 400 random points each, the five
-// town centres, and the moments around the start and the end.
+// The ten sample ads of scripts/seed-samples.cjs ("Ad Sample 1".."Ad Sample 10") over five towns, with different timers, each linked
+// to its own shop. Distance only (owner, 11 Nov 2026): an ad is shown ONLY to customers within the admin's one km of its shop, whatever
+// the ad's own old radius says, and only between its start and end. Checked with the code the website and the apps use (liveAds +
+// the shops within reach): at the shop, just inside and just outside the edge in 16 directions, 400 random points each, the five town
+// centres, and the moments around the start and the end.
 
 const towns = <String, ({double lat, double lng})>{
   'Narsipatnam': (lat: 17.6670, lng: 82.6120),
@@ -50,19 +52,28 @@ void main() {
     (near('Rajahmundry', -1.2, 1.0), 25, Duration.zero, day * 6),
     (near('Tuni', -0.9, -0.6), 50, Duration.zero, day * 4),
   ];
+  // The admin's one km (Settings > Business Profile).
+  const km = 25.0;
+  final shops = [
+    for (final (i, (c, _, _, _)) in plan.indexed) Entry('shop${i + 1}', {'name': 'Shop ${i + 1}', 'latitude': c.lat, 'longitude': c.lng}),
+  ];
   final ads = [
     for (final (i, (c, r, s, e)) in plan.indexed)
       Entry('ad${i + 1}', {
+        // The ad's own old radius is still saved, and no longer decides anything.
         'title': 'Ad Sample ${i + 1}', 'status': 'approved', 'active': true, 'imageUrl': 'x', 'contentType': 'image',
         'radiusKm': r, 'radiusLat': c.lat, 'radiusLng': c.lng, 'radiusShopId': 'shop${i + 1}', 'startsAt': at(s), 'endsAt': at(e),
       }),
   ];
-  Set<String> shownAt(double lat, double lng, DateTime t) => {for (final a in liveAds(customerAds(ads), t, latitude: lat, longitude: lng)) a.text('title')};
+  Set<String> shownAt(double lat, double lng, DateTime t) {
+    final inReach = shopIdsWithin(shops, lat, lng, km);
+    return {for (final a in liveAds(customerAds(ads), t, reaches: (ad) => inReach.contains(linkedShopId(ad)))) a.text('title')};
+  }
 
-  test('every ad shows inside its circle and never outside it (16 directions at the centre, just inside, just outside)', () {
+  test('every ad shows within the admin km of its shop and never outside it (16 directions at the shop, just inside, just outside)', () {
     var checks = 0;
     for (final ad in ads) {
-      final lat = ad.number('radiusLat'), lng = ad.number('radiusLng'), r = ad.number('radiusKm');
+      final lat = ad.number('radiusLat'), lng = ad.number('radiusLng'), r = km;
       // Checked while the ad is running (its own middle of the window), so only the circle decides here.
       final start = parseIstTime(ad.text('startsAt'))!, end = parseIstTime(ad.text('endsAt'))!;
       final t = start.add(end.difference(start) ~/ 2);
@@ -79,14 +90,14 @@ void main() {
       }
     }
     // ignore: avoid_print
-    print('radius edge checks: $checks, all correct');
+    print('distance edge checks: $checks, all correct');
   });
 
-  test('400 random places per ad: shown exactly when the place is within the radius', () {
+  test('400 random places per ad: shown exactly when the place is within the admin km of its shop', () {
     final rnd = Random(20261106);
     var checks = 0, inside = 0;
     for (final ad in ads) {
-      final lat = ad.number('radiusLat'), lng = ad.number('radiusLng'), r = ad.number('radiusKm');
+      final lat = ad.number('radiusLat'), lng = ad.number('radiusLng'), r = km;
       final start = parseIstTime(ad.text('startsAt'))!, end = parseIstTime(ad.text('endsAt'))!;
       final t = start.add(end.difference(start) ~/ 2);
       for (var i = 0; i < 400; i++) {
@@ -101,10 +112,10 @@ void main() {
     print('random checks: $checks ($inside inside, ${checks - inside} outside), all correct');
   });
 
-  test('the ads each town sees now (the five town centres)', () {
+  test('the ads each town sees now (the five town centres): only those of shops within the km, live now', () {
     final expected = {
-      'Narsipatnam': {'Ad Sample 1', 'Ad Sample 2', 'Ad Sample 10'},
-      'Tuni': {'Ad Sample 2', 'Ad Sample 3', 'Ad Sample 10'},
+      'Narsipatnam': {'Ad Sample 1', 'Ad Sample 2'},
+      'Tuni': {'Ad Sample 3', 'Ad Sample 10'},
       'Rajahmundry': {'Ad Sample 4', 'Ad Sample 9'},
       // Ad 5 has ended; Ad 6 is still running (it ends in 2 minutes).
       'Visakhapatnam': {'Ad Sample 6'},

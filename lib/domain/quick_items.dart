@@ -89,33 +89,29 @@ int quickDailyLimit(String role, Entry business) {
 String quickDurationLabel(String unit, int value) =>
     unit == 'days' ? '$value ${value == 1 ? 'day' : 'days'}' : '$value ${value == 1 ? 'hour' : 'hours'}';
 
-String _same(String value) => value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-
-/// Whether an item was added for the customer's town. The town is the one the customer chose with
-/// "Choose your location" (a name from the pincode directory); the district keeps two towns of the
-/// same name apart when both are known.
-bool quickItemAtPlace(Entry item, {required String town, String district = ''}) {
-  if (town.isEmpty) return false;
-  final itemTown = item.text('locationTown', item.text('locationName'));
-  if (_same(itemTown) != _same(town)) return false;
-  final itemDistrict = item.text('locationDistrict');
-  return district.isEmpty || itemDistrict.isEmpty || _same(itemDistrict) == _same(district);
+/// Whether an item is within [km] of the customer's point ([latitude], [longitude]), measured to the place the item was photographed
+/// (its saved latitude / longitude): distance only, like everything customers see (lib/domain/reach.dart). An item without a saved
+/// place, or a customer whose place is not known, never matches.
+bool quickItemWithin(Entry item, {required double? latitude, required double? longitude, required double km}) {
+  final lat = item.number('latitude'), lng = item.number('longitude');
+  if (latitude == null || longitude == null || (lat == 0 && lng == 0)) return false;
+  return distanceKm(latitude, longitude, lat, lng) <= km;
 }
 
-/// Live right now in the customer's town ([town], with [district] when known), optionally in one
-/// category: the customer's view.
+/// Live right now within [km] of the customer's point, optionally in one category: the customer's view.
 List<Entry> liveQuickItems(
   Iterable<Entry> items,
   DateTime now, {
-  required String town,
-  String district = '',
+  required double? latitude,
+  required double? longitude,
+  required double km,
   String? categoryId,
 }) {
   final live = items
       .where(
         (item) =>
             quickPhase(item, now) == QuickPhase.live &&
-            quickItemAtPlace(item, town: town, district: district) &&
+            quickItemWithin(item, latitude: latitude, longitude: longitude, km: km) &&
             (categoryId == null || item.text('categoryId') == categoryId),
       )
       .toList();

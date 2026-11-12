@@ -84,3 +84,15 @@ fastlane/report.xml
 
 # Play upload tool and service-account keys
 e-commerce-app-*.json
+# Project settings for the functions (Gmail sender address, Razorpay public key id): kept out of git.
+functions/.env.e-commerce-app-a3897
+# Scratch files and Android build output of the SMS forwarder tool: never committed.
+tmp/
+tools/sms-forwarder/.gradle/
+tools/sms-forwarder/**/build/
+tools/sms-forwarder/local.properties
+# Image sets (zips and folders of design pictures, about 120 MB): kept outside git.
+locamarket-characters.zip
+locamarket-characters/
+locamarket-locations.zip
+locamarket-locations/

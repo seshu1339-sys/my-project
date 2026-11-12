@@ -4,10 +4,9 @@ import '../data/store.dart';
 import '../services/strings.dart';
 import 'design_tokens.dart';
 
-/// Shown in Today's Offers' place when the customer's town has no offers and
-/// there are no general ones to fall back on, so the page never shows an
-/// empty box. The admin can reword it (Business settings -> noOffersMessage;
-/// `{town}` is replaced by the town's name).
+/// Shown in Today's Offers' place when no shop within the admin's km of the customer has an offer now (distance only, nothing is
+/// shown "for everyone"), so the page never shows an empty box: "No offers near you right now." The admin can reword it (Business
+/// settings -> noOffersMessage; `{town}` is replaced by the customer's area name).
 class NoOffersNotice extends StatelessWidget {
   const NoOffersNotice({super.key, required this.store, this.onLocation});
   final Store store;
@@ -17,13 +16,11 @@ class NoOffersNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final custom = store.business.text('noOffersMessage');
-    final text = !store.hasPlace
-        ? 'Choose your location to see offers for your town.'.tr(context)
+    final text = !store.located
+        ? 'Choose your location to see the offers near you.'.tr(context)
         : custom.isNotEmpty
-        ? custom.replaceAll('{town}', store.town)
-        : 'No offers in {town} yet. Check back soon!'.tr(context, {
-            'town': store.town,
-          });
+        ? custom.replaceAll('{town}', store.placeName)
+        : 'No offers near you right now.'.tr(context);
     final box = Container(
       key: const ValueKey('no-offers-notice'),
       width: double.infinity,
@@ -45,7 +42,7 @@ class NoOffersNotice extends StatelessWidget {
         ],
       ),
     );
-    return store.hasPlace || onLocation == null
+    return store.located || onLocation == null
         ? box
         : InkWell(onTap: onLocation, child: box);
   }

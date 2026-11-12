@@ -7,7 +7,8 @@ const {requireRole, isAdminToken} = require('./role-auth');
 // Expired items are hidden, never deleted. All writes go through these callables.
 const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {roleLoginFor} = require('./role-logins');
@@ -344,5 +345,5 @@ async function expireQuickItems(now = Date.now()) {
   }
   return expired;
 }
-exports.expireQuickItems = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1}, async () => { await expireQuickItems(); });
+exports.expireQuickItems = task(async () => { await expireQuickItems(); });
 exports._quick = {expireQuickItems};

@@ -2,11 +2,12 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../services/first_location.dart';
 import '../services/place_resolver.dart';
 import '../services/search.dart';
 import '../services/search_providers.dart';
@@ -29,9 +30,13 @@ class Storefront extends StatefulWidget {
       voice: DeviceVoiceSearch(),
       image: CloudImageSearch(),
     ),
+    this.firstPosition,
   });
   final Store store;
   final SmartSearch searchService;
+
+  /// The first open's location question and position ([positionWithPermission] by default); replaced in tests.
+  final Future<Position?> Function()? firstPosition;
   @override
   State<Storefront> createState() => _StorefrontState();
 }
@@ -92,30 +97,25 @@ class _StorefrontState extends State<Storefront> {
 
   bool _resolvingPlace = false;
   String _triedPlace = '';
-  // A customer whose stored location has a pincode but no town (typed by hand,
-  // or saved before towns existed) would otherwise see only the general offers.
-  // When some offer is aimed at specific places, look the pincode up once.
+  // A place saved before areas and distance-only offers (a pincode or town without a point, or a point without an area name) is
+  // completed once, so the customer sees the shops around them and their area's name without choosing again.
   void _resolvePlaceIfNeeded() {
-    if (_resolvingPlace || !needsPlaceResolution(store)) return;
-    final key = [store.pincode, store.town, store.district].join('|');
+    // Only with Firebase connected (the demo and the tests never look places up by themselves).
+    if (!store.live || _resolvingPlace || !needsPlaceResolution(store)) return;
+    final key = [store.pincode, store.town, store.latitude, store.longitude].join('|');
     if (key == _triedPlace) return; // already tried for this exact location
     _triedPlace = key;
     _resolvingPlace = true;
     completeStoredPlace(store).whenComplete(() => _resolvingPlace = false);
   }
 
-  /// Android app only: "Where are you shopping?" is shown the very first time the app opens, never again. The chosen place is saved on the
-  /// phone (Store), so every later start opens the home page with it; only the pin in the top row opens the picker after that.
+  /// The very first open, in the app and on the website alike: the location question, then GPS or the place picker
+  /// (lib/services/first_location.dart). Only with Firebase connected (not the demo or the tests).
   Future<void> _askLocationOnce() async {
-    if (!isAndroidApp() || store.hasPlace) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('locationAsked') ?? false) return;
-      await prefs.setBool('locationAsked', true);
-    } catch (_) {
-      return;
-    }
-    if (mounted && !store.hasPlace) await location();
+    if (!store.live) return;
+    await askLocationOnFirstOpen(store, position: widget.firstPosition, pick: () async {
+      if (mounted) await location();
+    });
   }
 
   @override

@@ -18,7 +18,7 @@ import 'right_ad_boxes.dart';
 /// ("Seconds each ad stays"), the same setting as the website. How many show at once is Settings > Android App. With fewer ads than
 /// boxes, or none, the rest are empty boxes of the same size with the "your ad here" text, so the row is always there.
 class AndroidAdsStrip extends StatefulWidget {
-  const AndroidAdsStrip({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now});
+  const AndroidAdsStrip({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now, this.showsBox});
   final List<Entry> settings;
   final ValueChanged<String> onTarget;
   final AdsTracker? tracker;
@@ -29,6 +29,9 @@ class AndroidAdsStrip extends StatefulWidget {
 
   /// The clock; the server's time by default.
   final DateTime Function()? now;
+
+  /// Whether a box's own photo may be shown to this customer (its shop within the admin's km); null: every photo.
+  final bool Function(RightBox box)? showsBox;
 
   @override
   State<AndroidAdsStrip> createState() => _AndroidAdsStripState();
@@ -56,7 +59,7 @@ class _AndroidAdsStripState extends State<AndroidAdsStrip> {
   }
 
   (List<RightBox>, List<Entry>, String) _items(DateTime now) {
-    final boxes = liveRightBoxes(rightBoxesRecord(widget.settings), now);
+    final boxes = [for (final b in liveRightBoxes(rightBoxesRecord(widget.settings), now)) if (widget.showsBox?.call(b) ?? true) b];
     final ads = widget.adsAt?.call(now) ?? const <Entry>[];
     return (boxes, ads, [for (final b in boxes) 'b${b.number}${b.imageUrl}', for (final a in ads) 'a${a.id}'].join('|'));
   }

@@ -6,7 +6,7 @@ test('a vendor price lasts 24 hours: then it is removed, the item hides and cann
   const fns = require('./index');
   const {expireVendorPricesNow, VENDOR_PRICE_VALID_MS} = require('./vendor-prices');
   const db = getFirestore();
-  assert.equal(typeof fns.expireVendorPrices, 'function', 'the scheduled job is deployed with the functions');
+  assert.equal(typeof fns.expireVendorPrices, 'function', 'the expiry is a task of the 15-minute job (scheduled-jobs.js)');
   const vendor = {auth: {uid: 'priceV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('priceV').set({vendorId: 'priceV', name: 'Price Shop', shopId: 'priceShop', status: 'approved'});
   await db.collection('vendorShopPhotos').doc('priceV_1').set({vendorId: 'priceV', slot: 1, status: 'approved'});

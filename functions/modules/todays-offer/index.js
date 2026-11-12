@@ -8,7 +8,8 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   removeTodaysOffer   admin    -> takes one offer down
 //   clearTodaysOffers   schedule -> removes ended offers and their photos
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('../../task');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('../../admin-session');
@@ -36,6 +37,6 @@ exports.removeTodaysOffer = onCall(options, async request => {
   await requireAdminSession(uid);
   try { return await removeOffer(getFirestore(), getStorage().bucket(), request.data?.offerId ?? request.data?.vendorId); } catch (error) { return fail(error); }
 });
-exports.clearTodaysOffers = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1}, async () => {
+exports.clearTodaysOffers = task(async () => {
   await clearEnded(getFirestore(), getStorage().bucket());
 });

@@ -25,6 +25,54 @@ class ReverseAddress {
   final String town;
 }
 
+/// What OpenStreetMap calls the place at a point, for the customer's AREA name (lib/services/area_lookup.dart).
+class OsmArea {
+  const OsmArea({this.areas = const [], this.town = '', this.district = '', this.state = '', this.pincode = ''});
+
+  /// The names of the area around the point, the most commonly used first: suburb, quarter, neighbourhood, hamlet, village.
+  /// Never a house number, a road or a full address.
+  final List<String> areas;
+
+  /// The city / town / municipality ('' when not known).
+  final String town, district, state;
+
+  /// The six-digit postcode, or ''.
+  final String pincode;
+}
+
+/// Reads the area names out of a Nominatim reverse result (zoom 16, with address details). Null when there are none at all.
+OsmArea? osmAreaFromJson(Object? decoded) {
+  if (decoded is! Map) return null;
+  final address = decoded['address'];
+  if (address is! Map) return null;
+  String part(String key) {
+    final value = address[key];
+    return value is String ? value.trim() : '';
+  }
+
+  final areas = <String>[];
+  for (final key in const ['suburb', 'quarter', 'neighbourhood', 'hamlet', 'village']) {
+    final value = part(key);
+    if (value.isNotEmpty && !areas.contains(value)) areas.add(value);
+  }
+  var town = '';
+  for (final key in const ['city', 'town', 'municipality', 'village']) {
+    if (part(key).isNotEmpty) {
+      town = part(key);
+      break;
+    }
+  }
+  final postcode = part('postcode').replaceAll(' ', '');
+  final result = OsmArea(
+    areas: areas,
+    town: town,
+    district: part('state_district').isNotEmpty ? part('state_district') : part('county'),
+    state: part('state'),
+    pincode: RegExp(r'^\d{6}$').hasMatch(postcode) ? postcode : '',
+  );
+  return result.areas.isEmpty && result.town.isEmpty ? null : result;
+}
+
 /// The readable address of a Nominatim reverse result: house number and road, the area, the town and the postcode (only the parts
 /// that are there). Falls back to the full display name.
 ReverseAddress? reverseAddressFromJson(Object? decoded) {
@@ -97,6 +145,25 @@ class NominatimGeocoder {
       }
     } catch (_) {}
     return '';
+  }
+
+  /// The area names at a point (suburb, neighbourhood...) and its town, or null when they cannot be worked out (offline, rate
+  /// limited...). Never throws.
+  Future<OsmArea?> reverseArea(double latitude, double longitude) async {
+    try {
+      final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+        'format': 'jsonv2',
+        'lat': '$latitude',
+        'lon': '$longitude',
+        'zoom': '16',
+        'addressdetails': '1',
+      });
+      final response = await _client.get(uri, headers: {'User-Agent': _userAgent});
+      if (response.statusCode != 200) return null;
+      return osmAreaFromJson(jsonDecode(response.body));
+    } catch (_) {
+      return null;
+    }
   }
 
   /// The street address at a point (for a vendor's shop or a provider's house), or null when it cannot be worked out. Never throws.

@@ -12,7 +12,8 @@ const {requireRole, isAdminToken} = require('./role-auth');
 //   gcloud projects add-iam-policy-binding <project> \
 //     --member="serviceAccount:<project>@appspot.gserviceaccount.com" \
 //     --role="roles/datastore.importExportAdmin"
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -52,7 +53,7 @@ async function exportFirestore() {
   return {gcsPath, operationName: json.name};
 }
 
-exports.aiAgentDailyBackup = onSchedule({schedule: 'every 24 hours', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.aiAgentDailyBackup = task(async () => {
   const config = await getConfigData();
   if (!config.enabled || config.modules?.backup === false) return;
   try {

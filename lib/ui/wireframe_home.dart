@@ -5,7 +5,7 @@ import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/fresh_strip.dart';
 import '../domain/today_offers.dart' show todayOfferBoxCount;
-import '../domain/towns.dart';
+import '../domain/reach.dart';
 import '../services/ad_tracker.dart';
 import '../services/search.dart';
 import '../services/strings.dart';
@@ -29,7 +29,6 @@ import 'quick_fresh.dart';
 import 'responsive_header.dart';
 import 'photo_library_page.dart';
 import '../modules/services/services_page.dart';
-import '../domain/radius.dart';
 import 'home_section_config.dart';
 import 'home_strip_band.dart';
 import 'item_shops_page.dart';
@@ -126,28 +125,18 @@ class WireframeHome extends StatelessWidget {
         )
         .where((e) => e.text('kind') != 'service')
         .toList();
-    final promotions = store
-        .visible('promotions')
-        .where(
-          (e) => promotionReaches(
-            e,
-            customerPincode: store.pincode,
-            customerLatitude: store.latitude,
-            customerLongitude: store.longitude,
-          ),
-        )
-        .toList();
-    // Location-tagged offers/ads: with a town chosen, only the ones listing it
-    // (else the general, all-town ones) -- see promotionsForTown.
-    TownOffers forTown(String placement) => promotionsForTown(
-      promotions.where((e) => e.text('placement') == placement).toList(),
-      store.town,
-      district: store.district,
-      state: store.state,
-      showAll: showAllLocations,
-    );
-    final offersForTown = forTown('carousel');
-    final offers = offersForTown.entries;
+    // Distance only (lib/domain/reach.dart): the offers and ads of the shops within the admin's km of the customer; an offer that
+    // is not linked to a shop is shown to nobody, and nothing is matched by town, district or pincode any more. The admin's preview
+    // ([showAllLocations]) shows them all.
+    final inReach = showAllLocations || store.showsEverything ? null : store.shopsInReach();
+    bool reaches(Entry item) => inReach == null || inReach.contains(linkedShopId(item));
+    // A Right Side Ad Box's own photo: the shop it opens (or the shop of the product it opens) must be within reach too.
+    bool showsBox(RightBox box) =>
+        inReach == null || inReach.contains(rightBoxShopId(box, shopOfProduct: (id) => store.item(id)?.text('shopId') ?? ''));
+    final promotions = store.visible('promotions').where(reaches).toList();
+    final offers = promotions.where((e) => e.text('placement') == 'carousel').toList();
+    // The Today's Offers Box promotions give the 6 boxes their colours whether or not their own text is shown here.
+    final boxLooks = store.visible('promotions').where((e) => e.text('placement') == 'carousel').toList();
     final localServices = localServiceEntries(
       store,
       searchService,
@@ -218,8 +207,8 @@ class WireframeHome extends StatelessWidget {
     final productLayout = layoutFor(context, settings, 'products');
     final adLayout = layoutFor(context, settings, 'ads');
     final nearby = layoutFor(context, settings, 'nearby');
-    final located = store.pincode.isNotEmpty || store.latitude != null;
-    final shops = located ? store.nearby() : store.visible('shops');
+    final located = store.located;
+    final shops = store.nearby();
     final theme =
         settings.where((e) => e.id == 'theme').firstOrNull ??
         const Entry('', {});
@@ -322,19 +311,10 @@ class WireframeHome extends StatelessWidget {
                     );
                     // The Right Side Ad Boxes (Settings > Right Side Ad Boxes): every box the same size, photos only, no labels.
                     // A box with a vendor's shop ad counts its views (only in the customer app, which has the tracker).
-                    // The live ads of the Ads list for this customer (approved, inside their dates by the server's clock, their radius
-                    // and their towns): they fill the boxes that have no photo of their own, and go round in Today's Offers too.
-                    List<Entry> adsAt(DateTime now) => liveAds(
-                      customerAds(store.entries('ads')),
-                      now,
-                      town: store.town,
-                      district: store.district,
-                      state: store.state,
-                      showAll: showAllLocations,
-                      latitude: store.latitude,
-                      longitude: store.longitude,
-                    );
-                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt, store: store);
+                    // The live ads of the Ads list for this customer (approved, inside their dates by the server's clock, of a shop
+                    // within the admin's km): they fill the boxes that have no photo of their own, and go round in Today's Offers too.
+                    List<Entry> adsAt(DateTime now) => liveAds(customerAds(store.entries('ads')), now, showAll: showAllLocations, reaches: reaches);
+                    final rightBoxes = RightAdBoxes(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt, store: store, showsBox: showsBox);
                     final hasRightBoxes = !android && shownRightBoxes(rightBoxesRecord(settings)).isNotEmpty;
                     final wide = c.maxWidth >= 1100 && hasRightBoxes;
                     final orderedSectionKeys = [...reorderableHomeSections]
@@ -370,8 +350,9 @@ class WireframeHome extends StatelessWidget {
                           // admin's seconds (Ads settings, shared with the right-side ad boxes).
                           visible: android ? 2 : todayOfferBoxCount,
                           seconds: AdsConfig.from(store.entries('settings')).seconds,
-                          empty: offers.isEmpty && (store.hasPlace || offersForTown.hiddenForLocation > 0) ? NoOffersNotice(store: store, onLocation: onLocation) : null,
+                          empty: offers.isEmpty ? NoOffersNotice(store: store, onLocation: onLocation) : null,
                           boxes: offers,
+                          looks: boxLooks,
                           // Android: two offer cards side by side
                           appearance: android ? Entry('promo', {...effectiveSectionConfig(settings, 'promo').data, 'visibleCount': 2}) : effectiveSectionConfig(settings, 'promo'),
                           showAll: showAllLocations,
@@ -475,7 +456,7 @@ class WireframeHome extends StatelessWidget {
                     Widget androidParts() {
                       final home = AndroidHomeConfig.from(settings);
                       final parts = <String, Widget>{
-                        'ads': Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt)),
+                        'ads': Padding(padding: const EdgeInsets.only(bottom: 4), child: AndroidAdsStrip(settings: settings, onTarget: onPromotion, tracker: AdsTracker.instance, town: store.town, adsAt: adsAt, showsBox: showsBox)),
                         'scrollingText': wrapSection('tickerMarquee', notice),
                         'notice': noticeRow,
                         'quickFresh': QuickFreshToday(store: store),

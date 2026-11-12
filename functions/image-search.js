@@ -1,10 +1,10 @@
 'use strict';
 // Photo search: describeImageForSearch  signed-in user -> a few search words for the product in the picture.
-// Uses the same Anthropic key as the AI agent (AI_AGENT_ANTHROPIC_API_KEY). Nothing is stored.
+// Uses the same Anthropic key as the Flash chat (ANTHROPIC_API_KEY). Nothing is stored.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {defineSecret} = require('firebase-functions/params');
 
-const anthropicKey = defineSecret('AI_AGENT_ANTHROPIC_API_KEY');
+const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 const MODEL = 'claude-haiku-5-5';
 const MAX_BASE64 = 4 * 1024 * 1024;
 const PROMPT = 'This photo was taken by a shopper looking for a product or a local service in an Indian town. ' +

@@ -23,7 +23,7 @@ import 'shared.dart';
 /// A box with a vendor's shop ad (a photo and an ad id) or an ad from the list reports to [tracker] when it has really been seen for a
 /// second, and when it is tapped, so the vendor's total views add up (functions/ad-tracking.js).
 class RightAdBoxes extends StatefulWidget {
-  const RightAdBoxes({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now, this.store, this.showcase});
+  const RightAdBoxes({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now, this.store, this.showcase, this.showsBox});
 
   /// The paid vendors' ad boxes (lib/modules/showcase): one box per paid vendor with the photo they chose, only for customers within
   /// their plan's km, taking turns with the admin's seconds; a tap opens the shop's place and route. [store] gives the customer's
@@ -32,6 +32,10 @@ class RightAdBoxes extends StatefulWidget {
   final Stream<Map<String, ShowcaseEntry>>? showcase;
   final List<Entry> settings;
   final ValueChanged<String> onTarget;
+
+  /// Whether a box's own photo may be shown to this customer (its shop within the admin's km, lib/domain/reach.dart); a box whose
+  /// photo may not is free for the paid vendors and the ads. Null: every photo (the admin's previews).
+  final bool Function(RightBox box)? showsBox;
   // Counts the views of the shop ads (null = not counted: the admin's previews, the demo); [town] is the customer's town for the reports.
   final AdsTracker? tracker;
   final String town;
@@ -108,7 +112,10 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
   }
 
   List<_Slot> _slots(DateTime now, AdsConfig config) {
-    final boxes = shownRightBoxes(rightBoxesRecord(widget.settings));
+    final boxes = [
+      for (final b in shownRightBoxes(rightBoxesRecord(widget.settings)))
+        widget.showsBox == null || widget.showsBox!(b) ? b : RightBox(b.number, '', b.target, b.color),
+    ];
     final ads = widget.adsAt?.call(now) ?? const <Entry>[];
     final free = [for (final b in boxes) if (!b.liveAt(now)) b.number];
     // Paid vendors first, one box each, taking turns every [config.seconds]; with as many or fewer vendors than boxes, every other turn

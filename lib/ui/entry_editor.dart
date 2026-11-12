@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../domain/post_duration.dart';
 import '../domain/radius.dart';
+import '../domain/reach.dart';
 import 'admin_fields.dart';
 import 'color_picker_field.dart';
 import '../domain/towns.dart';
@@ -191,30 +193,26 @@ class _EntryEditorState extends State<EntryEditor> {
     super.dispose();
   }
 
-  /// The common radius (same rule for Ads and Today's Offers): the radius must be one of the fixed options, the centre is the chosen shop's saved
-  /// location (copied here), and the area may not already be full (Settings > Ads > maximum per area).
-  void _applyRadius(Map<String, dynamic> data) {
-    final km = (data['radiusKm'] as num?)?.toDouble() ?? 0;
-    if (km <= 0) {
-      for (final k in ['radiusKm', 'radiusShopId', 'radiusLat', 'radiusLng']) {
-        data.remove(k);
-      }
-      return;
-    }
-    if (!radiusOptionsKm.contains(km.round())) throw StateError('Choose a radius from the list: 5, 10, 25, 50 or 100 km.');
+  /// Who sees an offer is decided by its SHOP only (distance only, lib/domain/reach.dart): customers within the admin's km of the
+  /// shop's saved location. The shop is required (an offer without one is shown to nobody), its location is copied here, and the
+  /// area may not already be full (Settings > Ads > maximum per area, counted with the admin's km). An old offer's own radius,
+  /// pincode or target area is kept in its record but no longer used.
+  void _applyShop(Map<String, dynamic> data) {
     final shop = widget.store.entries('shops').where((s) => s.id == data['radiusShopId']).firstOrNull;
-    if (shop == null) throw StateError('Choose the shop whose location is the centre of the radius.');
+    if (shop == null) throw StateError('Choose the shop: only customers near that shop see this offer.');
     final lat = shop.number('latitude'), lng = shop.number('longitude');
     if (lat == 0 && lng == 0) throw StateError('"${shop.text('name')}" has no saved location yet. Add the shop location first.');
     data['radiusLat'] = lat;
     data['radiusLng'] = lng;
+    final km = widget.store.reachKm;
+    Entry withKm(Entry e) => Entry(e.id, {...e.data, 'radiusKm': km});
     final id = widget.entry?.id ?? '';
     final same = data['placement']?.toString() ?? '';
     final others = [
-      for (final p in widget.store.entries('promotions')) if (p.id != id && p.text('placement') == same) p,
-      if (same == 'ad') ...widget.store.entries('ads'),
+      for (final p in widget.store.entries('promotions')) if (p.id != id && p.text('placement') == same && linkedShopId(p).isNotEmpty) withKm(p),
+      if (same == 'ad') ...[for (final a in widget.store.entries('ads')) if (linkedShopId(a).isNotEmpty) withKm(a)],
     ];
-    final problem = areaFullMessage(Entry(id, data), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
+    final problem = areaFullMessage(withKm(Entry(id, data)), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
     if (problem != null) throw StateError(problem);
   }
 
@@ -267,7 +265,7 @@ class _EntryEditorState extends State<EntryEditor> {
           data[field.key] = value;
         }
       }
-      if (widget.collection == 'promotions') _applyRadius(data);
+      if (widget.collection == 'promotions') _applyShop(data);
       // A record of the services collection is a service listing unless it is one of the fixed service types.
       if (widget.collection == 'services' && data['kind'] == null) data['kind'] = 'service';
       if (pickedShape != null) {
@@ -490,6 +488,12 @@ class _EntryEditorState extends State<EntryEditor> {
           child: Text('Never notify subscribers'),
         ),
       ];
+    } else if (key == 'postDuration') {
+      // One post duration for everyone (lib/domain/post_duration.dart, functions/post-duration.js).
+      options = [
+        const DropdownMenuItem(value: '', child: Text('24 hours (default)')),
+        for (final MapEntry(key: value, value: label) in postDurationChoices.entries) DropdownMenuItem(value: value, child: Text(label)),
+      ];
     } else if (key == 'defaultPaymentMethod') {
       options = const [
         DropdownMenuItem(
@@ -512,7 +516,7 @@ class _EntryEditorState extends State<EntryEditor> {
       ];
     } else if (widget.collection == 'promotions' && key == 'radiusShopId') {
       options = [
-        const DropdownMenuItem(value: '', child: Text('None')),
+        const DropdownMenuItem(value: '', child: Text('Choose the shop')),
         for (final shop in widget.store.entries('shops'))
           if (shop.number('latitude') != 0 || shop.number('longitude') != 0) DropdownMenuItem(value: shop.id, child: Text(shop.text('name'), overflow: TextOverflow.ellipsis)),
       ];

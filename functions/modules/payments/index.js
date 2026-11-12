@@ -15,17 +15,18 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 // payments closed). The webhook URL to give Razorpay is the razorpayWebhook function's URL, with those five events switched on.
 const {onCall, onRequest, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
-const {defineSecret} = require('firebase-functions/params');
+const {defineSecret, defineString} = require('firebase-functions/params');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('../../admin-session');
 const {keysReady, signatureValid} = require('./rules');
 const {saveSettings, startPayment, checkPayment, handleEvent, cancelLinkOf} = require('./store');
 
-const keyId = defineSecret('RAZORPAY_KEY_ID');
+// The key id is public (it is shown on the checkout page): a plain setting in functions/.env.<project>, not a secret.
+const keyId = defineString('RAZORPAY_KEY_ID');
 const keySecret = defineSecret('RAZORPAY_KEY_SECRET');
 const webhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
-const withKeys = {...options, secrets: [keyId, keySecret]};
+const withKeys = {...options, secrets: [keySecret]};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
@@ -80,7 +81,7 @@ exports.razorpayWebhook = onRequest({region: 'asia-south1', maxInstances: 3, inv
     res.status(500).send('Try again');
   }
 });
-exports.cancelRazorpayLink = onDocumentUpdated({document: 'paymentRequests/{requestId}', region: 'asia-south1', maxInstances: 3, secrets: [keyId, keySecret]}, async event => {
+exports.cancelRazorpayLink = onDocumentUpdated({document: 'paymentRequests/{requestId}', region: 'asia-south1', maxInstances: 3, secrets: [keySecret]}, async event => {
   const before = event.data.before.data(), after = event.data.after.data();
   if (after.status !== 'cancelled' || !after.razorpayLinkId) return;
   await cancelLinkOf(razorpay(), before, after);

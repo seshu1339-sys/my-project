@@ -11,14 +11,15 @@ const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // pepper (ADMIN_OTP_PEPPER, set once via `firebase functions:secrets:set`,
 // never in source or Git) is persisted, compared with a constant-time check.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {defineSecret} = require('firebase-functions/params');
+const {defineSecret, defineString} = require('firebase-functions/params');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {createHmac, randomInt, timingSafeEqual} = require('node:crypto');
 const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 
 const otpPepper = defineSecret('ADMIN_OTP_PEPPER');
-const mailUser = defineSecret('ADMIN_MAIL_USER');
+// The sending Gmail address is not a secret: a plain setting in functions/.env.<project> (Secret Manager cost, Nov 2026).
+const mailUser = defineString('ADMIN_MAIL_USER');
 const mailPassword = defineSecret('ADMIN_MAIL_PASSWORD');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -72,7 +73,7 @@ async function sendOtpEmail(to, code) {
   });
 }
 
-exports.requestAdminOtp = onCall({...options, secrets: [otpPepper, mailUser, mailPassword]}, async request => {
+exports.requestAdminOtp = onCall({...options, secrets: [otpPepper, mailPassword]}, async request => {
   const uid = requireAdminClaim(request);
   const email = loginEmail(request);
   if (!email) throw new HttpsError('failed-precondition', 'No email on this account.');

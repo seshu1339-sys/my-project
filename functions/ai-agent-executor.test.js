@@ -1,7 +1,7 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
@@ -58,7 +58,7 @@ test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {ski
   await assert.rejects(() => fns.confirmAgentAction.run({...other, data: {pendingActionId: anotherProposal.pendingActionId}}), /Only the admin who proposed/);
 });
 
-test('AI Agent executor: serverAction branch calls the integration write function directly, existing kinds unaffected', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent executor: serverAction branch calls the integration write function directly, existing kinds unaffected', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();

@@ -72,8 +72,10 @@ const stored = (db, uid, slot) => db.doc(`vendorTodaysOffers/${uid}_${slot}`).ge
 
 test('a paid vendor\'s item is live at once in their first box, with the item\'s photo and the shop', emulated, async () => {
   const {db, uid, bucket, offer} = await setup();
-  assert.deepEqual(await submitOffer(db, bucket, uid, offer(1), NOW), {slot: 1, endsAt: NOW + 7 * DAY});
+  // The vendor chose 7 days; the admin's post duration (24 hours unless set, functions/post-duration.js) ends it first, for everyone.
+  assert.deepEqual(await submitOffer(db, bucket, uid, offer(1), NOW), {slot: 1, endsAt: NOW + DAY});
   const saved = await stored(db, uid, 1);
+  assert.equal(saved.ownEndsAt.toMillis(), NOW + 7 * DAY, 'the days the vendor chose are kept');
   assert.deepEqual([saved.vendorId, saved.shopId, saved.productId, saved.name, saved.photoUrl, saved.price, saved.days, saved.slot],
     [uid, `shop-${uid}`, `${uid}-p1`, 'Item 1', 'https://example.com/1.jpg', 99, 7, 1]);
 });
@@ -142,11 +144,12 @@ test('the vendor takes a box down; never someone else\'s', emulated, async () =>
 });
 
 test('ended offers are cleared, running ones stay', emulated, async () => {
+  // Every offer ends after the post duration (24 hours): one posted two days ago has ended, one posted now runs.
   const running = await setup();
   await submitOffer(running.db, running.bucket, running.uid, running.offer(1, {days: 30}), NOW);
   const {db, uid, bucket, offer} = await setup();
-  await submitOffer(db, bucket, uid, offer(1), NOW);
-  await clearEnded(db, bucket, NOW + 7 * DAY);
+  await submitOffer(db, bucket, uid, offer(1), NOW - 2 * DAY);
+  await clearEnded(db, bucket, NOW + DAY / 2);
   assert.equal(await stored(db, uid, 1), undefined);
   assert.ok(await stored(db, running.uid, 1));
 });

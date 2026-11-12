@@ -78,7 +78,7 @@ class ItemShopsPage extends StatelessWidget {
           latitude: store.latitude,
           longitude: store.longitude,
         );
-        final where = store.town.isEmpty ? 'near you' : 'in ${store.town}';
+        final where = store.placeName.isEmpty ? 'near you' : 'near ${store.placeName}';
         final mapped = offers.where((o) => o.onMap).toList();
         return ListView(
           key: const ValueKey('item-shops'),

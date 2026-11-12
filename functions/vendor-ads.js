@@ -11,11 +11,13 @@ const {requireRole, isAdminToken} = require('./role-auth');
 //   sendAdSummaries     every morning -> the chosen summaries, as notices in the vendor app (and a push when the vendor has them on)
 // The vendor is told of every decision in vendorNotices.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
 const {OPTIONS, areaFullMessage} = require('./radius');
 const {requirePlan} = require('./plan-gate');
+const {readPostDurationMs, cappedEnd} = require('./post-duration');
 const {isStorageUrl} = require('./storage-url');
 
 const PLANS = {normal: {rounds: 1, seconds: 5}, silver: {rounds: 2, seconds: 7}, gold: {rounds: 3, seconds: 10}};
@@ -124,7 +126,9 @@ async function decideAd(db, data, now = Date.now()) {
     adId = `vad${now}${Math.floor(Math.random() * 1000)}`;
     const plan = PLANS[submission.package] || PLANS.normal;
     const vendor = (await db.collection('vendors').doc(submission.vendorId).get()).data() || {};
-    const startsAt = new Date(now).toISOString(), endsAt = new Date(now + submission.durationDays * 86400000).toISOString();
+    // The days chosen are the ad's own end; the admin's post duration (post-duration.js) caps it for everyone.
+    const ownEndsAt = new Date(now + submission.durationDays * 86400000).toISOString();
+    const startsAt = new Date(now).toISOString(), endsAt = new Date(cappedEnd(now, await readPostDurationMs(db), Date.parse(ownEndsAt))).toISOString();
     // The radius is centred on the vendor's registered shop location; the area may not already be full.
     let circle = {};
     if (radiusKm) {
@@ -139,7 +143,7 @@ async function decideAd(db, data, now = Date.now()) {
     await db.collection('ads').doc(adId).set({
       ...content, ...circle, status: 'approved', active: true, vendorId: submission.vendorId, vendorCode: submission.vendorCode, shopName: submission.shopName, shopId: submission.shopId,
       package: submission.package, rounds: plan.rounds, seconds: plan.seconds, maxPerDay: 0,
-      startsAt, endsAt,
+      startsAt, endsAt, ownEndsAt,
       order: Math.floor(now / 1000), source: 'vendor',
     });
     await db.collection('adsPrivate').doc(adId).set({paid: false, contactPerson: vendor.name || '', notes: 'Submitted from the vendor app'}, {merge: true});
@@ -227,7 +231,7 @@ exports.setAdSummary = onCall(options, async request => {
   const uid = requireVerified(request);
   try { return await setSummary(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
 });
-exports.sendAdSummaries = onSchedule({schedule: '30 8 * * *', timeZone: 'Asia/Kolkata', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300}, async () => {
+exports.sendAdSummaries = task(async () => {
   await sendSummaries(getFirestore());
 });
 exports._ads = {validateSubmission, submitAd, decideAd, removeAd, setSummary, sendSummaries, PLANS};

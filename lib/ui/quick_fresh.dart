@@ -62,7 +62,8 @@ class _QuickFreshTodayState extends State<QuickFreshToday> {
     final anyApproved = (store.catalog['quickItems'] ?? const []).isNotEmpty;
     if (!anyApproved) return const SizedBox.shrink();
     final items = store.quickItemsHere(now: now);
-    final hasTown = store.town.isNotEmpty;
+    // Distance only: the items within the admin's km of the customer's place, named by its area.
+    final hasTown = store.located;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Column(
@@ -73,7 +74,7 @@ class _QuickFreshTodayState extends State<QuickFreshToday> {
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                hasTown ? 'Showing items in: ${store.town}' : 'Choose your location to see fresh items',
+                hasTown ? 'Showing items near: ${store.placeName}' : 'Choose your location to see fresh items',
                 key: const ValueKey('quick-showing-in'),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
@@ -100,7 +101,7 @@ class _QuickFreshTodayState extends State<QuickFreshToday> {
           ] else if (hasTown)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text('No fresh items in ${store.town} right now.', key: const ValueKey('quick-none-here'), style: const TextStyle(fontSize: 12)),
+              child: Text('No fresh items near you right now.', key: const ValueKey('quick-none-here'), style: const TextStyle(fontSize: 12)),
             ),
         ],
       ),
@@ -207,14 +208,14 @@ class _QuickCategoryItemsState extends State<QuickCategoryItems> {
   Widget _content(BuildContext context) {
     final store = widget.store;
     final now = (widget.now ?? DateTime.now)();
-    if (store.town.isEmpty) return const SizedBox.shrink();
+    if (!store.located) return const SizedBox.shrink();
     final items = store.quickItemsHere(categoryId: widget.categoryId, now: now);
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Expanded(child: Text('Fresh today in ${store.town}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+          Expanded(child: Text('Fresh today near ${store.placeName}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
           TextButton(onPressed: () => widget.choose(context, store), child: const Text('Change')),
         ]),
         const SizedBox(height: 8),

@@ -33,8 +33,10 @@ Object.assign(exports, require('./email-login'));
 Object.assign(exports, require('./consent'));
 exports.describeImageForSearch = require('./image-search').describeImageForSearch;
 Object.assign(exports, require('./ids'));
-// Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
+// All scheduled work runs from two Cloud Scheduler jobs (functions/scheduled-jobs.js); the old scheduled names below are plain tasks.
+// Vendor prices last the admin's post duration (post-duration.js); the expiry is a task of every15Minutes.
 const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
+const {readPostDurationMs} = require('./post-duration');
 exports.expireVendorPrices = expireVendorPrices;
 // Service providers: a separate kind of account (only the callables are exported).
 const {registerProvider, approveProvider, updateProviderRate} = require('./providers');
@@ -60,7 +62,8 @@ Object.assign(exports, {sendPushNotification, trackPushOpen, pushAudience, pushN
 // Inactive accounts: the list, disable / enable, delete a customer, and the daily sweep (off until the admin switches it on).
 const {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts} = require('./inactive-accounts');
 Object.assign(exports, {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts});
-// AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
+// AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). The callables that need the agent's own keys (PIN, GitHub,
+// OpenAI, agent Anthropic key) are OFF since 12 Nov 2026: those secrets were removed to stay inside the Secret Manager free limit. Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js
 // and ai-agent-confirmation.js each also export a plain helper function for the
@@ -69,14 +72,14 @@ Object.assign(exports, {inactiveAccounts, setAccountDisabled, deleteInactiveAcco
 // mistakenly offered to Firebase as a function to deploy.
 const {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting} = require('./ai-agent-config');
 Object.assign(exports, {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting});
-const {setAgentPin} = require('./ai-agent-confirmation');
-Object.assign(exports, {setAgentPin});
+// OFF (Secret Manager cost, Nov 2026): const {setAgentPin} = require('./ai-agent-confirmation');
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, {setAgentPin});
 // ai-agent-actions.js exports only the whitelist data (no callables), so it's
 // never required here directly — only by the other ai-agent-*.js modules below.
-Object.assign(exports, require('./ai-agent-executor'));
-Object.assign(exports, require('./ai-agent-interpreter'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-executor'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-interpreter'));
 Object.assign(exports, require('./ai-agent-image-check'));
-Object.assign(exports, require('./ai-agent-trusted-device'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-trusted-device'));
 Object.assign(exports, require('./ai-agent-webauthn'));
 Object.assign(exports, require('./ai-agent-voice'));
 Object.assign(exports, require('./ai-agent-monitoring'));
@@ -86,7 +89,7 @@ Object.assign(exports, require('./ai-agent-backup'));
 // read-queries}.js export only plain functions/data, never onCall, so they
 // are required directly by ai-agent-executor.js/ai-agent-query.js and never
 // appear in this Object.assign list.
-Object.assign(exports, require('./ai-agent-query'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-query'));
 // Independent feature modules (functions/modules/<name>/). Each is one line here and shares nothing with the others.
 Object.assign(exports, require('./modules/plans'));
 Object.assign(exports, require('./modules/vendor-offers'));
@@ -459,7 +462,7 @@ exports.submitVendorChange = onCall(options, async request => {
       ...(ownPhotoRequired ? {awaitingOwnPhoto: true} : {}),
       name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', libraryImageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
       libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
-      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(),
+      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)),
       kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
     };
   } else {
@@ -469,8 +472,8 @@ exports.submitVendorChange = onCall(options, async request => {
     const mine = current.exists && (data.ownerId ? data.ownerId === uid : (collection === 'shops' ? targetId === vendor.shopId : data.shopId === vendor.shopId));
     if (!mine) throw new HttpsError('not-found', 'Public item not found.');
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
-    // A new price for an item lasts 24 hours again (vendor-prices.js removes it after that).
-    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields()};
+    // A new price for an item lasts the post duration again (vendor-prices.js removes it after that).
+    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields(Date.now(), await readPostDurationMs(db))};
   }
   // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
   // map and list; other changes follow the admin's policy (autoPublishVendorChanges).
@@ -604,3 +607,8 @@ exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{ord
     tx.update(orderRef, {stockRestored: true});
   });
 });
+
+// All scheduled work runs from two Cloud Scheduler jobs (owner, 12 Nov 2026: at most 3 jobs, 3 are free). The old scheduled functions
+// are plain tasks now (functions/task.js); every one of them is exported above, so they are handed over by name.
+const {scheduledJobs, TASK_NAMES} = require('./scheduled-jobs');
+Object.assign(exports, scheduledJobs(Object.fromEntries(TASK_NAMES.map(name => [name, exports[name]]))));

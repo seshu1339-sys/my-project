@@ -1,0 +1,30 @@
+[
+  {
+    "category": "grocery-and-staples",
+    "file": "tea-powder-pouch.png",
+    "instruction": "Replace the packaging with one single transparent sealed unbranded retail pouch containing only dry brown tea powder. Absolutely no printed images, illustrations, cup, leaves outside, text, labels or graphics. The pouch must be completely blank and transparent; only tea powder visible inside.",
+    "prompt": "Use case: precise-object-edit. Correct this product photo. Replace the packaging with one single transparent sealed unbranded retail pouch containing only dry brown tea powder. Absolutely no printed images, illustrations, cup, leaves outside, text, labels or graphics. The pouch must be completely blank and transparent; only tea powder visible inside. Keep one single product only, realistic HD product photography, pure white #FFFFFF background, centered product with even margins occupying about 75% of a square 1024x1024 PNG, soft light from upper left. No brand names, text, logos, props or hands. Preserve other product details.",
+    "source": "C:\\Users\\Lappy\\.codex\\generated_images\\01a1c4d1-e5f2-7412-9fb6-c0dc36db6169\\exec-d58750a5-856e-4d2c-a3e7-abb79d97d8e2.png"
+  },
+  {
+    "category": "beverages",
+    "file": "coconut-water-bottle.png",
+    "instruction": "Remove the coconut image/object completely. Show one single clear unbranded sealed bottle containing only plain slightly cloudy coconut water, no fruit, no coconut, no picture, no label, no graphic, no ingredients floating inside. Preserve the green cap and bottle.",
+    "prompt": "Use case: precise-object-edit. Correct this product photo. Remove the coconut image/object completely. Show one single clear unbranded sealed bottle containing only plain slightly cloudy coconut water, no fruit, no coconut, no picture, no label, no graphic, no ingredients floating inside. Preserve the green cap and bottle. Keep one single product only, realistic HD product photography, pure white #FFFFFF background, centered product with even margins occupying about 75% of a square 1024x1024 PNG, soft light from upper left. No brand names, text, logos, props or hands. Preserve other product details.",
+    "source": "C:\\Users\\Lappy\\.codex\\generated_images\\01a1c4d1-e5f2-7412-9fb6-c0dc36db6169\\exec-c3841964-df59-40f2-be66-6b8037e5142d.png"
+  },
+  {
+    "category": "electronics",
+    "file": "digital-alarm-clock.png",
+    "instruction": "Turn the display fully OFF. The front screen must be entirely blank glossy black with NO visible digits, segments, symbols, time, text or lettering at all. Preserve the single black digital alarm clock.",
+    "prompt": "Use case: precise-object-edit. Correct this product photo. Turn the display fully OFF. The front screen must be entirely blank glossy black with NO visible digits, segments, symbols, time, text or lettering at all. Preserve the single black digital alarm clock. Keep one single product only, realistic HD product photography, pure white #FFFFFF background, centered product with even margins occupying about 75% of a square 1024x1024 PNG, soft light from upper left. No brand names, text, logos, props or hands. Preserve other product details.",
+    "source": "C:\\Users\\Lappy\\.codex\\generated_images\\01a1c4d1-e5f2-7412-9fb6-c0dc36db6169\\exec-dc5f0690-4af5-4d4d-b1c1-1e4caf93d144.png"
+  },
+  {
+    "category": "electronics",
+    "file": "remote-control.png",
+    "instruction": "Remove every printed numeral, letter, symbol, glyph, arrow, plus, minus, icon and marking from every button and surface. Keep one single black remote control with the same physical buttons and colored buttons, but every button is entirely blank and unmarked. No digits, labels or text anywhere.",
+    "prompt": "Use case: precise-object-edit. Correct this product photo. Remove every printed numeral, letter, symbol, glyph, arrow, plus, minus, icon and marking from every button and surface. Keep one single black remote control with the same physical buttons and colored buttons, but every button is entirely blank and unmarked. No digits, labels or text anywhere. Keep one single product only, realistic HD product photography, pure white #FFFFFF background, centered product with even margins occupying about 75% of a square 1024x1024 PNG, soft light from upper left. No brand names, text, logos, props or hands. Preserve other product details.",
+    "source": "C:\\Users\\Lappy\\.codex\\generated_images\\01a1c4d1-e5f2-7412-9fb6-c0dc36db6169\\exec-ea5ee1ac-c7dd-4676-bc6d-52c88944e2d7.png"
+  }
+]

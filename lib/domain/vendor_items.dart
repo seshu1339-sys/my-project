@@ -49,7 +49,8 @@ List<(String, String)> libraryCategories(List<Entry> library, List<Entry> catego
   ];
 }
 
-/// A vendor's price lasts this long; then it is removed (functions/vendor-prices.js) and the vendor enters a new one.
+/// A vendor's price lasts the admin's post duration (lib/domain/post_duration.dart), 24 hours unless the admin changes it; then it is
+/// removed (functions/vendor-prices.js) and the vendor enters a new one. The price's own priceExpiresAt says when.
 const vendorPriceValidHours = 24;
 
 /// Whether a vendor item's price has run out at [now]: it has no price any more, or its 24 hours are over (priceExpiresAt).
@@ -67,5 +68,6 @@ String vendorPriceLine(Map<String, dynamic> item, DateTime now) {
   final expires = DateTime.tryParse('${item['priceExpiresAt'] ?? ''}');
   if (expires == null) return price;
   final left = expires.difference(now);
+  if (left.inDays >= 1) return '$price • valid for ${left.inDays} d ${left.inHours % 24} h';
   return '$price • valid for ${left.inHours} h ${left.inMinutes % 60} min';
 }

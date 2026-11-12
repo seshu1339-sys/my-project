@@ -13,6 +13,7 @@ import '../domain/catalog.dart';
 import '../domain/delivery.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
+import '../domain/reach.dart';
 import '../domain/towns.dart';
 import '../services/google_account.dart';
 import '../services/usage.dart';
@@ -79,13 +80,15 @@ class Store extends ChangeNotifier {
   final Set<String> wishlist = {};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   String pincode = '',
+      // What the customer typed as their address: for delivery only, never shown as their place.
       address = '',
-      // The customer's town (e.g. "Narsipatnam"), which decides which
-      // location-tagged offers/ads they see and names the offers ticker.
-      // '' until a location is chosen.
+      // The customer's AREA (lib/domain/area_names.dart): the name everyone calls the part of town they are in, e.g. "Kancharapalem".
+      // Shown, through [placeName], in the location box, the greeting and "Today's ... Offers". '' until it is known.
+      area = '',
+      // The customer's town (e.g. "Narsipatnam"): the area's fallback name, and the town in the usage reports. What the customer sees
+      // is decided by distance only (lib/domain/reach.dart), never by the town.
       town = '',
-      // ...and the district/state of the place they picked, so an offer can
-      // target a whole district or state. '' when unknown.
+      // ...and the district/state of the place, for the reports. '' when unknown.
       district = '',
       state = '',
       profileName = '',
@@ -240,10 +243,32 @@ class Store extends ChangeNotifier {
     return true;
   }
 
-  /// Where the customer is, as offers are matched against it.
+  /// Where the customer is, by name (town, district, state).
   CustomerPlace get place =>
       CustomerPlace(town: town, district: district, state: state);
-  bool get hasPlace => !place.isEmpty;
+
+  /// The ONE name of the customer's place, shown everywhere (location box, greeting, "Today's ... Offers"): the area, else the
+  /// town; '' while neither is known. Never the typed address.
+  String get placeName => area.isNotEmpty ? area : town;
+
+  /// The customer's point is known (GPS or a place chosen by hand): what they see is measured from it.
+  bool get located => latitude != null && longitude != null && !(latitude == 0 && longitude == 0);
+
+  /// The customer has a place: a point, or at least a name or pincode still to be turned into one.
+  bool get hasPlace => located || !place.isEmpty || pincode.isNotEmpty;
+
+  /// The admin's one km (Settings > Business Profile): customers see the shops, products, services, offers and ads within it.
+  double get reachKm => reachKmOf(business);
+
+  /// The ids of the shops within [reachKm] of the customer (none until the customer's point is known).
+  Set<String> shopsInReach() => shopIdsWithin(visible('shops'), located ? latitude : null, located ? longitude : null, reachKm);
+
+  /// Only the demo (no Firebase: the previews and the tests) with no place chosen yet shows the whole catalogue, offers and ads,
+  /// like the admin's preview. The real app and website never do: there nothing shows until the customer's place is known.
+  bool get showsEverything => !live && !located;
+
+  /// [item]'s shop is within reach of the customer ([linkedShopId]); an item without a shop never is.
+  bool reaches(Entry item) => showsEverything || shopsInReach().contains(linkedShopId(item));
   Entry get business =>
       entries('settings').where((e) => e.id == 'business').firstOrNull ??
       const Entry('business', {'name': 'Local Market', 'radiusKm': 10});
@@ -261,28 +286,25 @@ class Store extends ChangeNotifier {
     return shop?.text('town') ?? '';
   }
 
-  /// [items] of the customer's chosen town: items of other towns are hidden. Nothing is hidden while no town is chosen,
-  /// and an item with no known town shows everywhere. [all] (the admin preview) ignores the town.
-  List<Entry> _inTown(List<Entry> items, bool all) {
-    if (all || town.isEmpty) return items;
-    // Compared by town: a locality named "Krishna Bazar (Narsipatnam)" is in Narsipatnam.
-    final mine = townKey(town);
-    return items.where((p) {
-      final there = townKey(productTown(p));
-      return there.isEmpty || there == mine;
-    }).toList();
+  /// [items] of the shops within reach of the customer (distance only, lib/domain/reach.dart): an item of a farther shop, of a shop
+  /// with no saved location, or with no shop at all is hidden, and so is everything while the customer's place is not known yet.
+  /// [all] (the admin preview) shows every item.
+  List<Entry> _inReach(List<Entry> items, bool all) {
+    if (all || showsEverything) return items;
+    final shops = shopsInReach();
+    return items.where((p) => shops.contains(p.text('shopId'))).toList();
   }
 
-  /// Visible products for the customer's chosen town. Services are not products: they live in their own collection
+  /// Visible products of the shops within reach. Services are not products: they live in their own collection
   /// (see [visibleServices]), and a service record that is still in products is never listed here.
-  List<Entry> visibleProducts({bool all = false}) => _inTown(
+  List<Entry> visibleProducts({bool all = false}) => _inReach(
     visible('products').where((e) => e.text('kind') != 'service' && inSearchAt(e, ServerClock.now())).toList(),
     all,
   );
 
-  /// Visible service listings (the services collection, without the service-type records) for the chosen town.
+  /// Visible service listings (the services collection, without the service-type records) of the shops within reach.
   List<Entry> visibleServices({bool all = false}) =>
-      _inTown(visible('services').where((e) => e.text('kind') != 'serviceType').toList(), all);
+      _inReach(visible('services').where((e) => e.text('kind') != 'serviceType').toList(), all);
 
   /// The fixed service types (Plumber, Electrician, ...) stored in the services collection, in their own order.
   List<Entry> serviceTypes() => visible('services').where((e) => e.text('kind') == 'serviceType').toList();
@@ -340,6 +362,7 @@ class Store extends ChangeNotifier {
     pincode = prefs.getString('pincode') ?? '';
     await loadConsentDevice();
     address = prefs.getString('address') ?? '';
+    area = prefs.getString('area') ?? '';
     town = prefs.getString('town') ?? '';
     district = prefs.getString('district') ?? '';
     state = prefs.getString('state') ?? '';
@@ -477,13 +500,14 @@ class Store extends ChangeNotifier {
   List<Entry> get quickLocations =>
       entries('locations').where((l) => l.active).toList();
 
-  /// Live Quick Add items in the town the customer chose with "Choose your location" (the same
-  /// town that decides their offers), optionally one category. None until a town is chosen.
+  /// Live Quick Add items within the admin's km of the customer's place (distance only), optionally one category. None until the
+  /// customer's place is known.
   List<Entry> quickItemsHere({String? categoryId, DateTime? now}) => liveQuickItems(
     catalog['quickItems'] ?? const [],
     now ?? DateTime.now(),
-    town: town,
-    district: district,
+    latitude: located ? latitude : null,
+    longitude: located ? longitude : null,
+    km: reachKm,
     categoryId: categoryId,
   );
 
@@ -623,6 +647,14 @@ class Store extends ChangeNotifier {
           ),
         ),
       );
+  /// Changes only the typed address (for delivery): the place, its area and what the customer sees stay as they are.
+  Future<void> setDeliveryAddress(String value) async {
+    address = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('address', value);
+    notifyListeners();
+  }
+
   Future<void> setLocation(
     String pin,
     String value, {
@@ -631,12 +663,15 @@ class Store extends ChangeNotifier {
     String? town,
     String? district,
     String? state,
+    String? area,
     bool followGps = false,
   }) async {
     followsGps = followGps;
     // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
     // coordinate refresh) must not forget a town the customer already picked.
     final unchanged = town == null && pin == pincode && value == address;
+    // The area goes with the place it was worked out for (lib/services/area_lookup.dart): kept only when nothing else changes.
+    this.area = area ?? (unchanged && lat == latitude && lng == longitude ? this.area : '');
     final nextTown = unchanged
         ? this.town
         : resolveTown(
@@ -659,6 +694,7 @@ class Store extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pincode', pin);
     await prefs.setString('address', value);
+    await prefs.setString('area', this.area);
     await prefs.setString('town', this.town);
     await prefs.setString('district', this.district);
     await prefs.setString('state', this.state);
@@ -736,18 +772,13 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Entry> nearby() => visible('shops').where((s) {
-    if (latitude != null && longitude != null) {
-      return distanceKm(
-            latitude!,
-            longitude!,
-            s.number('latitude'),
-            s.number('longitude'),
-          ) <=
-          s.number('radiusKm', business.number('radiusKm', 10));
-    }
-    return pincode.isNotEmpty && s.text('pincode') == pincode;
-  }).toList();
+  /// The shops within the admin's km of the customer ([reachKm]; a shop's own radius no longer counts). None while the customer's
+  /// place is not known.
+  List<Entry> nearby() {
+    if (showsEverything) return visible('shops');
+    final ids = shopsInReach();
+    return visible('shops').where((s) => ids.contains(s.id)).toList();
+  }
   void add(Entry entry, [int quantity = 1]) {
     final next = (cart[entry.id] ?? 0) + quantity;
     if (next <= 0) {

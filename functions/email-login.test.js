@@ -41,3 +41,38 @@ test('email code sign-in: request, wrong code, correct code gives a verified acc
   for (let i = 0; i < 5; i++) await assert.rejects(() => fns.verifyEmailLoginCode.run({data: {email: 'lock.user@example.test', code: wrong}}), /Wrong code/);
   await assert.rejects(() => fns.verifyEmailLoginCode.run({data: {email: 'lock.user@example.test', code: real}}), /Too many wrong codes/);
 });
+
+test('Play review code: only the three playreview emails, no email sent, wrong code refused, off when unset', {skip: !(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST)}, async () => {
+  process.env.EMAIL_DRY_RUN = 'true';
+  const {getFirestore} = require('firebase-admin/firestore');
+  const {getAuth} = require('firebase-admin/auth');
+  const fns = require('./index');
+  const db = getFirestore();
+  const sentTo = async email => (await db.collection('_emailDryRun').where('to', '==', email).get()).size;
+  const reviewer = 'playreview.vendor@locamarket.in';
+  try {
+    process.env.REVIEW_LOGIN_CODE = '482913';
+    await fns.requestEmailLoginCode.run({data: {email: 'PlayReview.Vendor@locamarket.in'}});
+    assert.equal(await sentTo(reviewer), 0, 'no email to the reviewer mailbox');
+    await assert.rejects(() => fns.verifyEmailLoginCode.run({data: {email: reviewer, code: '111111'}}), {message: 'Wrong code.'});
+    const ok = await fns.verifyEmailLoginCode.run({data: {email: reviewer, code: '482913'}});
+    assert.equal(typeof ok.token, 'string');
+    assert.equal((await getAuth().getUserByEmail(reviewer)).emailVerified, true);
+    // it works again (reviewers sign in more than once), with no request first
+    assert.equal(typeof (await fns.verifyEmailLoginCode.run({data: {email: 'playreview.user@locamarket.in', code: '482913'}})).token, 'string');
+
+    // anyone else: the review code is just a wrong code
+    await fns.requestEmailLoginCode.run({data: {email: 'someone@example.test'}});
+    assert.equal(await sentTo('someone@example.test'), 1);
+    const real = (await db.collection('_emailDryRun').where('to', '==', 'someone@example.test').get()).docs[0].data().code;
+    if (real !== '482913') await assert.rejects(() => fns.verifyEmailLoginCode.run({data: {email: 'someone@example.test', code: '482913'}}), /tries left/);
+
+    // unset: playreview emails get a normal emailed code again
+    process.env.REVIEW_LOGIN_CODE = '';
+    await assert.rejects(() => fns.verifyEmailLoginCode.run({data: {email: 'playreview.staff@locamarket.in', code: '482913'}}), /Ask for a code first/);
+    await fns.requestEmailLoginCode.run({data: {email: 'playreview.staff@locamarket.in'}});
+    assert.equal(await sentTo('playreview.staff@locamarket.in'), 1);
+  } finally {
+    delete process.env.REVIEW_LOGIN_CODE;
+  }
+});

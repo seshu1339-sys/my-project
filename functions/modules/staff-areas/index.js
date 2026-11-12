@@ -23,7 +23,8 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   staffAreaLastChance    schedule -> 5 PM India time: a second reminder to those whose last chance is today and who sent nothing yet
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentWritten} = require('firebase-functions/v2/firestore');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('../../task');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {getStorage} = require('firebase-admin/storage');
@@ -90,9 +91,9 @@ exports.removeStaffTodayOffer = staff((db, uid, data) => S.removeStaffOffer(db, 
 exports.staffAreaOnStaffChange = onDocumentWritten({document: 'fieldStaff/{uid}', region: 'asia-south1', maxInstances: 3}, async event => {
   await S.onStaffStatus(getFirestore(), event.params.uid, event.data?.before?.data(), event.data?.after?.data());
 });
-exports.staffAreaNightly = onSchedule({schedule: '20 0 * * *', timeZone: 'Asia/Kolkata', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.staffAreaNightly = task(async () => {
   await S.nightlyCheck(getFirestore(), pushToStaff);
 });
-exports.staffAreaLastChance = onSchedule({schedule: '0 17 * * *', timeZone: 'Asia/Kolkata', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300}, async () => {
+exports.staffAreaLastChance = task(async () => {
   await S.lastChanceReminder(getFirestore(), pushToStaff);
 });

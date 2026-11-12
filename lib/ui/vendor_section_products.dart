@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/post_duration.dart';
 import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'library_item_tile.dart';
@@ -198,7 +199,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             child: const Text('Cancel'),
           ),
       ],
-    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. A price stays for $vendorPriceValidHours hours; then it is removed and you enter a new price.');
+    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. A price stays for ${postDurationLabel(store.business)}; then it is removed and you enter a new price.');
   }
 }
 
@@ -261,7 +262,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     ? const Icon(Icons.inventory_2_outlined)
                     : SizedBox(width: 44, height: 44, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
                 title: Text('${doc.data()['name']}'),
-                // Prices last 24 hours: an expired one is shown in red until the vendor enters a new price.
+                // Prices last the admin's post duration: an expired one is shown in red until the vendor enters a new price.
                 subtitle: Text(
                   '${vendorPriceLine(doc.data(), DateTime.now())} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}',
                   key: ValueKey('vendor-price-line-${doc.id}'),

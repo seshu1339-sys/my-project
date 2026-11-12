@@ -60,7 +60,8 @@ async function dryRun() {
     const page = await getAuth().listUsers(1000, pageToken);
     for (const user of page.users) {
       const email = String(user.email || user.customClaims?.loginEmail || '').toLowerCase();
-      if (keep.has(email) && !user.customClaims?.role) continue;
+      // A kept email keeps every login it has: its old email account and each role login (admin, user, vendor, staff).
+      if (keep.has(email)) continue;
       const records = [];
       for (const name of BY_UID) if ((await db.collection(name).doc(user.uid).get()).exists) records.push(`${name}/${user.uid}`);
       accounts.push({uid: user.uid, email, role: user.customClaims?.role || '(email login)', admin: user.customClaims?.admin === true,

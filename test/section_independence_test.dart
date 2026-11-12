@@ -46,7 +46,7 @@ void main() {
       expect(store.entries('settings').firstWhere((e) => e.id == 'scrollingText').data, _scrolling.data);
     });
 
-    testWidgets('until then it still follows the Scrolling Text; afterwards it does not', (tester) async {
+    testWidgets("its title is never the Scrolling Text's or any fixed text: always Today's <area> Offers (owner, 11 Nov 2026)", (tester) async {
       Future<String> banner(Store store) async {
         tester.view.physicalSize = const Size(1200, 600);
         tester.view.devicePixelRatio = 1;
@@ -73,14 +73,13 @@ void main() {
       }
 
       final store = await _store([_scrolling]);
-      expect(await banner(store), 'hello gayatri how are u', reason: 'the old behaviour: the label comes from the Scrolling Text');
+      expect(await banner(store), "Today's Offers", reason: 'no place yet: never the Scrolling Text');
+      await store.setLocation('530008', '', lat: 17.734, lng: 83.279, town: 'Visakhapatnam', area: 'Kancharapalem');
+      expect(await banner(store), "Today's Kancharapalem Offers");
       await store.save('settings', const Entry('scrollingText', {'name': 'Scrolling text', 'text': 'Changed on the Scrolling Text'}));
-      expect(await banner(store), 'Changed on the Scrolling Text', reason: 'not independent yet');
-
+      expect(await banner(store), "Today's Kancharapalem Offers", reason: 'not independent yet: still never its text');
       await makeNoticeIndependent(store);
-      expect(await banner(store), 'Changed on the Scrolling Text', reason: 'it kept what it showed');
-      await store.save('settings', const Entry('scrollingText', {'name': 'Scrolling text', 'text': 'Changed AGAIN'}));
-      expect(await banner(store), 'Changed on the Scrolling Text', reason: 'now the Scrolling Text no longer reaches it');
+      expect(await banner(store), "Today's Kancharapalem Offers", reason: 'independent: its own saved text is not the title either');
     });
   });
 

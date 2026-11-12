@@ -2,7 +2,8 @@
 const {isAdminToken} = require('./role-auth');
 const {loginEmailOf} = require('./role-logins');
 const {onDocumentUpdated, onDocumentWritten} = require('firebase-functions/v2/firestore');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
@@ -205,7 +206,7 @@ exports.notifyLocationOffers = onDocumentWritten({document: 'notificationSubscri
   await announceLocationOffers(event.params.uid, after);
 });
 // ...and this check catches offers whose scheduled start arrives without any edit.
-exports.notifyNewOffers = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.notifyNewOffers = task(async () => {
   for await (const offer of pages(db.collection('promotions').orderBy('__name__'))) {
     const data = offer.data();
     if (!offerNotifiable(data) || data.notifiedKey === offerKey(offer.id, data)) continue;

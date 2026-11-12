@@ -9,6 +9,7 @@ import '../services/localization.dart';
 import '../services/strings.dart';
 import 'contact_actions.dart';
 import 'design_tokens.dart';
+import 'greeting.dart';
 import 'layout_settings.dart';
 import 'responsive_search_box.dart';
 import 'shared.dart';
@@ -331,16 +332,14 @@ class ResponsiveHeader extends StatelessWidget {
                 // Wrap's own bound and can overflow at narrow widths; as
                 // separate Wrap children, the pill simply flows to its own
                 // line when there's no room instead.
+                // The greeting (lib/ui/greeting.dart): "Hello, Ravi" with the area under it, or "Hello, Kancharapalem People".
                 if (greeting.visible)
                   wrapSection(
                     'user',
-                    Text(
-                      store.profileName.isEmpty
-                          ? greeting.entry.text('text', 'Welcome').tr(context)
-                          : 'Hello {name}'.tr(context, {
-                              'name': store.profileName,
-                            }),
-                      style: applyFontFamily(
+                    Builder(
+                      builder: (context) {
+                        final lines = greetingLines(context, store, welcome: greeting.entry.text('text', 'Welcome'));
+                        final style = applyFontFamily(
                         TextStyle(
                           fontWeight: FontWeight.values.firstWhere(
                             (w) =>
@@ -369,7 +368,24 @@ class ResponsiveHeader extends StatelessWidget {
                               : FontStyle.normal,
                         ),
                         greeting.entry.text('fontFamily'),
-                      ),
+                      );
+                        return Column(
+                          key: const ValueKey('home-greeting'),
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(lines.line, maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+                            if (lines.under.isNotEmpty)
+                              Text(
+                                lines.under,
+                                key: const ValueKey('home-greeting-area'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: style.copyWith(fontWeight: FontWeight.w500, fontSize: (style.fontSize ?? 14) - 2),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 if (locationLayout.visible)
@@ -439,16 +455,15 @@ class ResponsiveHeader extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    store.address.isEmpty
-                                        ? (store.pincode.isEmpty
-                                              ? locationLayout.entry
-                                                    .text(
-                                                      'text',
-                                                      'Choose your location',
-                                                    )
-                                                    .tr(context)
-                                              : store.pincode)
-                                        : store.address,
+                                    // The area name, never the typed address (that is for delivery only).
+                                    store.placeName.isEmpty
+                                        ? locationLayout.entry
+                                              .text(
+                                                'text',
+                                                'Choose your location',
+                                              )
+                                              .tr(context)
+                                        : store.placeName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: applyFontFamily(

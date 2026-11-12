@@ -3,7 +3,8 @@
 // lifecycle (notify -> auto-archive -> auto-delete), sweeps a couple of narrowly-scoped orphan
 // cases, and records Storage usage for the admin. Reuses the pages()/send() helpers already
 // built for offer notifications (functions/notifications.js) instead of duplicating them.
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {_internal} = require('./notifications');
@@ -100,7 +101,7 @@ async function sweepOrphanVendorProducts(now) {
   }
 }
 
-exports.dailyStorageMaintenance = onSchedule({schedule: 'every 24 hours', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.dailyStorageMaintenance = task(async () => {
   const now = Date.now();
   await expireShopPhotos(now);
   await processExclusiveExpiry(now);
@@ -109,7 +110,7 @@ exports.dailyStorageMaintenance = onSchedule({schedule: 'every 24 hours', region
 });
 
 // Lighter cadence: a full bucket listing is more than a daily job needs.
-exports.weeklyStorageUsage = onSchedule({schedule: 'every monday 03:00', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.weeklyStorageUsage = task(async () => {
   const [files] = await getStorage().bucket().getFiles();
   let bytesUsed = 0;
   for (const file of files) bytesUsed += Number(file.metadata?.size) || 0;

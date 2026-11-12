@@ -6,14 +6,15 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../services/geocoding.dart';
 import '../services/location.dart';
-import '../services/location_town.dart';
+import '../services/area_lookup.dart';
 import '../services/usage.dart';
-import '../services/place_resolver.dart';
+import 'location_picker_dialog.dart' show kmLabel;
 import 'design_tokens.dart';
 import 'product_page.dart';
 import 'location_picker.dart';
 import 'shared.dart';
-import 'shop_map.dart';
+import 'shop_map.dart';
+
 import '../services/strings.dart';
 
 /// A shop, joined with one of its products, at a known distance from the
@@ -24,13 +25,8 @@ class _Match {
   final double distanceKm;
 }
 
-/// Location-based product search: a radius slider (snapping to admin-defined
-/// presets, never typed) plus a map + list of matching products, joined via
-/// each product's `shopId` to its shop's mandatory latitude/longitude.
-///
-/// Prices are always shown for every match — this has nothing to do with,
-/// and must never be confused with, `promotionMatchesLocation` (ad
-/// geo-targeting, a separate concern).
+/// Location-based product search: a map + list of the products of the shops within the admin's one km (Settings > Business Profile;
+/// the same km as everything customers see), joined via each product's `shopId` to its shop's saved latitude/longitude.
 class ProductSearchPage extends StatefulWidget {
   const ProductSearchPage({super.key, required this.store});
   final Store store;
@@ -42,61 +38,24 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
   Store get store => widget.store;
   bool locating = false;
   String? locationError;
-  int presetIndex = 0;
-  List<double> presets = const [2, 5, 10, 25, 50];
 
   @override
   void initState() {
     super.initState();
     Usage.screen('nearby_search');
-    _loadPresets();
-    if (store.latitude == null) {
+    if (!store.located) {
       _useGps();
     }
   }
 
-  void _loadPresets() {
-    final raw = store.business
-        .text('searchRadiusPresetsKm', '2,5,10,25,50')
-        .split(',')
-        .map((s) => double.tryParse(s.trim()))
-        .whereType<double>()
-        .where((v) => v > 0)
-        .toList()
-      ..sort();
-    final maxKm = store.business.number('searchRadiusMaxKm', raw.isEmpty ? 50 : raw.last);
-    final bounded = raw.where((v) => v <= maxKm).toList();
-    presets = bounded.isEmpty ? [maxKm > 0 ? maxKm : 50] : bounded;
-    final defaultKm = store.business.number('searchRadiusDefaultKm', presets.first);
-    var closest = 0;
-    for (var i = 1; i < presets.length; i++) {
-      if ((presets[i] - defaultKm).abs() < (presets[closest] - defaultKm).abs()) {
-        closest = i;
-      }
-    }
-    presetIndex = closest;
-  }
-
-  Future<void> _useGps() async {
+  /// Saves [place] as the customer's place (the same as the place picker: area, shops and offers change everywhere).
+  Future<void> _choose(Future<FoundPlace> Function() find, {bool gps = false}) async {
     setState(() {
       locating = true;
       locationError = null;
     });
     try {
-      final position = await currentPosition(action: 'search nearby products');
-      final nearest = await nearestPlaceFor(position.latitude, position.longitude);
-      await store.setLocation(
-        pincodeForGps(store.pincode, nearest),
-        nearest?.label ?? 'Current GPS location',
-        lat: position.latitude,
-        lng: position.longitude,
-        town: nearest?.town ??
-            await townForPoint(store, position.latitude, position.longitude),
-        district: nearest?.district,
-        state: nearest?.state,
-        followGps: true,
-      );
-      await completeStoredPlace(store);
+      await savePlace(store, await find(), followGps: gps);
       if (mounted) setState(() => locating = false);
     } catch (e) {
       if (mounted) {
@@ -108,6 +67,14 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
     }
   }
 
+  Future<void> _useGps() => _choose(() async {
+    final position = await currentPosition(action: 'search nearby products');
+    if (!exactEnough(position)) {
+      throw StateError('Your exact location could not be found. Search for your place or drop a pin instead.');
+    }
+    return placeAtPoint(store, position.latitude, position.longitude);
+  }, gps: true);
+
   Future<void> _searchPlace() async {
     final place = await showModalBottomSheet<NominatimPlace>(
       context: context,
@@ -117,46 +84,29 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
       ),
     );
     if (place == null) return;
-    await store.setLocation(
-      store.pincode,
-      place.displayName,
-      lat: place.latitude,
-      lng: place.longitude,
-      town: townForPlace(store, place),
-    );
-    await completeStoredPlace(store);
-    if (mounted) setState(() => locationError = null);
+    await _choose(() => placeAtPoint(store, place.latitude, place.longitude));
   }
 
   Future<void> _dropPin() async {
-    final initial = store.latitude != null && store.longitude != null
-        ? LatLng(store.latitude!, store.longitude!)
-        : null;
+    final initial = store.located ? LatLng(store.latitude!, store.longitude!) : null;
     final point = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(builder: (_) => MapPinPickerPage(initialCenter: initial)),
     );
     if (point == null) return;
-    await store.setLocation(
-      store.pincode,
-      'Pinned location',
-      lat: point.latitude,
-      lng: point.longitude,
-      town: await townForPoint(store, point.latitude, point.longitude),
-    );
-    if (mounted) setState(() => locationError = null);
+    await _choose(() => placeAtPoint(store, point.latitude, point.longitude));
   }
 
-  List<_Match> _matches(double radiusKm) {
-    if (store.latitude == null || store.longitude == null) return const [];
+  /// The products of the shops within the admin's km (the same km as everywhere: lib/domain/reach.dart), nearest shop first.
+  List<_Match> _matches() {
+    if (!store.located) return const [];
     final matches = <_Match>[];
-    for (final shop in store.visible('shops')) {
+    for (final shop in store.nearby()) {
       final distance = distanceKm(
         store.latitude!,
         store.longitude!,
         shop.number('latitude'),
         shop.number('longitude'),
       );
-      if (distance > radiusKm) continue;
       for (final product in store.visibleProducts().where((p) => p.text('shopId') == shop.id)) {
         matches.add(_Match(shop, product, distance));
       }
@@ -197,9 +147,9 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final radiusKm = presets[presetIndex];
-    final hasLocation = store.latitude != null && store.longitude != null;
-    final matches = hasLocation ? _matches(radiusKm) : const <_Match>[];
+    final radiusKm = store.reachKm;
+    final hasLocation = store.located;
+    final matches = hasLocation ? _matches() : const <_Match>[];
     final shopsById = <String, List<_Match>>{};
     for (final match in matches) {
       shopsById.putIfAbsent(match.shop.id, () => []).add(match);
@@ -223,7 +173,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          store.address.isEmpty ? 'Your location is set' : store.address,
+                          store.placeName.isEmpty ? 'Your location is set'.tr(context) : store.placeName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -233,22 +183,12 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
                   ),
                   if (locationError == 'change') _changeLocationRow(),
                   const SizedBox(height: 8),
-                  Text('Search radius: ${radiusKm.round()} km'),
-                  Slider(
-                    value: presetIndex.toDouble(),
-                    min: 0,
-                    max: (presets.length - 1).toDouble(),
-                    divisions: presets.length > 1 ? presets.length - 1 : null,
-                    label: '${radiusKm.round()} km',
-                    onChanged: presets.length > 1
-                        ? (value) => setState(() => presetIndex = value.round())
-                        : null,
-                  ),
+                  Text('Shops within {km} km'.tr(context, {'km': kmLabel(radiusKm)})),
                   const SizedBox(height: 12),
                   if (matches.isEmpty)
                     Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text('No products found in this radius yet. Try a larger radius.'.tr(context)),
+                      child: Text('No products near you yet.'.tr(context)),
                     )
                   else ...[
                     ShopMap(

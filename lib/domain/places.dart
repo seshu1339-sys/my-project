@@ -13,8 +13,12 @@ class Place {
     required this.latitude,
     required this.longitude,
     required this.town,
+    this.ownSpot = false,
   });
   final String name, district, state, pincode;
+  // The office has a map position of its own: the directory gave one, and no other office shares it (many sub offices only carry
+  // their town's point, which says nothing about which part of town they are in). Only these name an area (lib/services/area_lookup.dart).
+  final bool ownSpot;
   // A village branch office rather than a town's head/sub office...
   final bool village;
   // ...and a head office, i.e. a main town or city.
@@ -245,6 +249,14 @@ class PlacesIndex {
     }
     final entries = <_Indexed>[];
     final coordinates = filledCoordinates(json['places'] as List);
+    // How many offices share each given (not estimated) position.
+    String spot(List row) => '${row[4]}|${row[5]}';
+    bool given(List row) => !((row[4] as num) == 0 && (row[5] as num) == 0);
+    final sharing = <String, int>{};
+    for (final raw in json['places'] as List) {
+      final row = raw as List;
+      if (given(row)) sharing[spot(row)] = (sharing[spot(row)] ?? 0) + 1;
+    }
     var rowNumber = -1;
     for (final raw in json['places'] as List) {
       rowNumber++;
@@ -261,6 +273,7 @@ class PlacesIndex {
         latitude: coordinates[rowNumber].$1,
         longitude: coordinates[rowNumber].$2,
         town: row.length > 6 ? row[6] as String : name,
+        ownSpot: given(row) && sharing[spot(row)] == 1,
       );
       final lower = name.toLowerCase();
       entries.add(
@@ -370,6 +383,26 @@ class PlacesIndex {
     final distance = best == bestTown ? townKm : anyKm;
     return best != null && distance <= maxKm ? best : null;
   }
+
+  /// The nearest office with a map position of its own ([Place.ownSpot]) within [maxKm], for the customer's AREA name (a head office
+  /// only names the whole town, so it never counts). Null when there is none that close.
+  Place? nearestOwnSpot(double latitude, double longitude, {double maxKm = 1.5}) {
+    Place? best;
+    var bestKm = double.infinity;
+    for (final entry in _entries) {
+      final place = entry.place;
+      if (!place.ownSpot || place.head) continue;
+      final km = distanceKmBetween(latitude, longitude, place.latitude, place.longitude);
+      if (km < bestKm) {
+        bestKm = km;
+        best = place;
+      }
+    }
+    return bestKm <= maxKm ? best : null;
+  }
+
+  /// Every office of [pincode].
+  List<Place> officesOf(String pincode) => [for (final entry in _entries) if (entry.place.pincode == pincode) entry.place];
 
   // Head offices (main towns) first, then sub offices, then villages.
   static int _importance(Place place) =>

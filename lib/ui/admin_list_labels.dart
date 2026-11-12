@@ -1,5 +1,6 @@
 import '../domain/catalog.dart';
 import '../domain/places.dart';
+import '../domain/reach.dart';
 import '../domain/towns.dart';
 
 /// Where a promotion shows, in words for the admin's list: "All towns", or the
@@ -9,6 +10,14 @@ String promotionLocationLabel(Entry promotion) {
   final tokens = parseLocationList(promotion.text('locations'));
   if (tokens.isEmpty) return 'All towns';
   return tokens.map(describeLocationToken).join(', ');
+}
+
+/// Who sees a promotion, in words for the admin's list (distance only, lib/domain/reach.dart): its shop, or that it has none and so
+/// is shown to nobody. [shopNames] maps shop ids to names.
+String promotionShopLabel(Entry promotion, Map<String, String> shopNames) {
+  final id = linkedShopId(promotion);
+  if (id.isEmpty) return 'No shop: shown to nobody';
+  return 'Shop: ${shopNames[id] ?? id}';
 }
 
 /// Whether a promotion is showing now, from its dates and Published switch:

@@ -1,8 +1,6 @@
 import 'catalog.dart';
 import 'home_animations.dart';
 import 'ist_time.dart';
-import 'radius.dart';
-import 'towns.dart';
 
 // ---------------------------------------------------------------------------------------------
 // The unified Ads system. Every ad (added by the admin or approved from a vendor) is one record in the `ads` collection and is
@@ -151,22 +149,21 @@ bool adLiveNow(Entry ad, DateTime now) =>
     // the server marks an ad that reached its "max times per day" with that day; it is hidden for the rest of it
     ad.text('capDay') != adDay(now);
 
-/// The ads this customer can see now, pinned first, then in the admin's order. Location uses the same rule as offers: ads that list the
-/// customer's town (else the general, all-town ones).
+/// The ads this customer can see now, pinned first, then in the admin's order. Location is distance only, like the offers
+/// (lib/domain/reach.dart): only ads whose shop is within the admin's km ([reaches], from [Store.shopsInReach]); an ad without a shop,
+/// or with no [reaches] at all, is shown to nobody. The admin's preview ([showAll]) shows every live ad.
 List<Entry> liveAds(
   List<Entry> ads,
   DateTime now, {
-  String town = '',
-  String district = '',
-  String state = '',
   bool showAll = false,
-  double? latitude,
-  double? longitude,
+  bool Function(Entry ad)? reaches,
 }) {
-  // Only ads whose circle covers the customer's current location, each ad once; the admin's preview ([showAll]) shows every live ad.
   final running = ads.where((a) => adLiveNow(a, now)).toList();
-  final live = showAll ? running : coveringCustomer(running, latitude, longitude);
-  final local = promotionsForTown(live, town, district: district, state: state, showAll: showAll).entries.toList();
+  final seen = <String>{};
+  final local = [
+    for (final a in running)
+      if ((showAll || (reaches?.call(a) ?? false)) && seen.add(a.id)) a,
+  ];
   local.sort((a, b) {
     final pin = (b.text('pinned') == 'true' || b.data['pinned'] == true ? 1 : 0) - (a.text('pinned') == 'true' || a.data['pinned'] == true ? 1 : 0);
     return pin != 0 ? pin : a.number('order').compareTo(b.number('order'));

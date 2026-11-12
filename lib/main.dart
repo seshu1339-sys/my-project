@@ -24,8 +24,8 @@ import 'services/push_opens.dart';
 import 'services/emulators.dart';
 import 'services/server_clock.dart';
 import 'services/admin_route.dart';
+import 'services/area_lookup.dart';
 import 'services/location.dart';
-import 'services/location_town.dart';
 import 'services/app_theme.dart';
 import 'services/localization.dart';
 
@@ -122,42 +122,21 @@ Future<void> main() async {
   }
 }
 
-// On every app open, refresh the customer's coordinates (never the manually
-// chosen pincode/address) so ads/offers and nearby search reflect where they
-// actually are right now. Never prompts for permission and never blocks
-// first paint; silently does nothing if permission was never granted.
+// On every app open, someone who chose "Use my location" has their place follow the phone: once they have moved more than a little,
+// the point, the area name and so the shops and offers shown move with them. A place chosen by hand is never moved by GPS. Never
+// prompts for permission and never blocks first paint; silently does nothing if permission was never granted.
 Future<void> _refreshLocationOnOpen(Store store) async {
   await WidgetsBinding.instance.endOfFrame;
+  if (!store.followsGps) return;
   final position = await currentPositionIfPermitted();
-  if (position != null) {
-    // Someone who chose "Use my location" has the town follow their phone: when they
-    // have travelled to another town, the stored place (and so the offers shown and
-    // the location push notification) moves with them. A town picked by hand never moves.
-    final nearest = store.followsGps
-        ? await nearestPlaceFor(position.latitude, position.longitude)
-        : null;
-    if (nearest != null && nearest.town != store.town) {
-      await store.setLocation(
-        pincodeForGps(store.pincode, nearest),
-        nearest.label,
-        lat: position.latitude,
-        lng: position.longitude,
-        town: nearest.town,
-        district: nearest.district,
-        state: nearest.state,
-        followGps: true,
-      );
-      return;
-    }
-    await store.setLocation(
-      store.pincode,
-      store.address,
-      lat: position.latitude,
-      lng: position.longitude,
-      followGps: store.followsGps,
-    );
-  }
+  if (position == null || !exactEnough(position)) return;
+  final moved = !store.located || distanceKm(store.latitude!, store.longitude!, position.latitude, position.longitude) > movedKm;
+  if (!moved && store.area.isNotEmpty) return;
+  await savePlace(store, await placeAtPoint(store, position.latitude, position.longitude), followGps: true);
 }
+
+/// How far the phone must have moved before its place (and area name) is worked out again on open.
+const movedKm = 0.3;
 
 Future<void> _openAlert(Store store, RemoteMessage message) async {
   // Counted for the admin's push centre: which notification (or which kind) was opened.

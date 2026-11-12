@@ -13,7 +13,8 @@ const {isAdminToken} = require('./role-auth');
 // "Active" is the latest of: the account's own usage (userActivity, functions/usage.js), its last sign-in and its last token refresh
 // (Firebase Auth), and its creation (a new account is not inactive).
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getAuth} = require('firebase-admin/auth');
 const {requireAdminSession} = require('./admin-session');
@@ -147,6 +148,6 @@ async function sweep(now = Date.now()) {
   return done;
 }
 
-exports.sweepInactiveAccounts = onSchedule({schedule: 'every day 03:30', timeZone: 'Asia/Kolkata', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, () => sweep());
+exports.sweepInactiveAccounts = task(() => sweep());
 
 exports._inactive = {findInactive, sweep, deleteCustomer, setDisabled};

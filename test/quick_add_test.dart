@@ -43,6 +43,9 @@ Entry _item(String id, {String status = 'approved', DateTime? starts, DateTime? 
       'locationTown': town,
       'locationDistrict': district,
       'locationPincode': '533101',
+      // Where the item was photographed: Rajahmundry, or Kakinada (about 60 km away).
+      'latitude': town == 'Kakinada' ? 16.989 : 17.000,
+      'longitude': town == 'Kakinada' ? 82.247 : 81.800,
       'status': status,
       'imageUrl': '',
       'ownerName': 'Ravi Staff',
@@ -129,20 +132,21 @@ void main() {
         _item('otherCat', category: 'cat-9', starts: live, ends: _now.add(const Duration(hours: 2))),
       ];
       List<String> ids(Iterable<Entry> list) => [for (final i in list) i.id];
-      expect(ids(liveQuickItems(items, _now, town: 'Rajahmundry', district: 'East Godavari')), ['soon', 'otherCat', 'later']);
-      expect(ids(liveQuickItems(items, _now, town: 'Rajahmundry', categoryId: 'cat-1')), ['soon', 'later']);
-      expect(ids(liveQuickItems(items, _now, town: 'Kakinada')), ['elsewhere']);
-      expect(liveQuickItems(items, _now, town: ''), isEmpty, reason: 'no town chosen: nothing');
+      // Distance only (lib/domain/reach.dart): within the admin's km of the customer's point.
+      const rajahmundry = (17.002, 81.801), kakinada = (16.990, 82.245);
+      expect(ids(liveQuickItems(items, _now, latitude: rajahmundry.$1, longitude: rajahmundry.$2, km: 10)), ['soon', 'otherCat', 'later']);
+      expect(ids(liveQuickItems(items, _now, latitude: rajahmundry.$1, longitude: rajahmundry.$2, km: 10, categoryId: 'cat-1')), ['soon', 'later']);
+      expect(ids(liveQuickItems(items, _now, latitude: kakinada.$1, longitude: kakinada.$2, km: 10)), ['elsewhere']);
+      expect(liveQuickItems(items, _now, latitude: null, longitude: null, km: 10), isEmpty, reason: 'no place chosen: nothing');
     });
 
-    test('town matching ignores case and spacing, and keeps same-named towns of different districts apart', () {
-      final item = _item('a', town: 'Rajahmundry', district: 'East Godavari');
-      expect(quickItemAtPlace(item, town: ' rajahmundry '), isTrue);
-      expect(quickItemAtPlace(item, town: 'Rajahmundry', district: 'east  godavari'), isTrue);
-      expect(quickItemAtPlace(item, town: 'Rajahmundry', district: 'Krishna'), isFalse);
-      expect(quickItemAtPlace(item, town: 'Kakinada'), isFalse);
-      // an item from an extra place the admin added has only a name
-      expect(quickItemAtPlace(const Entry('x', {'locationName': 'Old Market'}), town: 'Old Market'), isTrue);
+    test('an item counts by distance, not by its town name', () {
+      final item = _item('a', town: 'Rajahmundry');
+      expect(quickItemWithin(item, latitude: 17.05, longitude: 81.80, km: 10), isTrue, reason: 'about 5.6 km away');
+      expect(quickItemWithin(item, latitude: 17.20, longitude: 81.80, km: 10), isFalse, reason: 'about 22 km away');
+      expect(quickItemWithin(item, latitude: 17.20, longitude: 81.80, km: 25), isTrue, reason: "the admin's km decides");
+      expect(quickItemWithin(const Entry('x', {'locationName': 'Old Market'}), latitude: 17.0, longitude: 81.8, km: 10), isFalse,
+          reason: 'an item without a saved place is never shown');
     });
   });
 
@@ -861,10 +865,11 @@ void main() {
   });
 
   group('customer website', () {
+    // The customer's place: a point and its name (distance only: the items within the admin's km of the point).
+    const points = {'Rajahmundry': (17.002, 81.801), 'Kakinada': (16.990, 82.245), 'Warangal': (17.970, 79.590)};
     Future<Store> chosenTown({String town = 'Rajahmundry', String district = 'East Godavari'}) async {
       final store = await _store();
-      store.town = town;
-      store.district = district;
+      await store.setLocation('', '', lat: points[town]!.$1, lng: points[town]!.$2, town: town, district: district, area: town);
       return store;
     }
 
@@ -881,7 +886,7 @@ void main() {
       ];
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickFreshToday(store: store, now: () => _now)))));
       await tester.pump();
-      expect(find.text('Showing items in: Rajahmundry'), findsOneWidget);
+      expect(find.text('Showing items near: Rajahmundry'), findsOneWidget);
       expect(find.text('Change'), findsOneWidget);
       expect(find.text('Fresh today'), findsOneWidget);
       expect(find.text('Tomatoes'), findsOneWidget);
@@ -924,7 +929,7 @@ void main() {
               now: () => _now,
               choose: (context, s) async {
                 opened++;
-                await s.setLocation('533001', 'Kakinada', town: 'Kakinada', district: 'East Godavari', state: 'Andhra Pradesh');
+                await s.setLocation('533001', '', lat: 16.990, lng: 82.245, town: 'Kakinada', district: 'East Godavari', state: 'Andhra Pradesh', area: 'Kakinada');
               },
             ),
           ),
@@ -936,7 +941,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('quick-change-location')));
       await tester.pumpAndSettle();
       expect(opened, 1);
-      expect(find.text('Showing items in: Kakinada'), findsOneWidget);
+      expect(find.text('Showing items near: Kakinada'), findsOneWidget);
       expect(find.text('Kakinada Mangoes'), findsOneWidget);
       expect(find.text('Tomatoes'), findsNothing);
     });
@@ -975,7 +980,7 @@ void main() {
       ];
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: QuickCategoryItems(store: store, categoryId: 'cat-1', now: () => _now)))));
       await tester.pump();
-      expect(find.text('Fresh today in Rajahmundry'), findsOneWidget);
+      expect(find.text('Fresh today near Rajahmundry'), findsOneWidget);
       expect(find.text('Tomatoes'), findsOneWidget);
       expect(find.text('Shirts'), findsNothing);
       expect(find.text('Kakinada Mangoes'), findsNothing);

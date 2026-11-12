@@ -6,9 +6,10 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/radius.dart';
+import '../domain/reach.dart';
+import 'location_picker_dialog.dart' show kmLabel;
 import '../domain/catalog.dart';
 import '../domain/ist_time.dart';
-import '../domain/towns.dart';
 import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_reports_page.dart';
@@ -82,7 +83,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
       reason = asked;
     }
     try {
-      final km = approveRadius[submission.id] ?? 10;
+      // The server still records a circle for its own checks: the admin's km, as the next of its fixed sizes.
+      final km = approveRadius[submission.id] ?? nextRadiusOption(store.reachKm) ?? radiusOptionsKm.last;
       final decide = widget.decide ?? (id, ok, why, radius) => store.call('decideVendorAd', {'submissionId': id, 'approved': ok, 'reason': why, if (radius > 0) 'radiusKm': radius});
       await decide(submission.id, approved, reason, km);
       if (mounted) message(context, approved ? 'Approved. The ad is live now.' : 'Rejected. The vendor has been told why.');
@@ -125,20 +127,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
               ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: 280,
-              child: DropdownButtonFormField<int>(
-                key: ValueKey('approve-radius-${s.id}-${approveRadius[s.id] ?? 10}'),
-                isExpanded: true,
-                initialValue: approveRadius[s.id] ?? 10,
-                decoration: const InputDecoration(labelText: 'Radius around the vendor shop', isDense: true, border: OutlineInputBorder()),
-                items: [
-                  const DropdownMenuItem(value: 0, child: Text('No radius')),
-                  for (final km in radiusOptionsKm) DropdownMenuItem(value: km, child: Text('@km km')),
-                ],
-                onChanged: (v) => setState(() => approveRadius[s.id] = v ?? 10),
-              ),
-            ),
+            // Distance only (lib/domain/reach.dart): the ad reaches the customers within the km of Business Profile of the vendor's shop.
+            Text("Shown to customers within ${kmLabel(store.reachKm)} km of the vendor's shop (Business Profile).", key: ValueKey('approve-reach-${s.id}'), style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 8),
             Row(children: [
               FilledButton.icon(key: ValueKey('approve-${s.id}'), onPressed: () => _decide(s, true), icon: const Icon(Icons.check), label: const Text('Approve')),
@@ -588,8 +578,6 @@ class _AdEditorPageState extends State<AdEditorPage> {
 
   String s(String key) => values[key] == null ? '' : '${values[key]}';
 
-  /// The radius as the list shows it ("10"), whether it was saved as 10 or 10.0.
-  String get radiusText => (values['radiusKm'] is num && (values['radiusKm'] as num) > 0) ? '${(values['radiusKm'] as num).round()}' : '';
   void _set(String key, Object? v) => setState(() => v == null || '$v'.isEmpty ? values.remove(key) : values[key] = v);
 
   Widget _field(String key, String label, {int lines = 1, TextInputType? type, String? hint}) => TextField(
@@ -633,20 +621,7 @@ class _AdEditorPageState extends State<AdEditorPage> {
     _set('slots', slotsToText(slots));
   }
 
-  /// The common radius: pick a size from the list and the shop whose saved location is the centre (copied in automatically).
-  void _setRadius(String? km) {
-    setState(() {
-      if (km == null || km.isEmpty) {
-        for (final k in ['radiusKm', 'radiusShopId', 'radiusLat', 'radiusLng']) {
-          values.remove(k);
-        }
-      } else {
-        values['radiusKm'] = int.parse(km);
-        _centreFromShop();
-      }
-    });
-  }
-
+  /// The ad's shop (required): its saved location is copied in automatically.
   void _setRadiusShop(String? shopId) {
     setState(() {
       if (shopId == null || shopId.isEmpty) {
@@ -675,15 +650,21 @@ class _AdEditorPageState extends State<AdEditorPage> {
     if ((action == 'call' || action == 'whatsapp') && s('tapValue').replaceAll(RegExp(r'[^0-9]'), '').length < 10) return 'Enter a 10-digit phone number for the tap action.';
     if ((action == 'link') && !s('tapValue').startsWith('https://')) return 'A link must start with https://';
     if (action == 'shop' && s('tapValue').isEmpty) return 'Choose the shop.';
-    if (hasRadius(Entry(id, values))) {
-      if (!radiusOptionsKm.contains(values['radiusKm'])) return 'Choose a radius from the list.';
-      final shop = widget.store.entries('shops').where((x) => x.id == s('radiusShopId')).firstOrNull;
-      if (shop == null) return 'Choose the shop whose location is the centre of the radius.';
-      if (shop.number('latitude') == 0 && shop.number('longitude') == 0) return '"${shop.text('name')}" has no saved location yet. Add the shop location first.';
-      final others = [...widget.store.entries('ads'), for (final p in widget.store.entries('promotions')) if (p.text('placement') == 'ad') p];
-      final full = areaFullMessage(Entry(id, values), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
-      if (full != null) return full;
-    }
+    // Customers see an ad only within the km of Business Profile of its shop (lib/domain/reach.dart): an ad for customers needs a
+    // shop with a saved location (the Shop box, or the shop it opens). Ads only for the vendor and staff apps follow their own rules.
+    if (!adAudience(Entry(id, values)).contains('customers')) return null;
+    final shopId = linkedShopId(Entry(id, values));
+    final shop = widget.store.entries('shops').where((x) => x.id == shopId).firstOrNull;
+    if (shop == null) return 'Choose the shop: only customers near that shop see the ad.';
+    if (shop.number('latitude') == 0 && shop.number('longitude') == 0) return '"${shop.text('name')}" has no saved location yet. Add the shop location first.';
+    final km = widget.store.reachKm;
+    Entry withKm(Entry e) => Entry(e.id, {...e.data, 'radiusKm': km});
+    final others = [
+      for (final a in widget.store.entries('ads')) if (linkedShopId(a).isNotEmpty) withKm(a),
+      for (final p in widget.store.entries('promotions')) if (p.text('placement') == 'ad' && linkedShopId(p).isNotEmpty) withKm(p),
+    ];
+    final full = areaFullMessage(withKm(Entry(id, {...values, 'radiusLat': shop.number('latitude'), 'radiusLng': shop.number('longitude')})), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
+    if (full != null) return full;
     return null;
   }
 
@@ -731,8 +712,6 @@ class _AdEditorPageState extends State<AdEditorPage> {
     final package = s('package').isEmpty ? 'normal' : s('package');
     final type = s('contentType');
     final shops = widget.store.entries('shops');
-    final towns = parseServiceTowns(widget.store.business.text('serviceTowns')).map((t) => t.name).toList();
-    final chosenTowns = parseLocationList(s('locations')).map((t) => t.toLowerCase()).toSet();
     final audience = adAudience(Entry(id, values));
     final chosenCategories = adCategories(Entry(id, values));
     // The categories the shops have, as their owners typed them; each spelling once.
@@ -914,58 +893,24 @@ class _AdEditorPageState extends State<AdEditorPage> {
                 ),
               ActionChip(key: const ValueKey('ad-add-slot'), avatar: const Icon(Icons.add), label: const Text('Add time slot'), onPressed: _addSlot),
             ]),
-            Text(_label('Show only in these places', s('locations').isEmpty ? 'everywhere' : s('locations')), style: const TextStyle(fontWeight: FontWeight.w600)),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              FilterChip(
-                key: const ValueKey('ad-loc-ap'),
-                label: const Text('All Andhra Pradesh'),
-                selected: chosenTowns.contains('andhra pradesh'),
-                onSelected: (on) => _set('locations', on ? 'Andhra Pradesh' : null),
+            // Who sees the ad is decided by its SHOP only (distance only, lib/domain/reach.dart): customers within the km of Business
+            // Profile of the shop's saved location. Places, towns and an ad's own radius no longer count; without a shop nobody sees it.
+            Text(_label('Shop', shops.where((x) => x.id == s('radiusShopId')).firstOrNull?.text('name') ?? 'not chosen'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('Required. Only customers within ${kmLabel(widget.store.reachKm)} km of this shop (Business Profile) see the ad.', style: const TextStyle(fontSize: 12)),
+            SizedBox(
+              width: 300,
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('ad-radius-shop-${s('radiusShopId')}'),
+                isExpanded: true,
+                initialValue: shops.any((x) => x.id == s('radiusShopId')) ? s('radiusShopId') : '',
+                decoration: const InputDecoration(labelText: 'Shop', isDense: true, border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('Choose the shop')),
+                  for (final x in shops) if (x.number('latitude') != 0 || x.number('longitude') != 0) DropdownMenuItem(value: x.id, child: Text(x.text('name'), overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: _setRadiusShop,
               ),
-              for (final t in towns)
-                FilterChip(
-                  label: Text(t),
-                  selected: chosenTowns.contains(t.toLowerCase()),
-                  onSelected: (on) {
-                    final next = parseLocationList(s('locations')).where((x) => x.toLowerCase() != t.toLowerCase() && x.toLowerCase() != 'andhra pradesh').toList();
-                    if (on) next.add(t);
-                    _set('locations', next.isEmpty ? null : next.join(', '));
-                  },
-                ),
-            ]),
-            _field('locations', 'Places (comma-separated; blank = everywhere)'),
-            Text(_label('Radius around a shop', values['radiusKm'] == null ? 'none' : '${values['radiusKm']} km'), style: const TextStyle(fontWeight: FontWeight.w600)),
-            const Text('Shown only to customers inside the circle. The centre is the saved location of the chosen shop.', style: TextStyle(fontSize: 12)),
-            Wrap(spacing: 12, runSpacing: 12, children: [
-              SizedBox(
-                width: 240,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('ad-radius-$radiusText'),
-                  isExpanded: true,
-                  initialValue: radiusText,
-                  decoration: const InputDecoration(labelText: 'Radius', isDense: true, border: OutlineInputBorder()),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('No radius')),
-                    for (final km in radiusOptionsKm) DropdownMenuItem(value: '$km', child: Text('$km km')),
-                  ],
-                  onChanged: _setRadius,
-                ),
-              ),
-              SizedBox(
-                width: 300,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('ad-radius-shop-${s('radiusShopId')}'),
-                  isExpanded: true,
-                  initialValue: shops.any((x) => x.id == s('radiusShopId')) ? s('radiusShopId') : '',
-                  decoration: const InputDecoration(labelText: 'Centre: shop location', isDense: true, border: OutlineInputBorder()),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('None')),
-                    for (final x in shops) if (x.number('latitude') != 0 || x.number('longitude') != 0) DropdownMenuItem(value: x.id, child: Text(x.text('name'), overflow: TextOverflow.ellipsis)),
-                  ],
-                  onChanged: _setRadiusShop,
-                ),
-              ),
-            ]),
+            ),
             if (values['radiusLat'] != null) Text('Centre: ${values['radiusLat']}, ${values['radiusLng']}', key: const ValueKey('ad-radius-centre'), style: const TextStyle(fontSize: 12)),
           ]),
           _group('3 · How much', 'howmuch', [

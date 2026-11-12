@@ -1,7 +1,7 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-test('AI Agent query: unknown query, module gating, role gating, successful read', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent query: unknown query, module gating, role gating, successful read', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();

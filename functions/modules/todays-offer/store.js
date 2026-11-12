@@ -10,6 +10,7 @@
 // Offers made before (one per vendor, document id = the vendor, an uploaded photo) still show until they end.
 // How offers are shown (circle, boxes, rotation) is not here.
 const {Timestamp} = require('firebase-admin/firestore');
+const {readPostDurationMs, cappedEnd} = require('../../post-duration');
 const {photoPath, validateOffer, offerEnd, boxesOf, boxId} = require('./rules');
 
 const offers = db => db.collection('vendorTodaysOffers');
@@ -50,13 +51,15 @@ async function submitOffer(db, bucket, uid, data, now = Date.now()) {
     for (let i = 1; i <= boxes && slot === null; i++) if (!used.has(i)) slot = i;
     if (slot === null) throw new Error(`All your ${boxes} Today's Offers ${boxes === 1 ? 'box is' : 'boxes are'} in use. Choose a box to replace, or remove an offer first.`);
   }
-  const endsAt = offerEnd(now, safe.days, planEndsAt);
+  // The days chosen and the plan end are the offer's own end; the admin's post duration (post-duration.js) caps it for everyone.
+  const ownEndsAt = offerEnd(now, safe.days, planEndsAt);
+  const endsAt = cappedEnd(now, await readPostDurationMs(db), ownEndsAt);
   const batch = db.batch();
   // One item, one box: moving an item to another box frees its old one.
   if (sameItem && sameItem.data().slot !== slot) batch.delete(sameItem.ref);
   batch.set(offers(db).doc(boxId(uid, slot)), {
     vendorId: uid, shopId: vendor.shopId, slot, productId: safe.productId, name: product.name || '', photoUrl, price: safe.price, days: safe.days,
-    submittedAt: Timestamp.fromMillis(now), endsAt: Timestamp.fromMillis(endsAt),
+    submittedAt: Timestamp.fromMillis(now), endsAt: Timestamp.fromMillis(endsAt), ownEndsAt: Timestamp.fromMillis(ownEndsAt),
   });
   // An offer of the older kind (one per vendor, its own uploaded photo) gives way to the new boxes.
   const legacy = running.find(d => d.id === uid);

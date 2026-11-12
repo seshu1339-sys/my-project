@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_android_home.dart';
+import 'admin_area_names.dart';
 import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
@@ -30,7 +31,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('services', 'Services', Icons.home_repair_service_outlined, 'Service listings and the service types (their own collection)'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('cityCodes', 'City codes', Icons.pin_outlined, 'Four-letter town codes in vendor IDs (VEN-NRPM-116-325)'),
-  _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
+  _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Customers see shops and offers within (km); name, address, phone, limits, payments'),
   _SettingsSection('theme', 'Theme', Icons.palette_outlined, 'Colors and fonts of the whole site'),
   _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
   _SettingsSection('scrollingText', 'Scrolling Text', Icons.text_rotation_none, 'The moving red line at the top of the home page'),
@@ -45,6 +46,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('androidHome', 'Android App', Icons.phone_android_outlined, 'Android app only: how many ad boxes show at the top, and whether they show'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
   _SettingsSection('samples', 'Sample data', Icons.science_outlined, 'Records labelled SAMPLE, and the button that deletes them all'),
+  _SettingsSection('areaNames', 'Area names', Icons.place_outlined, 'Fix or stop the area names customers see (Kancharapalem S.O → Kancharapalem)'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
 ];
@@ -84,6 +86,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         return AdminAndroidHomePage(store: widget.store);
       case 'cityCodes':
         return AdminCityCodesPage(store: widget.store);
+      case 'areaNames':
+        return AdminAreaNamesPage(store: widget.store);
       case 'samples':
         return ScreenView('admin_samples', child: AdminNeedsFirebase(store: widget.store, child: AdminSamplesPage(store: widget.store)));
       case 'rightBoxes':
