@@ -96,3 +96,6 @@ locamarket-characters.zip
 locamarket-characters/
 locamarket-locations.zip
 locamarket-locations/
+
+# One-time hexagon script (tools/hex): its own packages; the WorldPop file is kept outside the repo.
+tools/hex/node_modules/
