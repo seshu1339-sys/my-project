@@ -290,7 +290,8 @@ exports.reviewComplaint = onCall(options, async request => {
   await db.collection('complaints').doc(complaintId).collection('messages').add({authorId: request.auth.uid, authorRole: 'admin', body: resolution.trim() || `Status changed to ${status}.`, createdAt: FieldValue.serverTimestamp()});
   return {status};
 });
-exports.registerVendor = onCall(options, async request => {
+// 512 MiB: checking the application photos needs more than 256 MiB (it ran out on 13 Nov 2026); still inside the free tier.
+exports.registerVendor = onCall({...options, memory: '512MiB'}, async request => {
   // Only the email's vendor login registers a shop (its customer, provider or staff login has its own ID and records).
   const uid = requireRole(request, ['vendor']);
   let details;
