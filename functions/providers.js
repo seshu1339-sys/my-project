@@ -1,4 +1,5 @@
 'use strict';
+const {assertNotBlocked} = require('./block-list');
 const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Service providers: a separate kind of account from vendors (one login is never both; a person who wants both registers twice, with
 // two email addresses). A provider registers like a vendor (verified email, location on, admin approval) with a name, mobile number,
@@ -68,6 +69,8 @@ exports.registerProvider = onCall(options, async request => {
   const uid = requireRole(request, ['provider']);
   let details;
   try { details = providerApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone]});
   const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
   if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose a service from the list.');
   const ref = db.collection('providerApplications').doc(uid);

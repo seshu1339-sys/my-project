@@ -14,6 +14,7 @@ import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_map.dart';
 import 'screen_view.dart';
+import 'report_abuse.dart';
 
 class ShopPage extends StatelessWidget {
   const ShopPage({super.key, required this.store, required this.shop});
@@ -45,6 +46,8 @@ class ShopPage extends StatelessWidget {
               whatsapp: shop.text('whatsapp'),
               onUsed: (way) => trackShopContact(way, shop),
             ),
+            // A customer who ordered from this shop may report it (functions/modules/abuse-reports checks the order).
+            if (store.user != null) Align(alignment: Alignment.centerLeft, child: ReportButton(store: store, target: {'kind': 'shop', 'shopId': shop.id}, label: shop.text('name'))),
             const SizedBox(height: 20),
             ShopMap(
               shops: [shop],

@@ -151,3 +151,5 @@ async function sweep(now = Date.now()) {
 exports.sweepInactiveAccounts = task(() => sweep());
 
 exports._inactive = {findInactive, sweep, deleteCustomer, setDisabled};
+// The account switch, shared with the automatic suspension after reports (functions/modules/abuse-reports).
+exports._accountSwitch = {setDisabled};

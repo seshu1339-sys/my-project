@@ -110,6 +110,9 @@ Object.assign(exports, require('./modules/payments'));
 Object.assign(exports, require('./modules/flash'));
 // Admin AI assistant: the admin's questions answered by Claude Sonnet 5.5 from today's counts (functions/modules/admin-assistant).
 Object.assign(exports, require('./modules/admin-assistant'));
+// Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
+const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
+Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
@@ -286,6 +289,8 @@ exports.registerVendor = onCall(options, async request => {
   const uid = requireRole(request, ['vendor']);
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone, details.whatsapp]});
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
@@ -339,24 +344,11 @@ exports.approveVendor = onCall(options, async request => {
 // Hides (or restores) everything a vendor sells: the products it created, the products of its
 // shop, and its shop. Only items this function hid are restored, so an admin's own choice to
 // hide something is never overridden.
+// The shop, products and services of a suspended vendor are hidden; the helper is shared with the automatic suspension after reports.
+const {setCatalogVisibility} = require('./catalog-visibility');
+const {assertNotBlocked} = require('./block-list');
 async function setVendorCatalogVisibility(vendorId, shopId, hide) {
-  const found = new Map();
-  const add = snapshot => snapshot.docs.forEach(doc => found.set(doc.ref.path, doc));
-  for (const name of ['products', 'services']) {
-    add(await db.collection(name).where('ownerId', '==', vendorId).get());
-    if (typeof shopId === 'string' && shopId) add(await db.collection(name).where('shopId', '==', shopId).get());
-  }
-  add(await db.collection('shops').where('ownerId', '==', vendorId).get());
-  let batch = db.batch(), pending = 0, changed = 0;
-  for (const doc of found.values()) {
-    const item = doc.data();
-    if (hide) { if (item.active === false) continue; batch.update(doc.ref, {active: false, hiddenBySuspension: vendorId}); }
-    else { if (item.hiddenBySuspension !== vendorId) continue; batch.update(doc.ref, {active: true, hiddenBySuspension: FieldValue.delete()}); }
-    changed++;
-    if (++pending === 400) { await batch.commit(); batch = db.batch(); pending = 0; }
-  }
-  if (pending) await batch.commit();
-  return changed;
+  return setCatalogVisibility(db, vendorId, shopId, hide);
 }
 exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async request => {
   await requireAdmin(request);

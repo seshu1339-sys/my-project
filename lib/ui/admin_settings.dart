@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/module_admin.dart';
+import 'admin_abuse_reports.dart';
 import 'admin_ai_assistant.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
@@ -53,6 +54,9 @@ final _sections = <_SettingsSection>[
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
   // The admin's AI assistant (Claude Sonnet 5.5, functions/modules/admin-assistant): last, so the numbers of the others stay the same.
   _SettingsSection('aiAssistant', 'AI assistant', Icons.smart_toy_outlined, 'Ask about your numbers in plain words: vendors, offers, payments, tickets'),
+  // Abuse reports, the automatic temporary suspension and the permanent block list (functions/modules/abuse-reports).
+  _SettingsSection('reports', 'Reports', Icons.flag_outlined, 'Reported shops, providers and customers; restore or block for good'),
+  _SettingsSection('blockList', 'Block list', Icons.block, 'Emails and phones that cannot register or sign in again'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -102,6 +106,10 @@ Widget adminSettingsContent(Store store, String key) {
   switch (key) {
       case 'aiAssistant':
         return AdminAiAssistantPage(store: store);
+      case 'reports':
+        return AdminReportsPage(store: store);
+      case 'blockList':
+        return AdminBlockListPage(store: store);
       case 'fieldAssistants':
         return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: FieldModerationPage(store: store)));
       case 'layout':

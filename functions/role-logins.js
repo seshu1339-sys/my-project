@@ -11,6 +11,7 @@
 //
 // Every role login has its own ID, its own records and its own block / delete: blocking one never touches the email's other roles.
 // roleLogins/<role>_<sha256(email)> = {role, email, uid, createdAt} remembers which login is which; it is server-only (no client rule).
+const {assertNotBlocked} = require('./block-list');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getAuth} = require('firebase-admin/auth');
@@ -85,6 +86,8 @@ exports.enterRole = onCall(options, async request => {
   if (token.email_verified !== true || !token.email) throw new HttpsError('permission-denied', 'Verify your email first.');
   const role = request.data?.role;
   if (!ROLES.includes(role)) throw new HttpsError('invalid-argument', 'Unknown app.');
+  // A permanently blocked email signs in to no app (functions/block-list.js).
+  await assertNotBlocked(getFirestore(), {emails: [token.email]});
   return tokenFor(role, token.email);
 });
 

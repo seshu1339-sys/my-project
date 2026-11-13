@@ -15,6 +15,7 @@ import 'shared.dart';
 import 'item_shops_page.dart';
 import 'item_shop_list.dart';
 import 'shop_page.dart';
+import 'report_abuse.dart';
 
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key, required this.store, required this.entry});
@@ -383,6 +384,8 @@ class _ProductPageState extends State<ProductPage> {
                     whatsapp: p.text('whatsapp'),
                     onUsed: (way) => Usage.track(way == 'call' ? 'worker_call' : 'worker_whatsapp', key: p.id, label: p.text('name'), town: p.text('town')),
                   ),
+                  // A customer who called or messaged this provider from the app may report them (the server checks).
+                  if (store.user != null) Align(alignment: Alignment.centerLeft, child: ReportButton(store: store, target: {'kind': 'provider', 'listingId': p.id}, label: p.text('name'))),
                 ],
                 const Divider(height: 40),
                 if (related.isNotEmpty) ...[

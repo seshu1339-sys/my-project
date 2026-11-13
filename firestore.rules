@@ -404,6 +404,16 @@ service cloud.firestore {
       allow write: if false;
     }
     match /aiDailyUse/{id} { allow read, write: if false; }
+    // Abuse reports (functions/modules/abuse-reports) and the permanent block list (functions/block-list.js): the admin reads them,
+    // functions write them. Who reported whom is never readable by the person reported. The admin only marks an alert as read.
+    match /abuseReports/{id} { allow read: if admin(); allow write: if false; }
+    match /abuseTargets/{id} { allow read: if admin(); allow write: if false; }
+    match /blockedContacts/{id} { allow read: if admin(); allow write: if false; }
+    match /adminAlerts/{id} {
+      allow read: if admin();
+      allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']) && request.resource.data.read is bool;
+      allow create, delete: if false;
+    }
     // Flash module (functions/modules/flash): a person reads their own chats in each of the three separate collections, the admin reads all.
     // Tickets, their AI suggestions, the counts and the settings are for the admin only. Functions write everything.
     match /flashUserChats/{id} {

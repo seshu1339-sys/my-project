@@ -1,4 +1,5 @@
 'use strict';
+const {assertNotBlocked} = require('./block-list');
 const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Field Assistant: staff visit vendor shops in person and submit a photo + item
 // name/price/stock + the shop's GPS (an existing shop by id, or a brand-new one).
@@ -50,6 +51,8 @@ exports.requestFieldStaffAccess = onCall(options, async request => {
   if (existing.exists) return {status: existing.data().status, staffCode: existing.data().staffCode || null};
   let details;
   try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone]});
   await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
   const staffCode = await accountCodeFor(db, 'STF', {pincode: details.pincode, existing: '', owner: uid});
   await ref.set({

@@ -14,7 +14,7 @@ const _numbers = {
   'vendorPhotoLimit': '3', 'fieldPhotoLimit': '2', 'quickItemsPerDayStaff': '5', 'quickItemsPerDayVendor': '4', 'freeDeliveryAbove': '300',
   'width': '320', 'height': '300', 'fontSize': '14', 'speed': '80', 'padding': '6', 'radius': '12', 'shadow': '0.5', 'brightness': '1.1',
   'opacity': '0.9', 'spacing': '8', 'animationMs': '500', 'stopAfter': '10', 'countdownSeconds': '60', 'borderWidth': '2',
-  'exclusiveExpiryNoticeDays': '3', 'storageWarningGb': '4', 'photoSearchesPerDay': '10', 'adminAiPerDay': '5',
+  'exclusiveExpiryNoticeDays': '3', 'storageWarningGb': '4', 'photoSearchesPerDay': '10', 'adminAiPerDay': '5', 'abuseReportsToSuspend': '12',
 };
 const _texts = {
   'supportEmail': 'help@example.com', 'websiteUrl': 'https://example.com', 'vendorSignupUrl': 'https://example.com/sell',

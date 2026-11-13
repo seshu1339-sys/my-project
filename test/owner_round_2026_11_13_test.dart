@@ -64,7 +64,7 @@ void main() {
     expect(searchAdminSettings('SCROLLING', index: index).first.title, 'Scrolling Text');
     expect(searchAdminSettings('area names', index: index).first.sectionKey, 'areaNames');
     expect(searchAdminSettings('nothing like this', index: index), isEmpty);
-    expect(index.where((h) => !h.isField).last.sectionKey, 'aiAssistant', reason: 'the new section comes last, so the old numbers stay');
+    expect(index.firstWhere((h) => h.sectionKey == 'areaNames').serial, '20', reason: 'new sections come after the old ones, so the old numbers stay');
   });
 
   testWidgets('the admin types or says a setting and a tap opens it', (tester) async {
