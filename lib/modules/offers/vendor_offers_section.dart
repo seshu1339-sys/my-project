@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../domain/post_duration.dart' show showPostDayChoices, postDurationNotice;
 import '../../data/store.dart';
 import 'offer_model.dart';
 import 'offers_page.dart' show offerPhoto;
@@ -60,6 +61,7 @@ class _VendorOffersSectionState extends State<VendorOffersSection> {
         onDelete: (id) => store.call('deleteVendorOffer', {'offerId': id}),
         canAlert: premium.data?.data()?['active'] == true,
         planKm: (premium.data?.data()?['radiusKm'] as num?)?.toDouble(),
+        durationNote: postDurationNotice(store.business),
       ),
     ),
   );
@@ -67,7 +69,9 @@ class _VendorOffersSectionState extends State<VendorOffersSection> {
 
 /// The card itself: the Add button and the vendor's own offers.
 class VendorOffersView extends StatefulWidget {
-  const VendorOffersView({super.key, required this.offers, required this.onSave, required this.onDelete, this.now, this.canAlert = false, this.planKm});
+  const VendorOffersView({super.key, required this.offers, required this.onSave, required this.onDelete, this.now, this.canAlert = false, this.planKm, this.durationNote});
+  // The admin's post duration, said before posting (lib/domain/post_duration.dart).
+  final String? durationNote;
   // Paid vendors only: the nearby alert choice in the editor. It reaches the plan's km.
   final bool canAlert;
   final double? planKm;
@@ -97,7 +101,7 @@ class _VendorOffersViewState extends State<VendorOffersView> {
   }
 
   Future<void> _edit([VendorOffer? offer]) async {
-    final draft = await showDialog<OfferDraft>(context: context, builder: (_) => OfferEditorDialog(offer: offer, now: now, canAlert: widget.canAlert, planKm: widget.planKm));
+    final draft = await showDialog<OfferDraft>(context: context, builder: (_) => OfferEditorDialog(offer: offer, now: now, canAlert: widget.canAlert, planKm: widget.planKm, durationNote: widget.durationNote));
     if (draft != null && mounted) await _run(() => widget.onSave(draft), 'Offer saved');
   }
 
@@ -124,7 +128,7 @@ class _VendorOffersViewState extends State<VendorOffersView> {
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('My Offers', style: TextStyle(fontWeight: FontWeight.bold)),
-          const Text('Show customers an offer with your own photos and prices, for up to 30 days. Offers are free and separate from plans.'),
+          Text(widget.durationNote ?? 'Show customers an offer with your own photos and prices. Offers are free and separate from plans.'),
           const SizedBox(height: 8),
           FilledButton.icon(key: const ValueKey('offer-add'), onPressed: busy ? null : _edit, icon: const Icon(Icons.add), label: const Text('Add offer')),
           for (final offer in offers)
@@ -150,7 +154,9 @@ class _VendorOffersViewState extends State<VendorOffersView> {
 
 /// Name, prices, days and photos of an offer. Pops an [OfferDraft], or null when cancelled.
 class OfferEditorDialog extends StatefulWidget {
-  const OfferEditorDialog({super.key, this.offer, required this.now, this.pickPhoto, this.canAlert = true, this.planKm});
+  const OfferEditorDialog({super.key, this.offer, required this.now, this.pickPhoto, this.canAlert = true, this.planKm, this.durationNote});
+  // The admin's post duration, said before posting (lib/domain/post_duration.dart).
+  final String? durationNote;
   // Paid vendors (a running plan) may alert customers nearby; free vendors see no alert choice. The alert reaches the plan's km.
   final bool canAlert;
   final double? planKm;
@@ -174,7 +180,8 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
   late final regularPrice = TextEditingController(text: widget.offer?.regularPrice == null ? '' : '${widget.offer!.regularPrice}');
   late final running = widget.offer != null && !widget.offer!.endedAt(widget.now);
   // null keeps the end date of an offer that is still running.
-  late int? days = running ? null : 7;
+  // With the day choices hidden the longest choice is sent (null keeps a running offer's end): the admin's post duration ends it first.
+  late int? days = running ? null : (showPostDayChoices ? 7 : offerDays.last);
   // The nearby alert (on or off; it reaches the plan km): chosen for a new offer or one that runs again; a running offer's edit keeps
   // its own.
   bool alertOn = false;
@@ -278,7 +285,8 @@ class _OfferEditorDialogState extends State<OfferEditorDialog> {
               },
             ),
             const SizedBox(height: 8),
-            DropdownButton<int?>(
+            if (widget.durationNote != null) Text(widget.durationNote!, key: const ValueKey('offer-duration-note')),
+            if (showPostDayChoices) DropdownButton<int?>(
               key: const ValueKey('offer-days'),
               isExpanded: true,
               value: days,

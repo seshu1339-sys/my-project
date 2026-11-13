@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../domain/post_duration.dart' show showPostDayChoices;
 
 /// One of the vendor's items the form offers to choose from: its photo is what the box shows.
 class OfferItemChoice {
@@ -20,8 +21,10 @@ class OfferFormResult {
 /// A vendor puts one of their items in Today's Offers: which item (its photo shows), the offer price and how long (1 week to 3 months).
 /// Pops an [OfferFormResult], or null when cancelled.
 class OfferFormDialog extends StatefulWidget {
-  const OfferFormDialog({super.key, required this.items, required this.dayOptions, this.slot, this.initial});
+  const OfferFormDialog({super.key, required this.items, required this.dayOptions, this.slot, this.initial, this.durationNote});
   final List<OfferItemChoice> items;
+  // The admin's post duration, said to the vendor before posting (lib/domain/post_duration.dart).
+  final String? durationNote;
   final Map<int, String> dayOptions;
   final int? slot;
   final OfferFormResult? initial;
@@ -34,7 +37,8 @@ class _OfferFormDialogState extends State<OfferFormDialog> {
   final formKey = GlobalKey<FormState>();
   late final price = TextEditingController(text: widget.initial == null ? '' : _plain(widget.initial!.price));
   late String? productId = widget.initial?.productId;
-  late int? days = widget.initial?.days;
+  // With the day choices hidden the longest choice is sent: the admin's post duration (server) ends the offer first.
+  late int? days = showPostDayChoices ? widget.initial?.days : (widget.dayOptions.keys.isEmpty ? 7 : widget.dayOptions.keys.reduce((a, b) => a > b ? a : b));
   String? error;
 
   static String _plain(num p) => p == p.roundToDouble() ? '${p.toInt()}' : '$p';
@@ -101,8 +105,9 @@ class _OfferFormDialogState extends State<OfferFormDialog> {
                 validator: (v) => (num.tryParse((v ?? '').trim()) ?? 0) <= 0 ? 'Enter a price above 0' : null,
               ),
               const SizedBox(height: 12),
-              const Text("How long should it show in Today's Offers?"),
-              Wrap(spacing: 8, children: [
+              if (widget.durationNote != null) Text(widget.durationNote!, key: const ValueKey('todays-offer-duration-note')),
+              if (showPostDayChoices) const Text("How long should it show in Today's Offers?"),
+              if (showPostDayChoices) Wrap(spacing: 8, children: [
                 for (final option in widget.dayOptions.entries)
                   ChoiceChip(
                     key: ValueKey('todays-offer-days-${option.key}'),

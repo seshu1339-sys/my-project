@@ -192,6 +192,7 @@ class _AccountPageState extends State<AccountPage> {
                               pincode: widget.store.pincode,
                               latitude: widget.store.latitude,
                               longitude: widget.store.longitude,
+                              area: widget.store.placeName,
                             );
                             if (context.mounted) {
                               message(context, 'Price-drop and offer alerts enabled'.tr(context));

@@ -149,6 +149,8 @@ const fields = <String, Map<String, String>>{
         'Auto-publish approved vendor changes (true / false)',
     'priceDropAutoEnabled':
         'Automatic price-drop alerts (true / false; blank = on)',
+    'photoSearchesPerDay': 'Photo searches per person per day (AI; 10 when blank)',
+    'adminAiPerDay': 'Admin AI assistant questions per admin per day (50 when blank)',
     'postDuration': 'Post duration: every post (vendor rates, offers, ads) hides after this time, for everyone',
     'defaultPaymentMethod': 'Default payment (direct_vendor / cash_on_delivery / platform_collected)',
     'directVendorPaymentEnabled': 'Allow direct vendor payment (true / false)',

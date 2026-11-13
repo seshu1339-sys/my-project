@@ -72,7 +72,7 @@ class SubscriptionPlan {
 
 /// The vendor's latest plan (their `vendorPlanStatus` document); null when they never had one.
 class VendorPlanStatus {
-  const VendorPlanStatus({required this.planName, required this.endsAt, this.itemLimit = defaultPlanItemLimit, this.uid = '', this.vendorName = '', this.vendorCode = '', this.byAdmin = false});
+  const VendorPlanStatus({required this.planName, required this.endsAt, this.itemLimit = defaultPlanItemLimit, this.uid = '', this.vendorName = '', this.vendorCode = '', this.byAdmin = false, this.renewedAt, this.byPayment = false});
 
   factory VendorPlanStatus.fromData(String uid, Map<String, dynamic> data) {
     final endsAt = data['endsAt'];
@@ -84,6 +84,8 @@ class VendorPlanStatus {
       vendorName: data['vendorName']?.toString() ?? '',
       vendorCode: data['vendorCode']?.toString() ?? '',
       byAdmin: data['source'] == 'admin',
+      byPayment: data['source'] == 'payment',
+      renewedAt: switch (data['updatedAt']) { final Timestamp t => t.toDate(), _ => null },
     );
   }
 
@@ -93,6 +95,17 @@ class VendorPlanStatus {
   // For the admin's list: whose plan it is, and whether the admin started or stopped it by hand.
   final String uid, vendorName, vendorCode;
   final bool byAdmin;
+  // The last start or renewal: a verified payment renews by itself (functions/modules/plans activatePlan), or the admin by hand.
+  final bool byPayment;
+  final DateTime? renewedAt;
+
+  /// "Renewed by payment on 13/11/2026", "Started by admin on ...", or '' when unknown.
+  String get renewalText {
+    final when = renewedAt;
+    if (when == null) return '';
+    final date = '${when.day}/${when.month}/${when.year}';
+    return byPayment ? 'Renewed by payment on $date' : byAdmin ? 'Changed by admin on $date' : 'Updated on $date';
+  }
 
   bool activeAt(DateTime now) => endsAt.isAfter(now);
 }

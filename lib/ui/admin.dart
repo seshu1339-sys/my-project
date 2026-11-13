@@ -7,7 +7,9 @@ import 'admin_entry_list.dart';
 import 'sample_tag.dart';
 import 'admin_frame.dart';
 import 'admin_insights.dart';
+import 'admin_ai_assistant.dart';
 import 'admin_settings.dart';
+import 'admin_settings_search.dart';
 
 // admin.dart is the admin shell: the tabs (Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, Settings)
 // and the three top-bar buttons (Search, AI Agent, Sign out). Each moderation/editing concern lives in its own file with no
@@ -84,7 +86,20 @@ class _AdminPageState extends State<AdminPage> {
       final store = widget.store;
       // The three top-bar buttons always carry a text label. On a phone they sit in a row under the title instead of beside it.
       final narrow = MediaQuery.sizeOf(context).width < 760;
+      // The settings search sits at the top of the panel; on a short window (under 700 px high) it opens from a top-bar button instead,
+      // so the pages keep their room.
+      final tall = MediaQuery.sizeOf(context).height >= 700;
       final buttons = <Widget>[
+        if (!tall)
+          TextButton.icon(
+            key: const ValueKey('top-find-setting'),
+            onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Find a setting')),
+              body: Column(children: [AdminSettingsSearchBar(store: store)]),
+            ))),
+            icon: const Icon(Icons.manage_search),
+            label: const Text('Find setting'),
+          ),
         TextButton.icon(
           key: const ValueKey('top-search'),
           onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminSearchPage(store: store))),
@@ -93,7 +108,17 @@ class _AdminPageState extends State<AdminPage> {
         ),
         TextButton.icon(
           key: const ValueKey('top-ai-agent'),
-          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: store))),
+          // The AI assistant (Claude Sonnet 5.5, read-only counts). The older AI Agent page stays one tap away in its top bar.
+          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (context) => Scaffold(
+            appBar: AppBar(title: const Text('AI assistant'), actions: [
+              TextButton(
+                key: const ValueKey('open-old-ai-agent'),
+                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: store))),
+                child: const Text('Older AI Agent'),
+              ),
+            ]),
+            body: AdminAiAssistantPage(store: store),
+          ))),
           icon: const Icon(Icons.smart_toy_outlined),
           label: const Text('AI Agent'),
         ),
@@ -127,6 +152,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
           body: Column(
             children: [
+              // Find any setting by name or number, typed or spoken (lib/ui/admin_settings_search.dart).
+              if (tall) AdminSettingsSearchBar(store: store),
               if (!store.live)
                 Container(
                   width: double.infinity,

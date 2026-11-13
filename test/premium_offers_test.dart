@@ -1,3 +1,4 @@
+import 'package:ecommerce_app/domain/post_duration.dart' show showPostDayChoices;
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,6 +41,9 @@ void setSize(WidgetTester tester, Size size) {
 }
 
 void main() {
+  // These tests check the vendor's own day choices, which the app hides (lib/domain/post_duration.dart): switched on here.
+  setUp(() => showPostDayChoices = true);
+  tearDown(() => showPostDayChoices = false);
   group('rotation: the order of the boxes', () {
     test('admin offers come first, then vendor offers, and none is left out however many', () {
       final vendors = [for (var i = 0; i < 40; i++) 'v$i'];

@@ -707,7 +707,7 @@ class Store extends ChangeNotifier {
       await prefs.remove('longitude');
     }
     if (live) {
-      unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng));
+      unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng, area: placeName));
     }
     notifyListeners();
   }

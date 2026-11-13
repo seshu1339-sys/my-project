@@ -31,7 +31,9 @@ test('the five chats are separate, with the categories of the promo-video spec',
   assert.deepEqual(staff.categories, ['My area', 'Targets', 'Missed days', 'Adding offers', 'Terms', 'Account', 'App', 'Other']);
   const all = [user, vendor, premium, provider, staff];
   for (const field of ['kind', 'collection', 'rules', 'helpField']) assert.equal(new Set(all.map(c => c[field])).size, 5, field);
-  assert.equal(premium.model, SONNET, 'the advanced chat uses the stronger model');
+  // Owner, 13 Nov 2026: every Flash chat uses Claude Haiku 5.5 (functions/ai-models.js); the Premium chat gets more effort instead.
+  assert.equal(premium.model, HAIKU, 'the advanced chat uses the chat model (Haiku)');
+  assert.equal(premium.effort, 'medium');
   assert.equal(premium.priority, true, 'and comes first in the Support Inbox');
   for (const c of [user, vendor, provider, staff]) assert.equal(c.model, undefined, c.kind);
 });
@@ -457,7 +459,7 @@ test('the Premium chat: only for a running plan, the stronger model, every fact 
   await db.collection('wholesaleOffers').add({name: 'Rice 25 kg bag', price: 1100, minQuantity: 2, wholesaler: 'Sri Traders', phone: '9000000001', validUntil: Timestamp.fromMillis(Date.now() + 24 * HOUR)});
   await send(ai.client, premium, me, {category: 'My stats', text: 'how many calls?', now: NOW});
   const system = ai.calls[0].system;
-  assert.equal(ai.calls[0].model, SONNET);
+  assert.equal(ai.calls[0].model, HAIKU);
   assert.match(system, /"shop_call":7/);
   assert.equal(system.includes('ad_view'), false, 'never a view number');
   assert.match(system, /Rice 25 kg bag/);

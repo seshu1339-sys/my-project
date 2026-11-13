@@ -14,8 +14,10 @@ class RunningOffer {
 /// The vendor's Today's Offers boxes (as many as the plan gives): each running box with its item, price and end, marked LIVE in its own
 /// colour, and a button to fill an empty box or change one.
 class TodaysOfferPanel extends StatefulWidget {
-  const TodaysOfferPanel({super.key, required this.offers, required this.boxes, required this.items, required this.dayOptions, required this.onSubmit, this.onRemove});
+  const TodaysOfferPanel({super.key, required this.offers, required this.boxes, required this.items, required this.dayOptions, required this.onSubmit, this.onRemove, this.durationNote});
   final List<RunningOffer> offers;
+  // The admin's post duration, said before posting (lib/domain/post_duration.dart).
+  final String? durationNote;
   final int boxes;
   final List<OfferItemChoice> items;
   final Map<int, String> dayOptions;
@@ -50,6 +52,7 @@ class _TodaysOfferPanelState extends State<TodaysOfferPanel> {
       builder: (_) => OfferFormDialog(
         items: widget.items,
         dayOptions: widget.dayOptions,
+        durationNote: widget.durationNote,
         slot: slot,
         initial: running == null ? null : OfferFormResult(productId: running.productId, price: running.price, days: running.days, slot: slot),
       ),

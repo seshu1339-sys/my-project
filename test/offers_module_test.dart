@@ -1,3 +1,4 @@
+import 'package:ecommerce_app/domain/post_duration.dart' show showPostDayChoices;
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -68,6 +69,9 @@ Future<void> _save(WidgetTester tester) async {
 }
 
 void main() {
+  // These tests check the vendor's own day choices, which the app hides (lib/domain/post_duration.dart): switched on here.
+  setUp(() => showPostDayChoices = true);
+  tearDown(() => showPostDayChoices = false);
   test('the module has its own route and collection, and a home box', () {
     expect(offersRoute, '/vendor-offers');
     expect(offersCollection, 'vendorOffers');

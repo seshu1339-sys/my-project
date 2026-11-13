@@ -1,7 +1,7 @@
 'use strict';
 // Claude Sonnet 5.5 reads one new ticket for the admin: its type, how urgent it is, and a suggested way to resolve it. It reads that ticket
 // only, never an older one, and what it writes is a suggestion the admin sees. Nothing here changes a payment, a plan or an account.
-const {SONNET} = require('../ai-core');
+const {AI_MODELS} = require('../ai-core');
 
 const TYPES = ['payment', 'order', 'offer', 'account', 'app', 'shop', 'staff_work', 'other'];
 const URGENCIES = ['low', 'medium', 'high'];
@@ -42,7 +42,7 @@ function readTriage(response) {
 /// Reads one ticket. Returns {triage, response}; triage is null when it could not be read. Throws only for a failed API call.
 async function readTicket(client, ticket) {
   const response = await client.messages.create({
-    model: SONNET,
+    model: AI_MODELS.admin,
     max_tokens: 1500,
     system: SYSTEM,
     output_config: {effort: 'low', format: FORMAT},

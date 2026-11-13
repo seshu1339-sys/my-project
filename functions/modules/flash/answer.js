@@ -1,7 +1,7 @@
 'use strict';
 // Asks Claude Haiku 5.5 for Flash's reply. It has no tools and no way to read the database: it sees this chat, the facts the chat file
 // gathered for this one person, and nothing else. Anything but a clean answer means "could not answer", and the chat becomes a ticket.
-const {HAIKU} = require('../ai-core');
+const {AI_MODELS} = require('../ai-core');
 
 const COMMON = `You are Flash, the help assistant of LOCAMARKET, an app that connects local shops, their customers and field staff in India.
 
@@ -50,7 +50,7 @@ function readAnswer(response) {
 }
 
 /// Asks about one chat. Returns {answer, response}; answer is null when there is no usable reply. Throws only for a failed API call.
-async function askFlash(client, {rules, help, facts, history, model = HAIKU, effort = 'low'}) {
+async function askFlash(client, {rules, help, facts, history, model = AI_MODELS.chat, effort = 'low'}) {
   const response = await client.messages.create({
     model,
     max_tokens: 1500,

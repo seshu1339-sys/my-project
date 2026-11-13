@@ -9,7 +9,8 @@ const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
 const {getAuth} = require('firebase-admin/auth');
 const {createHash} = require('node:crypto');
-const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, locationOffers, locationNoticeKey, locationNoticeCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
+const {active, priceDrop, price, priceAlertKey, offerNotifiable, offerKey, offerCopy, locationOffers, locationNoticeKey, locationNoticeCopy, nearbyOffers, nearbyNoticeKey, nearbyNoticeCopy, reachKmOf, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS} = require('./notifications-domain');
+const {distanceKm} = require('./radius');
 const {flagOff, promotionMatchesLocation, promotionMatchesPlace} = require('./domain');
 const {placeForPincode} = require('./places');
 const {requireAdminSession} = require('./admin-session');
@@ -184,7 +185,8 @@ exports.notifyOfferPublished = onDocumentWritten({document: 'promotions/{promoti
 /// The same place with the same offers is not announced again for 24 hours, so going back and
 /// forth between two towns, or saving the same location twice, cannot repeat the notification.
 const LOCATION_NOTICE_WINDOW_MS = 24 * 60 * 60 * 1000;
-async function announceLocationOffers(uid, subscriber, now = Date.now()) {
+// The older town rule, kept for reference; the trigger below uses announceNearbyOffers (distance).
+async function announceLocationOffersByTown(uid, subscriber, now = Date.now()) {
   if (!subscriber?.enabled) return 'not-subscribed';
   const place = placeForPincode(subscriber.pincode);
   if (!place) return 'no-place';
@@ -197,13 +199,43 @@ async function announceLocationOffers(uid, subscriber, now = Date.now()) {
   if (!offers.length) return 'no-offers';
   return send(uid, locationNoticeKey(place, offers), locationNoticeCopy(place, offers), {type: 'locationOffers', town: place.town}, {reclaimAfterMs: LOCATION_NOTICE_WINDOW_MS});
 }
+/// A customer who moved (GPS, the location pill, a new pincode) hears once about the live offers of the shops within the admin's km of
+/// the new point: the same distance rule as the website and the apps (owner, 11 Nov 2026). Admin promotions and vendors' live offers.
+/// The same area with the same offers is not announced again for 24 hours.
+const MOVED_KM = 1;
+async function announceNearbyOffers(uid, subscriber, now = Date.now()) {
+  if (!subscriber?.enabled) return 'not-subscribed';
+  const latitude = Number(subscriber.latitude), longitude = Number(subscriber.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) return 'no-place';
+  const business = (await db.collection('settings').doc('business').get()).data() || {};
+  if (flagOff(business.offerNotificationsEnabled)) return 'disabled';
+  // "Offers in your town" when a customer's place changes has its own switch in the push centre.
+  if (flagOff(business.locationOfferNotificationsEnabled)) return 'disabled';
+  const promotions = [];
+  for await (const doc of pages(db.collection('promotions').orderBy('__name__'))) promotions.push({id: doc.id, data: doc.data()});
+  const vendorOffers = (await db.collection('vendorOffers').where('status', '==', 'live').get()).docs.map(doc => ({id: doc.id, data: doc.data()}));
+  const shops = new Map((await db.collection('shops').get()).docs.map(doc => [doc.id, doc.data()]));
+  const offers = nearbyOffers({promotions, vendorOffers, shops, latitude, longitude, km: reachKmOf(business), now});
+  if (!offers.length) return 'no-offers';
+  const area = String(subscriber.area || '').trim();
+  return send(uid, nearbyNoticeKey(latitude, longitude, offers), nearbyNoticeCopy(offers, area), {type: 'locationOffers', area}, {reclaimAfterMs: LOCATION_NOTICE_WINDOW_MS});
+}
+/// Whether the subscriber's place really changed: a new pincode, or a point more than [MOVED_KM] away (or a first point).
+function placeChanged(before, after) {
+  if (!before?.enabled) return true;
+  if ((before.pincode || '') !== (after.pincode || '')) return true;
+  const [a, b] = [before, after].map(p => [Number(p?.latitude), Number(p?.longitude)]);
+  if (!b.every(Number.isFinite)) return false;
+  if (!a.every(Number.isFinite)) return true;
+  return distanceKm(a[0], a[1], b[0], b[1]) > MOVED_KM;
+}
 exports.notifyLocationOffers = onDocumentWritten({document: 'notificationSubscribers/{uid}', region: 'asia-south1', maxInstances: 3}, async event => {
   const after = event.data?.after?.data();
   if (!after?.enabled) return;
   const before = event.data.before?.data();
   // Only a changed place counts: refreshing the same pincode or coordinates sends nothing.
-  if (before?.enabled && before.pincode === after.pincode) return;
-  await announceLocationOffers(event.params.uid, after);
+  if (!placeChanged(before, after)) return;
+  await announceNearbyOffers(event.params.uid, after);
 });
 // ...and this check catches offers whose scheduled start arrives without any edit.
 exports.notifyNewOffers = task(async () => {
@@ -293,4 +325,4 @@ exports.offerAudienceSize = onCall(adminOptions, async request => {
 });
 // Exposed for reuse by other function modules (e.g. functions/storage-maintenance.js), which
 // otherwise only see the onCall/onSchedule handlers above via index.js's Object.assign(exports, ...).
-exports._internal = {send, pages, hash, announceLocationOffers};
+exports._internal = {send, pages, hash, announceLocationOffers: announceNearbyOffers, announceNearbyOffers, announceLocationOffersByTown, placeChanged};

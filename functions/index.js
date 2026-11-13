@@ -108,6 +108,8 @@ Object.assign(exports, require('./modules/todays-offer'));
 Object.assign(exports, require('./modules/wholesale'));
 Object.assign(exports, require('./modules/payments'));
 Object.assign(exports, require('./modules/flash'));
+// Admin AI assistant: the admin's questions answered by Claude Sonnet 5.5 from today's counts (functions/modules/admin-assistant).
+Object.assign(exports, require('./modules/admin-assistant'));
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

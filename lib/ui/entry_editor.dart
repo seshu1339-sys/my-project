@@ -95,6 +95,8 @@ class _EntryEditorState extends State<EntryEditor> {
     'searchRadiusDefaultKm',
     'searchRadiusMaxKm',
     'vendorPhotoLimit',
+    'photoSearchesPerDay',
+    'adminAiPerDay',
     'fieldPhotoLimit',
     'quickItemsPerDayStaff',
     'quickItemsPerDayVendor',

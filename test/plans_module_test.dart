@@ -211,8 +211,9 @@ void main() {
       ),
     ));
     expect(find.text('Ramu Kirana • VEN-NRPM-116-325'), findsOneWidget);
-    expect(find.text('Premium • until 06/11/2029 • 10 items • by admin'), findsOneWidget);
-    expect(find.text('Premium • ended 01/01/2026 • 10 items'), findsOneWidget);
+    // The row also says it runs and, below, when and how it was last started or renewed.
+    expect(find.textContaining('Running • Premium • until 06/11/2029 • 10 items • by admin'), findsOneWidget);
+    expect(find.textContaining('Ended • Premium • ended 01/01/2026 • 10 items'), findsOneWidget);
     expect(find.byKey(const ValueKey('plan-stop-v2')), findsNothing, reason: 'an ended plan cannot be stopped');
 
     await tester.tap(find.byKey(const ValueKey('plan-activate')));

@@ -1,6 +1,7 @@
 import 'catalog.dart';
 import 'home_animations.dart';
 import 'ist_time.dart';
+import 'reach.dart';
 
 // ---------------------------------------------------------------------------------------------
 // The unified Ads system. Every ad (added by the admin or approved from a vendor) is one record in the `ads` collection and is
@@ -200,11 +201,16 @@ List<Entry> customerAds(List<Entry> ads) => [for (final a in ads) if (adAudience
 /// The ads for the bottom box of the vendor app ([shopCategory] = the vendor's shop category) or, with [staff], the staff app. Live now;
 /// in the vendor app those aimed at vendors, only with no categories or with the vendor's own (a plastic ad reaches plastic vendors
 /// only); in the staff app every live ad, whatever its audience or category (owner, 6 Nov 2026). Pinned first, then in order.
-List<Entry> appAds(List<Entry> ads, DateTime now, {bool staff = false, String shopCategory = ''}) {
+///
+/// An ad posted for a place (linked to a shop: lib/domain/reach.dart linkedShopId) shows only where [reaches] says the viewer is within
+/// the admin's km of that shop; [reaches] null (no place known) shows none of them. An ad with no place (the admin's ad for every
+/// vendor or staff) shows to all, as before.
+List<Entry> appAds(List<Entry> ads, DateTime now, {bool staff = false, String shopCategory = '', bool Function(Entry ad)? reaches}) {
   final category = shopCategory.trim().toLowerCase();
+  bool placeOk(Entry a) => linkedShopId(a).isEmpty || (reaches?.call(a) ?? false);
   final out = [
     for (final a in ads)
-      if (adLiveNow(a, now) && (staff || (adAudience(a).contains('vendors') && (adCategories(a).isEmpty || adCategories(a).contains(category))))) a,
+      if (adLiveNow(a, now) && placeOk(a) && (staff || (adAudience(a).contains('vendors') && (adCategories(a).isEmpty || adCategories(a).contains(category))))) a,
   ];
   out.sort((a, b) {
     final pin = (b.text('pinned') == 'true' || b.data['pinned'] == true ? 1 : 0) - (a.text('pinned') == 'true' || a.data['pinned'] == true ? 1 : 0);

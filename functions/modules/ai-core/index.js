@@ -10,13 +10,16 @@ const {defineSecret} = require('firebase-functions/params');
 const {Timestamp} = require('firebase-admin/firestore');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
-const SONNET = 'claude-sonnet-5-5';
-const HAIKU = 'claude-haiku-5-5';
+// The model names live in functions/ai-models.js (one place for every AI feature).
+const {AI_MODELS, SONNET, HAIKU, keyIsSet} = require('../../ai-models');
 const IST = 19800000;
 
 let client;
 /// The Anthropic client. Loaded on first use, so starting the other functions stays fast.
+/// Until the owner sets the real key (the secret holds a placeholder), it throws before any call, so nothing reaches Anthropic; every
+/// AI feature then falls back (Flash makes a ticket, the assistant says it is not set up).
 function anthropic() {
+  if (!keyIsSet(process.env.ANTHROPIC_API_KEY)) throw Object.assign(Error('The Anthropic key is not set up yet.'), {name: 'AiKeyMissing'});
   if (!client) {
     const Anthropic = require('@anthropic-ai/sdk').default;
     client = new Anthropic({apiKey: process.env.ANTHROPIC_API_KEY});
@@ -46,4 +49,4 @@ async function takeDailyUse(db, key, limit, now = Date.now()) {
   });
 }
 
-module.exports = {anthropicKey, anthropic, logAiCall, takeDailyUse, SONNET, HAIKU};
+module.exports = {anthropicKey, anthropic, logAiCall, takeDailyUse, SONNET, HAIKU, AI_MODELS, keyIsSet};

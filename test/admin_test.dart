@@ -551,6 +551,10 @@ void main() {
     await tester.pump();
     await tester.enterText(find.widgetWithText(TextFormField, fieldLabel), '3');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.ensureVisible(find.text('Save changes'));
+    // The first save's "Saved" message sits over the bottom of the form for a few seconds: let it go first.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(store.business.number('fieldPhotoLimit'), 3);

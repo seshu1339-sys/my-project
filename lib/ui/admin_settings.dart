@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/module_admin.dart';
+import 'admin_ai_assistant.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
 import 'admin_city_codes.dart';
@@ -9,6 +10,7 @@ import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
 import 'admin_samples.dart';
 import 'admin_entry_list.dart';
+import 'admin_fields.dart';
 import 'admin_fresh_strip.dart';
 import 'admin_shops_location.dart';
 import 'animation_settings_form.dart';
@@ -49,7 +51,97 @@ final _sections = <_SettingsSection>[
   _SettingsSection('areaNames', 'Area names', Icons.place_outlined, 'Fix or stop the area names customers see (Kancharapalem S.O → Kancharapalem)'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
+  // The admin's AI assistant (Claude Sonnet 5.5, functions/modules/admin-assistant): last, so the numbers of the others stay the same.
+  _SettingsSection('aiAssistant', 'AI assistant', Icons.smart_toy_outlined, 'Ask about your numbers in plain words: vendors, offers, payments, tickets'),
 ];
+
+/// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
+/// ("5.12 Business Profile › Post duration"). [serial] is its number in the Settings list.
+class AdminSettingHit {
+  const AdminSettingHit({required this.serial, required this.title, required this.sectionKey, this.section = '', this.hint = ''});
+  final String serial, title, sectionKey, section, hint;
+  bool get isField => section.isNotEmpty;
+  String get label => isField ? '$section › $title' : title;
+}
+
+/// Every Settings section, numbered from 1 in the order of the list, and the fields of the sections that are one form (Business
+/// Profile, Theme, Scrolling Text: lib/ui/admin_fields.dart), numbered 5.1, 5.2 ...
+List<AdminSettingHit> adminSettingsIndex() => [
+  for (final (i, s) in _sections.indexed) ...[
+    AdminSettingHit(serial: '${i + 1}', title: s.label, sectionKey: s.key, hint: s.hint),
+    for (final (j, f) in (fields[s.key]?.entries ?? const Iterable<MapEntry<String, String>>.empty()).indexed)
+      AdminSettingHit(serial: '${i + 1}.${j + 1}', title: f.value, sectionKey: s.key, section: s.label, hint: f.key),
+  ],
+];
+
+/// The settings that match what the admin typed or said: a number finds that serial (and the fields under a section number); words
+/// find every entry whose name, section or hint holds all of them. Sections come before fields.
+List<AdminSettingHit> searchAdminSettings(String query, {List<AdminSettingHit>? index}) {
+  final all = index ?? adminSettingsIndex();
+  final q = query.trim().toLowerCase().replaceAll(RegExp(r'^(no\.?|number|serial|నంబర్)\s*'), '');
+  if (q.isEmpty) return const [];
+  if (RegExp(r'^\d+(\.\d+)?$').hasMatch(q)) {
+    return [for (final h in all) if (h.serial == q || (!q.contains('.') && h.serial.startsWith('$q.'))) h];
+  }
+  final words = q.split(RegExp(r'\s+'));
+  final hits = [for (final h in all) if (words.every('${h.serial} ${h.title} ${h.section} ${h.hint}'.toLowerCase().contains)) h];
+  return [...hits.where((h) => !h.isField), ...hits.where((h) => h.isField)];
+}
+
+/// One Settings section as its own page (the search opens it straight away). [focus] names the field the admin looked for.
+Widget adminSettingsSectionPage(Store store, String key, {String? focus}) {
+  final section = _sections.where((s) => s.key == key).firstOrNull;
+  return Scaffold(
+    appBar: AppBar(title: Text(focus == null ? (section?.label ?? 'Settings') : '${section?.label ?? 'Settings'} › $focus')),
+    body: adminSettingsContent(store, key),
+  );
+}
+
+/// What one Settings section shows.
+Widget adminSettingsContent(Store store, String key) {
+  switch (key) {
+      case 'aiAssistant':
+        return AdminAiAssistantPage(store: store);
+      case 'fieldAssistants':
+        return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: FieldModerationPage(store: store)));
+      case 'layout':
+        return _LayoutMenu(store: store);
+      case 'animations':
+        return AdminAnimationsForm(store: store);
+      case 'scrollingText':
+        return AdminHomeSectionPage(store: store, part: 'scrollingText');
+      case 'homeOffers':
+        return AdminHomeSectionPage(store: store, part: 'notice');
+      case 'homePromo':
+        return AdminHomeSectionPage(store: store, part: 'promo');
+      case 'homeFresh':
+        return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: store));
+      case 'shopsLocation':
+        return ScreenView('admin_shops_location', child: AdminShopsLocationPage(store: store));
+      case 'ads':
+        return AdminHomeSectionPage(store: store, part: 'ads');
+      case 'androidHome':
+        return AdminAndroidHomePage(store: store);
+      case 'cityCodes':
+        return AdminCityCodesPage(store: store);
+      case 'areaNames':
+        return AdminAreaNamesPage(store: store);
+      case 'samples':
+        return ScreenView('admin_samples', child: AdminNeedsFirebase(store: store, child: AdminSamplesPage(store: store)));
+      case 'rightBoxes':
+        return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: store));
+      // One record each: the form opens directly, with no list and no "Add new".
+      case 'settings':
+      case 'theme':
+        return AdminSingleRecord(store: store, section: key);
+      default:
+        if (key.startsWith('module-')) {
+          final section = moduleAdminSections.where((s) => 'module-${s.id}' == key).firstOrNull;
+          if (section != null) return section.build(store);
+        }
+        return AdminEntryList(store: store, section: key);
+    }
+  }
 
 /// The Settings tab: a list of sections on the left (a plain list on a phone) and the chosen section beside it.
 class AdminSettingsPage extends StatefulWidget {
@@ -62,48 +154,7 @@ class AdminSettingsPage extends StatefulWidget {
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
   String selected = _sections.first.key;
 
-  Widget _content(String key) {
-    switch (key) {
-      case 'fieldAssistants':
-        return AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: FieldModerationPage(store: widget.store)));
-      case 'layout':
-        return _LayoutMenu(store: widget.store);
-      case 'animations':
-        return AdminAnimationsForm(store: widget.store);
-      case 'scrollingText':
-        return AdminHomeSectionPage(store: widget.store, part: 'scrollingText');
-      case 'homeOffers':
-        return AdminHomeSectionPage(store: widget.store, part: 'notice');
-      case 'homePromo':
-        return AdminHomeSectionPage(store: widget.store, part: 'promo');
-      case 'homeFresh':
-        return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: widget.store));
-      case 'shopsLocation':
-        return ScreenView('admin_shops_location', child: AdminShopsLocationPage(store: widget.store));
-      case 'ads':
-        return AdminHomeSectionPage(store: widget.store, part: 'ads');
-      case 'androidHome':
-        return AdminAndroidHomePage(store: widget.store);
-      case 'cityCodes':
-        return AdminCityCodesPage(store: widget.store);
-      case 'areaNames':
-        return AdminAreaNamesPage(store: widget.store);
-      case 'samples':
-        return ScreenView('admin_samples', child: AdminNeedsFirebase(store: widget.store, child: AdminSamplesPage(store: widget.store)));
-      case 'rightBoxes':
-        return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: widget.store));
-      // One record each: the form opens directly, with no list and no "Add new".
-      case 'settings':
-      case 'theme':
-        return AdminSingleRecord(store: widget.store, section: key);
-      default:
-        if (key.startsWith('module-')) {
-          final section = moduleAdminSections.where((s) => 'module-${s.id}' == key).firstOrNull;
-          if (section != null) return section.build(widget.store);
-        }
-        return AdminEntryList(store: widget.store, section: key);
-    }
-  }
+  Widget _content(String key) => adminSettingsContent(widget.store, key);
 
   void _open(_SettingsSection s) {
     final wide = MediaQuery.sizeOf(context).width >= 900;

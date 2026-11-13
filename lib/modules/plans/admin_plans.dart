@@ -170,7 +170,7 @@ class AdminPlansView extends StatelessWidget {
             key: ValueKey('plan-status-${status.uid}'),
             title: Text(_who(status)),
             subtitle: Text(
-              '${status.planName} • ${running ? 'until' : 'ended'} ${planDate(status.endsAt)} • ${status.itemLimit} items${status.byAdmin ? ' • by admin' : ''}',
+              '${running ? 'Running' : 'Ended'} • ${status.planName} • ${running ? 'until' : 'ended'} ${planDate(status.endsAt)} • ${status.itemLimit} items${status.byAdmin ? ' • by admin' : ''}${status.renewalText.isEmpty ? '' : '\n${status.renewalText}'}',
               style: TextStyle(color: running ? null : Theme.of(context).colorScheme.error),
             ),
             trailing: Wrap(spacing: 4, children: [

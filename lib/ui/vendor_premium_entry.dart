@@ -1,3 +1,4 @@
+import '../domain/post_duration.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -89,6 +90,7 @@ class _VendorPremiumPageState extends State<VendorPremiumPage> {
                       OfferItemChoice(id: d.id, name: '${d.data()['name'] ?? ''}', photoUrl: '${d.data()['imageUrl']}', price: d.data()['price'] as num?),
                 ],
                 dayOptions: todaysOfferDays,
+                durationNote: postDurationNotice(widget.store.business),
                 onSubmit: (r) => offers.submit(productId: r.productId, price: r.price, days: r.days, slot: r.slot),
                 onRemove: offers.remove,
               ),

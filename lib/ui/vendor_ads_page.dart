@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
+import '../domain/post_duration.dart';
 import '../domain/ad_reports.dart';
 import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
@@ -85,6 +86,7 @@ class _VendorAdsPageState extends State<VendorAdsPage> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
                   const Text('Nothing you send goes live by itself. The administrator checks every new ad and every change before customers see it.'),
+                  Text(postDurationNotice(store.business), key: const ValueKey('my-ads-duration-note')),
                   const SizedBox(height: 8),
                   if (recent.isNotEmpty)
                     Card(
@@ -201,7 +203,8 @@ class _VendorAdEditorState extends State<VendorAdEditor> {
   late final phone = TextEditingController(text: widget.ad?.text('tapAction') == 'call' || widget.ad?.text('tapAction') == 'whatsapp' ? widget.ad!.text('tapValue') : '');
   late String tapAction = widget.ad?.text('tapAction') ?? '';
   String package = 'normal';
-  int days = 30;
+  // With the day choices hidden the longest choice is sent: the admin's post duration (server) ends the ad first.
+  int days = showPostDayChoices ? 30 : vendorAdDurations.keys.last;
   bool busy = false;
   String? error;
 
@@ -316,7 +319,7 @@ class _VendorAdEditorState extends State<VendorAdEditor> {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            if (showPostDayChoices) Expanded(
               child: DropdownButtonFormField<int>(
                 key: const ValueKey('vad-days'),
                 initialValue: days,

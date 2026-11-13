@@ -237,7 +237,9 @@ service cloud.firestore {
       // last-known location already used client-side (never continuous
       // background tracking).
       allow create, update: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'pincode', 'latitude', 'longitude'])
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'pincode', 'latitude', 'longitude', 'area'])
+        // area: the place name the customer sees (Kancharapalem), for the "Offers near ..." notification.
+        && (!('area' in request.resource.data) || (request.resource.data.area is string && request.resource.data.area.size() <= 80))
         && request.resource.data.enabled is bool
         && request.resource.data.updatedAt == request.time
         && (!('pincode' in request.resource.data) || (request.resource.data.pincode is string && request.resource.data.pincode.matches('^([0-9]{6})?$')))

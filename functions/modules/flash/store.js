@@ -14,7 +14,7 @@
 // The ticket id comes from the chat, so a chat can never make two tickets. Tickets are read only to close and to triage: nothing that talks
 // to a person reads them. uid and role come from the sign-in and the server's own records, never from the request.
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
-const {SONNET, HAIKU, logAiCall, takeDailyUse} = require('../ai-core');
+const {AI_MODELS, logAiCall, takeDailyUse, keyIsSet} = require('../ai-core');
 const {askFlash} = require('./answer');
 const {readTicket} = require('./triage');
 const {DEFAULT_CONFIG, cleanText, helpFor, historyFor, ticketId, ticketReply, ticketText, validId, validateConfig} = require('./rules');
@@ -90,7 +90,7 @@ async function flashAnswer(db, client, chat, {uid, category}, ref, help, now) {
     const facts = await chat.facts(db, uid, category, now);
     const history = historyFor(await readMessages(ref));
     // A chat may ask for the stronger model (the Premium vendors' advanced chat); the others use Haiku.
-    const model = chat.model ?? HAIKU;
+    const model = chat.model ?? AI_MODELS.chat;
     const {answer, response} = await askFlash(client(), {rules: chat.rules, help, facts, history, model, effort: chat.effort ?? 'low'});
     await logAiCall(db, {feature: `flash_${chat.kind}`, model, usage: response.usage, uid, stopReason: response.stop_reason}, now);
     return answer;
@@ -190,11 +190,11 @@ async function triageTicket(db, client, id, ticket, now = Date.now()) {
   try {
     const result = await readTicket(client(), ticket);
     triage = result.triage;
-    await logAiCall(db, {feature: 'flash_triage', model: SONNET, usage: result.response.usage, uid: ticket.uid, stopReason: result.response.stop_reason}, now);
+    await logAiCall(db, {feature: 'flash_triage', model: AI_MODELS.admin, usage: result.response.usage, uid: ticket.uid, stopReason: result.response.stop_reason}, now);
   } catch (error) {
     console.warn('Ticket not read', error.status ?? error.name);
   }
-  await ref.set({...(triage ?? {failed: true}), kind: ticket.kind, model: SONNET, at: Timestamp.fromMillis(now)});
+  await ref.set({...(triage ?? {failed: true}), kind: ticket.kind, model: AI_MODELS.admin, at: Timestamp.fromMillis(now)});
 }
 
 module.exports = {readConfig, saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket};

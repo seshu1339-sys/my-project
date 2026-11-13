@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../domain/reach.dart';
 import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
@@ -58,7 +59,27 @@ class _AppBottomAdState extends State<AppBottomAd> {
     return widget.store.entries('shops').where((s) => s.id == uid || s.text('ownerId') == uid).firstOrNull?.text('category') ?? '';
   }
 
-  List<Entry> get ads => appAds(widget.store.entries('ads'), now, staff: widget.staff, shopCategory: shopCategory);
+  /// Where the viewer is: a vendor at their own shop, staff (or a vendor without a shop point) where the app's location is.
+  (double, double)? get place {
+    final store = widget.store;
+    if (!widget.staff) {
+      final uid = widget.uid ?? store.user?.uid;
+      final shop = store.entries('shops').where((s) => s.id == uid || s.text('ownerId') == uid).firstOrNull;
+      final lat = shop?.number('latitude'), lng = shop?.number('longitude');
+      if (lat != null && lng != null && !(lat == 0 && lng == 0)) return (lat, lng);
+    }
+    return store.located ? (store.latitude!, store.longitude!) : null;
+  }
+
+  /// An ad posted for a place shows only within the admin's km of its shop (lib/domain/ads.dart appAds).
+  bool _reaches(Entry ad) {
+    final here = place;
+    if (here == null) return false;
+    final shop = widget.store.entries('shops').where((s) => s.id == linkedShopId(ad)).firstOrNull;
+    return shopWithinKm(shop, here.$1, here.$2, widget.store.reachKm);
+  }
+
+  List<Entry> get ads => appAds(widget.store.entries('ads'), now, staff: widget.staff, shopCategory: shopCategory, reaches: _reaches);
 
   Entry? get current {
     final list = ads;

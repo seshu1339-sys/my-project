@@ -83,7 +83,9 @@ class _StorefrontState extends State<Storefront> {
             'Voice search provider is not connected yet. Please type your search.',
           );
         }
-        query = await provider.transcribe();
+        // The phone's own recogniser listens in the app's language (Telugu or English); no server, no AI cost.
+        final voice = provider is DeviceVoiceSearch && provider.localeId == null ? DeviceVoiceSearch(localeId: voiceLocaleFor(store.language)) : provider;
+        query = await voice.transcribe();
       }
       if (mounted) {
         setState(() => search.text = query);

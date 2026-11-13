@@ -6,8 +6,23 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'search.dart';
 
-/// Voice search: the phone's (or browser's) own speech recogniser. Free, no server.
-/// Speaks in the device language; Telugu works where the device has a Telugu recogniser.
+/// The recogniser language for the app's language: Telugu (India) for 'te', English (India) otherwise.
+String voiceLocaleFor(String language) => language == 'te' ? 'te_IN' : 'en_IN';
+
+/// The locale to listen in: [wanted] when the phone or browser has it (also written te-IN), else English (India), else the device's own.
+String? pickVoiceLocale(String? wanted, List<String> available) {
+  String norm(String id) => id.replaceAll('-', '_').toLowerCase();
+  final have = {for (final id in available) norm(id): id};
+  for (final candidate in [?wanted, 'en_IN']) {
+    if (have[norm(candidate)] case final id?) return id;
+  }
+  // Browsers often list no locales; then the asked one is used as it is.
+  return available.isEmpty ? wanted : null;
+}
+
+/// Voice search: the phone's (or browser's) own speech recogniser. Free, no server, nothing goes to Anthropic.
+/// Listens in Telugu or English by the app's language ([localeId], from [voiceLocaleFor]); falls back to English (India), then to the
+/// device's own language, where the phone has no Telugu recogniser.
 class DeviceVoiceSearch implements VoiceSearchProvider {
   const DeviceVoiceSearch({this.localeId});
   final String? localeId;
@@ -23,8 +38,9 @@ class DeviceVoiceSearch implements VoiceSearchProvider {
     }
     final words = <String>[];
     var done = false;
+    final available = [for (final l in await speech.locales()) l.localeId];
     await speech.listen(
-      localeId: localeId,
+      localeId: pickVoiceLocale(localeId, available),
       listenFor: const Duration(seconds: 15),
       pauseFor: const Duration(seconds: 3),
       onResult: (r) {
@@ -65,11 +81,12 @@ class CloudImageSearch implements ImageSearchProvider {
       }
       return query;
     } on FirebaseFunctionsException catch (e) {
-      throw StateError(
-        e.code == 'unauthenticated'
-            ? 'Please sign in to search by photo.'
-            : 'Photo search is not available right now. Please type your search.',
-      );
+      throw StateError(switch (e.code) {
+        'unauthenticated' => 'Please sign in to search by photo.',
+        // The day's photo searches are used (the admin's number): the server says "Please try again tomorrow." and calls no AI.
+        'resource-exhausted' => e.message ?? "Today's photo searches are used. Please try again tomorrow.",
+        _ => 'Photo search is not available right now. Please type your search.',
+      });
     }
   }
 }
