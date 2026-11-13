@@ -271,13 +271,18 @@ const productChangeFields = {
   shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
   // A new vendor item: an item from the admin's library (its name, photo and category come from there, never typed), the quantity
   // (1-10 kg or 1-10 pieces) and the price for that quantity.
-  newProduct: ['libraryItemId', 'unitType', 'quantity', 'price'],
+  // customName + categoryId instead of libraryItemId: an item that is not in the catalog (owner, 13 Nov 2026); it waits, hidden, for the
+  // vendor's own photo (checked by Claude Haiku).
+  newProduct: ['libraryItemId', 'customName', 'categoryId', 'unitType', 'quantity', 'price'],
 };
 // Validates the values a vendor proposes for a public change. Throws Error(message).
 function validateVendorChange(type, changes) {
   const money = key => { const v = changes[key]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 10000000) throw Error(`${key} must be a number from 0 to 10000000.`); };
   if (type === 'newProduct') {
-    if (typeof changes.libraryItemId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.libraryItemId)) throw Error('Choose an item from the list.');
+    if (changes.libraryItemId === undefined && changes.customName !== undefined) {
+      if (typeof changes.customName !== 'string' || changes.customName.trim().length < 2 || changes.customName.trim().length > 60) throw Error('Enter the item name (2 to 60 letters).');
+      if (typeof changes.categoryId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.categoryId)) throw Error('Choose a category for the item.');
+    } else if (typeof changes.libraryItemId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.libraryItemId)) throw Error('Choose an item from the list.');
     if (!['kg', 'pcs'].includes(changes.unitType)) throw Error('Choose Kg or Pieces.');
     if (!Number.isInteger(changes.quantity) || changes.quantity < 1 || changes.quantity > 10) throw Error('Choose a quantity from 1 to 10.');
     money('price');

@@ -11,6 +11,7 @@
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {vendorPhotoAllowance, vendorPhotosUsed} = require('../../plan-gate');
 const {publicStorageUrl} = require('../../storage-url');
+const {checkStoredPhotos, unsafeReason} = require('../../photo-safety');
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const privatePath = (uid, productId) => `vendorItemPhotos/${uid}/${productId}`;
@@ -37,7 +38,7 @@ async function ownProduct(db, uid, productId) {
 
 /// The vendor sends their own photo for an item (uploaded first to vendorItemPhotos/<uid>/<productId>). It waits for the admin's photo
 /// check; meanwhile the item keeps our standard photo (or stays hidden when its category needs an own photo).
-async function submitItemPhoto(db, bucket, uid, data = {}, now = Date.now()) {
+async function submitItemPhoto(db, bucket, uid, data = {}, now = Date.now(), checkOptions = {}) {
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   if (vendor?.status !== 'approved') throw Error('Your vendor application must be approved first.');
   const product = await ownProduct(db, uid, data.productId);
@@ -50,9 +51,21 @@ async function submitItemPhoto(db, bucket, uid, data = {}, now = Date.now()) {
     const {extras} = await vendorPhotoAllowance(db, uid, now);
     if ((await vendorPhotosUsed(db, uid, {productId: data.productId})) >= extras) throw Error(`You have used all ${extras} extra photos of your plan. Change or remove one first.`);
   }
+  // Owner, 13 Nov 2026: Claude Haiku checks the photo. Only drugs, weapons, alcohol, tobacco and adult content are refused (with the
+  // reason); a photo that is safe goes live at once; when the check cannot run, the admin checks it as before.
+  const check = await checkStoredPhotos(db, [privatePath(uid, data.productId)], {feature: 'item_photo', uid, ...checkOptions});
+  if (check.verdict === 'unsafe') {
+    await bucket.file(privatePath(uid, data.productId)).delete({ignoreNotFound: true});
+    throw Error(unsafeReason(check.categories));
+  }
   const at = Timestamp.fromMillis(now);
   await ref.set({vendorId: uid, productId: data.productId, name: product.name || '', path: privatePath(uid, data.productId), status: 'pending', submittedAt: at, decisionReason: FieldValue.delete()}, {merge: true});
   await db.collection('products').doc(data.productId).update({ownPhotoStatus: 'pending', updatedAt: at, ...(searchDays ? {searchUntilMs: now + searchDays * DAY_MS} : {})});
+  if (check.verdict === 'safe') {
+    await reviewItemPhoto(db, bucket, {productId: data.productId, approved: true}, now);
+    await ref.update({autoApproved: true});
+    return {status: 'approved', auto: true};
+  }
   return {status: 'pending'};
 }
 
@@ -73,7 +86,7 @@ async function dropOwnPhoto(db, bucket, product, productId, at) {
     bucket.file(publicPath(productId)).delete({ignoreNotFound: true}),
   ]);
   const category = product.categoryId ? (await db.collection('categories').doc(product.categoryId).get()).data() : null;
-  const required = category?.ownPhotoRequired === true;
+  const required = category?.ownPhotoRequired === true || product.customItem === true;
   await db.collection('products').doc(productId).update({
     imageUrl: product.libraryImageUrl || '', ownPhoto: false, ownPhotoStatus: FieldValue.delete(), updatedAt: at,
     ...(required ? {active: false, awaitingOwnPhoto: true} : {}),
@@ -103,6 +116,23 @@ async function reviewItemPhoto(db, bucket, data = {}, now = Date.now()) {
     ...(product.awaitingOwnPhoto ? {active: true, awaitingOwnPhoto: FieldValue.delete()} : {}),
   });
   return {status: 'approved'};
+}
+
+/// Admin: "Add to catalog". A vendor's own item photo becomes the standard photo of that item in the Product Image Library for every
+/// vendor (a separate copy, so the vendor taking their own photo down never removes it). Once per item.
+async function addPhotoToCatalog(db, bucket, data = {}, now = Date.now()) {
+  if (typeof data.productId !== 'string' || !ID.test(data.productId)) throw Error('Choose the item.');
+  const product = (await db.collection('products').doc(data.productId).get()).data();
+  if (!product || product.ownPhoto !== true) throw Error('This item has no approved own photo.');
+  const ref = db.collection('productImageLibrary').doc(`vendor_${data.productId}`);
+  if ((await ref.get()).exists) throw Error('This item is already in the catalog.');
+  const path = `catalog/library_${data.productId}.jpg`;
+  await bucket.file(publicPath(data.productId)).copy(bucket.file(path));
+  const imageUrl = publicStorageUrl(bucket.name, path, `&v=${now}`);
+  const name = String(data.name || product.name || '').trim().slice(0, 100);
+  if (!name) throw Error('The item has no name.');
+  await ref.set({name, imageUrl, url: imageUrl, categoryId: product.categoryId || '', active: true, tags: '', fromVendor: product.ownerId || '', fromProduct: data.productId, createdAt: Timestamp.fromMillis(now)});
+  return {libraryId: ref.id};
 }
 
 /// The vendor goes back to our standard photo for an item.
@@ -138,4 +168,4 @@ async function trimAfterPlan(db, bucket, uid, keep, now = Date.now()) {
   return extra.length;
 }
 
-module.exports = {submitItemPhoto, setItemSearchTime, reviewItemPhoto, removeItemPhoto, trimAfterPlan, privatePath, publicPath, SEARCH_DAYS};
+module.exports = {addPhotoToCatalog, submitItemPhoto, setItemSearchTime, reviewItemPhoto, removeItemPhoto, trimAfterPlan, privatePath, publicPath, SEARCH_DAYS};

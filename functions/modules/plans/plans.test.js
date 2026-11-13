@@ -36,12 +36,14 @@ test("a plan allows 10 items unless the admin sets its own number; the free numb
 test('Silver, Gold and Premium differ only in extra photos and km, which the admin sets', () => {
   const silver = validatePlan(good({name: 'Silver', tier: 'silver', extraPhotos: 4, radiusKm: 10}));
   assert.deepEqual([silver.tier, silver.extraPhotos, silver.radiusKm, silver.offerBoxes], ['silver', 4, 10, 1]);
-  // Today's Offers boxes: Silver 1, Gold 3, Premium 5 unless the admin sets the plan's own number (owner, 7 Nov 2026).
-  assert.equal(validatePlan(good({tier: 'gold'})).offerBoxes, 3);
+  // Today's Offers boxes: Silver 1, Gold 2, Platinum 4, Diamond 6, Premium 5 unless the admin sets the plan's own number (owner, 7 Nov 2026).
+  assert.equal(validatePlan(good({tier: 'gold'})).offerBoxes, 2);
+  assert.equal(validatePlan(good({tier: 'platinum'})).offerBoxes, 4);
+  assert.equal(validatePlan(good({tier: 'diamond'})).offerBoxes, 6);
   assert.equal(validatePlan(good({tier: 'premium', offerBoxes: 8})).offerBoxes, 8);
   assert.throws(() => validatePlan(good({offerBoxes: 21})), /Today's Offers boxes/);
   assert.throws(() => validatePlan(good({offerBoxes: 1.5})), /Today's Offers boxes/);
-  assert.throws(() => validatePlan(good({tier: 'diamond'})), /Silver, Gold or Premium/);
+  assert.throws(() => validatePlan(good({tier: 'bronze'})), /Silver, Gold, Platinum, Diamond or Premium/);
   assert.throws(() => validatePlan(good({extraPhotos: 31})), /extra photos/);
   assert.throws(() => validatePlan(good({radiusKm: 0})), /km/);
 });
@@ -259,5 +261,18 @@ test("the plan kind, extra photos and km go onto the vendor's plan status", emul
   const {planId} = await savePlan(db, good({name: 'Gold', tier: 'gold', extraPhotos: 6, radiusKm: 15}), t0);
   await adminActivatePlan(db, {uid: 'v1', planId}, 'admin1', t0);
   const status = (await db.collection('vendorPlanStatus').doc('v1').get()).data();
-  assert.deepEqual([status.tier, status.extraPhotos, status.radiusKm, status.offerBoxes], ['gold', 6, 15, 3]);
+  assert.deepEqual([status.tier, status.extraPhotos, status.radiusKm, status.offerBoxes], ['gold', 6, 15, 2]);
+});
+
+test('editing a plan changes the vendors already on it (boxes, km, photos, items), not the price they paid', emulator, async () => {
+  const db = await setup();
+  const {planId} = await savePlan(db, good({name: 'Diamond', tier: 'diamond', radiusKm: 25}), t0);
+  await adminActivatePlan(db, {uid: 'v1', planId}, 'admin1', t0);
+  assert.equal((await db.collection('vendorPlanStatus').doc('v1').get()).data().offerBoxes, 6);
+  const edited = await savePlan(db, good({planId, name: 'Diamond', tier: 'diamond', radiusKm: 100, offerBoxes: 8, extraPhotos: 20, itemLimit: 30, price: 9999}), t0 + 1000);
+  assert.equal(edited.updated, 1);
+  const status = (await db.collection('vendorPlanStatus').doc('v1').get()).data();
+  assert.deepEqual([status.radiusKm, status.offerBoxes, status.extraPhotos, status.itemLimit], [100, 8, 20, 30]);
+  const period = (await db.collection('vendorPlanPeriods').where('uid', '==', 'v1').get()).docs[0].data();
+  assert.equal(period.price, 4999, 'the plan bought keeps its price');
 });

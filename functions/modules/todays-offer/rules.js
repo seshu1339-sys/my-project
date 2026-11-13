@@ -29,7 +29,7 @@ function photoPath(url, uid) {
 const DAY_MS = 86400000;
 const DAY_CHOICES = [7, 30, 60, 90];
 /// How many Today's Offers boxes a plan gives when the admin has not set the plan's own number: Silver 1, Gold 3, Premium 5.
-const DEFAULT_BOXES = {silver: 1, gold: 3, premium: 5};
+const DEFAULT_BOXES = {silver: 1, gold: 2, platinum: 4, diamond: 6, premium: 5};
 const MAX_BOXES = 20;
 
 /// The boxes of a vendor's running plan (vendorPremium.offerBoxes, copied from the plan), else the default of the plan's kind.

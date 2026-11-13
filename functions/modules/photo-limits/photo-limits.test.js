@@ -114,3 +114,30 @@ test('the vendor chooses how long an item shows in search (1 week to 3 months), 
   assert.equal((await db.collection('products').doc('p1').get()).data().searchUntilMs, T + 90 * DAY);
   await assert.rejects(S.submitItemPhoto(db, bucket, 'v1', {productId: 'p1', searchDays: 3}, T), /1 week, 1 month/);
 });
+
+// Owner, 13 Nov 2026: Claude Haiku checks an own item photo; the admin can add an approved one to the catalog. A fake AI answers.
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xd9]);
+const fakeAi = found => () => ({messages: {create: async () => ({stop_reason: 'end_turn', usage: {input_tokens: 10, output_tokens: 5}, content: [{type: 'text', text: JSON.stringify({found, note: 'x'})}]})}});
+
+test('own item photo: a safe photo goes live at once, a forbidden one is refused with the reason, and the admin can add it to the catalog', emulator, async () => {
+  const {db, bucket, product} = await setup();
+  await db.collection('vendorPremium').doc('v1').set({active: true, endsAt: Timestamp.fromMillis(T + 86400000), extraPhotos: 10});
+  await product('p1', 'veg');
+  await product('p2', 'veg');
+  for (const id of ['p1', 'p2']) await bucket.file(S.privatePath('v1', id)).save(JPEG, {metadata: {contentType: 'image/jpeg'}});
+  const done = await S.submitItemPhoto(db, bucket, 'v1', {productId: 'p1'}, T, {makeClient: fakeAi([])});
+  assert.deepEqual([done.status, done.auto], ['approved', true]);
+  const item = (await db.collection('products').doc('p1').get()).data();
+  assert.equal(item.ownPhoto, true);
+  assert.match(item.imageUrl, /catalog%2Fitem_p1\.jpg/);
+  await assert.rejects(S.submitItemPhoto(db, bucket, 'v1', {productId: 'p2'}, T, {makeClient: fakeAi(['alcohol'])}), /alcohol/);
+  assert.equal((await db.collection('vendorItemPhotos').doc('p2').get()).exists, false, 'nothing saved for a refused photo');
+  assert.equal((await bucket.file(S.privatePath('v1', 'p2')).exists())[0], false, 'and the file is deleted');
+
+  const added = await S.addPhotoToCatalog(db, bucket, {productId: 'p1'}, T);
+  const library = (await db.collection('productImageLibrary').doc(added.libraryId).get()).data();
+  assert.deepEqual([library.name, library.active, library.categoryId, library.fromVendor], ['p1', true, 'veg', 'v1']);
+  await assert.rejects(S.addPhotoToCatalog(db, bucket, {productId: 'p1'}, T), /already in the catalog/);
+  await assert.rejects(S.addPhotoToCatalog(db, bucket, {productId: 'p2'}, T), /no approved own photo/);
+  await db.collection('productImageLibrary').doc(added.libraryId).delete();
+});

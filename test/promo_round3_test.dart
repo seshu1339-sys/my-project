@@ -10,12 +10,15 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final now = DateTime(2026, 11, 7, 10);
 
-  test("Today's Offers boxes per plan: Silver 1, Gold 3, Premium 5 unless the admin set the plan's own number", () {
+  // Owner, 13 Nov 2026: Gold 2, Platinum 4, Diamond 6 (Gold was 3).
+  test("Today's Offers boxes per plan: Silver 1, Gold 2, Platinum 4, Diamond 6, Premium 5 unless the admin set the plan's own number", () {
     expect(todaysOfferBoxesOf({'tier': 'silver'}), 1);
-    expect(todaysOfferBoxesOf({'tier': 'gold'}), 3);
+    expect(todaysOfferBoxesOf({'tier': 'gold'}), 2);
+    expect(todaysOfferBoxesOf({'tier': 'platinum'}), 4);
+    expect(todaysOfferBoxesOf({'tier': 'diamond'}), 6);
     expect(todaysOfferBoxesOf({'tier': 'premium'}), 5);
     expect(todaysOfferBoxesOf({'tier': 'premium', 'offerBoxes': 8}), 8);
-    expect(SubscriptionPlan.fromData('p', {'tier': 'gold'}).offerBoxes, 3);
+    expect(SubscriptionPlan.fromData('p', {'tier': 'gold'}).offerBoxes, 2);
     expect(SubscriptionPlan.fromData('p', {'tier': 'premium', 'offerBoxes': 7}).offerBoxes, 7);
     expect(todaysOfferDays.values, ['1 week', '1 month', '2 months', '3 months']);
   });

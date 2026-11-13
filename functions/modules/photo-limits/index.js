@@ -8,6 +8,7 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   setItemSearchTime vendor  -> how long an item shows in the website's category and search results (1 week to 3 months)
 //   removeItemPhoto   vendor  -> back to our standard photo
 //   reviewItemPhoto   admin   -> approve or reject an own item photo
+//   addPhotoToCatalog admin   -> an approved own photo becomes the item's standard photo in the Product Image Library
 //   trimPhotosOnPlanEnd trigger -> vendorPremium/<uid> went from active to not active
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentWritten} = require('firebase-functions/v2/firestore');
@@ -15,6 +16,7 @@ const {getFirestore} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('../../admin-session');
 const {FREE_EXTRA_PHOTOS} = require('../../plan-gate');
+const {anthropicKey} = require('../../photo-safety');
 const S = require('./store');
 
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -30,7 +32,7 @@ async function requireAdmin(request) {
   await requireAdminSession(uid);
 }
 
-exports.submitItemPhoto = onCall(options, async request => {
+exports.submitItemPhoto = onCall({...options, memory: '512MiB', secrets: [anthropicKey]}, async request => {
   const uid = requireVerified(request);
   try { return await S.submitItemPhoto(getFirestore(), getStorage().bucket(), uid, request.data || {}); } catch (error) { return fail(error); }
 });
@@ -41,6 +43,10 @@ exports.setItemSearchTime = onCall(options, async request => {
 exports.removeItemPhoto = onCall(options, async request => {
   const uid = requireVerified(request);
   try { return await S.removeItemPhoto(getFirestore(), getStorage().bucket(), uid, request.data || {}); } catch (error) { return fail(error); }
+});
+exports.addPhotoToCatalog = onCall(options, async request => {
+  await requireAdmin(request);
+  try { return await S.addPhotoToCatalog(getFirestore(), getStorage().bucket(), request.data || {}); } catch (error) { return fail(error); }
 });
 exports.reviewItemPhoto = onCall(options, async request => {
   await requireAdmin(request);

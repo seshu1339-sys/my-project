@@ -12,7 +12,8 @@ const DEFAULT_PLAN_ITEM_LIMIT = 10;
 const MAX_ITEM_LIMIT = 100;
 // Paid plans come in three kinds (owner, 6 Nov 2026): Silver (small), Gold (middle), Premium (biggest). They differ only in how many
 // extra photos the vendor may have and how far (km) the vendor's ad and offer reach users. Every paid plan has the same services.
-const TIERS = ['silver', 'gold', 'premium'];
+// Platinum and Diamond were added on 13 Nov 2026; more kinds can be added here later (and in lib/modules/plans/plan_model.dart).
+const TIERS = ['silver', 'gold', 'platinum', 'diamond', 'premium'];
 const DEFAULT_EXTRA_PHOTOS = 10;
 const MAX_EXTRA_PHOTOS = 30;
 const DEFAULT_RADIUS_KM = 25;
@@ -20,7 +21,8 @@ const MAX_RADIUS_KM = 500;
 const FREE_EXTRA_PHOTOS = 2;
 // How many Today's Offers boxes a plan gives (owner, 7 Nov 2026): Silver 1, Gold 3, Premium as the admin sets (5 until then). The admin
 // can set the number of every plan.
-const DEFAULT_OFFER_BOXES = {silver: 1, gold: 3, premium: 5};
+// Owner, 13 Nov 2026: Gold 2, Platinum 4, Diamond 6.
+const DEFAULT_OFFER_BOXES = {silver: 1, gold: 2, platinum: 4, diamond: 6, premium: 5};
 const MAX_OFFER_BOXES = 20;
 const itemLimitOk = n => Number.isInteger(n) && n >= 0 && n <= MAX_ITEM_LIMIT;
 
@@ -38,7 +40,7 @@ function validatePlan(data = {}) {
   const itemLimit = data.itemLimit ?? DEFAULT_PLAN_ITEM_LIMIT;
   if (!itemLimitOk(itemLimit) || itemLimit < 1) throw Error(`Enter how many items the plan allows (1 to ${MAX_ITEM_LIMIT}).`);
   const tier = data.tier ?? 'premium';
-  if (!TIERS.includes(tier)) throw Error('Choose Silver, Gold or Premium.');
+  if (!TIERS.includes(tier)) throw Error('Choose Silver, Gold, Platinum, Diamond or Premium.');
   const extraPhotos = data.extraPhotos ?? DEFAULT_EXTRA_PHOTOS;
   if (!Number.isInteger(extraPhotos) || extraPhotos < 0 || extraPhotos > MAX_EXTRA_PHOTOS) throw Error(`Enter how many extra photos the plan allows (0 to ${MAX_EXTRA_PHOTOS}).`);
   const radiusKm = data.radiusKm ?? DEFAULT_RADIUS_KM;

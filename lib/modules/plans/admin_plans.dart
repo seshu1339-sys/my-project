@@ -229,8 +229,9 @@ class _PlanEditorDialogState extends State<PlanEditorDialog> {
   late final itemLimit = TextEditingController(text: '${widget.plan?.itemLimit ?? defaultPlanItemLimit}');
   late String tier = widget.plan?.tier ?? 'premium';
   late final extraPhotos = TextEditingController(text: '${widget.plan?.extraPhotos ?? defaultPlanExtraPhotos}');
-  late final radiusKm = TextEditingController(text: kmText(widget.plan?.radiusKm ?? defaultPlanRadiusKm).replaceAll(' km', ''));
-  // Today's Offers boxes: Silver 1, Gold 3, Premium 5 unless the admin types another number. Changing the kind of a new plan moves the
+  // The km is picked from the existing choices (5 / 10 / 25 / 50 / 100); an older plan with another number keeps it as a choice.
+  late num radiusKm = widget.plan?.radiusKm ?? defaultPlanRadiusKm;
+  // Today's Offers boxes: Silver 1, Gold 2, Platinum 4, Diamond 6, Premium 5 unless the admin types another number. Changing the kind of a new plan moves the
   // number to that kind's default until the admin types one.
   late final offerBoxes = TextEditingController(text: '${widget.plan?.offerBoxes ?? defaultOfferBoxes[tier]}');
   late bool boxesTyped = widget.plan != null;
@@ -242,7 +243,6 @@ class _PlanEditorDialogState extends State<PlanEditorDialog> {
     duration.dispose();
     itemLimit.dispose();
     extraPhotos.dispose();
-    radiusKm.dispose();
     offerBoxes.dispose();
     super.dispose();
   }
@@ -258,7 +258,7 @@ class _PlanEditorDialogState extends State<PlanEditorDialog> {
       'itemLimit': int.parse(itemLimit.text.trim()),
       'tier': tier,
       'extraPhotos': int.parse(extraPhotos.text.trim()),
-      'radiusKm': num.parse(radiusKm.text.trim()),
+      'radiusKm': radiusKm,
       'offerBoxes': int.parse(offerBoxes.text.trim()),
       'active': active,
     });
@@ -307,7 +307,7 @@ class _PlanEditorDialogState extends State<PlanEditorDialog> {
             DropdownButtonFormField<String>(
               key: const ValueKey('plan-tier'),
               initialValue: tier,
-              decoration: const InputDecoration(labelText: 'Plan type (Silver, Gold or Premium)'),
+              decoration: const InputDecoration(labelText: 'Plan type (Silver, Gold, Platinum, Diamond or Premium)'),
               items: [for (final t in planTiers.entries) DropdownMenuItem(value: t.key, child: Text(t.value))],
               onChanged: (v) => setState(() {
                 tier = v ?? tier;
@@ -324,15 +324,12 @@ class _PlanEditorDialogState extends State<PlanEditorDialog> {
                 return n == null || n < 0 || n > 30 ? 'Enter 0 to 30' : null;
               },
             ),
-            TextFormField(
+            DropdownButtonFormField<num>(
               key: const ValueKey('plan-radius'),
-              controller: radiusKm,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              initialValue: radiusKm,
               decoration: const InputDecoration(labelText: 'Reach (km)', helperText: 'Customers within this distance of the shop see the ad, offers and alerts'),
-              validator: (v) {
-                final n = num.tryParse((v ?? '').trim());
-                return n == null || n < 1 || n > 500 ? 'Enter 1 to 500 km' : null;
-              },
+              items: [for (final km in ({...planRadiusChoices, radiusKm}.toList()..sort())) DropdownMenuItem<num>(value: km, child: Text(kmText(km.toDouble())))],
+              onChanged: (v) => setState(() => radiusKm = v ?? radiusKm),
             ),
             TextFormField(
               key: const ValueKey('plan-item-limit'),

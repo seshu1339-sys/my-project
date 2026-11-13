@@ -35,8 +35,9 @@ class _ItemPhotosSectionState extends State<ItemPhotosSection> {
     try {
       final bytes = await file.readAsBytes();
       await FirebaseStorage.instance.ref('vendorItemPhotos/${widget.uid}/$productId').putData(bytes, SettableMetadata(contentType: 'image/jpeg', cacheControl: 'no-cache'));
-      await widget.store.call('submitItemPhoto', {'productId': productId, 'searchDays': days});
-      messenger.showSnackBar(const SnackBar(content: Text('Sent. The photo shows once the admin has checked it.')));
+      final result = await widget.store.call('submitItemPhoto', {'productId': productId, 'searchDays': days});
+      // The photo is checked automatically (functions/photo-safety.js): approved at once, or the admin checks it when the check cannot run.
+      messenger.showSnackBar(SnackBar(content: Text(result['status'] == 'approved' ? 'Checked: your photo is live now.' : 'Sent. The photo shows once the admin has checked it.')));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('$e')));
     }
@@ -225,6 +226,7 @@ class ItemPhotosView extends StatelessWidget {
   String _status(Map<String, dynamic> item) {
     if (item['ownPhotoStatus'] == 'pending') return 'Your own photo is waiting for the admin';
     if (item['ownPhotoStatus'] == 'rejected') return 'Your photo was not approved. Send another';
+    if (item['customItem'] == true && item['ownPhoto'] != true) return 'Not in the catalog: add your own photo; the item shows after it is checked';
     if (item['awaitingOwnPhoto'] == true) return 'This category needs your own photo: the item shows after it is approved';
     if (item['ownPhoto'] == true) return 'Your own photo';
     return 'Our standard photo';

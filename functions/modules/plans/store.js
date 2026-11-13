@@ -31,8 +31,33 @@ async function savePlan(db, data = {}, now = Date.now()) {
   if (typeof data.planId !== 'string' || !ID.test(data.planId)) throw Error('That plan was not found.');
   const ref = db.collection('vendorPlans').doc(data.planId);
   if (!(await ref.get()).exists) throw Error('That plan was not found.');
+  const before = (await ref.get()).data();
   await ref.update({...fields, updatedAt: at});
-  return {planId: ref.id};
+  // Owner, 13 Nov 2026: a change of boxes, km, photos, items or kind reaches the vendors already on this plan at once. The price and
+  // the months only apply to new purchases (a bought plan keeps its own).
+  const updated = await syncRunningVendors(db, ref.id, before?.name, fields, now);
+  return {planId: ref.id, updated};
+}
+
+/// The vendors whose running plan is this one (by plan id; older statuses by plan name) get the plan's new benefits.
+async function syncRunningVendors(db, planId, oldName, fields, now) {
+  const found = new Map();
+  for (const doc of (await db.collection('vendorPlanStatus').where('planId', '==', planId).get()).docs) found.set(doc.id, doc);
+  if (oldName) {
+    for (const doc of (await db.collection('vendorPlanStatus').where('planName', '==', oldName).get()).docs) {
+      if (!doc.data().planId) found.set(doc.id, doc);
+    }
+  }
+  const running = [...found.values()].filter(doc => (doc.data().endsAt?.toMillis?.() ?? 0) > now);
+  const at = Timestamp.fromMillis(now);
+  for (let i = 0; i < running.length; i += 400) {
+    const batch = db.batch();
+    for (const doc of running.slice(i, i + 400)) {
+      batch.update(doc.ref, {planId, planName: fields.name, itemLimit: fields.itemLimit, ...planBenefits(fields), benefitsSyncedAt: at});
+    }
+    await batch.commit();
+  }
+  return running.length;
 }
 
 async function saveGates(db, data = {}, now = Date.now()) {
@@ -71,8 +96,8 @@ async function startPurchase(db, uid, data = {}, now = Date.now()) {
 }
 
 /// The vendor's plan status: who (name and Vendor ID, for the admin's list), the plan, its end and how many items it allows.
-const statusFields = (uid, vendor, planName, endsAt, itemLimit, at, source, plan = {}) => ({
-  uid, vendorName: vendor.name || '', vendorCode: vendor.vendorCode || '', planName, endsAt: Timestamp.fromMillis(endsAt), itemLimit, source, updatedAt: at,
+const statusFields = (uid, vendor, planName, endsAt, itemLimit, at, source, plan = {}, planId = null) => ({
+  uid, vendorName: vendor.name || '', vendorCode: vendor.vendorCode || '', planName, ...(planId ? {planId} : {}), endsAt: Timestamp.fromMillis(endsAt), itemLimit, source, updatedAt: at,
   // The kind (Silver / Gold / Premium), the extra photos, the km and the Today's Offers boxes of the latest plan.
   ...planBenefits(plan),
 });
@@ -95,7 +120,7 @@ async function activatePlan(db, requestId, request, now = Date.now()) {
     const {startsAt, endsAt} = planPeriod(paidAt, period.durationMonths, current?.endsAt?.toMillis?.() ?? 0);
     const at = Timestamp.fromMillis(now);
     tx.update(periodRef, {status: 'active', paidAt: Timestamp.fromMillis(paidAt), startsAt: Timestamp.fromMillis(startsAt), endsAt: Timestamp.fromMillis(endsAt), updatedAt: at});
-    tx.set(statusRef, statusFields(period.uid, vendor, period.planName, endsAt, itemLimitAfter(current, period, now), at, 'payment', period));
+    tx.set(statusRef, statusFields(period.uid, vendor, period.planName, endsAt, itemLimitAfter(current, period, now), at, 'payment', period, period.planId));
     tx.set(db.collection('vendorNotices').doc(), {
       vendorId: period.uid, type: 'plan', title: 'Your plan is active', body: `${period.planName}: from ${dateText(startsAt)} to ${dateText(endsAt)}.`, createdAt: at,
     });
@@ -136,7 +161,7 @@ async function adminActivatePlan(db, data = {}, adminUid = '', now = Date.now())
     tx.set(db.collection('vendorPlanPeriods').doc(), {
       ...period, status: 'active', source: 'admin', activatedBy: adminUid, startsAt: Timestamp.fromMillis(startsAt), endsAt: Timestamp.fromMillis(endsAt), createdAt: at, updatedAt: at,
     });
-    tx.set(statusRef, statusFields(uid, vendor, plan.name, endsAt, itemLimitAfter(current, period, now), at, 'admin', plan));
+    tx.set(statusRef, statusFields(uid, vendor, plan.name, endsAt, itemLimitAfter(current, period, now), at, 'admin', plan, data.planId));
     tx.set(db.collection('vendorNotices').doc(), {
       vendorId: uid, type: 'plan', title: 'Your plan is active', body: `${plan.name}: from ${dateText(startsAt)} to ${dateText(endsAt)}.`, createdAt: at,
     });

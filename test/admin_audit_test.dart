@@ -32,7 +32,7 @@ void main() {
           ),
         ),
       ));
-      expect(find.textContaining("3 Today's Offers boxes"), findsOneWidget);
+      expect(find.textContaining("2 Today's Offers boxes"), findsOneWidget);
       expect(find.textContaining('reach 15 km'), findsOneWidget);
       expect(find.byKey(const ValueKey('plan-free-photos-edit')), findsOneWidget);
       await tester.scrollUntilVisible(find.byKey(const ValueKey('plan-related-settings')), 300);
@@ -42,7 +42,7 @@ void main() {
       await tester.scrollUntilVisible(find.byKey(const ValueKey('plan-add')), -300);
       await tester.tap(find.byKey(const ValueKey('plan-add')));
       await tester.pumpAndSettle();
-      for (final label in ['Plan name', 'Price (₹)', 'How long the plan runs', 'Plan type (Silver, Gold or Premium)', 'Extra photos', 'Reach (km)', 'Items the vendor may list', "Today's Offers boxes"]) {
+      for (final label in ['Plan name', 'Price (₹)', 'How long the plan runs', 'Plan type (Silver, Gold, Platinum, Diamond or Premium)', 'Extra photos', 'Reach (km)', 'Items the vendor may list', "Today's Offers boxes"]) {
         expect(find.text(label), findsOneWidget, reason: label);
       }
       expect(find.text('Years'), findsOneWidget);

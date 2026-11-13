@@ -73,7 +73,7 @@ void main() {
   testWidgets('a first item: category, then an admin item (no typing), Pieces 1-10, the price for that quantity, Save', (tester) async {
     final store = await pumpSection(tester, (0, 2, true));
     expect(find.text('Items: 0 of 2'), findsOneWidget);
-    expect(find.byType(TextField), findsNothing, reason: 'nothing to type before an item is chosen');
+    expect(find.byKey(const ValueKey('vendor-item-price')), findsNothing, reason: 'no price to type before an item is chosen (only the catalog search)');
     await tester.tap(find.byKey(const ValueKey('vendor-item-category-null')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vegetables').last);

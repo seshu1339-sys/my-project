@@ -13,6 +13,11 @@ import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_visibility.dart';
 
+/// True while the plans page is open: the bottom ad is then about 30% of the screen's height (owner, 13 Nov 2026), so the vendor sees
+/// the ads right where they choose a plan. It is 72 px everywhere else.
+final ValueNotifier<bool> appBottomAdTall = ValueNotifier<bool>(false);
+const appBottomAdTallShare = 0.3;
+
 /// Puts [AppBottomAd] under every page of the vendor or staff app once someone is signed in. Hidden while the keyboard is open, so
 /// it never pushes a form field off the screen.
 Widget withAppBottomAd(BuildContext context, Widget? child, Store store, {bool staff = false}) {
@@ -164,8 +169,9 @@ class _AppBottomAdState extends State<AppBottomAd> {
       elevation: 6,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: AppBottomAd.height,
+        child: ValueListenableBuilder<bool>(
+          valueListenable: appBottomAdTall,
+          builder: (context, tall, child) => SizedBox(height: tall ? MediaQuery.sizeOf(context).height * appBottomAdTallShare : AppBottomAd.height, child: child),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: ad == null

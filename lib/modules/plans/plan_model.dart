@@ -6,11 +6,14 @@ const defaultFreeItemLimit = 2;
 const defaultPlanItemLimit = 10;
 
 /// Paid plans come in three kinds; they differ only in extra photos and km (functions/modules/plans/rules.js).
-const planTiers = <String, String>{'silver': 'Silver', 'gold': 'Gold', 'premium': 'Premium'};
+// Platinum and Diamond were added on 13 Nov 2026; a new kind only needs a line here and in functions/modules/plans/rules.js.
+const planTiers = <String, String>{'silver': 'Silver', 'gold': 'Gold', 'platinum': 'Platinum', 'diamond': 'Diamond', 'premium': 'Premium'};
+/// The km a plan can reach, as the admin picks them (the existing choices).
+const planRadiusChoices = <int>[5, 10, 25, 50, 100];
 const defaultPlanExtraPhotos = 10;
 const defaultPlanRadiusKm = 25.0;
-/// Today's Offers boxes a plan gives unless the admin sets the plan's own number (owner, 7 Nov 2026): Silver 1, Gold 3, Premium 5.
-const defaultOfferBoxes = <String, int>{'silver': 1, 'gold': 3, 'premium': 5};
+/// Today's Offers boxes a plan gives unless the admin sets the plan's own number (owner, 13 Nov 2026): Silver 1, Gold 2, Platinum 4, Diamond 6, Premium 5.
+const defaultOfferBoxes = <String, int>{'silver': 1, 'gold': 2, 'platinum': 4, 'diamond': 6, 'premium': 5};
 const maxOfferBoxes = 20;
 // Every vendor has one shop photo (not counted) and, on the free plan, this many extra photos.
 const freeExtraPhotos = 2;
@@ -41,7 +44,7 @@ class SubscriptionPlan {
     this.extraPhotos = defaultPlanExtraPhotos,
     this.radiusKm = defaultPlanRadiusKm,
     int? offerBoxes,
-  }) : offerBoxes = offerBoxes ?? (tier == 'silver' ? 1 : tier == 'gold' ? 3 : 5);
+  }) : offerBoxes = offerBoxes ?? (tier == 'silver' ? 1 : tier == 'gold' ? 2 : tier == 'platinum' ? 4 : tier == 'diamond' ? 6 : 5);
 
   factory SubscriptionPlan.fromData(String id, Map<String, dynamic> data) => SubscriptionPlan(
     id: id,
@@ -72,13 +75,14 @@ class SubscriptionPlan {
 
 /// The vendor's latest plan (their `vendorPlanStatus` document); null when they never had one.
 class VendorPlanStatus {
-  const VendorPlanStatus({required this.planName, required this.endsAt, this.itemLimit = defaultPlanItemLimit, this.uid = '', this.vendorName = '', this.vendorCode = '', this.byAdmin = false, this.renewedAt, this.byPayment = false});
+  const VendorPlanStatus({required this.planName, required this.endsAt, this.tier = '', this.itemLimit = defaultPlanItemLimit, this.uid = '', this.vendorName = '', this.vendorCode = '', this.byAdmin = false, this.renewedAt, this.byPayment = false});
 
   factory VendorPlanStatus.fromData(String uid, Map<String, dynamic> data) {
     final endsAt = data['endsAt'];
     return VendorPlanStatus(
       uid: uid,
       planName: data['planName']?.toString() ?? '',
+      tier: data['tier']?.toString() ?? '',
       endsAt: endsAt is Timestamp ? endsAt.toDate() : DateTime.fromMillisecondsSinceEpoch(0),
       itemLimit: _count(data['itemLimit']) ?? defaultPlanItemLimit,
       vendorName: data['vendorName']?.toString() ?? '',
@@ -90,6 +94,8 @@ class VendorPlanStatus {
   }
 
   final String planName;
+  // Silver, Gold, Platinum, Diamond or Premium (empty on old statuses).
+  final String tier;
   final DateTime endsAt;
   final int itemLimit;
   // For the admin's list: whose plan it is, and whether the admin started or stopped it by hand.

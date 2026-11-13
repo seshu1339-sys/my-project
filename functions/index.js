@@ -102,6 +102,8 @@ Object.assign(exports, require('./modules/offer-alerts'));
 Object.assign(exports, require('./modules/staff-links'));
 // Photo limits: own item photos, the shared photo allowance and the trim when a paid plan ends (functions/modules/photo-limits).
 Object.assign(exports, require('./modules/photo-limits'));
+// Plan items: when a paid plan ends only the vendor's first items stay live, the rest are hidden (not deleted) and come back on renewal (functions/modules/plan-items).
+Object.assign(exports, require('./modules/plan-items'));
 // Showcase: the paid vendors' boxes in Today's Offers and the right-side ad boxes, within the plan km (functions/modules/showcase).
 Object.assign(exports, require('./modules/showcase'));
 // Staff Area System: areas, daily targets, missed days and the staff's Today's Offers (functions/modules/staff-areas).
@@ -489,18 +491,23 @@ exports.submitVendorChange = onCall(options, async request => {
   let oldValue = {}, newValue = safeChanges;
   if (isNew) {
     // The item is one the admin put in the library: its name, photo and category come from there, never from the vendor.
-    const libraryItem = (await db.collection('productImageLibrary').doc(safeChanges.libraryItemId).get()).data();
+    // Not in the catalog (owner, 13 Nov 2026): the vendor names it and picks the category; it stays hidden until their own photo is approved.
+    const custom = safeChanges.libraryItemId === undefined;
+    const libraryItem = custom
+      ? {name: String(safeChanges.customName || '').trim().replace(/\s+/g, ' '), imageUrl: '', categoryId: safeChanges.categoryId, active: true}
+      : (await db.collection('productImageLibrary').doc(safeChanges.libraryItemId).get()).data();
     if (!libraryItem || libraryItem.active === false) throw new HttpsError('failed-precondition', 'Choose an item from the list.');
+    if (custom && !(await db.collection('categories').doc(libraryItem.categoryId).get()).exists) throw new HttpsError('failed-precondition', 'Choose a category for the item.');
     // The product carries its shop's place (pincode, town, district, state, GPS) so it shows where it is.
     const shopPlace = vendor.shopId ? locationStamp((await db.collection('shops').doc(vendor.shopId).get()).data() || {}) : {};
     // A category where the admin ticked "own photo required" (for example sarees): the item waits, hidden, until the vendor's own photo
     // is approved (functions/modules/photo-limits). Otherwise the item uses our standard photo until the vendor adds their own.
     const category = libraryItem.categoryId ? (await db.collection('categories').doc(libraryItem.categoryId).get()).data() : null;
-    const ownPhotoRequired = category?.ownPhotoRequired === true;
+    const ownPhotoRequired = category?.ownPhotoRequired === true || custom;
     newValue = {
       ...(ownPhotoRequired ? {awaitingOwnPhoto: true} : {}),
       name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', libraryImageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
-      libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
+      ...(custom ? {customItem: true} : {libraryItemId: safeChanges.libraryItemId}), unitType: safeChanges.unitType, quantity: safeChanges.quantity,
       unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)),
       kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
     };
@@ -525,7 +532,8 @@ exports.submitVendorChange = onCall(options, async request => {
     await db.runTransaction(async tx => {
       const mine = await tx.get(db.collection('products').where('ownerId', '==', uid));
       if (mine.size >= limit) throw new HttpsError('resource-exhausted', `Your plan has ${limit} item${limit === 1 ? '' : 's'}, and they are all in use. A plan with more items is in Plans.`);
-      tx.set(target, {...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()});
+      // createdAt: when a plan ends, the first items the vendor posted stay live (functions/modules/plan-items).
+      tx.set(target, {...newValue, ownerId: uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
       tx.set(db.collection('vendorChanges').doc(), change);
     });
   } else if (autoPublish) {

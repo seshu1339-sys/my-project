@@ -10,7 +10,8 @@ const todaysOfferDays = <int, String>{7: '1 week', 30: '1 month', 60: '2 months'
 int todaysOfferBoxesOf(Map<String, dynamic>? premium) {
   final n = premium?['offerBoxes'];
   if (n is num && n == n.roundToDouble() && n >= 0 && n <= 20) return n.toInt();
-  return switch (premium?['tier']) { 'silver' => 1, 'gold' => 3, _ => 5 };
+  // Owner, 13 Nov 2026: Silver 1, Gold 2, Platinum 4, Diamond 6, Premium 5.
+  return switch (premium?['tier']) { 'silver' => 1, 'gold' => 2, 'platinum' => 4, 'diamond' => 6, _ => 5 };
 }
 
 /// What the rest of the app may do with Today's Offers.

@@ -27,6 +27,16 @@ class AdminItemPhotosPage extends StatelessWidget {
     }
   }
 
+  Future<void> _addToCatalog(BuildContext context, String productId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await store.call('addPhotoToCatalog', {'productId': productId});
+      messenger.showSnackBar(const SnackBar(content: Text('Added to the catalog: every vendor can pick this photo now')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
     stream: store.firestore.collection('vendorItemPhotos').where('status', isEqualTo: 'pending').snapshots(),
@@ -63,6 +73,22 @@ class AdminItemPhotosPage extends StatelessWidget {
               ]),
             ),
           ),
+        const Divider(height: 32),
+        Text('Add to catalog', style: Theme.of(context).textTheme.headlineSmall),
+        const Text("A vendor's own photo that is in use can become the standard photo of that item in the Product Image Library, for every vendor. Vendors then pick it instead of uploading again."),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: store.firestore.collection('vendorItemPhotos').where('status', isEqualTo: 'approved').limit(50).snapshots(),
+          builder: (context, approved) => Column(children: [
+            if (approved.hasData && approved.data!.docs.isEmpty) const ListTile(title: Text('No own photos in use yet.')),
+            for (final d in approved.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              ListTile(
+                key: ValueKey('admin-item-photo-approved-${d.id}'),
+                title: Text('${d.data()['name'] ?? d.id}'),
+                subtitle: Text(d.data()['autoApproved'] == true ? 'Checked by AI' : 'Checked by the office'),
+                trailing: OutlinedButton(key: ValueKey('admin-item-photo-catalog-${d.id}'), onPressed: () => _addToCatalog(context, d.id), child: const Text('Add to catalog')),
+              ),
+          ]),
+        ),
       ]);
     },
   );

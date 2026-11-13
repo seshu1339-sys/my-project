@@ -30,7 +30,7 @@ test('an item, a price, 1 week to 3 months and a box within the plan are checked
 
 test('a plan gives its own box number; without one Silver 1, Gold 3, Premium 5', () => {
   assert.equal(boxesOf({tier: 'silver'}), 1);
-  assert.equal(boxesOf({tier: 'gold'}), 3);
+  assert.equal(boxesOf({tier: 'gold'}), 2);
   assert.equal(boxesOf({tier: 'premium'}), 5);
   assert.equal(boxesOf({tier: 'premium', offerBoxes: 8}), 8);
   assert.equal(boxesOf({tier: 'gold', offerBoxes: 0}), 0);
@@ -80,8 +80,8 @@ test('a paid vendor\'s item is live at once in their first box, with the item\'s
     [uid, `shop-${uid}`, `${uid}-p1`, 'Item 1', 'https://example.com/1.jpg', 99, 7, 1]);
 });
 
-test('Gold has 3 boxes: a fourth item is refused unless a box is chosen to replace; the same item stays in its box', emulated, async () => {
-  const {db, uid, bucket, offer} = await setup({tier: 'gold'});
+test('Gold plan with 3 boxes (set by the admin): a fourth item is refused unless a box is chosen to replace; the same item stays in its box', emulated, async () => {
+  const {db, uid, bucket, offer} = await setup({tier: 'gold', offerBoxes: 3});
   for (const n of [1, 2, 3]) assert.equal((await submitOffer(db, bucket, uid, offer(n), NOW)).slot, n);
   await assert.rejects(submitOffer(db, bucket, uid, offer(4), NOW), /All your 3 Today's Offers boxes are in use/);
   assert.equal((await submitOffer(db, bucket, uid, offer(2, {price: 50, days: 30}), NOW)).slot, 2, 'the same item is updated in its box');

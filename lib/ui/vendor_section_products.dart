@@ -14,9 +14,11 @@ import '../services/usage.dart';
 /// has [vendorItemLimit] items (2 unless the admin allows more; hidden items count): "Add another item" shows only below the limit.
 /// Photo 1 of the shop is required first. Its own state and busy flag.
 class VendorAddProductSection extends StatefulWidget {
-  const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview});
+  const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview, this.onUpgrade});
   final Store store;
   final String uid;
+  // Opens the plans page (the workspace passes it; sections never import each other).
+  final VoidCallback? onUpgrade;
 
   /// For tests: (items the vendor has, items allowed, photo 1 ready) instead of reading them from Firestore.
   final (int, int, bool)? preview;
@@ -26,6 +28,10 @@ class VendorAddProductSection extends StatefulWidget {
 
 class _VendorAddProductSectionState extends State<VendorAddProductSection> with VendorSectionState {
   final price = TextEditingController();
+  // Search the whole catalog by name (owner, 13 Nov 2026), and the item that is not in the catalog (named by the vendor).
+  final search = TextEditingController();
+  final customName = TextEditingController();
+  bool custom = false;
   String? categoryId;
   Entry? item;
   String unitType = 'kg';
@@ -38,11 +44,16 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
   @override
   void dispose() {
     price.dispose();
+    search.dispose();
+    customName.dispose();
     super.dispose();
   }
 
   void _reset() {
     price.clear();
+    search.clear();
+    customName.clear();
+    custom = false;
     categoryId = null;
     item = null;
     unitType = 'kg';
@@ -51,17 +62,20 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
 
   Future<void> _save() async {
     final chosen = item;
-    if (chosen == null) throw StateError('Choose an item.');
+    if (chosen == null && !custom) throw StateError('Choose an item.');
+    if (custom && customName.text.trim().length < 2) throw StateError('Enter the name of your item.');
     final p = double.tryParse(price.text.trim());
     if (p == null || p <= 0) throw StateError('Enter the price for ${vendorItemUnit(unitType, quantity)}.');
     await store.submitVendorChange(type: 'newProduct', collection: 'products', docId: '', changes: {
-      'libraryItemId': chosen.id, 'unitType': unitType, 'quantity': quantity, 'price': p,
+      if (custom) ...{'customName': customName.text.trim(), 'categoryId': categoryId} else 'libraryItemId': chosen!.id,
+      'unitType': unitType, 'quantity': quantity, 'price': p,
     });
+    final wasCustom = custom;
     setState(() {
       _reset();
       adding = false;
     });
-    toast('Saved. Your item is live at your shop\'s location.');
+    toast(wasCustom ? 'Saved. Add your own photo of this item in Item photos below; it shows to customers after the photo is checked.' : 'Saved. Your item is live at your shop\'s location.');
   }
 
   @override
@@ -107,13 +121,21 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     final open = !full && (adding ?? itemCount == 0);
     final library = store.entries('productImageLibrary');
     final categories = libraryCategories(library, store.visible('categories'));
-    final items = categoryId == null ? const <Entry>[] : libraryItemsIn(library, categoryId!);
+    final query = search.text.trim().toLowerCase();
+    // A search looks through the whole catalog (name and keywords); without one, the chosen category's items show.
+    final items = query.isNotEmpty
+        ? [for (final e in library) if (e.active && ('${e.text('name')} ${e.text('tags')}').toLowerCase().contains(query)) e]
+        : categoryId == null ? const <Entry>[] : libraryItemsIn(library, categoryId!);
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
     return vendorCard('Add an item', [
       Text('Items: $itemCount of $itemLimit', key: const ValueKey('vendor-item-count'), style: const TextStyle(fontWeight: FontWeight.bold)),
       if (!shopPhotoReady) Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: error),
       if (full)
-        Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, all your plan allows. You can change their prices any day; Plans shows the plans with more items.', key: const ValueKey('vendor-item-limit-reached'))
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, all your plan allows. You can change their prices any day; Plans shows the plans with more items.', key: const ValueKey('vendor-item-limit-reached')),
+          const SizedBox(height: 8),
+          if (widget.onUpgrade != null) FilledButton.icon(key: const ValueKey('vendor-item-upgrade'), onPressed: widget.onUpgrade, icon: const Icon(Icons.workspace_premium), label: const Text('Upgrade for more items')),
+        ])
       else if (!open)
         FilledButton.icon(
           key: const ValueKey('vendor-add-another'),
@@ -127,6 +149,15 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           label: Text(itemCount == 0 ? 'Add an item' : 'Add another item'),
         )
       else ...[
+        TextField(
+          key: const ValueKey('vendor-item-search'),
+          controller: search,
+          decoration: const InputDecoration(labelText: 'Search the item catalog', prefixIcon: Icon(Icons.search)),
+          onChanged: (_) => setState(() {
+            custom = false;
+            item = null;
+          }),
+        ),
         DropdownButtonFormField<String>(
           key: ValueKey('vendor-item-category-$categoryId'),
           initialValue: categoryId,
@@ -139,10 +170,10 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           }),
         ),
         if (categories.isEmpty) const Text('The admin has not added any items yet. Please check again later.'),
-        if (categoryId != null) ...[
+        if (categoryId != null || query.isNotEmpty) ...[
           const SizedBox(height: 8),
           const Text('Choose your item:'),
-          if (items.isEmpty) const Text('No items in this category yet.'),
+          if (items.isEmpty) Text(query.isNotEmpty ? 'Nothing in the catalog matches "${search.text.trim()}".' : 'No items in this category yet.'),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -152,12 +183,29 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
                   key: ValueKey('vendor-library-item-${e.id}'),
                   item: e,
                   selected: item?.id == e.id,
-                  onTap: () => setState(() => item = e),
+                  onTap: () => setState(() {
+                    item = e;
+                    custom = false;
+                  }),
                 ),
             ],
           ),
         ],
-        if (item != null) ...[
+        // Only when the item is missing from the catalog: the vendor names it and later adds their own photo (checked by AI).
+        if (categoryId != null && !custom)
+          TextButton(
+            key: const ValueKey('vendor-item-missing'),
+            onPressed: () => setState(() {
+              custom = true;
+              item = null;
+            }),
+            child: const Text('My item is not in the catalog'),
+          ),
+        if (custom) ...[
+          TextField(key: const ValueKey('vendor-custom-name'), controller: customName, decoration: const InputDecoration(labelText: 'Name of your item')),
+          const Text('Your item shows to customers after you add your own photo of it (Item photos, below); the photo is checked automatically.', key: ValueKey('vendor-custom-note')),
+        ],
+        if (item != null || custom) ...[
           const SizedBox(height: 12),
           SegmentedButton<String>(
             key: const ValueKey('vendor-item-unit'),

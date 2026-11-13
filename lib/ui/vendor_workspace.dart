@@ -7,6 +7,8 @@ import '../modules/photolimits/photolimits_module.dart';
 import '../modules/showcase/showcase_module.dart';
 import 'my_numbers_card.dart';
 import 'vendor_ads_page.dart';
+import '../modules/plans/plans_module.dart' show VendorPlanBadge;
+import 'vendor_plans_page.dart';
 import 'vendor_plans_payment.dart';
 import 'vendor_premium_entry.dart';
 import 'vendor_section_exclusives.dart';
@@ -43,6 +45,8 @@ class VendorWorkspace extends StatelessWidget {
         return Padding(padding: const EdgeInsets.only(top: 4), child: Text('Vendor ID: $code', style: Theme.of(context).textTheme.bodyMedium));
       },
     ),
+    // The plan at the top: Free Plan + Upgrade, or the running plan and its end (owner, 13 Nov 2026).
+    VendorPlanBadge(store: store, uid: uid, onUpgrade: () => openVendorPlans(context, store, uid)),
     const SizedBox(height: 8),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
     const SizedBox(height: 12),
@@ -64,7 +68,7 @@ class VendorWorkspace extends StatelessWidget {
     VendorShopAdSection(store: store, uid: uid, uploadPhotoPage: (_) => VendorAdEditor(store: store, uid: uid)),
     VendorMyAdsCard(store: store, uid: uid),
     const SizedBox(height: 20),
-    VendorAddProductSection(store: store, uid: uid),
+    VendorAddProductSection(store: store, uid: uid, onUpgrade: () => openVendorPlans(context, store, uid)),
     // The vendor's own shop's products (including ones the office added for the shop), not only the ones the vendor submitted itself.
     VendorMyProductsSection(store: store, uid: uid),
     // Our standard photo or the vendor's own, per item (lib/modules/photolimits).
