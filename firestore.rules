@@ -152,21 +152,25 @@ service cloud.firestore {
         && (!('paymentLast4' in request.resource.data) || (request.resource.data.paymentLast4 is string && request.resource.data.paymentLast4.size() <= 4))
         && (!('wishlist' in request.resource.data) || (request.resource.data.wishlist is list && request.resource.data.wishlist.size() <= 500));
     }
+    // The vendor app has two logins (vendor and service provider). Either may read the record under ITS OWN uid in these four
+    // collections, so the app can tell which one it is (the Help chat reads all four: lib/modules/flash/flash_module.dart). A login's
+    // uid never holds the other kind's record, so this shows nothing new; other people's records stay closed (13 Nov 2026 fix for
+    // "The chat could not open: permission-denied").
     match /vendorApplications/{uid} {
-      allow read: if (signedInAs('vendor') && owner(uid)) || admin();
+      allow read: if ((signedInAs('vendor') || signedInAs('provider')) && owner(uid)) || admin();
       allow write: if false;
     }
     match /vendors/{uid} {
-      allow read: if (signedInAs('vendor') && owner(uid)) || admin();
+      allow read: if ((signedInAs('vendor') || signedInAs('provider')) && owner(uid)) || admin();
       allow write: if false;
     }
     // Service providers (the email's provider login, separate from its vendor login): written only by functions/providers.js.
     match /providerApplications/{uid} {
-      allow read: if (signedInAs('provider') && owner(uid)) || admin();
+      allow read: if ((signedInAs('provider') || signedInAs('vendor')) && owner(uid)) || admin();
       allow write: if false;
     }
     match /providers/{uid} {
-      allow read: if (signedInAs('provider') && owner(uid)) || admin();
+      allow read: if ((signedInAs('provider') || signedInAs('vendor')) && owner(uid)) || admin();
       allow write: if false;
     }
     match /vendorChanges/{changeId} {

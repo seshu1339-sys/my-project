@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
@@ -36,10 +37,21 @@ Future<FlashChatSetup> vendorAppFlashSetup(Store store) async {
   final uid = store.user?.uid;
   if (uid == null) return userFlashChat;
   final db = store.firestore;
-  final premium = (await db.collection('vendorPremium').doc(uid).get()).data();
+  // A record the rules do not let this login read counts as missing, so the chat always opens (an older rule refused a provider
+  // login the vendor records, and an unregistered vendor the provider records: "The chat could not open: permission-denied").
+  Future<Map<String, dynamic>?> read(String collection) async {
+    try {
+      return (await db.collection(collection).doc(uid).get()).data();
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') return null;
+      rethrow;
+    }
+  }
+
+  final premium = await read('vendorPremium');
   if (premium?['active'] == true) return premiumFlashChat;
-  if ((await db.collection('vendors').doc(uid).get()).exists || (await db.collection('vendorApplications').doc(uid).get()).exists) return vendorFlashChat;
-  if ((await db.collection('providerApplications').doc(uid).get()).exists || (await db.collection('providers').doc(uid).get()).exists) return providerFlashChat;
+  if (await read('vendors') != null || await read('vendorApplications') != null) return vendorFlashChat;
+  if (await read('providerApplications') != null || await read('providers') != null) return providerFlashChat;
   return userFlashChat;
 }
 

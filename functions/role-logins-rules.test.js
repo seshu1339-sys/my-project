@@ -60,6 +60,21 @@ test('same email, different roles: no role login sees another role\'s records', 
     for (const db of [customer, vendor, staff]) await assertFails(read(db, 'providers/P'));
     for (const db of [customer, vendor, provider]) await assertFails(read(db, 'fieldStaff/S'));
     await assertFails(read(customer, 'users/V'));
+    // The vendor app's Help chat checks all four vendor-app records under the login's own uid (13 Nov 2026 fix): a provider login
+    // may look for a vendor record under its own uid and a vendor login for a provider record (none exists there, so nothing shows)...
+    await assertSucceeds(read(provider, 'vendors/P'));
+    await assertSucceeds(read(provider, 'vendorApplications/P'));
+    await assertSucceeds(read(vendor, 'providers/V'));
+    await assertSucceeds(read(vendor, 'providerApplications/V'));
+    // ...but never another person's record, and never from the customer or staff app.
+    await assertFails(read(provider, 'vendors/V'));
+    await assertFails(read(vendor, 'providers/P'));
+    for (const db of [customer, staff]) {
+      await assertFails(read(db, 'providerApplications/P'));
+      await assertFails(read(db, 'vendorApplications/V'));
+    }
+    await assertFails(read(as('U', login('user')), 'providerApplications/U'));
+    await assertFails(read(as('S', login('staff')), 'vendors/S'));
     // A record under a login's own uid but of another role's kind is still refused (a vendor record is read only as a vendor).
     await assertFails(read(as('V', login('user')), 'vendors/V'));
 
