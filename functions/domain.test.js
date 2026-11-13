@@ -101,10 +101,11 @@ test('vendor fee is optional or normalized to a bounded custom amount', () => {
 test('vendor application requires every detail and rejects malformed ones', () => {
   const ok = {ownerName: 'Ravi Kumar', phone: '+91 98765 43210', name: 'Ravi Stores', shopCategory: 'Grocery', address: '12 MG Road', pincode: '560001', description: 'Fresh vegetables daily', latitude: 12.9716, longitude: 77.5946};
   assert.deepEqual(vendorApplication({...ok, name: '  Ravi   Stores '}), ok);
-  for (const key of Object.keys(ok)) assert.throws(() => vendorApplication({...ok, [key]: ''}), undefined, `${key} must be required`);
+  // Owner, 13 Nov 2026: the address and the description are optional at registration.
+  for (const key of Object.keys(ok)) if (!['address', 'description'].includes(key)) assert.throws(() => vendorApplication({...ok, [key]: ''}), undefined, `${key} must be required`);
+  assert.doesNotThrow(() => vendorApplication({...ok, address: '', description: ''}));
   assert.throws(() => vendorApplication({...ok, pincode: '5600'}));
   assert.throws(() => vendorApplication({...ok, phone: 'call me'}));
-  assert.throws(() => vendorApplication({...ok, description: 'short'}));
   assert.throws(() => vendorApplication({...ok, ownerName: 123}));
   // The shop's GPS location, captured on the device — required, and out of range is rejected.
   assert.throws(() => vendorApplication({...ok, latitude: undefined}), /GPS location/);
