@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_abuse_reports.dart';
+import 'admin_groups.dart';
 import 'admin_staff_work.dart';
 import 'shop_ratings.dart' show AdminRatingsPage;
 import 'admin_ai_assistant.dart';
@@ -169,6 +170,26 @@ Widget adminSettingsContent(Store store, String key) {
     }
   }
 
+/// The sections in the order of the six groups (lib/ui/admin_groups.dart), each group's name before its first section.
+List<(String?, _SettingsSection)> _sectionsByGroup() {
+  final out = <(String?, _SettingsSection)>[];
+  final placed = <String>{};
+  for (final group in adminGroups) {
+    var first = true;
+    for (final item in group.items) {
+      final section = _sections.where((x) => x.key == item.id && item.kind == AdminItemKind.section).firstOrNull;
+      if (section == null || !placed.add(section.key)) continue;
+      out.add((first ? group.title : null, section));
+      first = false;
+    }
+  }
+  final rest = [for (final x in _sections) if (!placed.contains(x.key)) x];
+  for (final (i, x) in rest.indexed) {
+    out.add((i == 0 ? 'More' : null, x));
+  }
+  return out;
+}
+
 /// The Settings tab: a list of sections on the left (a plain list on a phone) and the chosen section beside it.
 class AdminSettingsPage extends StatefulWidget {
   const AdminSettingsPage({super.key, required this.store});
@@ -200,16 +221,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     final list = ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        for (final s in _sections)
+        for (final s in _sectionsByGroup()) ...[
+          if (s.$1 != null) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4), child: Text(s.$1!, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary))),
           ListTile(
-            key: ValueKey('settings-${s.key}'),
-            selected: wide && selected == s.key,
-            leading: Icon(s.icon),
-            title: Text(s.label),
-            subtitle: wide ? null : Text(s.hint),
+            key: ValueKey('settings-${s.$2.key}'),
+            selected: wide && selected == s.$2.key,
+            leading: Icon(s.$2.icon),
+            title: Text(s.$2.label),
+            subtitle: wide ? null : Text(s.$2.hint),
             trailing: wide ? null : const Icon(Icons.chevron_right),
-            onTap: () => _open(s),
+            onTap: () => _open(s.$2),
           ),
+        ],
       ],
     );
     if (!wide) return list;

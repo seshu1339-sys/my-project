@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
+import 'package:ecommerce_app/modules/module_admin.dart';
 import 'package:ecommerce_app/ui/admin.dart';
+import 'package:ecommerce_app/ui/admin_groups.dart';
+import 'package:ecommerce_app/ui/admin_settings.dart';
 
 Future<Store> _open(WidgetTester tester, double width) async {
   tester.view.physicalSize = Size(width, 1600);
@@ -22,16 +25,30 @@ Future<void> _tab(WidgetTester tester, int index) async {
   await tester.pumpAndSettle();
 }
 
-// Settings is the last tab, however many module tabs come before it.
+int _group(String id) => adminGroups.indexWhere((g) => g.id == id);
+
+// Settings is the last tab: the index of every section, under the group names.
 Future<void> _settingsTab(WidgetTester tester) => _tab(tester, DefaultTabController.of(tester.element(find.byType(TabBar).first)).length - 1);
 
+Future<void> _tapSetting(WidgetTester tester, String key) async {
+  final tile = find.byKey(ValueKey('settings-$key'));
+  await tester.scrollUntilVisible(tile, 200, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+  await tester.ensureVisible(tile);
+  await tester.pumpAndSettle();
+  await tester.tap(tile);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _item(WidgetTester tester, String id) async {
+  await tester.tap(find.byKey(ValueKey('group-item-$id')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('the main tabs are Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, the module tabs, then Settings', (tester) async {
+  testWidgets('six groups: Business, Vendors & Shops, Services, Staff, Ads & Offers, Settings; Business opens on Insights', (tester) async {
     await _open(tester, 1200);
-    expect(tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList(), [
-      'Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Payments', 'Flash', 'Staff Areas', 'Settings',
-    ]);
-    expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0, reason: 'Insights is the home page');
+    expect(tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList(), ['Business', 'Vendors & Shops', 'Services', 'Staff', 'Ads & Offers', 'Settings']);
+    expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0, reason: 'Business (Insights) is the home page');
     expect(find.text('Site and ad statistics'), findsOneWidget);
   });
 
@@ -49,32 +66,42 @@ void main() {
     }
   });
 
-  testWidgets('every other setting is in Settings, each in exactly one place', (tester) async {
+  test('nothing was taken away: every earlier tab and every Settings section is in exactly one group', () {
+    final placed = [for (final g in adminGroups) for (final i in g.items) i.id];
+    expect(placed.toSet().length, placed.length, reason: 'no page in two groups');
+    for (final tab in ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', for (final m in moduleAdminTabs) m.title]) {
+      expect(placed, contains(tab), reason: tab);
+    }
+    for (final hit in adminSettingsIndex().where((h) => !h.isField)) {
+      expect(adminGroupOf(hit.sectionKey), isNotNull, reason: '${hit.sectionKey} is in a group');
+    }
+    expect(adminGroupOf('serviceProviders'), 'Services');
+    expect(adminGroupOf('ratings'), 'Vendors & Shops');
+    expect(adminGroupOf('staffWork'), 'Staff');
+    expect(adminGroupOf('Promotions'), 'Ads & Offers');
+    expect(adminGroupOf('theme'), 'Settings');
+  });
+
+  testWidgets('Settings is the index of every section, under the group names, each once', (tester) async {
     await _open(tester, 1200);
+    // A tall window, so the whole index is built at once.
+    tester.view.physicalSize = const Size(1200, 9000);
+    await tester.pumpAndSettle();
     await _settingsTab(tester);
+    for (final heading in ['Business', 'Vendors & Shops', 'Services', 'Staff', 'Ads & Offers', 'Settings']) {
+      expect(find.text(heading), findsWidgets, reason: heading);
+    }
     for (final key in ['categories', 'fieldAssistants', 'settings', 'theme', 'animations', 'scrollingText', 'productImageLibrary', 'layout', 'locations']) {
       expect(find.byKey(ValueKey('settings-$key')), findsOneWidget, reason: key);
-    }
-    expect(find.text('Business Profile'), findsOneWidget);
-    expect(find.text('Theme'), findsOneWidget);
-    expect(find.text('Product Image Library'), findsOneWidget);
-    // the old duplicate entry points are gone from the other tabs
-    for (final index in [2, 4, 6]) {
-      await _tab(tester, index);
-      expect(find.text('Product Image Library'), findsNothing);
-      expect(find.text('Theme Settings'), findsNothing);
-      expect(find.text('Business profile'), findsNothing);
     }
   });
 
   testWidgets('Settings sections open: Field Assistants, Layout (Layout settings, Visual Editor, Page view), Quick Add locations', (tester) async {
     await _open(tester, 1200);
     await _settingsTab(tester);
-    await tester.tap(find.byKey(const ValueKey('settings-fieldAssistants')));
-    await tester.pumpAndSettle();
+    await _tapSetting(tester, 'fieldAssistants');
     expect(find.textContaining('available when Firebase is connected'), findsOneWidget, reason: 'the offline demo says so instead of failing');
-    await tester.tap(find.byKey(const ValueKey('settings-layout')));
-    await tester.pumpAndSettle();
+    await _tapSetting(tester, 'layout');
     expect(find.byKey(const ValueKey('layout-settings')), findsOneWidget);
     expect(find.byKey(const ValueKey('layout-visual-editor')), findsOneWidget);
     expect(find.byKey(const ValueKey('layout-page-view')), findsOneWidget);
@@ -83,42 +110,49 @@ void main() {
     expect(find.text('UI Customization / Layout Settings'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('settings-locations')));
-    await tester.pumpAndSettle();
+    await _tapSetting(tester, 'locations');
     expect(find.text('Add new'), findsOneWidget);
   });
 
-  testWidgets('Vendors holds vendor approvals with the Quick Add accounts and items beside them', (tester) async {
+  testWidgets('Vendors & Shops opens on the vendor approvals; Complaints, Ratings and Reports are beside them', (tester) async {
     await _open(tester, 1200);
-    await _tab(tester, 3);
+    await _tab(tester, _group('vendors'));
     // (these pages read Firebase directly, so the offline demo shows a note; their content is tested in quick_add_test.dart)
     expect(find.textContaining('available when Firebase is connected'), findsOneWidget);
+    for (final id in ['Complaints', 'ratings', 'reports', 'blockList', 'Products', 'Shops']) {
+      expect(find.byKey(ValueKey('group-item-$id')), findsOneWidget, reason: id);
+    }
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the Vendors tab has its three parts', (tester) async {
-    final store = Store(live: false);
-    await store.init();
-    tester.view.physicalSize = const Size(1200, 1600);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    await _tab(tester, 3);
-    expect(find.text('Complaints'), findsOneWidget, reason: 'the main tab bar is still there');
-  });
-
-  testWidgets('Products, Shops and Promotions tabs list their records with Add new', (tester) async {
+  testWidgets('service providers are in one place: Services; the Vendors tab points there', (tester) async {
     await _open(tester, 1200);
-    for (final index in [2, 4, 6]) {
-      await _tab(tester, index);
-      expect(find.text('Add new'), findsOneWidget);
-    }
+    await _tab(tester, _group('services'));
+    await _item(tester, 'serviceProviders');
+    expect(find.textContaining('available when Firebase is connected'), findsOneWidget);
+    // (The Vendors tab's own "Service providers" part now only points here; it needs Firebase, so the demo cannot open it.)
+    expect(adminGroups.expand((g) => g.items).where((i) => i.kind == AdminItemKind.providers).length, 1);
   });
 
-  testWidgets('on a phone Settings is a list of sections that open one by one', (tester) async {
+  testWidgets('Products, Shops and Promotions list their records with Add new', (tester) async {
+    await _open(tester, 1200);
+    await _tab(tester, _group('vendors'));
+    for (final id in ['Products', 'Shops']) {
+      await _item(tester, id);
+      expect(find.text('Add new'), findsOneWidget, reason: id);
+    }
+    await _tab(tester, _group('ads'));
+    expect(find.text('Add new'), findsOneWidget, reason: 'Ads & Offers opens on Promotions');
+  });
+
+  testWidgets('on a phone a group lists its pages; Settings is a list of sections that open one by one', (tester) async {
     await _open(tester, 390);
+    await _tab(tester, _group('staff'));
+    expect(find.byKey(const ValueKey('group-item-staffWork')), findsOneWidget, reason: 'a phone lists the group pages');
     await _settingsTab(tester);
+    // A tall phone, so the whole index is built at once.
+    tester.view.physicalSize = const Size(390, 9000);
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('settings-theme')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('settings-categories')));
     await tester.pumpAndSettle();

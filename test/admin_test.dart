@@ -5,6 +5,8 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 import 'package:ecommerce_app/ui/home_section_config.dart';
+import 'package:ecommerce_app/ui/admin_groups.dart';
+import 'package:ecommerce_app/ui/admin_settings.dart';
 
 // The studio opens on Insights; the other pages are tabs, and everything else is a section of the Settings tab.
 Future<void> goTab(WidgetTester tester, int index) async {
@@ -14,7 +16,19 @@ Future<void> goTab(WidgetTester tester, int index) async {
 
 Future<void> goSettings(WidgetTester tester, String key) async {
   await goTab(tester, DefaultTabController.of(tester.element(find.byType(TabBar).first)).length - 1); // Settings is the last tab
-  await tester.tap(find.byKey(ValueKey('settings-$key')));
+  // The Settings index lists every section under the six group names; scroll to the section first.
+  final tile = find.byKey(ValueKey('settings-$key'));
+  await tester.scrollUntilVisible(tile, 200, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+  await tester.ensureVisible(tile);
+  await tester.pumpAndSettle();
+  await tester.tap(tile);
+  await tester.pumpAndSettle();
+}
+
+/// Opens one page of one of the six groups (lib/ui/admin_groups.dart).
+Future<void> goItem(WidgetTester tester, String group, String item) async {
+  await goTab(tester, adminGroups.indexWhere((g) => g.id == group));
+  await tester.tap(find.byKey(ValueKey('group-item-$item')));
   await tester.pumpAndSettle();
 }
 
@@ -73,7 +87,7 @@ void main() {
     final store = Store();
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    await goTab(tester, 2); // Products
+    await goItem(tester, 'vendors', 'Products');
     await tester.tap(find.text('Add new'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));

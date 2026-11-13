@@ -8,6 +8,7 @@ import 'sample_tag.dart';
 import 'admin_frame.dart';
 import 'admin_insights.dart';
 import 'admin_ai_assistant.dart';
+import 'admin_groups.dart';
 import 'admin_settings.dart';
 import 'admin_settings_search.dart';
 
@@ -53,7 +54,22 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  static final _tabs = ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', for (final m in moduleAdminTabs) m.title, 'Settings'];
+  // Owner, 13 Nov 2026: six groups, so the panel is clear at a glance; every earlier page is one item of one group (lib/ui/admin_groups.dart).
+  static final _tabs = [for (final g in adminGroups) g.title];
+
+  /// One group: its items beside (wide) or above (phone) the open item. Settings is the index of every setting, by group.
+  Widget _group(AdminGroup group) {
+    if (group.id == 'settings') return AdminEmbedScope(child: AdminSettingsPage(store: widget.store));
+    return AdminGroupPage(
+      key: ValueKey('admin-group-${group.id}'),
+      items: group.items,
+      build: (item) => switch (item.kind) {
+        AdminItemKind.tab => _tab(item.id),
+        AdminItemKind.section => AdminEmbedScope(child: adminSettingsContent(widget.store, item.id)),
+        AdminItemKind.providers => AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: ProviderModerationPage(store: widget.store))),
+      },
+    );
+  }
 
   Widget _tab(String name) {
     final store = widget.store;
@@ -166,7 +182,7 @@ class _AdminPageState extends State<AdminPage> {
                 final controller = DefaultTabController.of(context);
                 return ListenableBuilder(
                   listenable: controller,
-                  builder: (context, _) => KeyedSubtree(key: ValueKey(controller.index), child: _tab(_tabs[controller.index])),
+                  builder: (context, _) => KeyedSubtree(key: ValueKey(controller.index), child: _group(adminGroups[controller.index])),
                 );
               })),
             ],
@@ -197,7 +213,8 @@ class _VendorsTab extends StatelessWidget {
                 child: AdminEmbedScope(
                   child: switch (controller.index) {
                     0 => VendorModerationPage(store: store),
-                    1 => ProviderModerationPage(store: store),
+                    // Service providers are under Services > Service providers (one place); this tab only points there.
+                    1 => const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Service providers are now under Services > Service providers.', key: ValueKey('providers-moved'), textAlign: TextAlign.center))),
                     2 => QuickAccountsPage(store: store),
                     _ => QuickItemsAdminPage(store: store),
                   },
