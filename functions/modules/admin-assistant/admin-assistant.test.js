@@ -74,3 +74,29 @@ test('the counts are read-only numbers and a missing collection is never a failu
   assert.equal(typeof facts.asOf, 'string');
   for (const value of [facts.shops, facts.products, facts.vendors.approved, facts.posts.vendorOffersLive]) assert.ok(value === null || Number.isInteger(value));
 });
+
+test('the admin search "Ask AI": Haiku 5.5 chooses from the panel list, unknown serials are dropped, the daily limit stops only the AI', emulated, async () => {
+  const {searchWithAi, searchAiLimit, indexLines} = require('.')._test;
+  const db = getFirestore();
+  const uid = `search${Date.now()}`;
+  assert.equal(searchAiLimit({}), 100);
+  assert.match(indexLines([{serial: '5.12', label: 'Business Profile > Post duration', key: 'postDuration', value: '24h'}]), /5\.12 \| Business Profile > Post duration \| postDuration \| 24h/);
+  const calls = [];
+  const fake = () => ({messages: {create: async request => {
+    calls.push(request);
+    return {stop_reason: 'end_turn', usage: {input_tokens: 50, output_tokens: 10}, content: [{type: 'text', text: JSON.stringify({answer: 'Post duration is 24 hours.', serials: ['5.12', '99.99']})}]};
+  }}});
+  await db.doc('settings/business').set({adminSearchAiPerDay: 1}, {merge: true});
+  try {
+    const index = [{serial: '5.12', label: 'Business Profile > Post duration', key: 'postDuration', value: '24h'}, {serial: 'P3', label: 'Products', key: 'tab:Products', value: ''}];
+    const result = await searchWithAi(db, fake, uid, {query: 'పోస్ట్ ఎంత సేపు', index});
+    assert.deepEqual(result, {answer: 'Post duration is 24 hours.', serials: ['5.12']}, 'a serial not in the list is dropped');
+    assert.equal(calls[0].model, 'claude-haiku-5-5');
+    assert.equal(calls[0].output_config.format.type, 'json_schema');
+    assert.match(calls[0].messages[0].content, /<settings>[\s\S]*5\.12[\s\S]*<values>[\s\S]*staffPay/);
+    await assert.rejects(searchWithAi(db, fake, uid, {query: 'again', index}), error => error.code === 'resource-exhausted' && /normal search still works/.test(error.message));
+    assert.equal(calls.length, 1, 'past the limit the AI is not called');
+  } finally {
+    await db.doc('settings/business').set({adminSearchAiPerDay: FieldValue.delete()}, {merge: true});
+  }
+});

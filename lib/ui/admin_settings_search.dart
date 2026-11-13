@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../services/search_providers.dart';
+import 'admin_groups.dart';
 import 'admin_settings.dart';
 
 /// The box at the top of the admin panel: type or say a setting's name or its number in the Settings list ("5", "5.12", "post
 /// duration", "scrolling text") and the matching settings show; a tap opens that setting at once. No AI, no server: the list is in the
 /// app and the voice is turned into text on the device.
 class AdminSettingsSearchBar extends StatefulWidget {
-  const AdminSettingsSearchBar({super.key, required this.store, this.listen, this.open});
+  const AdminSettingsSearchBar({super.key, required this.store, this.listen, this.open, this.askAi});
   final Store store;
 
-  /// Test seams: the voice input, and what a tap opens (the section page by default).
+  /// Test seams: the voice input, what a tap opens (the section page by default), and the AI search (askAdminSearch by default).
   final Future<String> Function()? listen;
   final void Function(AdminSettingHit hit)? open;
+  final Future<Map<String, dynamic>> Function(Map<String, dynamic> data)? askAi;
 
   @override
   State<AdminSettingsSearchBar> createState() => _AdminSettingsSearchBarState();
@@ -23,6 +25,36 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
   final query = TextEditingController();
   final index = adminSettingsIndex();
   String? note;
+  // The AI's answer and the settings it chose, for the words asked ([aiFor]).
+  String? aiAnswer, aiFor;
+  List<AdminSettingHit> aiHits = const [];
+  bool asking = false;
+
+  /// Only when the normal search finds nothing: Claude Haiku 5.5 reads every setting of the panel (with the current values) and
+  /// answers which one it is (functions/modules/admin-assistant askAdminSearch). Its daily limit never stops the normal search.
+  Future<void> _askAi() async {
+    final q = query.text.trim();
+    if (q.isEmpty || asking) return;
+    setState(() { asking = true; aiAnswer = null; aiHits = const []; aiFor = q; });
+    try {
+      final data = {
+        'query': q,
+        'index': [
+          for (final h in index) {'serial': h.serial, 'label': [adminGroupOf(h.sectionKey) ?? h.hint, if (h.isField) h.section, h.title].where((x) => x.isNotEmpty).join(' > '), 'key': h.isField ? h.hint : h.sectionKey, 'value': adminSettingValue(widget.store, h)},
+        ],
+      };
+      final result = await (widget.askAi ?? (d) => widget.store.call('askAdminSearch', d))(data);
+      final serials = [for (final s in result['serials'] as List? ?? const []) '$s'];
+      if (!mounted) return;
+      setState(() {
+        aiAnswer = '${result['answer'] ?? ''}';
+        aiHits = [for (final s in serials) ...index.where((h) => h.serial == s)];
+      });
+    } catch (e) {
+      if (mounted) setState(() => aiAnswer = '$e'.replaceFirst(RegExp(r'^\[[^\]]+\]\s*'), '').replaceFirst('Bad state: ', ''));
+    }
+    if (mounted) setState(() => asking = false);
+  }
 
   @override
   void dispose() {
@@ -83,7 +115,26 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
               child: Material(
                 elevation: 2,
                 child: hits.isEmpty
-                    ? const ListTile(key: ValueKey('admin-settings-search-none'), title: Text('No setting with that name or number'))
+                    ? ListView(shrinkWrap: true, children: [
+                        const ListTile(key: ValueKey('admin-settings-search-none'), title: Text('No setting with that name or number')),
+                        if (aiFor != query.text.trim())
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: OutlinedButton.icon(key: const ValueKey('admin-settings-ask-ai'), onPressed: asking ? null : _askAi, icon: const Icon(Icons.auto_awesome_outlined), label: Text(asking ? 'Asking…' : 'AI ని అడుగు (Ask AI)')),
+                          ),
+                        if (asking) const LinearProgressIndicator(),
+                        if (aiAnswer != null && aiFor == query.text.trim()) ...[
+                          ListTile(key: const ValueKey('admin-settings-ai-answer'), leading: const Icon(Icons.auto_awesome_outlined), title: Text(aiAnswer!)),
+                          for (final hit in aiHits)
+                            ListTile(
+                              key: ValueKey('admin-settings-ai-hit-${hit.serial}'),
+                              dense: true,
+                              leading: CircleAvatar(radius: 16, child: Text(hit.serial, style: const TextStyle(fontSize: 11))),
+                              title: Text(hit.label),
+                              onTap: () => _open(hit),
+                            ),
+                        ],
+                      ])
                     : ListView(
                         shrinkWrap: true,
                         children: [

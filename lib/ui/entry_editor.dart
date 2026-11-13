@@ -98,6 +98,7 @@ class _EntryEditorState extends State<EntryEditor> {
     'photoSearchesPerDay',
     'abuseReportsToSuspend',
     'adminAiPerDay',
+    'adminSearchAiPerDay',
     'fieldPhotoLimit',
     'quickItemsPerDayStaff',
     'quickItemsPerDayVendor',

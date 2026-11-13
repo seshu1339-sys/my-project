@@ -42,6 +42,8 @@ class _AdminPageState extends State<AdminPage> {
   @override
   void initState() {
     super.initState();
+    // The search opens an earlier main tab (Orders, Products, Plans...) as a page with this (lib/ui/admin_settings.dart).
+    adminTabBuilder = _tab;
     // The sample accounts, for the SAMPLE label on their records (lib/ui/sample_tag.dart).
     if (widget.store.live) SampleOwners.watch(() => widget.store.firestore);
     // A Home Screen shortcut to `<admin route>?open=ai-agent` lands here straight after the normal password+OTP login; this is

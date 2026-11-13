@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_abuse_reports.dart';
+import 'provider_moderation.dart';
 import 'admin_groups.dart';
 import 'admin_staff_work.dart';
-import 'shop_ratings.dart' show AdminRatingsPage;
+import 'admin_ratings.dart';
 import 'admin_ai_assistant.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
@@ -78,14 +79,30 @@ class AdminSettingHit {
 }
 
 /// Every Settings section, numbered from 1 in the order of the list, and the fields of the sections that are one form (Business
-/// Profile, Theme, Scrolling Text: lib/ui/admin_fields.dart), numbered 5.1, 5.2 ...
+/// Profile, Theme, Scrolling Text: lib/ui/admin_fields.dart), numbered 5.1, 5.2 ...; then the other pages of the six groups (Orders,
+/// Products, Plans...), numbered P1, P2 ... Everything comes from the panel's own lists, so a new section, field or page is found
+/// by itself (and the AI search knows it).
 List<AdminSettingHit> adminSettingsIndex() => [
   for (final (i, s) in _sections.indexed) ...[
     AdminSettingHit(serial: '${i + 1}', title: s.label, sectionKey: s.key, hint: s.hint),
     for (final (j, f) in (fields[s.key]?.entries ?? const Iterable<MapEntry<String, String>>.empty()).indexed)
       AdminSettingHit(serial: '${i + 1}.${j + 1}', title: f.value, sectionKey: s.key, section: s.label, hint: f.key),
   ],
+  for (final (i, item) in [for (final g in adminGroups) for (final it in g.items) if (it.kind != AdminItemKind.section) (g, it)].indexed)
+    AdminSettingHit(serial: 'P${i + 1}', title: item.$2.label, sectionKey: item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}', hint: item.$1.title),
 ];
+
+/// Opens an earlier main tab (Orders, Products, Plans...) as a page; set by the admin panel (lib/ui/admin.dart).
+Widget Function(String name)? adminTabBuilder;
+
+/// The current value of a field hit (Business Profile, Theme and Scrolling Text are records of the settings collection), or ''.
+String adminSettingValue(Store store, AdminSettingHit hit) {
+  if (!hit.isField) return '';
+  final record = switch (hit.sectionKey) { 'settings' => 'business', final other => other };
+  final entry = store.entries('settings').where((e) => e.id == record).firstOrNull;
+  final value = entry?.data[hit.hint];
+  return value == null ? '' : '$value';
+}
 
 /// The settings that match what the admin typed or said: a number finds that serial (and the fields under a section number); words
 /// find every entry whose name, section or hint holds all of them. Sections come before fields.
@@ -112,6 +129,8 @@ Widget adminSettingsSectionPage(Store store, String key, {String? focus}) {
 
 /// What one Settings section shows.
 Widget adminSettingsContent(Store store, String key) {
+  if (key.startsWith('tab:')) return adminTabBuilder?.call(key.substring(4)) ?? const Center(child: Text('Open this page from its group in the top bar.'));
+  if (key == 'serviceProviders') return AdminNeedsFirebase(store: store, child: ProviderModerationPage(store: store));
   switch (key) {
       case 'aiAssistant':
         return AdminAiAssistantPage(store: store);

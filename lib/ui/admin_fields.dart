@@ -151,6 +151,7 @@ const fields = <String, Map<String, String>>{
         'Automatic price-drop alerts (true / false; blank = on)',
     'abuseReportsToSuspend': 'Reports for an automatic temporary suspension (vendors, providers and customers; 10 when blank)',
     'photoSearchesPerDay': 'Photo searches per person per day (AI; 10 when blank)',
+    'adminSearchAiPerDay': 'Admin search "Ask AI" per admin per day (100 when blank)',
     'adminAiPerDay': 'Admin AI assistant questions per admin per day (50 when blank)',
     'postDuration': 'Post duration: every post (vendor rates, offers, ads) hides after this time, for everyone',
     'defaultPaymentMethod': 'Default payment (direct_vendor / cash_on_delivery / platform_collected)',

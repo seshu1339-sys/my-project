@@ -72,7 +72,8 @@ void main() {
     for (final tab in ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', for (final m in moduleAdminTabs) m.title]) {
       expect(placed, contains(tab), reason: tab);
     }
-    for (final hit in adminSettingsIndex().where((h) => !h.isField)) {
+    // (The index also lists the group pages, tab:... and serviceProviders; those are checked above.)
+    for (final hit in adminSettingsIndex().where((h) => !h.isField && !h.sectionKey.startsWith('tab:') && h.sectionKey != 'serviceProviders')) {
       expect(adminGroupOf(hit.sectionKey), isNotNull, reason: '${hit.sectionKey} is in a group');
     }
     expect(adminGroupOf('serviceProviders'), 'Services');
