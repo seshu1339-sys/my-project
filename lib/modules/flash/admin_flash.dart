@@ -11,7 +11,7 @@ import 'flash_module.dart';
 Widget _build(Store store) => AdminFlashPage(store: store);
 
 /// The Flash tab of the admin panel (listed in module_admin.dart).
-const flashAdminSection = ModuleAdminSection(id: 'flash', title: 'Flash', icon: Icons.support_agent_outlined, hint: 'Chats, tickets and what Flash knows', build: _build);
+const flashAdminSection = ModuleAdminSection(id: 'flash', title: 'Support Team chat', icon: Icons.support_agent_outlined, hint: 'Chats, tickets and what the AI helper (AI సహాయం) knows', build: _build);
 
 /// Admin > Flash: the Support Inbox (every unanswered ticket, by role), then each chat in its own tab, then the settings.
 class AdminFlashPage extends StatelessWidget {

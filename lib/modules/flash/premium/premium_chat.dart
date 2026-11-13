@@ -4,7 +4,8 @@ import '../flash_data.dart';
 /// office's phone and WhatsApp on the page.
 const premiumFlashChat = FlashChatSetup(
   kind: 'premium',
-  title: 'Flash Premium Help',
+  // The chat's name in every app (owner, 13 Nov 2026).
+  title: 'Support Team',
   adminTitle: 'Premium vendors',
   collection: 'flashPremiumChats',
   callable: 'flashPremiumChat',

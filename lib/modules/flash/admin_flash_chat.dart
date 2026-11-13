@@ -36,7 +36,7 @@ class AdminFlashChatView extends StatelessWidget {
     if (tickets.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No open tickets.', key: ValueKey('flash-no-tickets')))),
     for (final ticket in tickets) _TicketCard(key: ValueKey('flash-ticket-${ticket.id}'), ticket: ticket, triageOf: triageOf, messagesOf: messagesOf, onClose: onClose),
     const SizedBox(height: 16),
-    Text('Solved by Flash, to check', style: Theme.of(context).textTheme.titleLarge),
+    Text('Solved by AI సహాయం, to check', style: Theme.of(context).textTheme.titleLarge),
     if (solved.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Nothing to check.', key: ValueKey('flash-none-solved')))),
     for (final chat in solved)
       Card(

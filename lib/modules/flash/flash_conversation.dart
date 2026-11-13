@@ -144,7 +144,8 @@ class _FlashConversationViewState extends State<FlashConversationView> {
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              if (!mine) Text(message.role == 'admin' ? 'LOCAMARKET team' : 'Flash', style: Theme.of(context).textTheme.labelSmall),
+              // Who answered: the AI ("AI సహాయం") or the office ("Support Team"), owner 13 Nov 2026.
+              if (!mine) Text(message.role == 'admin' ? 'Support Team' : 'AI సహాయం', key: ValueKey('flash-author-${message.role}'), style: Theme.of(context).textTheme.labelSmall),
               SelectableText(message.text),
             ]),
           ),
@@ -183,10 +184,10 @@ class _FlashConversationViewState extends State<FlashConversationView> {
   Widget build(BuildContext context) => Column(children: [
     Expanded(
       child: ListView(padding: const EdgeInsets.all(12), children: [
-        if (widget.messages.isEmpty && !_showSending) Text('Tell Flash what happened. If Flash cannot solve it, your problem goes to our team.'.tr(context)),
+        if (widget.messages.isEmpty && !_showSending) Text('Tell us what happened. AI సహాయం answers first; if it cannot solve it, your problem goes to the Support Team.'.tr(context)),
         for (final message in widget.messages) _bubble(message),
         if (_showSending) _bubble(FlashMessage(role: 'user', text: _sending!)),
-        if (_busy) Padding(padding: EdgeInsets.all(8), child: Text('Flash is replying...'.tr(context), key: ValueKey('flash-busy'))),
+        if (_busy) Padding(padding: EdgeInsets.all(8), child: Text('AI సహాయం is replying...'.tr(context), key: ValueKey('flash-busy'))),
       ]),
     ),
     SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: _footer)),

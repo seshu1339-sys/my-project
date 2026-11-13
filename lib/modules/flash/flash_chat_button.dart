@@ -17,7 +17,7 @@ class FlashChatButton extends StatelessWidget {
     final messenger = ScaffoldMessenger.of(context);
     if (store.user == null) {
       if (onSignIn != null) return onSignIn!(context);
-      messenger.showSnackBar(const SnackBar(content: Text('Sign in to chat with Flash.')));
+      messenger.showSnackBar(const SnackBar(content: Text('Sign in to chat with the Support Team.')));
       return;
     }
     try {

@@ -158,7 +158,8 @@ void main() {
     final sent = <String>[];
     var solved = 0, unsolved = 0;
     await tester.pumpWidget(page(conversation(onSend: (text) async => sent.add(text), onSolved: () async => solved++, onUnsolved: () async => unsolved++)));
-    expect(find.text('Flash'), findsOneWidget);
+    // The AI's answer carries the small label "AI సహాయం" (owner, 13 Nov 2026).
+    expect(find.text('AI సహాయం'), findsOneWidget);
     await tester.enterText(find.byKey(const ValueKey('flash-text')), '  Thank you  ');
     await tester.tap(find.byKey(const ValueKey('flash-send')));
     await tester.pumpAndSettle();
@@ -208,7 +209,9 @@ void main() {
     expect(find.byKey(const ValueKey('flash-text')), findsNothing);
     expect(find.byKey(const ValueKey('flash-solved')), findsNothing);
     await tester.pumpWidget(page(conversation(status: 'closed', messages: const [...talk, FlashMessage(role: 'admin', text: 'We fixed it.')])));
-    expect(find.text('LOCAMARKET team'), findsOneWidget);
+    // The office's answer carries "Support Team".
+    expect(find.text('Support Team'), findsOneWidget);
+    expect(find.byKey(const ValueKey('flash-author-admin')), findsOneWidget);
     expect(find.text('We fixed it.'), findsOneWidget);
     expect(find.byKey(const ValueKey('flash-finished')), findsOneWidget);
   });
@@ -236,7 +239,7 @@ void main() {
     await tester.pump();
     expect(find.text('I want a refund'), findsOneWidget);
     expect(find.textContaining('Ravi · r@example.com'), findsOneWidget);
-    expect(find.textContaining('The person said Flash did not solve it'), findsOneWidget);
+    expect(find.textContaining('The person said AI సహాయం did not solve it'), findsOneWidget);
     expect(find.textContaining('AI suggestion, nothing has been done: order, high urgency. Ask the shop first.'), findsOneWidget);
     expect(closed, isEmpty);
 

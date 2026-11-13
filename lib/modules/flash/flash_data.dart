@@ -66,9 +66,9 @@ class FlashTicket {
   final bool priority;
 
   String get reasonLabel => switch (reason) {
-    'person' => 'The person said Flash did not solve it',
-    'no_answer' => 'Flash could not answer',
-    _ => 'Flash sent this to the team',
+    'person' => 'The person said AI సహాయం did not solve it',
+    'no_answer' => 'AI సహాయం could not answer',
+    _ => 'AI సహాయం sent this to the Support Team',
   };
 }
 
