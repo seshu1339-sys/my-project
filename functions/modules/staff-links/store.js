@@ -123,4 +123,80 @@ async function disableOldStaffAdded(db, adminUid, now = Date.now()) {
   return counts;
 }
 
-module.exports = {linkAccount, removeLink, disableOldStaffAdded, OLD_REASON};
+// ---- The admin links at any time; the vendor asks for local staff (owner, 13 Nov 2026) ----
+//   staffLinkRequests/<kind>_<uid>  {kind, accountUid, code, name, town, phone, latitude, longitude, status: 'open' | 'linked', at}
+
+/// The registration of a vendor or provider by their ID or uid: {kind, ref, app, code}.
+async function registration(db, data) {
+  const parsed = parseCode(data.code);
+  if (parsed) {
+    const [collection, field] = APPLICATIONS[parsed.kind];
+    const found = await db.collection(collection).where(field, '==', parsed.code).limit(1).get();
+    if (found.empty) throw Error(`No registration has the ID ${parsed.code}.`);
+    return {kind: parsed.kind, ref: found.docs[0].ref, app: found.docs[0].data(), code: parsed.code};
+  }
+  const kind = data.kind === 'provider' ? 'provider' : data.kind === 'vendor' ? 'vendor' : null;
+  if (!kind || typeof data.accountUid !== 'string' || !ID.test(data.accountUid)) throw Error('Enter the Vendor ID or the service provider ID.');
+  const [collection, field] = APPLICATIONS[kind];
+  const doc = await db.collection(collection).doc(data.accountUid).get();
+  if (!doc.exists) throw Error('That registration was not found.');
+  return {kind, ref: doc.ref, app: doc.data(), code: doc.data()[field] || ''};
+}
+
+/// The active staff whose own area holds this point (only they may be linked to the person).
+async function staffInAreaOf(db, place) {
+  const holders = await db.collection('staffAreaHolders').get();
+  const out = [];
+  for (const holder of holders.docs) {
+    const staffUid = holder.data().staffUid;
+    if (!staffUid) continue;
+    const [area, staff] = await Promise.all([db.collection('staffAreas').doc(holder.id).get(), db.collection('fieldStaff').doc(staffUid).get()]);
+    if (!area.exists || staff.data()?.status !== 'active') continue;
+    if (areaProblem({id: area.id, ...area.data()}, place)) continue;
+    out.push({staffUid, staffCode: staff.data().staffCode || '', name: staff.data().name || '', phone: staff.data().phone || '', areaName: area.data().name || ''});
+  }
+  return out;
+}
+
+/// The admin links a vendor or provider to a staff member at any time (no 30-minute limit), only when the person is inside the staff
+/// member's own area. An existing link is replaced. An open request of the person is closed.
+async function adminLink(db, adminUid, data = {}, now = Date.now()) {
+  const {kind, ref, app, code} = await registration(db, data);
+  if (typeof data.staffUid !== 'string' || !ID.test(data.staffUid)) throw Error('Choose the staff member.');
+  const staff = await activeStaff(db, data.staffUid);
+  const area = await ownArea(db, data.staffUid);
+  if (!area) throw Error('This staff member has no area yet, so nobody can be linked to them.');
+  if (areaProblem(area, app)) throw Error(`This vendor or provider is outside the area "${area.name}" of ${staff.staffCode || 'this staff member'}, so they cannot be linked.`);
+  const at = Timestamp.fromMillis(now);
+  const link = {
+    kind, accountUid: ref.id, code, name: app.name || '', town: app.town || '', pincode: app.pincode || '',
+    staffUid: data.staffUid, staffCode: staff.staffCode || '', staffName: staff.name || '',
+    registeredAt: app.submittedAt ?? at, linkedAt: at, linkedBy: 'admin', linkedByUid: adminUid,
+  };
+  const batch = db.batch();
+  batch.set(db.collection('staffLinks').doc(linkId(kind, ref.id)), link);
+  batch.set(ref, {registeredByStaffUid: data.staffUid, registeredByStaffCode: staff.staffCode || '', registeredByLinkedAt: at}, {merge: true});
+  batch.set(db.collection('staffLinkRequests').doc(`${kind}_${ref.id}`), {status: 'linked', staffUid: data.staffUid, staffCode: staff.staffCode || '', decidedAt: at}, {merge: true});
+  await batch.commit();
+  return {linkId: linkId(kind, ref.id), staffCode: staff.staffCode || ''};
+}
+
+/// A vendor or provider asks (from the Support Team chat) to be connected to the staff of their area. No staff ID is needed: the admin
+/// chooses from the staff of that area. One open request at a time.
+async function requestLocalStaff(db, uid, role, now = Date.now()) {
+  const kind = role === 'provider' ? 'provider' : 'vendor';
+  const [collection, field] = APPLICATIONS[kind];
+  const app = (await db.collection(collection).doc(uid).get()).data();
+  if (!app) throw Error('Register your shop or service first, then ask for local staff.');
+  if ((await db.collection('staffLinks').doc(linkId(kind, uid)).get()).exists) throw Error('You are already connected to a staff member of your area.');
+  const ref = db.collection('staffLinkRequests').doc(`${kind}_${uid}`);
+  const current = (await ref.get()).data();
+  if (current?.status === 'open') return {status: 'open', already: true};
+  await ref.set({
+    kind, accountUid: uid, code: app[field] || '', name: app.name || '', town: app.town || '', phone: app.phone || '',
+    latitude: app.latitude ?? null, longitude: app.longitude ?? null, status: 'open', at: Timestamp.fromMillis(now),
+  });
+  return {status: 'open'};
+}
+
+module.exports = {linkAccount, removeLink, disableOldStaffAdded, OLD_REASON, adminLink, requestLocalStaff, staffInAreaOf, registration};

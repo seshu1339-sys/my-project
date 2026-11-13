@@ -35,7 +35,11 @@ class _FlashChatPageState extends State<FlashChatPage> {
         if (found.hasError) return Center(child: Text('Your chats could not load.'.tr(context)));
         if (!found.hasData) return const Center(child: CircularProgressIndicator());
         return FlashChatListView(
-          top: setup.officeContact ? FlashOfficeContact(store: store) : null,
+          top: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (setup.officeContact) FlashOfficeContact(store: store),
+            // Vendors and providers may ask to be connected to the staff of their area; the admin chooses who (no staff ID needed).
+            if (const {'vendor', 'premium', 'provider'}.contains(setup.kind)) LocalStaffRequestButton(store: store),
+          ]),
           categories: setup.categories,
           chats: [for (final doc in found.data!.docs) FlashChat.fromData(doc.id, doc.data())],
           onNew: (category) => _open(category: category),
@@ -131,4 +135,35 @@ class FlashOfficeContactView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// "Connect me to local staff": a request the admin sees (Admin > Staff > Link requests) and answers by choosing a staff member of the
+/// vendor's or provider's area (functions/modules/staff-links requestLocalStaff).
+class LocalStaffRequestButton extends StatelessWidget {
+  const LocalStaffRequestButton({super.key, required this.store, this.send});
+  final Store store;
+
+  /// Test seam: sends the request.
+  final Future<Map<String, dynamic>> Function()? send;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: OutlinedButton.icon(
+      key: const ValueKey('flash-local-staff'),
+      icon: const Icon(Icons.support_agent_outlined),
+      label: const Text('Connect me to local staff'),
+      onPressed: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        try {
+          final result = await (send ?? () => store.call('requestLocalStaff', const {}))();
+          messenger.showSnackBar(SnackBar(content: Text(result['already'] == true
+              ? 'You already asked. The Support Team will connect you to the staff of your area.'
+              : 'Request sent. The Support Team will connect you to the staff of your area.')));
+        } catch (e) {
+          messenger.showSnackBar(SnackBar(content: Text('$e'.replaceFirst(RegExp(r'^\[[^\]]+\]\s*'), ''))));
+        }
+      },
+    ),
+  );
 }

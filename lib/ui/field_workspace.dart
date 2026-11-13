@@ -6,6 +6,7 @@ import '../modules/stafflinks/stafflinks_module.dart';
 import 'field_add_page.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
+import 'staff_my_work.dart';
 
 /// Shown only once the staff member's fieldStaff doc is 'active'. The staff member's ID, Add (link a vendor or service provider who
 /// registered themselves, by their ID within 30 minutes), and "Vendors I registered", read only. Staff never create vendors or change
@@ -50,6 +51,9 @@ class _FieldWorkspaceState extends State<FieldWorkspace> {
         icon: const Icon(Icons.link),
         label: const Text('Add (link a vendor or service)', style: TextStyle(fontSize: 18)),
       ),
+      const SizedBox(height: 16),
+      // My own work: linked vendors' updates, targets, the graph and this month's amount (lib/ui/staff_my_work.dart).
+      StaffMyWork(store: store, uid: uid),
       const SizedBox(height: 16),
       StaffLinkedList(store: store, uid: uid),
     ],

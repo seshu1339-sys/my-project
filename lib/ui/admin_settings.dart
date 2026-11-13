@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_abuse_reports.dart';
+import 'admin_staff_work.dart';
 import 'shop_ratings.dart' show AdminRatingsPage;
 import 'admin_ai_assistant.dart';
 import 'admin_android_home.dart';
@@ -59,6 +60,11 @@ final _sections = <_SettingsSection>[
   _SettingsSection('reports', 'Reports', Icons.flag_outlined, 'Reported shops, providers and customers; restore or block for good'),
   _SettingsSection('blockList', 'Block list', Icons.block, 'Emails and phones that cannot register or sign in again'),
   _SettingsSection('ratings', 'Ratings', Icons.star_outline, 'Star ratings of shops and service providers; remove fake ones'),
+  // Staff work (functions/modules/staff-work, staff-links): performance, targets, pay slabs, ranking, ID report, links.
+  _SettingsSection('staffWork', 'Staff work and pay', Icons.badge_outlined, 'Each staff member: linked vendors, daily target (50), month, pay slabs, mark paid'),
+  _SettingsSection('staffRanking', 'Staff ranking', Icons.leaderboard_outlined, "This month's best staff: updates, active vendors, target done; by area"),
+  _SettingsSection('idReport', 'ID report', Icons.manage_search, 'Type a Vendor, provider or Staff ID: the full report, graphs, Excel and PDF'),
+  _SettingsSection('staffLinks', 'Staff links and requests', Icons.link, 'Link any vendor to staff of its area; vendors\' "connect me to local staff" requests'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -114,6 +120,14 @@ Widget adminSettingsContent(Store store, String key) {
         return AdminBlockListPage(store: store);
       case 'ratings':
         return AdminRatingsPage(store: store);
+      case 'staffWork':
+        return AdminStaffWorkPage(store: store);
+      case 'staffRanking':
+        return AdminStaffRankingPage(store: store);
+      case 'idReport':
+        return AdminIdReportPage(store: store);
+      case 'staffLinks':
+        return AdminLinkRequestsPage(store: store);
       case 'fieldAssistants':
         return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: FieldModerationPage(store: store)));
       case 'layout':

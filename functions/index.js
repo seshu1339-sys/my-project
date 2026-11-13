@@ -116,6 +116,9 @@ Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockCon
 // Shop and service-provider star ratings (functions/modules/shop-ratings).
 const {rateShop, removeShopRating} = require('./modules/shop-ratings');
 Object.assign(exports, {rateShop, removeShopRating});
+// Staff work: linked vendors' updates, targets, pay slabs, the ID report and the ranking (functions/modules/staff-work).
+const staffWork = require('./modules/staff-work');
+for (const name of ['countItemUpdate', 'countServiceUpdate', 'countOfferUpdate', 'countTodaysOfferUpdate', 'staffWorkOverview', 'staffRanking', 'idReport', 'saveStaffPayConfig', 'setStaffTargets', 'markStaffPaid']) exports[name] = staffWork[name];
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

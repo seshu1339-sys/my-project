@@ -354,6 +354,18 @@ service cloud.firestore {
       allow read: if admin() || (signedIn() && (resource.data.staffUid == request.auth.uid || resource.data.accountUid == request.auth.uid));
       allow write: if false;
     }
+    // Staff Work module (functions/modules/staff-work): a staff member reads only their own work, targets and payouts; the admin reads
+    // everything; functions write it all. Nobody else sees another staff member's numbers or the ranking.
+    match /staffWork/{uid}/{document=**} { allow read: if (signedInAs('staff') && owner(uid)) || admin(); allow write: if false; }
+    match /staffPayTargets/{uid} { allow read: if (signedInAs('staff') && owner(uid)) || admin(); allow write: if false; }
+    match /staffPayConfig/{id} { allow read: if signedInAs('staff') || admin(); allow write: if false; }
+    match /staffPayouts/{id} { allow read: if admin() || (signedInAs('staff') && resource.data.staffUid == request.auth.uid); allow write: if false; }
+    match /vendorActivity/{uid}/{document=**} { allow read: if admin(); allow write: if false; }
+    // A vendor's or provider's "connect me to local staff" request: the admin and the person themself read it; functions write it.
+    match /staffLinkRequests/{id} {
+      allow read: if admin() || (signedIn() && resource.data.accountUid == request.auth.uid);
+      allow write: if false;
+    }
     // Offer Alerts module (functions/modules/offer-alerts): the one-alert-a-day limit and how many each alert reached; admin only.
     match /vendorOfferAlerts/{vendorId} {
       allow read: if admin();

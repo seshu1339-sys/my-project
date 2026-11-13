@@ -8,10 +8,13 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   linkStaffRegistration    staff -> link the vendor / provider with this ID (VEN-... / SRV-...)
 //   removeStaffLink          admin -> remove a wrong link
 //   disableOldStaffAdded     admin -> suspend the vendors and providers staff created the old way (they must register themselves)
+//   adminLinkStaff           admin -> link a vendor / provider to a staff member of their area, at any time
+//   staffForArea             admin -> the active staff whose area holds this vendor / provider (to choose from)
+//   requestLocalStaff        vendor / provider -> "connect me to the staff of my area" (from the Support Team chat)
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('../../admin-session');
-const {linkAccount, removeLink, disableOldStaffAdded} = require('./store');
+const {linkAccount, removeLink, disableOldStaffAdded, adminLink, requestLocalStaff, staffInAreaOf, registration} = require('./store');
 
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
@@ -38,4 +41,20 @@ exports.removeStaffLink = onCall(options, async request => {
 exports.disableOldStaffAdded = onCall({...options, timeoutSeconds: 300}, async request => {
   const uid = await requireAdmin(request);
   try { return await disableOldStaffAdded(getFirestore(), uid); } catch (error) { return fail(error); }
+});
+exports.adminLinkStaff = onCall(options, async request => {
+  const uid = await requireAdmin(request);
+  try { return await adminLink(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
+});
+exports.staffForArea = onCall({...options, timeoutSeconds: 60}, async request => {
+  await requireAdmin(request);
+  try {
+    const db = getFirestore();
+    const {app} = await registration(db, request.data || {});
+    return {staff: await staffInAreaOf(db, app)};
+  } catch (error) { return fail(error); }
+});
+exports.requestLocalStaff = onCall(options, async request => {
+  const uid = requireRole(request, ['vendor', 'provider']);
+  try { return await requestLocalStaff(getFirestore(), uid, request.auth.token.role); } catch (error) { return fail(error); }
 });

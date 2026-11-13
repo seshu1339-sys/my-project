@@ -79,7 +79,7 @@ class _StaffLinkPageState extends State<StaffLinkPage> {
                 key: const ValueKey('staff-link-code'),
                 controller: code,
                 textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(prefixIcon: const Icon(Icons.search), labelText: idName, hintText: widget.provider ? 'SRV-NRPM-116-001' : 'VEN-NRPM-116-325', errorText: error),
+                decoration: InputDecoration(prefixIcon: const Icon(Icons.search), labelText: 'Enter $idName', hintText: widget.provider ? 'SRV-NRPM-116-001' : 'VEN-NRPM-116-325', errorText: error),
                 onSubmitted: (_) => busy ? null : _link(),
               ),
               const SizedBox(height: 12),
