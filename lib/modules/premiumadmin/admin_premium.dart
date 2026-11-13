@@ -25,7 +25,8 @@ class AdminPremiumPage extends StatelessWidget {
   Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
     stream: store.firestore.collection('wholesaleOffers').orderBy('validUntil').snapshots(),
     builder: (context, wholesale) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: store.firestore.collection('vendorTodaysOffers').where('endsAt', isGreaterThan: Timestamp.now()).orderBy('endsAt').snapshots(),
+      // Every box, newest first: live, hidden, waiting and the ones whose plan ended (kept until the vendor renews).
+      stream: store.firestore.collection('vendorTodaysOffers').orderBy('submittedAt', descending: true).limit(300).snapshots(),
       builder: (context, offers) {
         if (wholesale.hasError || offers.hasError) return const Center(child: Text('Premium offers could not load.'));
         if (!wholesale.hasData || !offers.hasData) return const Center(child: CircularProgressIndicator());
@@ -36,6 +37,7 @@ class AdminPremiumPage extends StatelessWidget {
           onSave: _save,
           onDelete: (id) => store.call('deleteWholesaleOffer', {'offerId': id}),
           onRemoveOffer: (offerId) => store.call('removeTodaysOffer', {'offerId': offerId}),
+          onHideOffer: (offerId, hidden) => store.call('setTodaysOfferHidden', {'offerId': offerId, 'hidden': hidden}),
         );
       },
     ),
@@ -43,13 +45,15 @@ class AdminPremiumPage extends StatelessWidget {
 }
 
 class AdminPremiumView extends StatelessWidget {
-  const AdminPremiumView({super.key, required this.wholesale, required this.vendorOffers, required this.shopName, required this.onSave, required this.onDelete, required this.onRemoveOffer, this.now});
+  const AdminPremiumView({super.key, required this.wholesale, required this.vendorOffers, required this.shopName, required this.onSave, required this.onDelete, required this.onRemoveOffer, this.onHideOffer, this.now});
   final List<AdminWholesale> wholesale;
   final List<AdminVendorOffer> vendorOffers;
   final String Function(String shopId) shopName;
   final Future<void> Function(WholesaleDraft draft) onSave;
   final Future<void> Function(String offerId) onDelete;
   final Future<void> Function(String vendorId) onRemoveOffer;
+  // Hide an offer (true) or show it again (false); null hides the buttons.
+  final Future<void> Function(String offerId, bool hidden)? onHideOffer;
   final DateTime? now;
 
   Future<void> _run(BuildContext context, Future<void> Function() action, String done) async {
@@ -114,9 +118,9 @@ class AdminPremiumView extends StatelessWidget {
         ),
       const SizedBox(height: 20),
       Text("Vendors' Today's Offers", style: Theme.of(context).textTheme.headlineSmall),
-      const Text('These go live without approval. Remove one if it is wrong; the vendor is told and can submit a new one.'),
+      const Text('These go live without approval and stay while the vendor\'s plan runs. Hide one (the vendor is told), Show it again, or Remove it. An own photo the AI check could not look at waits here until you press Show.'),
       const SizedBox(height: 8),
-      if (vendorOffers.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No vendor offers are live.', key: ValueKey('admin-vendor-offers-empty')))),
+      if (vendorOffers.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No vendor offers yet.', key: ValueKey('admin-vendor-offers-empty')))),
       for (final offer in vendorOffers)
         Card(
           child: ListTile(
@@ -127,17 +131,29 @@ class AdminPremiumView extends StatelessWidget {
             ),
             title: Text(shopName(offer.shopId)),
             subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${premiumPrice(offer.price)} • until ${premiumDate(offer.endsAt)}'),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
+              if (offer.vendorCode.isNotEmpty || offer.planName.isNotEmpty)
+                Text(
+                  [if (offer.vendorCode.isNotEmpty) 'Vendor ID: ${offer.vendorCode}', if (offer.planName.isNotEmpty) 'Plan: ${offer.planName}'].join(' • '),
+                  key: ValueKey('admin-vendor-offer-who-${offer.vendorId}'),
+                ),
+              Text([if (offer.name.isNotEmpty) offer.name, premiumPrice(offer.price), if (offer.ownPhoto) 'own photo'].join(' • ')),
+              if (offer.note.isNotEmpty) Text(offer.note, style: const TextStyle(fontStyle: FontStyle.italic)),
+              Text(offer.statusAt(today), key: ValueKey('admin-vendor-offer-status-${offer.vendorId}')),
+              Wrap(spacing: 4, children: [
+                if (onHideOffer != null)
+                  TextButton(
+                    key: ValueKey('admin-vendor-offer-${offer.hidden ? 'show' : 'hide'}-${offer.vendorId}'),
+                    onPressed: () => _run(context, () => onHideOffer!(offer.vendorId, !offer.hidden), offer.hidden ? 'Offer shown' : 'Offer hidden'),
+                    child: Text(offer.hidden ? 'Show' : 'Hide'),
+                  ),
+                TextButton(
                   key: ValueKey('admin-vendor-offer-remove-${offer.vendorId}'),
                   onPressed: () async {
                     if (await _sure(context, 'Remove this offer?') && context.mounted) await _run(context, () => onRemoveOffer(offer.vendorId), 'Offer removed');
                   },
                   child: const Text('Remove'),
                 ),
-              ),
+              ]),
             ]),
           ),
         ),

@@ -66,7 +66,7 @@ test('a changed duration recalculates the running posts once, and gives back tim
   assert.equal(s.price.priceExpiresAt, iso(posted + DAY_MS));
   assert.equal(s.excl.expiresAt, iso(posted + DAY_MS));
   assert.equal(s.excl.endsAt, iso(posted + DAY_MS), 'the website and the apps hide the exclusive item at that time');
-  assert.equal(s.box.endsAt.toMillis(), posted + DAY_MS);
+  assert.equal(s.box.endsAt.toMillis(), posted + 7 * DAY_MS, "a Today's Offers box runs with the plan, never capped (owner, 13 Nov 2026)");
   assert.equal(s.offer.endsAt.toMillis(), posted + DAY_MS);
   assert.equal(s.removed.endsAt.toMillis(), posted + 30 * DAY_MS, 'a removed offer is not touched');
   assert.equal(s.ad.endsAt, iso(posted + DAY_MS));

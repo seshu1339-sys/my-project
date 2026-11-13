@@ -4,7 +4,7 @@
 // posted, paid plans included (a plan gives more photos and posts, not a longer time):
 //   vendor item prices      products.priceSetAt   -> priceExpiresAt, endsAt (ISO)
 //   exclusive items         products.postedAt     -> expiresAt, endsAt (ISO)
-//   Today's Offers boxes    vendorTodaysOffers.submittedAt -> endsAt (Timestamp)
+//   (Today's Offers boxes are not posts any more: they run with the vendor's plan, owner 13 Nov 2026)
 //   Vendor Offers           vendorOffers.postedAt (else createdAt) -> endsAt (Timestamp); staff offers end the same day anyway
 //   vendor ads              ads (source 'vendor').startsAt -> endsAt (ISO)
 // A post keeps its own end (ownEndsAt: the days the vendor chose, the plan end) when that is earlier. The end is capped when the post
@@ -64,7 +64,8 @@ async function recapLivePosts(db, durationMs, now = Date.now()) {
     if (end !== millisOf(item.expiresAt) || end !== millisOf(item.endsAt)) plan(doc.ref, {expiresAt: iso(end), endsAt: iso(end), ownEndsAt: iso(own)});
   }
   // Today's Offers boxes and Vendor Offers (Timestamps).
-  for (const [collection, postedOf] of [['vendorTodaysOffers', o => firstMillis(o.submittedAt)], ['vendorOffers', o => firstMillis(o.postedAt, o.createdAt)]]) {
+  // Today's Offers boxes are not capped any more: they stay live while the vendor's plan runs (owner, 13 Nov 2026).
+  for (const [collection, postedOf] of [['vendorOffers', o => firstMillis(o.postedAt, o.createdAt)]]) {
     for (const doc of (await db.collection(collection).where('endsAt', '>', Timestamp.fromMillis(now)).get()).docs) {
       const post = doc.data();
       if (collection === 'vendorOffers' && !['live', 'pending'].includes(post.status)) continue;

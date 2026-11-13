@@ -164,6 +164,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
         frame: entryDecoration(look, fallback: AppTokens.primaryLight),
         colour: colorFromHex(look.text('backgroundColor'), AppTokens.primary),
         radius: inner,
+        note: offer.note,
         onTap: () => _openVendor(offer),
       );
     },

@@ -153,7 +153,7 @@ void main() {
     testWidgets('the form takes an item, a price and 1 week to 3 months, and each is needed', (tester) async {
       OfferFormResult? sent;
       await openForm(tester, (r) async => sent = r);
-      expect(find.byType(TextFormField), findsOneWidget, reason: 'the price is the only typed field');
+      expect(find.byType(TextFormField), findsNWidgets(2), reason: 'the price and the optional offer text (owner, 13 Nov 2026)');
       for (final words in ['1 week', '1 month', '2 months', '3 months']) expect(find.text(words), findsOneWidget, reason: words);
       await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
       await tester.pump();

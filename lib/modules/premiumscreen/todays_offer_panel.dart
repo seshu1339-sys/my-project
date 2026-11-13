@@ -4,18 +4,35 @@ import 'offer_form_dialog.dart';
 
 /// What the panel shows of one running box.
 class RunningOffer {
-  const RunningOffer({required this.photoUrl, required this.price, required this.endsAt, this.slot = 1, this.productId = '', this.name = '', this.days = 0});
-  final String photoUrl, productId, name;
+  const RunningOffer({
+    required this.photoUrl,
+    required this.price,
+    required this.endsAt,
+    this.slot = 1,
+    this.productId = '',
+    this.name = '',
+    this.days = 0,
+    this.libraryItemId = '',
+    this.note = '',
+    this.untilPlanEnds = false,
+    this.hidden = false,
+    this.waitingCheck = false,
+  });
+  final String photoUrl, productId, name, libraryItemId, note;
   final num price;
   final DateTime endsAt;
   final int slot, days;
+  // Runs while the plan runs; hidden by the admin; waiting for the admin because the photo check could not run.
+  final bool untilPlanEnds, hidden, waitingCheck;
 }
 
 /// The vendor's Today's Offers boxes (as many as the plan gives): each running box with its item, price and end, marked LIVE in its own
 /// colour, and a button to fill an empty box or change one.
 class TodaysOfferPanel extends StatefulWidget {
-  const TodaysOfferPanel({super.key, required this.offers, required this.boxes, required this.items, required this.dayOptions, required this.onSubmit, this.onRemove, this.durationNote});
+  const TodaysOfferPanel({super.key, required this.offers, required this.boxes, required this.items, required this.dayOptions, required this.onSubmit, this.onRemove, this.durationNote, this.catalog = const []});
   final List<RunningOffer> offers;
+  // The catalog (Product Image Library) to choose a stock photo from.
+  final List<OfferItemChoice> catalog;
   // The admin's post duration, said before posting (lib/domain/post_duration.dart).
   final String? durationNote;
   final int boxes;
@@ -51,10 +68,13 @@ class _TodaysOfferPanelState extends State<TodaysOfferPanel> {
       context: context,
       builder: (_) => OfferFormDialog(
         items: widget.items,
+        catalog: widget.catalog,
         dayOptions: widget.dayOptions,
         durationNote: widget.durationNote,
         slot: slot,
-        initial: running == null ? null : OfferFormResult(productId: running.productId, price: running.price, days: running.days, slot: slot),
+        initial: running == null
+            ? null
+            : OfferFormResult(productId: running.productId, libraryItemId: running.libraryItemId, note: running.note, price: running.price, days: running.untilPlanEnds || running.days == 0 ? null : running.days, slot: slot),
       ),
     );
     if (result == null || !mounted) return;
@@ -84,20 +104,28 @@ class _TodaysOfferPanelState extends State<TodaysOfferPanel> {
           ],
           Expanded(
             child: running == null
-                ? Text('Box $slot is empty. Choose one of your items to show here.', key: ValueKey('todays-offer-empty-$slot'))
+                ? Text('Box $slot is empty. Choose one of your items, a catalog item or your own photo.', key: ValueKey('todays-offer-empty-$slot'))
                 : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Container(
-                        key: ValueKey('todays-offer-live-$slot'),
+                        key: ValueKey(running.hidden ? 'todays-offer-hidden-$slot' : 'todays-offer-live-$slot'),
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: TodaysOfferPanel.liveColour, borderRadius: BorderRadius.circular(4)),
-                        child: const Text('LIVE', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                        decoration: BoxDecoration(color: running.hidden ? Colors.grey : TodaysOfferPanel.liveColour, borderRadius: BorderRadius.circular(4)),
+                        child: Text(running.hidden ? 'HIDDEN' : 'LIVE', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                       ),
                       const SizedBox(width: 6),
                       Flexible(child: Text(running.name.isEmpty ? 'Box $slot' : running.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
                     ]),
                     Text(_price(running.price), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: TodaysOfferPanel.liveColour)),
-                    Text('Shows until ${_date(running.endsAt)}', key: ValueKey('todays-offer-until-$slot')),
+                    if (running.note.isNotEmpty) Text(running.note, key: ValueKey('todays-offer-note-$slot'), style: const TextStyle(fontStyle: FontStyle.italic)),
+                    Text(
+                      running.untilPlanEnds ? 'Live while your plan runs (until ${_date(running.endsAt)})' : 'Shows until ${_date(running.endsAt)}',
+                      key: ValueKey('todays-offer-until-$slot'),
+                    ),
+                    if (running.waitingCheck)
+                      Text('Waiting for the office to check your photo', key: ValueKey('todays-offer-waiting-$slot'), style: const TextStyle(color: Colors.deepOrange))
+                    else if (running.hidden)
+                      Text('Hidden by the LOCAMARKET team. Change it to show a new offer.', key: ValueKey('todays-offer-hidden-note-$slot'), style: const TextStyle(color: Colors.grey)),
                   ]),
           ),
           const SizedBox(width: 8),

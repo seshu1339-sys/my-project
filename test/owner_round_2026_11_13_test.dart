@@ -29,7 +29,8 @@ void main() {
     expect(postDurationNotice(const Entry('business', {})), contains('Paid plans give more photos and posts, not a longer time'));
   });
 
-  testWidgets("Today's Offers form: no day chips, the note shows, the longest choice is sent (the server caps it)", (tester) async {
+  // Owner, 13 Nov 2026 (later the same day): a Today's Offers box runs while the plan runs, so no days are sent.
+  testWidgets("Today's Offers form: no day chips, the note shows, the box runs with the plan", (tester) async {
     OfferFormResult? sent;
     await tester.pumpWidget(MaterialApp(home: Builder(builder: (context) => Scaffold(body: TextButton(
       onPressed: () async => sent = await showDialog<OfferFormResult>(context: context, builder: (_) => const OfferFormDialog(
@@ -47,7 +48,8 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('todays-offer-price')), '45');
     await tester.tap(find.byKey(const ValueKey('todays-offer-send')));
     await tester.pumpAndSettle();
-    expect(sent?.days, 90);
+    expect(sent?.days, isNull);
+    expect(sent?.productId, 'p1');
   });
 
   test('the settings index numbers every section and the fields of the one-form sections; search finds by name or number', () {
