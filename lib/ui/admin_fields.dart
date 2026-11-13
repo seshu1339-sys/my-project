@@ -149,6 +149,8 @@ const fields = <String, Map<String, String>>{
         'Auto-publish approved vendor changes (true / false)',
     'priceDropAutoEnabled':
         'Automatic price-drop alerts (true / false; blank = on)',
+    'autoApproval': 'Auto Approval: register vendors and service providers at once when their photos pass the AI check (OFF by default)',
+    'photoSafetyChecksPerDay': 'AI photo safety checks per day (all photos; 300 when blank)',
     'abuseReportsToSuspend': 'Reports for an automatic temporary suspension (vendors, providers and customers; 10 when blank)',
     'photoSearchesPerDay': 'Photo searches per person per day (AI; 10 when blank)',
     'adminSearchAiPerDay': 'Admin search "Ask AI" per admin per day (100 when blank)',

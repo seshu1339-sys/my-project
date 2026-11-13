@@ -58,9 +58,14 @@ void main() {
     expect(errors(phone: 'abc'), hasLength(1));
     expect(errors(shop: ''), hasLength(1));
     expect(errors(category: ''), hasLength(1));
-    expect(errors(address: 'abc'), hasLength(1));
     expect(errors(pincode: '5600'), hasLength(1));
-    expect(errors(description: 'short'), hasLength(1));
+  });
+
+  test('owner, 13 Nov 2026: the address, the description and the shop photo are optional at registration', () {
+    expect(errors(address: ''), isEmpty);
+    expect(errors(description: ''), isEmpty);
+    expect(errors(shopPhoto: false), isEmpty);
+    expect(errors(address: 'x' * 501), hasLength(1), reason: 'only too long is refused');
   });
 
   test('the shop GPS location is mandatory and reported separately', () {
@@ -68,10 +73,9 @@ void main() {
     expect(errors(location: false, vendorPhoto: false), hasLength(2));
   });
 
-  test('each photo is mandatory and reported separately', () {
+  test('the owner photo is mandatory', () {
     expect(errors(vendorPhoto: false), ['Upload a clear personal photo of the vendor.']);
-    expect(errors(shopPhoto: false), ['Upload a photo of the actual shop.']);
-    expect(errors(vendorPhoto: false, shopPhoto: false), hasLength(2));
+    expect(errors(vendorPhoto: false, shopPhoto: false), hasLength(1), reason: 'the shop photo may come later');
   });
 
   testWidgets('the form lists every problem and sends nothing when incomplete', (tester) async {
@@ -81,16 +85,16 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: VendorRegistrationForm(store: store, email: 'vendor@example.com'))));
 
     expect(find.text('vendor@example.com'), findsOneWidget);
-    for (final label in ['Owner full name', 'Contact phone', 'Shop name', 'Shop address', 'Pincode', 'Shop description']) {
+    for (final label in ['Owner full name', 'Contact phone', 'Shop name', 'Shop address (optional)', 'Pincode', 'Shop description (optional)']) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
     expect(find.text('Vendor photo'), findsOneWidget);
-    expect(find.text('Shop photo'), findsOneWidget);
+    expect(find.text('Shop photo (optional now)'), findsOneWidget);
 
     await tester.tap(find.text('Submit for approval'));
     await tester.pump();
     expect(find.text('• Upload a clear personal photo of the vendor.'), findsOneWidget);
-    expect(find.text('• Upload a photo of the actual shop.'), findsOneWidget);
+    expect(find.text('• Upload a photo of the actual shop.'), findsNothing, reason: 'the shop photo may come later');
     expect(find.text("• Enter the owner's full name."), findsOneWidget);
     expect(store.registrations, 0);
 

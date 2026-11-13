@@ -54,7 +54,7 @@ class ProviderModerationPage extends StatelessWidget {
         key: ValueKey('provider-application-${doc.id}'),
         initiallyExpanded: status == 'pending',
         title: SampleTitle('${data['name'] ?? doc.id} • ${data['serviceName'] ?? ''}', id: doc.id, data: data),
-        subtitle: Text('₹${data['hourlyRate'] ?? ''} per hour • ${switch (status) { 'pending' => 'Pending approval', 'approved' => 'Approved, live', 'rejected' => 'Rejected', _ => status }}'),
+        subtitle: Text('${data['autoApproved'] == true ? 'Auto Approved • ' : ''}₹${data['hourlyRate'] ?? ''} per hour • ${switch (status) { 'pending' => 'Pending approval', 'approved' => 'Approved, live', 'rejected' => 'Rejected', _ => status }}'),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [

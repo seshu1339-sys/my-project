@@ -12,6 +12,8 @@ const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
 const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit} = require('./domain');
 const {vendorItemLimitNow} = require('./plan-gate');
+// The photo safety check of the Auto Approval (Claude Haiku: drugs, weapons, alcohol, tobacco, adult content).
+const {anthropicKey: photoSafetyKey, checkStoredPhotos, unsafeReason} = require('./photo-safety');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
@@ -161,12 +163,15 @@ function publicChangeFields(type, changes) {
 // The two mandatory application photos live at fixed, separate paths so they
 // can never be confused with each other or with public catalog images.
 const applicationPhotos = {vendorPhoto: 'Upload a clear personal photo of the vendor before submitting.', shopPhoto: 'Upload a photo of the actual shop before submitting.'};
+const OPTIONAL_APPLICATION_PHOTOS = ['shopPhoto'];
 async function requireApplicationPhotos(uid) {
   const bucket = getStorage().bucket();
   const paths = {};
   for (const [name, missing] of Object.entries(applicationPhotos)) {
     const file = bucket.file(`vendorApplications/${uid}/${name}`);
     const [exists] = await file.exists();
+    // Owner, 13 Nov 2026: only the owner photo is needed to register; the shop photo may come later (it is still needed before items).
+    if (!exists && OPTIONAL_APPLICATION_PHOTOS.includes(name)) continue;
     if (!exists) throw new HttpsError('failed-precondition', missing);
     const [metadata] = await file.getMetadata();
     if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', missing);
@@ -291,7 +296,7 @@ exports.reviewComplaint = onCall(options, async request => {
   return {status};
 });
 // 512 MiB: checking the application photos needs more than 256 MiB (it ran out on 13 Nov 2026); still inside the free tier.
-exports.registerVendor = onCall({...options, memory: '512MiB'}, async request => {
+exports.registerVendor = onCall({...options, memory: '512MiB', secrets: [photoSafetyKey]}, async request => {
   // Only the email's vendor login registers a shop (its customer, provider or staff login has its own ID and records).
   const uid = requireRole(request, ['vendor']);
   let details;
@@ -310,11 +315,46 @@ exports.registerVendor = onCall({...options, memory: '512MiB'}, async request =>
     // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
+  const decided = await autoDecideVendor(uid);
+  if (decided) return {status: decided, vendorCode, auto: true};
   await countUsage(db, 'vendor_register', {key: locationStamp({pincode: details.pincode}).town || details.pincode, label: locationStamp({pincode: details.pincode}).town || details.pincode, town: locationStamp({pincode: details.pincode}).town || '', uid});
   return {status: 'pending', vendorCode};
 });
 /// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec
 /// section 8: name, photo, address, phone to call, location). Merged, so a later verifyVendorShop or shop photo keeps its own fields.
+/// Makes an approved vendor: the vendor record and the public shop (the admin's approval and the Auto Approval). [extra] goes on both
+/// the application and the vendor (autoApproved).
+function approvedVendorWrites(batch, vendorId, data, extra = {}) {
+  batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), ...extra, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
+}
+
+/// Auto Approval (owner, 13 Nov 2026; Business Profile > Auto Approval, OFF unless the admin turns it on). The owner and shop photos
+/// are checked (functions/photo-safety.js): nothing forbidden -> approved at once with the Vendor ID; drugs, weapons, alcohol, tobacco
+/// or adult content -> refused with the reason; not checked (no key, limit, error) -> waits for the admin as before.
+async function autoDecideVendor(uid, checkOptions = {}) {
+  const business = (await db.collection('settings').doc('business').get()).data() || {};
+  if (!flagOn(business.autoApproval)) return null;
+  const ref = db.collection('vendorApplications').doc(uid);
+  const data = (await ref.get()).data();
+  if (!data || data.status !== 'pending') return null;
+  const check = await checkStoredPhotos(db, [data.vendorPhotoPath, data.shopPhotoPath], {feature: 'auto_approval_vendor', uid, ...checkOptions});
+  const at = FieldValue.serverTimestamp();
+  if (check.verdict === 'unsafe') {
+    await ref.set({status: 'rejected', decisionReason: unsafeReason(check.categories), autoRejected: true, photoSafety: check.categories, decidedAt: at}, {merge: true});
+    return 'rejected';
+  }
+  if (check.verdict !== 'safe') {
+    await ref.set({autoApprovalHeld: check.results.map(r => r.note).filter(Boolean).join(' ') || 'The photo check did not run.', autoApprovalCheckedAt: at}, {merge: true});
+    return null;
+  }
+  const batch = db.batch();
+  batch.set(ref, {status: 'approved', autoApproved: true, feeRequired: false, feePaymentStatus: 'not_required', decisionReason: 'Auto approved', decidedAt: at}, {merge: true});
+  approvedVendorWrites(batch, uid, data, {autoApproved: true});
+  await batch.commit();
+  return 'approved';
+}
+
 function vendorShopRecord(vendorId, data) {
   const digits = String(data.phone || '').replace(/[^0-9]/g, '');
   return {
@@ -336,14 +376,12 @@ exports.approveVendor = onCall(options, async request => {
   const data = application.data();
   // A decision is made once: an approved vendor cannot be flipped to rejected here (the vendor record would stay active).
   if (data.status !== 'pending') throw new HttpsError('failed-precondition', 'Only a pending application can be approved or rejected.');
-  if (approved && (!data.vendorPhotoPath || !data.shopPhotoPath)) throw new HttpsError('failed-precondition', 'The application is missing the vendor or shop photo, so it cannot be approved.');
+  if (approved && !data.vendorPhotoPath) throw new HttpsError('failed-precondition', 'The application is missing the vendor photo, so it cannot be approved.');
   const batch = db.batch();
   const nextStatus = !approved ? 'rejected' : fee.required ? 'payment_required' : 'approved';
   batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
   if (approved && !fee.required) {
-    const vendorRef = db.collection('vendors').doc(vendorId);
-    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
-    batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
+    approvedVendorWrites(batch, vendorId, data);
   }
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
@@ -613,3 +651,5 @@ exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{ord
 // are plain tasks now (functions/task.js); every one of them is exported above, so they are handed over by name.
 const {scheduledJobs, TASK_NAMES} = require('./scheduled-jobs');
 Object.assign(exports, scheduledJobs(Object.fromEntries(TASK_NAMES.map(name => [name, exports[name]]))));
+// For the tests only (a plain object, never a Cloud Function).
+exports._autoApproval = {autoDecideVendor};

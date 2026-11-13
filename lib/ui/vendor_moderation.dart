@@ -62,6 +62,18 @@ class VendorModerationPage extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 16),
+          // Auto Approval (Business Profile): the vendors approved at once after the AI photo check, with their photos, phone,
+          // location and the staff member who linked them; suspend one below if something is wrong.
+          Text('Auto Approved', style: Theme.of(context).textTheme.titleLarge),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorApplications').where('autoApproved', isEqualTo: true).limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Auto approved vendors could not load.')),
+              for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc, decide: false),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(key: ValueKey('auto-approved-empty'), title: Text('No auto approved vendors yet.')),
+            ]),
+          ),
+          const SizedBox(height: 16),
           Text('Vendor fee payments awaiting confirmation', style: Theme.of(context).textTheme.titleLarge),
           StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: store.firestore.collection('vendorApplications').where('status', isEqualTo: 'payment_submitted').limit(100).snapshots(),
@@ -134,11 +146,11 @@ class VendorModerationPage extends StatelessWidget {
       onSuccess: (_) => 'Shop verified',
     );
   }
-  Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc, {bool decide = true}) {
     final data = doc.data();
     return Card(child: ExpansionTile(
       title: SampleTitle(data['name']?.toString() ?? doc.id, id: doc.id, data: data),
-      subtitle: Text('Vendor ID: ${data['vendorCode'] ?? doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}'),
+      subtitle: Text('${data['autoApproved'] == true ? 'Auto Approved • ' : ''}Vendor ID: ${data['vendorCode'] ?? doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}${data['autoApprovalHeld'] != null ? ' • waits for you: ${data['autoApprovalHeld']}' : ''}'),
       children: [
         // Self-registered, or linked by a staff member within 30 minutes (lib/modules/stafflinks).
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Align(alignment: Alignment.centerLeft, child: RegisteredByLine(store: store, accountUid: doc.id))),
@@ -161,10 +173,11 @@ class VendorModerationPage extends StatelessWidget {
             )),
           ])),
         for (final entry in data.entries.where((e) => e.key != 'vendorPhotoPath' && e.key != 'shopPhotoPath')) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
-        OverflowBar(children: [
-          IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
-          IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
-        ]),
+        if (decide)
+          OverflowBar(children: [
+            IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
+            IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
+          ]),
       ],
     ));
   }

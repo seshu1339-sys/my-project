@@ -97,6 +97,7 @@ class _EntryEditorState extends State<EntryEditor> {
     'vendorPhotoLimit',
     'photoSearchesPerDay',
     'abuseReportsToSuspend',
+    'photoSafetyChecksPerDay',
     'adminAiPerDay',
     'adminSearchAiPerDay',
     'fieldPhotoLimit',
@@ -491,6 +492,12 @@ class _EntryEditorState extends State<EntryEditor> {
           value: 'false',
           child: Text('Never notify subscribers'),
         ),
+      ];
+    } else if (key == 'autoApproval') {
+      // Auto Approval (functions/photo-safety.js checks the photos with AI): OFF unless the admin turns it on.
+      options = const [
+        DropdownMenuItem(value: '', child: Text('Off (admin approves)')),
+        DropdownMenuItem(value: 'true', child: Text('On (AI photo check)')),
       ];
     } else if (key == 'postDuration') {
       // One post duration for everyone (lib/domain/post_duration.dart, functions/post-duration.js).

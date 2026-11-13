@@ -195,6 +195,8 @@ function text(value, min, max, label) {
   if (v.length < min || v.length > max) throw Error(`Provide ${label} (${min}-${max} characters).`);
   return v;
 }
+/// Trimmed text up to [max] letters, '' when not given.
+const optionalText = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 function vendorApplication(data = {}) {
   const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
   if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error('Provide a valid contact phone number.');
@@ -207,7 +209,8 @@ function vendorApplication(data = {}) {
   return {
     ownerName: text(data.ownerName, 2, 100, "the owner's full name"), phone,
     name: text(data.name, 2, 120, 'the shop name'), shopCategory: text(data.shopCategory, 2, 80, 'the shop category'),
-    address: text(data.address, 5, 500, 'the shop address'), pincode, description: text(data.description, 10, 1000, 'a shop description'),
+    // Owner, 13 Nov 2026: the address (else the one worked out from the GPS) and the description are optional.
+    address: optionalText(data.address, 500) || optionalText(data.gpsAddress, 500), pincode, description: optionalText(data.description, 1000),
     latitude: data.latitude, longitude: data.longitude,
     // The address the app worked out from the GPS (the vendor may have corrected the typed one); shown to the admin.
     ...(typeof data.gpsAddress === 'string' && data.gpsAddress.trim() ? {gpsAddress: data.gpsAddress.trim().replace(/\s+/g, ' ').slice(0, 500)} : {}),
