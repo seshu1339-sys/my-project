@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_abuse_reports.dart';
+import 'shop_ratings.dart' show AdminRatingsPage;
 import 'admin_ai_assistant.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
@@ -57,6 +58,7 @@ final _sections = <_SettingsSection>[
   // Abuse reports, the automatic temporary suspension and the permanent block list (functions/modules/abuse-reports).
   _SettingsSection('reports', 'Reports', Icons.flag_outlined, 'Reported shops, providers and customers; restore or block for good'),
   _SettingsSection('blockList', 'Block list', Icons.block, 'Emails and phones that cannot register or sign in again'),
+  _SettingsSection('ratings', 'Ratings', Icons.star_outline, 'Star ratings of shops and service providers; remove fake ones'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -110,6 +112,8 @@ Widget adminSettingsContent(Store store, String key) {
         return AdminReportsPage(store: store);
       case 'blockList':
         return AdminBlockListPage(store: store);
+      case 'ratings':
+        return AdminRatingsPage(store: store);
       case 'fieldAssistants':
         return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: FieldModerationPage(store: store)));
       case 'layout':

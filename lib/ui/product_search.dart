@@ -16,6 +16,7 @@ import 'shared.dart';
 import 'shop_map.dart';
 
 import '../services/strings.dart';
+import 'shop_ratings.dart';
 
 /// A shop, joined with one of its products, at a known distance from the
 /// customer — the unit both the map markers and the list rows are built from.
@@ -125,6 +126,8 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
           padding: const EdgeInsets.all(16),
           children: [
             Text(shop.text('name'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            if (ratingLabel(shop).isNotEmpty) Text(ratingLabel(shop), key: const ValueKey('search-shop-rating')),
+            for (final r in recentRatings(shop)) Text('${stars(r.stars)}  ${r.name}: ${r.comment}'),
             const SizedBox(height: 8),
             for (final match in shopMatches)
               ListTile(
@@ -260,7 +263,7 @@ class _ProductLocationTile extends StatelessWidget {
             ),
       title: Text(match.product.text('name')),
       subtitle: Text(
-        '${money(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km • ${match.shop.text('name')}\n${match.shop.text('address')}',
+        '${money(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km • ${match.shop.text('name')}${ratingLabel(match.shop).isEmpty ? '' : ' ${ratingLabel(match.shop)}'}\n${match.shop.text('address')}',
       ),
       isThreeLine: true,
       trailing: IconButton(

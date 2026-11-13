@@ -406,6 +406,9 @@ service cloud.firestore {
     match /aiDailyUse/{id} { allow read, write: if false; }
     // Abuse reports (functions/modules/abuse-reports) and the permanent block list (functions/block-list.js): the admin reads them,
     // functions write them. Who reported whom is never readable by the person reported. The admin only marks an alert as read.
+    // Shop and provider ratings (functions/modules/shop-ratings): anyone reads the ratings that are not hidden (no phone, no account id
+    // in them); the admin also sees the removed ones. Functions write them.
+    match /shopRatings/{id} { allow read: if resource.data.hidden == false || admin(); allow write: if false; }
     match /abuseReports/{id} { allow read: if admin(); allow write: if false; }
     match /abuseTargets/{id} { allow read: if admin(); allow write: if false; }
     match /blockedContacts/{id} { allow read: if admin(); allow write: if false; }

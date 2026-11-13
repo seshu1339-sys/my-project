@@ -8,6 +8,7 @@ import 'provider_registration_form.dart';
 import 'text_prompt_dialog.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
+import 'shop_ratings.dart';
 
 /// Services in the vendor app: the service provider's own flow. Registration (verified email first), then waiting for the admin, then
 /// the live service with the charge per hour, which the provider can change. A provider account is separate from vendor accounts.
@@ -44,7 +45,11 @@ class ServiceProviderPage extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: MyNumbersCard(store: store, ownerId: user.uid, events: const ['worker_call', 'worker_whatsapp']),
+                  child: Column(children: [
+                    MyNumbersCard(store: store, ownerId: user.uid, events: const ['worker_call', 'worker_whatsapp']),
+                    // The provider's ratings from customers (lib/ui/shop_ratings.dart).
+                    MyRatingsCard(store: store, targetKey: 'provider_${user.uid}'),
+                  ]),
                 ),
               ),
             ),

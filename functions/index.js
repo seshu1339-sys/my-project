@@ -113,6 +113,9 @@ Object.assign(exports, require('./modules/admin-assistant'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
 const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
 Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});
+// Shop and service-provider star ratings (functions/modules/shop-ratings).
+const {rateShop, removeShopRating} = require('./modules/shop-ratings');
+Object.assign(exports, {rateShop, removeShopRating});
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.

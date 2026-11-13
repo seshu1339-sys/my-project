@@ -18,6 +18,7 @@ import 'vendor_section_shop_ad.dart';
 import 'vendor_section_shop_photos.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
+import 'shop_ratings.dart';
 
 /// Business features. Only built once the application status is approved; the
 /// server independently refuses every one of these actions for anyone else.
@@ -47,6 +48,8 @@ class VendorWorkspace extends StatelessWidget {
     const SizedBox(height: 12),
     // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).
     MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
+    // The shop's ratings from customers: names, stars, comments (lib/ui/shop_ratings.dart).
+    for (final shop in store.entries('shops').where((s) => s.text('ownerId') == uid || s.id == uid).take(1)) MyRatingsCard(store: store, targetKey: 'shop_${shop.id}'),
     const SizedBox(height: 20),
     VendorPremiumEntry(store: store, uid: uid),
     // Paid vendors: their right-side ad box photo and reach (lib/modules/showcase).

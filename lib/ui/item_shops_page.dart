@@ -13,6 +13,7 @@ import 'design_tokens.dart';
 import 'shared.dart';
 
 import '../services/strings.dart';
+import 'shop_ratings.dart';
 
 /// Opens where to buy an item. [openItem] opens one shop's item (the product page), to put it in the bag.
 void openItemShops(BuildContext context, Store store, {required String name, String libraryItemId = '', required ValueChanged<Entry> openItem}) =>
@@ -182,7 +183,7 @@ class ItemOfferTile extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: _ShopPhoto(url: offer.photo, size: 52),
-        title: Text(offer.shopName, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text('${offer.shopName}${ratingLabel(offer.shop).isEmpty ? '' : '  ${ratingLabel(offer.shop)}'}', style: const TextStyle(fontWeight: FontWeight.w600)),
         // A price set today carries the green "Updated today" label after it.
         subtitle: priceUpdatedToday(offer.product, (now ?? ServerClock.now)())
             ? Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [line, UpdatedTodayTag(key: ValueKey('updated-today-${offer.product.id}'))])
@@ -265,7 +266,7 @@ class ItemShopsMap extends StatelessWidget {
                       key: ValueKey('item-pin-${o.product.text('shopId', o.product.id)}'),
                       onTap: () => onShop(o),
                       child: Tooltip(
-                        message: o.shopName,
+                        message: '${o.shopName}${ratingLabel(o.shop).isEmpty ? '' : ' ${ratingLabel(o.shop)}'}',
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
