@@ -11,10 +11,13 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   adminLinkStaff           admin -> link a vendor / provider to a staff member of their area, at any time
 //   staffForArea             admin -> the active staff whose area holds this vendor / provider (to choose from)
 //   requestLocalStaff        vendor / provider -> "connect me to the staff of my area" (from the Support Team chat)
+//   relinkAreaVendors        admin -> one click: the vendors / providers under the admin inside a staff member's cell are linked to them
+//   staffLinksOnStaffCancel  trigger -> a staff ID was cancelled: their linked vendors and providers move under the admin
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {onDocumentWritten} = require('firebase-functions/v2/firestore');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('../../admin-session');
-const {linkAccount, removeLink, disableOldStaffAdded, adminLink, requestLocalStaff, staffInAreaOf, registration} = require('./store');
+const {linkAccount, removeLink, disableOldStaffAdded, adminLink, requestLocalStaff, staffInAreaOf, registration, moveLinksToAdmin, relinkAreaVendors} = require('./store');
 
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
@@ -33,6 +36,16 @@ async function requireAdmin(request) {
 exports.linkStaffRegistration = onCall(options, async request => {
   const uid = requireVerified(request);
   try { return await linkAccount(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
+});
+exports.relinkAreaVendors = onCall(options, async request => {
+  const uid = await requireAdmin(request);
+  try { return await relinkAreaVendors(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
+});
+exports.staffLinksOnStaffCancel = onDocumentWritten({document: 'fieldStaff/{uid}', region: 'asia-south1', maxInstances: 3}, async event => {
+  const before = event.data?.before?.data();
+  const after = event.data?.after?.data();
+  if (after?.status !== 'cancelled' || before?.status === 'cancelled') return;
+  await moveLinksToAdmin(getFirestore(), event.params.uid);
 });
 exports.removeStaffLink = onCall(options, async request => {
   await requireAdmin(request);

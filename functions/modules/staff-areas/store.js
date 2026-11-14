@@ -14,10 +14,18 @@
 //                                the area's own vendors' offers are counted from the same collection
 //   fieldStaff/<uid>             read (status, staffCode, name, phone); a deactivation sets status 'suspended' (reason missedDays)
 //   shops, productImageLibrary   read
+//
+// Hexagon cells (owner, 13 Nov 2026), the only way new staff get an area: India is divided into H3 hexagons sized by population
+// density (functions/hex-grid.js: 1, 2 or 5 km). Nothing is stored for a free cell. A claimed cell is a staffAreas/<H3 cell> document
+// like any other area (so targets, the nightly check, My work and vendor linking work the same), with hex: true, hexCell, hexCode
+// (HX1-...), hexSizeKm, hexParent5 (to find the claimed cells near a place) and hexOutline; staffAreaStaff/<uid> keeps the staff
+// member's home pin (homeLatitude, homeLongitude, homeAddress, homeDistanceKm). A cell freed later keeps a small record marked free
+// (the admin's reactivation gives it back). The older admin areas and automatic blocks stay in the code, unused for new staff.
 const {Timestamp, FieldValue} = require('firebase-admin/firestore');
 const {publicStorageUrl} = require('../../storage-url');
 const R = require('./rules');
 const B = require('./blocks');
+const G = require('../../hex-grid');
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const settingsRef = db => db.collection('staffAreaSettings').doc('main');
@@ -212,6 +220,100 @@ async function claimAutoArea(db, staffUid, data = {}, countBuildings, now = Date
   });
 }
 
+// ---- Hexagon cells (owner, 13 Nov 2026) ----
+
+/// The staff member's home must be within this distance of the centre of their cell (Terms & Conditions).
+const HOME_MAX_KM = 5;
+/// A GPS reading less exact than this cannot register a cell.
+const GPS_MAX_ERROR_M = 100;
+
+const place = (lat, lng) => typeof lat === 'number' && typeof lng === 'number' && G.inIndia(lat, lng);
+
+/// The claimed (pending or booked) cells among [cells], by cell, with their holder for the staff member's own one.
+async function claimedCells(db, cells) {
+  const parents = [...new Set(cells.map(G.parent5Of))];
+  const found = new Map();
+  for (let i = 0; i < parents.length; i += 30) {
+    const snap = await db.collection('staffAreas').where('hexParent5', 'in', parents.slice(i, i + 30)).get();
+    for (const doc of snap.docs) if (doc.data().status && doc.data().status !== 'free') found.set(doc.id, doc.data());
+  }
+  return found;
+}
+
+/// Staff: the cell where they stand and the cells around it, each green (free) or red (taken); their own is marked.
+async function hexNearby(db, staffUid, data = {}) {
+  const [staff, mine] = await Promise.all([
+    db.collection('fieldStaff').doc(staffUid).get().then(d => d.data()),
+    db.collection('staffAreaStaff').doc(staffUid).get().then(d => d.data()),
+  ]);
+  if (!staff || !['pending', 'active'].includes(staff.status)) throw Error('Register as staff first.');
+  if (!place(data.latitude, data.longitude)) throw Error('Turn on location. Your place must be in India.');
+  const cells = G.cellsNear(data.latitude, data.longitude);
+  const taken = await claimedCells(db, cells);
+  const myArea = mine?.areaId ? (await db.collection('staffAreas').doc(mine.areaId).get()).data() : null;
+  const status = cell => (taken.has(cell) ? (mine?.areaId === cell ? 'mine' : 'taken') : 'free');
+  const [lat, lng] = G.centerOf(cells[0]);
+  return {
+    cellId: cells[0], code: G.codeOf(cells[0]), sizeKm: G.sizeKm(cells[0]), center: [lat, lng], status: status(cells[0]),
+    homeMaxKm: HOME_MAX_KM, hasArea: Boolean(myArea && myArea.status !== 'free'), myAreaCode: myArea && myArea.status !== 'free' ? myArea.hexCode || myArea.name || '' : '',
+    cells: cells.map(cell => ({cellId: cell, code: G.codeOf(cell), sizeKm: G.sizeKm(cell), status: status(cell), outline: G.outlineOf(cell)})),
+  };
+}
+
+const homeText = v => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '');
+
+/// Staff: registers the cell where they stand (GPS on, inside it), if it is free, with their home pin within 5 km of the cell's centre
+/// and the Terms accepted. One cell per staff member; a cell is never shared. Pending until the admin approves the staff member.
+async function claimHexCell(db, staffUid, data = {}, now = Date.now()) {
+  if (data.termsAccepted !== true) throw Error('Tick "I accept the Terms & Conditions" to finish.');
+  if (!place(data.latitude, data.longitude)) throw Error('Turn on GPS. We need where you stand to register your cell.');
+  if (data.accuracyM !== undefined && data.accuracyM !== null && !(typeof data.accuracyM === 'number' && data.accuracyM >= 0 && data.accuracyM <= GPS_MAX_ERROR_M)) {
+    throw Error(`Your GPS is not exact enough (more than ${GPS_MAX_ERROR_M} m). Go to an open place and try again.`);
+  }
+  const cell = G.cellAt(data.latitude, data.longitude);
+  if (data.cellId !== undefined && data.cellId !== cell) throw Error('You are not standing inside this cell. Go inside the cell to register it.');
+  if (!place(data.homeLatitude, data.homeLongitude)) throw Error('Put the pin on your home on the map.');
+  const homeAddress = homeText(data.homeAddress);
+  if (homeAddress.length < 10 || homeAddress.length > 300) throw Error('Enter your home address (10 to 300 letters).');
+  const center = G.centerOf(cell);
+  const homeKm = Math.round(G.distanceKm([data.homeLatitude, data.homeLongitude], center) * 100) / 100;
+  if (homeKm > HOME_MAX_KM) throw Error(`Your home is ${homeKm.toFixed(1)} km from the centre of this cell. Staff must live within ${HOME_MAX_KM} km of their cell's centre.`);
+  const code = G.codeOf(cell);
+  const sizeKm = G.sizeKm(cell);
+  const outline = G.outlineOf(cell);
+  const staffRef = db.collection('fieldStaff').doc(staffUid);
+  const mineRef = db.collection('staffAreaStaff').doc(staffUid);
+  const areaRef = db.collection('staffAreas').doc(cell);
+  const holderRef = db.collection('staffAreaHolders').doc(cell);
+  return db.runTransaction(async tx => {
+    const [staffDoc, mineDoc, areaDoc, termsDoc] = await Promise.all([tx.get(staffRef), tx.get(mineRef), tx.get(areaRef), tx.get(settingsRef(db))]);
+    const staff = staffDoc.data();
+    if (!staff || !['pending', 'active'].includes(staff.status)) throw Error('Register as staff first.');
+    if (await heldArea(ref => tx.get(ref), db, mineDoc.data())) throw Error('You already have a cell. One staff member has one cell.');
+    const existing = areaDoc.data();
+    if (existing && existing.status !== 'free') throw Error('This cell is already taken (red). Only a free (green) cell can be registered.');
+    const at = Timestamp.fromMillis(now);
+    const status = staff.status === 'active' ? 'booked' : 'pending';
+    const town = B.label(staff.town || staff.placeName || staff.district, code);
+    const name = town === code ? code : `${code} · ${town}`;
+    tx.set(areaRef, {
+      name, town, townKey: R.townKey(town), latitude: center[0], longitude: center[1], radiusKm: G.radiusKmOf(cell), status,
+      hex: true, hexCell: cell, hexCode: code, hexSizeKm: sizeKm, hexParent5: G.parent5Of(cell), hexOutline: outline.flat(),
+      createdAt: existing?.createdAt ?? at, updatedAt: at,
+    });
+    tx.set(holderRef, {
+      staffUid, staffCode: staff.staffCode || '', staffName: staff.name || staff.displayName || '', staffPhone: staff.phone || '',
+      claimedAt: at, ...(status === 'booked' ? {bookedAt: at} : {}),
+    });
+    tx.set(mineRef, {
+      staffUid, areaId: cell, areaName: name, town, areaCode: code, termsAcceptedAt: at, termsVersion: termsDoc.data()?.updatedAt ?? null, claimedAt: at,
+      homeLatitude: data.homeLatitude, homeLongitude: data.homeLongitude, homeAddress, homeDistanceKm: homeKm,
+      ...(status === 'booked' ? {bookedAt: at} : {}),
+    }, {merge: true});
+    return {areaId: cell, code, sizeKm, status, homeDistanceKm: homeKm};
+  });
+}
+
 /// The staff record changed (fieldStaff/<uid> trigger): approved -> the pending area is booked; not approved -> the area is free again.
 async function onStaffStatus(db, staffUid, before, after, now = Date.now()) {
   if (!after || before?.status === after.status) return null;
@@ -230,10 +332,11 @@ async function onStaffStatus(db, staffUid, before, after, now = Date.now()) {
       tx.set(db.collection('staffAreaStaff').doc(staffUid), {bookedAt: at}, {merge: true});
       return 'booked';
     }
-    if (after.status === 'rejected') {
+    // Not approved, or the staff ID was cancelled for good (owner, 13 Nov 2026): the cell is free again for a new staff member.
+    if (after.status === 'rejected' || after.status === 'cancelled') {
       tx.update(areaRef, {status: 'free', updatedAt: at});
       tx.delete(holderRef);
-      tx.set(db.collection('staffAreaStaff').doc(staffUid), {areaId: null}, {merge: true});
+      tx.set(db.collection('staffAreaStaff').doc(staffUid), {areaId: null, ...(after.status === 'cancelled' ? {cancelledAreaId: mine.areaId, cancelledAt: at} : {})}, {merge: true});
       return 'free';
     }
     return null;
@@ -565,6 +668,7 @@ async function report(db, data = {}, now = Date.now()) {
 }
 
 module.exports = {
+  hexNearby, claimHexCell, HOME_MAX_KM,
   previewAutoArea, claimAutoArea,
   readSettings, saveSettings, saveTown, saveArea, deleteArea, claimArea, onStaffStatus, freeArea,
   shopsInArea, dayCounts, workProgress, myToday, addStaffOffer, removeStaffOffer, nightlyCheck, lastChanceReminder, reactivate, report, WARN_TEXT,

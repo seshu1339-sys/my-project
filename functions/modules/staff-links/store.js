@@ -7,6 +7,8 @@
 //   fieldStaff/<uid>           read: only an active staff member links, with their Staff ID
 //   staffAreaStaff, staffAreas, staffAreaHolders   read (the Staff Area System's records): only registrations inside the staff
 //                              member's own area can be linked
+// A cancelled staff ID (owner, 13 Nov 2026): their links stay, with no staff member (staffUid ''), underAdmin: true and
+// previousStaffUid / previousStaffCode, until the admin links the cell's vendors to its next staff member in one click (relinkAreaVendors).
 // Old way (closed): vendors and providers that staff created themselves (vendors/providers with noLogin + addedByStaffUid) are
 // disabled by the admin's one button (disableOldStaffAdded) and must register themselves and be linked again.
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
@@ -49,6 +51,7 @@ async function linkAccount(db, staffUid, data = {}, now = Date.now()) {
   const ref = db.collection('staffLinks').doc(linkId(parsed.kind, application.id));
   return db.runTransaction(async tx => {
     const existing = (await tx.get(ref)).data();
+    if (existing?.underAdmin === true) throw Error('This registration is with the LOCAMARKET office now. The admin links it to the staff member of its area.');
     if (existing) throw Error(existing.staffUid === staffUid ? 'You already linked this registration.' : `This registration is already linked to ${existing.staffCode || 'another staff member'}.`);
     if (problem) throw Error(problem);
     const at = Timestamp.fromMillis(now);
@@ -199,4 +202,54 @@ async function requestLocalStaff(db, uid, role, now = Date.now()) {
   return {status: 'open'};
 }
 
-module.exports = {linkAccount, removeLink, disableOldStaffAdded, OLD_REASON, adminLink, requestLocalStaff, staffInAreaOf, registration};
+/// A staff ID was cancelled: every vendor and provider linked to them moves under the admin (the link keeps who it was). Returns how many.
+async function moveLinksToAdmin(db, staffUid, now = Date.now()) {
+  const links = await db.collection('staffLinks').where('staffUid', '==', staffUid).get();
+  const at = Timestamp.fromMillis(now);
+  for (let i = 0; i < links.docs.length; i += 400) {
+    const batch = db.batch();
+    for (const doc of links.docs.slice(i, i + 400)) {
+      batch.update(doc.ref, {
+        staffUid: '', staffCode: '', staffName: '', underAdmin: true, movedToAdminAt: at,
+        previousStaffUid: staffUid, previousStaffCode: doc.data().staffCode || '', previousStaffName: doc.data().staffName || '',
+      });
+    }
+    await batch.commit();
+  }
+  return links.size;
+}
+
+/// The admin's one click: the vendors and providers under the admin whose place is inside this staff member's cell are linked to them.
+/// With preview: true it only says how many would be linked.
+async function relinkAreaVendors(db, adminUid, data = {}, now = Date.now()) {
+  if (typeof data.staffUid !== 'string' || !ID.test(data.staffUid)) throw Error('Choose the staff member.');
+  const staff = await activeStaff(db, data.staffUid);
+  const area = await ownArea(db, data.staffUid);
+  if (!area) throw Error('This staff member has no area yet, so nobody can be linked to them.');
+  const waiting = await db.collection('staffLinks').where('underAdmin', '==', true).get();
+  const inArea = [];
+  for (const doc of waiting.docs) {
+    const [collection] = APPLICATIONS[doc.data().kind] || [];
+    if (!collection) continue;
+    const app = (await db.collection(collection).doc(doc.data().accountUid).get()).data();
+    if (app && app.status !== 'rejected' && !areaProblem(area, app)) inArea.push(doc);
+  }
+  if (data.preview === true) return {count: inArea.length, names: inArea.slice(0, 20).map(d => d.data().name || d.data().code || '')};
+  const at = Timestamp.fromMillis(now);
+  for (let i = 0; i < inArea.length; i += 200) {
+    const batch = db.batch();
+    for (const doc of inArea.slice(i, i + 200)) {
+      const link = doc.data();
+      batch.update(doc.ref, {
+        staffUid: data.staffUid, staffCode: staff.staffCode || '', staffName: staff.name || '', linkedAt: at, linkedBy: 'admin', linkedByUid: adminUid,
+        underAdmin: FieldValue.delete(), relinkedAt: at,
+      });
+      const [collection] = APPLICATIONS[link.kind];
+      batch.set(db.collection(collection).doc(link.accountUid), {registeredByStaffUid: data.staffUid, registeredByStaffCode: staff.staffCode || '', registeredByLinkedAt: at}, {merge: true});
+    }
+    await batch.commit();
+  }
+  return {count: inArea.length, staffCode: staff.staffCode || '', areaName: area.name || ''};
+}
+
+module.exports = {moveLinksToAdmin, relinkAreaVendors, linkAccount, removeLink, disableOldStaffAdded, OLD_REASON, adminLink, requestLocalStaff, staffInAreaOf, registration};

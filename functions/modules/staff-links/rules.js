@@ -5,6 +5,8 @@
 // the staff app (Add > Vendor or Add > Services) within 30 minutes of the registration; then the person is linked to the staff member
 // ("Registered by" in the admin panel). After 30 minutes the link is no longer possible and the person stays with the admin only.
 // A link gives the staff member no access at all to the person's shop, items or prices: only a read-only view of their updates.
+// The staff hexagon grid (functions/hex-grid.js, a shared root file).
+const hexGrid = require('../../hex-grid');
 const LINK_WINDOW_MS = 30 * 60 * 1000;
 
 /// The kind of account an ID belongs to: VEN-NRPM-116-325 is a vendor, SRV-NRPM-116-001 a service provider. Null when it is neither.
@@ -45,7 +47,9 @@ function areaProblem(area, place) {
   if (!area) return 'You need your own area first. Choose your area, then link the vendors in it.';
   const lat = num(place?.latitude), lng = num(place?.longitude);
   if (lat === null || lng === null) return 'This registration has no location, so it cannot be linked.';
-  if (distanceKm(area.latitude, area.longitude, lat, lng) > area.radiusKm) return `This registration is outside your area "${area.name}", so you cannot link it.`;
+  // A hexagon area (owner, 13 Nov 2026) holds exactly the places of its cell; an older area its circle.
+  const outside = area.hexCell ? !hexGrid.contains(area.hexCell, lat, lng) : distanceKm(area.latitude, area.longitude, lat, lng) > area.radiusKm;
+  if (outside) return `This registration is outside your area "${area.name}", so you cannot link it.`;
   return null;
 }
 

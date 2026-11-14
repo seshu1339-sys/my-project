@@ -95,6 +95,25 @@ exports.setFieldStaffSuspension = onCall(options, async request => {
   return {status: suspended ? 'suspended' : 'active'};
 });
 
+// Admin: cancels a staff ID for good (owner, 13 Nov 2026). The ID is closed and never given again (staff IDs stay reserved in
+// _vendorCodes; a new staff member always gets a new ID). The same login cannot register again (requestFieldStaffAccess returns the
+// cancelled record) and a cancelled ID cannot be reinstated (setFieldStaffSuspension needs 'suspended'). The fieldStaff triggers do the
+// rest: the cell is free again (functions/modules/staff-areas) and the linked vendors and providers move under the admin
+// (functions/modules/staff-links), ready for the admin's one-click link to the cell's next staff member.
+exports.cancelFieldStaff = onCall(options, async request => {
+  await requireAdmin(request);
+  const {staffUid, reason = ''} = request.data || {};
+  if (typeof staffUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(staffUid)) throw new HttpsError('invalid-argument', 'Choose the staff member.');
+  const note = String(reason).trim().slice(0, 500);
+  if (note.length < 3) throw new HttpsError('invalid-argument', 'Give a reason for cancelling the staff ID.');
+  const ref = db.collection('fieldStaff').doc(staffUid);
+  const staff = (await ref.get()).data();
+  if (!staff) throw new HttpsError('not-found', 'Field staff member not found.');
+  if (staff.status === 'cancelled') throw new HttpsError('failed-precondition', 'This staff ID is already cancelled.');
+  await ref.update({status: 'cancelled', previousStatus: staff.status || '', cancelReason: note, cancelledAt: FieldValue.serverTimestamp(), cancelledBy: request.auth.uid});
+  return {status: 'cancelled', staffCode: staff.staffCode || ''};
+});
+
 // Configurable, admin-set max item photos per field submission — defaults to
 // 2. Deliberately a separate, un-shared implementation from vendor-photos.js's
 // vendorPhotoLimit(): the two settings must never affect each other.

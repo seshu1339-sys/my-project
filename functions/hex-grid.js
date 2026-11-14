@@ -128,4 +128,16 @@ function cellOfCode(code) {
   return isCell(cell) ? cell : null;
 }
 
-module.exports = {cellAt, cellOfHex, cellsNear, isCell, sizeKm, centerOf, outlineOf, distanceKm, codeOf, cellOfCode, inIndia, levels, SIZE_OF_RES};
+/// The resolution-5 hexagon above a cell (the claimed cells near a place are found by it with one query).
+const parent5Of = cell => h3.cellToParent(cell, 5);
+
+/// The distance (km) from a cell's centre to its farthest corner: the circle that holds the whole cell.
+function radiusKmOf(cell) {
+  const center = centerOf(cell);
+  return Math.ceil(Math.max(...outlineOf(cell).map(p => distanceKm(center, p))) * 100) / 100;
+}
+
+/// True when a place is in [cell] (false outside India).
+const contains = (cell, lat, lng) => inIndia(lat, lng) && cellAt(lat, lng) === cell;
+
+module.exports = {parent5Of, radiusKmOf, contains, cellAt, cellOfHex, cellsNear, isCell, sizeKm, centerOf, outlineOf, distanceKm, codeOf, cellOfCode, inIndia, levels, SIZE_OF_RES};

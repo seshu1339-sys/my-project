@@ -17,6 +17,8 @@
 //   5 PM if they have not yet). The area is free again after a stop, and the vendors of the area stay live.
 // - Staff never choose dates for an offer (owner, 7 Nov 2026): a staff rate update is that day's rate and ends at midnight. How long a
 //   vendor's own offers show is the vendor's choice, in the vendor app.
+// The staff hexagon grid (functions/hex-grid.js, a shared root file): a hexagon area holds exactly the places of its cell.
+const hexGrid = require('../../hex-grid');
 const B = require('./blocks');
 const IST = 19800000;
 const DAY_MS = 86400000;
@@ -94,8 +96,12 @@ function validateArea(data = {}) {
 /// Two areas overlap when their circles touch: the distance between the centres is under the two radii together.
 const overlaps = (a, b) => distanceKm(a.latitude, a.longitude, b.latitude, b.longitude) < a.radiusKm + b.radiusKm;
 
-/// Whether a place is inside an area's circle.
-const inside = (area, lat, lng) => validCoordinate(lat, lng) && distanceKm(area.latitude, area.longitude, lat, lng) <= area.radiusKm;
+/// Whether a place is inside an area: its hexagon cell (owner, 13 Nov 2026), or the circle of an older area.
+const inside = (area, lat, lng) => {
+  if (!validCoordinate(lat, lng)) return false;
+  if (area.hexCell) return hexGrid.contains(area.hexCell, lat, lng);
+  return distanceKm(area.latitude, area.longitude, lat, lng) <= area.radiusKm;
+};
 
 /// The India date of a moment: "2026-11-06".
 const istDay = ms => new Date(ms + IST).toISOString().slice(0, 10);

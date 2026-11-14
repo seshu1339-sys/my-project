@@ -14,6 +14,8 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   claimStaffArea         staff  -> take a free area the admin made, standing inside it, Terms accepted
 //   previewAutoStaffArea   staff  -> a tapped centre: its block, the buildings counted in OpenStreetMap, the radius (automatic)
 //   claimAutoStaffArea     staff  -> register that automatic area (radius by the server only; one area per staff member)
+//   staffHexNearby         staff  -> the hexagon cell where they stand and the cells around it, free (green) or taken (red)
+//   claimHexCell           staff  -> register that cell: standing inside it, free, home within 5 km of its centre, Terms accepted
 //   myStaffAreaToday       staff  -> my area, today's count, missed days, my area's shops
 //   addStaffTodayOffer     staff  -> a rate update (Today's Offer) for a shop in my area, with a live photo within 100 m
 //   removeStaffTodayOffer  staff  -> remove my own offer
@@ -84,6 +86,8 @@ exports.staffAreaReport = admin((db, data) => S.report(db, data));
 exports.claimStaffArea = staff((db, uid, data) => S.claimArea(db, uid, data));
 exports.previewAutoStaffArea = staff((db, uid, data) => S.previewAutoArea(db, uid, data, countBuildings));
 exports.claimAutoStaffArea = staff((db, uid, data) => S.claimAutoArea(db, uid, data, countBuildings));
+exports.staffHexNearby = staff((db, uid, data) => S.hexNearby(db, uid, data));
+exports.claimHexCell = staff((db, uid, data) => S.claimHexCell(db, uid, data));
 exports.myStaffAreaToday = staff((db, uid) => S.myToday(db, uid));
 exports.addStaffTodayOffer = staff((db, uid, data) => S.addStaffOffer(db, getStorage().bucket(), uid, data));
 exports.removeStaffTodayOffer = staff((db, uid, data) => S.removeStaffOffer(db, uid, data));
