@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -71,6 +72,17 @@ Future<void> main() async {
   store.requiresConsent = !(kIsWeb && isAdminRoute);
   // The admin panel signs in with the email's own administrator login (functions/role-logins.js), never the customer one.
   if (kIsWeb && isAdminRoute) store.appRole = 'admin';
+  // The admin panel keeps its login in this browser tab only (owner, 14 Nov 2026). The shop and the admin panel can run on the same
+  // site (locamarket.in and locamarket.in/<admin path>), and Firebase shares one login across every tab of a site: a shop tab that
+  // saw the admin login signed it out (it is not a shop login, Store._adoptLogin), and the panel fell back to its sign-in page right
+  // after opening. Kept in the tab, a reload still keeps the panel signed in; a new tab signs in again.
+  if (live && kIsWeb && isAdminRoute) {
+    try {
+      await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+    } catch (_) {
+      /* The browser refused: the panel works as before. */
+    }
+  }
   await store.init();
   if (kIsWeb && isAdminRoute) {
     // Usage analytics (lib/services/usage.dart): the admin panel counts as the admin app.
