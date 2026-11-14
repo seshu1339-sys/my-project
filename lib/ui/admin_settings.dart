@@ -4,6 +4,7 @@ import '../data/store.dart';
 import '../modules/module_admin.dart';
 import 'admin_abuse_reports.dart';
 import 'provider_moderation.dart';
+import 'admin_routes.dart';
 import 'admin_groups.dart';
 import 'admin_staff_work.dart';
 import 'admin_ratings.dart';
@@ -72,8 +73,10 @@ final _sections = <_SettingsSection>[
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
 /// ("5.12 Business Profile › Post duration"). [serial] is its number in the Settings list.
 class AdminSettingHit {
-  const AdminSettingHit({required this.serial, required this.title, required this.sectionKey, this.section = '', this.hint = ''});
+  const AdminSettingHit({required this.serial, required this.title, required this.sectionKey, this.section = '', this.hint = '', this.aliases = ''});
   final String serial, title, sectionKey, section, hint;
+  // The page's Telugu name and other words from the route map (lib/ui/admin_routes.dart), " | " between them; searched, not shown.
+  final String aliases;
   bool get isField => section.isNotEmpty;
   String get label => isField ? '$section › $title' : title;
 }
@@ -84,12 +87,21 @@ class AdminSettingHit {
 /// by itself (and the AI search knows it).
 List<AdminSettingHit> adminSettingsIndex() => [
   for (final (i, s) in _sections.indexed) ...[
-    AdminSettingHit(serial: '${i + 1}', title: s.label, sectionKey: s.key, hint: s.hint),
+    AdminSettingHit(serial: '${i + 1}', title: s.label, sectionKey: s.key, hint: s.hint, aliases: adminRouteAliases(s.key)),
     for (final (j, f) in (fields[s.key]?.entries ?? const Iterable<MapEntry<String, String>>.empty()).indexed)
       AdminSettingHit(serial: '${i + 1}.${j + 1}', title: f.value, sectionKey: s.key, section: s.label, hint: f.key),
   ],
   for (final (i, item) in [for (final g in adminGroups) for (final it in g.items) if (it.kind != AdminItemKind.section) (g, it)].indexed)
-    AdminSettingHit(serial: 'P${i + 1}', title: item.$2.label, sectionKey: item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}', hint: item.$1.title),
+    AdminSettingHit(
+      serial: 'P${i + 1}',
+      title: item.$2.label,
+      sectionKey: item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}',
+      hint: item.$1.title,
+      aliases: adminRouteAliases(item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}'),
+    ),
+  // Parts of a page with no line of their own (owner, 14 Nov 2026), from the route map: "Cells" opens Staff Areas on its Cells tab.
+  for (final (i, r) in [for (final r in adminRoutes) if (r.extra) r].indexed)
+    AdminSettingHit(serial: 'R${i + 1}', title: r.en, sectionKey: r.key, hint: r.key.replaceFirst('tab:', ''), aliases: [r.te, ...r.words].join(' | ')),
 ];
 
 /// Opens an earlier main tab (Orders, Products, Plans...) as a page; set by the admin panel (lib/ui/admin.dart).
@@ -114,8 +126,23 @@ List<AdminSettingHit> searchAdminSettings(String query, {List<AdminSettingHit>? 
     return [for (final h in all) if (h.serial == q || (!q.contains('.') && h.serial.startsWith('$q.'))) h];
   }
   final words = q.split(RegExp(r'\s+'));
-  final hits = [for (final h in all) if (words.every('${h.serial} ${h.title} ${h.section} ${h.hint}'.toLowerCase().contains)) h];
+  final hits = [for (final h in all) if (words.every('${h.serial} ${h.title} ${h.section} ${h.hint} ${h.aliases}'.toLowerCase().contains)) h];
   return [...hits.where((h) => !h.isField), ...hits.where((h) => h.isField)];
+}
+
+/// The one page that text names (typed, said, or an AI agent command like "Cells తెరువు"), or null when none or several fit. An exact
+/// name (English title or a route-map word) wins over a partial one.
+AdminSettingHit? bestAdminPage(String text, {List<AdminSettingHit>? index}) {
+  final q = adminCommandQuery(text);
+  if (q.isEmpty) return null;
+  final pages = [for (final h in searchAdminSettings(q, index: index)) if (!h.isField) h];
+  if (pages.isEmpty) return null;
+  final exact = [
+    for (final h in pages)
+      if (h.title.toLowerCase() == q || h.aliases.toLowerCase().split(' | ').contains(q)) h,
+  ];
+  if (exact.length == 1) return exact.first;
+  return pages.length == 1 ? pages.first : null;
 }
 
 /// One Settings section as its own page (the search opens it straight away). [focus] names the field the admin looked for.

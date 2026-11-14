@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../services/search_providers.dart';
 import 'admin_groups.dart';
+import 'admin_routes.dart';
 import 'admin_settings.dart';
 
 /// The box at the top of the admin panel: type or say a setting's name or its number in the Settings list ("5", "5.12", "post
@@ -79,6 +80,9 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
         query.text = text;
         note = null;
       });
+      // Owner, 14 Nov 2026: when the words name one page ("Cells", "ప్లాన్స్ తెరువు"), it opens at once.
+      final page = bestAdminPage(text, index: index);
+      if (page != null) _open(page);
     } catch (e) {
       if (mounted) setState(() => note = '$e'.replaceFirst('Bad state: ', ''));
     }
@@ -86,7 +90,8 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    final hits = searchAdminSettings(query.text, index: index);
+    // "open" / "తెరువు" and the like are left out (lib/ui/admin_routes.dart); Telugu names are found through the route map.
+    final hits = searchAdminSettings(adminCommandQuery(query.text), index: index);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
@@ -96,6 +101,11 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
             key: const ValueKey('admin-settings-search'),
             controller: query,
             onChanged: (_) => setState(() => note = null),
+            // Enter opens the page the words name, else the first match.
+            onSubmitted: (text) {
+              final page = bestAdminPage(text, index: index) ?? hits.firstOrNull;
+              if (page != null) _open(page);
+            },
             decoration: InputDecoration(
               isDense: true,
               prefixIcon: const Icon(Icons.manage_search),
