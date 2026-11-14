@@ -1,3 +1,4 @@
+import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Staff Area System (functions/modules/staff-areas): named areas in a town (a centre + the town's radius), Free / Pending / Booked,
@@ -21,11 +22,25 @@ const defaultStaffTerms = '''LOCAMARKET staff Terms & Conditions
 4. You update the rates of the shops in your area on the minimum number of days every week, each with a live camera photo taken at the shop (within 100 metres, with real GPS). Photos sent from anywhere else never count.
 5. You complete the targets for the day, the week and the month: live photos, shops visited, new vendors and new paid vendors. A month counts only when its monthly targets are complete.
 6. Days without rate updates beyond the weekly allowance are missed days. When the allowed number of missed days is reached, your staff ID is deactivated automatically and your area is given to another person. You are warned one day before.
-7. LOCAMARKET can change these rules at any time.''';
+7. LOCAMARKET can change these rules at any time.
+8. Your area is one hexagon cell, set automatically from where you stand: 1 km in dense cities, 2 km in towns, 5 km in villages (by how many people live there). You can register a cell only while standing inside it with GPS on, and only if it is free. One cell per staff member; a cell is never shared.
+9. You must be local: your home must be within 5 km of the centre of your cell. If your home is farther, you cannot register that cell. Your home address may be checked before approval.
+10. If your staff ID is cancelled, it is closed for good and never given to anyone again. Your cell becomes free for a new staff member, and the vendors linked to you move to LOCAMARKET.''';
 
 /// One area (a `staffAreas` document): where it is and whether it is taken. Who holds it is admin only (staffAreaHolders).
 class StaffArea {
-  const StaffArea({required this.id, required this.name, required this.town, required this.latitude, required this.longitude, required this.radiusKm, required this.status});
+  const StaffArea({
+    required this.id,
+    required this.name,
+    required this.town,
+    required this.latitude,
+    required this.longitude,
+    required this.radiusKm,
+    required this.status,
+    this.hexCode = '',
+    this.hexSizeKm = 0,
+    this.outline = const [],
+  });
 
   factory StaffArea.fromData(String id, Map<String, dynamic> data) => StaffArea(
     id: id,
@@ -35,10 +50,25 @@ class StaffArea {
     longitude: (data['longitude'] as num?)?.toDouble() ?? 0,
     radiusKm: (data['radiusKm'] as num?)?.toDouble() ?? 1,
     status: data['status']?.toString() ?? 'free',
+    hexCode: data['hexCode']?.toString() ?? '',
+    hexSizeKm: (data['hexSizeKm'] as num?)?.toInt() ?? 0,
+    outline: _outline(data['hexOutline']),
   );
+
+  /// The hexagon cell's outline (hexOutline: lat, lng, lat, lng, ...), or empty for an older circle area.
+  static List<LatLng> _outline(Object? raw) {
+    if (raw is! List || raw.length < 6) return const [];
+    return [for (var i = 0; i + 1 < raw.length; i += 2) if (raw[i] is num && raw[i + 1] is num) LatLng((raw[i] as num).toDouble(), (raw[i + 1] as num).toDouble())];
+  }
 
   final String id, name, town, status;
   final double latitude, longitude, radiusKm;
+  // A hexagon cell (owner, 13 Nov 2026): its code (HX1-...), size (1, 2 or 5 km) and outline; empty for an older circle area.
+  final String hexCode;
+  final int hexSizeKm;
+  final List<LatLng> outline;
+
+  bool get hex => outline.isNotEmpty;
 
   bool get free => status == 'free';
 }

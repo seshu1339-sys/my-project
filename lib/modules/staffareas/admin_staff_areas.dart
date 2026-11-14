@@ -6,6 +6,7 @@ import '../../data/store.dart';
 import '../../services/file_download.dart';
 import '../../services/report_export.dart';
 import '../home_module.dart';
+import 'admin_hex_cells.dart';
 import 'area_map.dart';
 import 'staff_area_model.dart';
 import 'staff_terms.dart';
@@ -33,11 +34,13 @@ class AdminStaffAreasPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: 5,
+    length: 6,
     child: Column(children: [
-      const TabBar(isScrollable: true, tabs: [Tab(text: 'Areas'), Tab(text: 'Towns'), Tab(text: 'Settings'), Tab(text: 'Deactivated'), Tab(text: 'Reports')]),
+      // Cells (owner, 13 Nov 2026): the hexagon cells every new staff member registers. Areas and Towns are the older way, kept.
+      const TabBar(isScrollable: true, tabs: [Tab(text: 'Cells'), Tab(text: 'Areas'), Tab(text: 'Towns'), Tab(text: 'Settings'), Tab(text: 'Deactivated'), Tab(text: 'Reports')]),
       Expanded(
         child: TabBarView(children: [
+          AdminHexCellsTab(store: store),
           _AreasTab(store: store),
           _TownsTab(store: store),
           _SettingsTab(store: store),

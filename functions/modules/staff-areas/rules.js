@@ -50,6 +50,9 @@ const DEFAULT_TERMS = [
   '5. You complete the targets for the day, the week and the month: live photos, shops visited, new vendors and new paid vendors. A month counts only when its monthly targets are complete.',
   '6. Days without rate updates beyond the weekly allowance are missed days. When the allowed number of missed days is reached, your staff ID is deactivated automatically and your area is given to another person. You are warned one day before.',
   '7. LOCAMARKET can change these rules at any time.',
+  "8. Your area is one hexagon cell, set automatically from where you stand: 1 km in dense cities, 2 km in towns, 5 km in villages (by how many people live there). You can register a cell only while standing inside it with GPS on, and only if it is free. One cell per staff member; a cell is never shared.",
+  "9. You must be local: your home must be within 5 km of the centre of your cell. If your home is farther, you cannot register that cell. Your home address may be checked before approval.",
+  "10. If your staff ID is cancelled, it is closed for good and never given to anyone again. Your cell becomes free for a new staff member, and the vendors linked to you move to LOCAMARKET.",
 ].join('\n');
 
 const text = v => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '');

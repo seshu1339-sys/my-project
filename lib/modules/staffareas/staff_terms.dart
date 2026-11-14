@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
+import 'hex_cell.dart';
 import 'staff_area_model.dart';
 
 /// The staff Terms & Conditions as the admin wrote them (staffAreaSettings/main.terms), or the default ones.
@@ -34,5 +35,17 @@ class StaffTermsView extends StatelessWidget {
       'Now: rate updates on at least ${settings.rateDaysPerWeek} days a week; monthly targets of ${settings.monthlyPhotoTarget} live photos, ${settings.monthlyVendorTarget} vendor registrations and ${settings.monthlyPaidVendorTarget} paid vendor registrations; the account stops at ${settings.maxMissedDays} missed days in a month.',
       style: const TextStyle(fontWeight: FontWeight.w600),
     ),
+    const SizedBox(height: 16),
+    // Always shown (owner, 13 Nov 2026), also when the admin wrote their own Terms.
+    const Text('Your cell', style: TextStyle(fontWeight: FontWeight.bold)),
+    const Text(
+      'Your area is one hexagon cell, set automatically from where you stand (1, 2 or 5 km by how many people live there). '
+      'You register it standing inside it, only if it is free; one cell per staff member, never shared. '
+      'You must be local: your home must be within 5 km of the centre of your cell, or the cell cannot be registered. '
+      'A cancelled staff ID is closed for good and never given again; its cell becomes free and its vendors move to LOCAMARKET.',
+      key: ValueKey('staff-terms-cell-rules'),
+    ),
+    const SizedBox(height: 12),
+    const Text(worldPopCredit, key: ValueKey('staff-terms-worldpop'), style: TextStyle(fontSize: 12, color: Colors.black54)),
   ]);
 }

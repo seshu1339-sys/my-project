@@ -64,6 +64,9 @@ class _FieldHomePageState extends State<FieldHomePage> {
           if (status == 'suspended') {
             return const _Message(title: 'Access suspended', body: 'Your field staff access has been suspended by the administrator. Contact them to have it reinstated.');
           }
+          if (status == 'cancelled') {
+            return const _Message(title: 'Staff ID closed', body: 'Your staff ID was cancelled by LOCAMARKET and is closed for good. Your cell is free for a new staff member. Contact the LOCAMARKET office if you have questions.');
+          }
           if (status == 'rejected') {
             return const _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved. Contact the administrator for details.');
           }
@@ -109,7 +112,8 @@ class _PendingStaff extends StatelessWidget {
       if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
       final mine = snapshot.data!.data();
       final area = mine?['areaId'] == null ? null : '${mine?['areaName'] ?? ''}';
-      if (area == null) return StaffAreaClaimPage(store: store);
+      // New staff register a hexagon cell (owner, 13 Nov 2026); the older claim page stays in the code, unused.
+      if (area == null) return StaffHexCellPage(store: store);
       return _Message(
         title: 'Waiting for approval',
         body: 'Your registration is waiting for administrator approval. Your area "$area" is held for you until then; nobody else can take it.'

@@ -60,8 +60,15 @@ class AreaMap extends StatelessWidget {
         options: MapOptions(initialCenter: _centre, initialZoom: 13.5, onTap: (_, at) => _tap(at)),
         children: [
           TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'com.neighbourly.ecommerce'),
+          // A hexagon cell is drawn as its outline (owner, 13 Nov 2026); an older area as its circle.
+          PolygonLayer(polygons: [
+            for (final a in areas)
+              if (a.hex)
+                Polygon(points: a.outline, color: areaColour(a.status).withValues(alpha: 0.18), borderColor: areaColour(a.status), borderStrokeWidth: a.id == selectedId ? 4 : 2),
+          ]),
           CircleLayer(circles: [
             for (final a in areas)
+              if (!a.hex)
               CircleMarker(
                 point: LatLng(a.latitude, a.longitude),
                 radius: a.radiusKm * 1000,

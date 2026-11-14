@@ -167,6 +167,8 @@ void main() {
   });
 
   testWidgets('the Terms show the admin\'s text and the current numbers; the defaults name every rule', (tester) async {
+    // The cell rules (owner, 13 Nov 2026) made the Terms longer: a tall screen shows them all.
+    _phone(tester, const Size(900, 2400));
     await tester.pumpWidget(const MaterialApp(home: Scaffold(body: StaffTermsView(settings: StaffAreaSettings(rateDaysPerWeek: 5, maxMissedDays: 6)))));
     expect(find.textContaining('no fixed salary'), findsOneWidget);
     expect(find.textContaining('rate updates on at least 5 days a week'), findsOneWidget);

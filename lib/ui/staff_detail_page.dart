@@ -36,6 +36,43 @@ class StaffDetailPage extends StatelessWidget {
     await _decide(context, 'setFieldStaffSuspension', {'staffUid': staffUid, 'suspended': suspend, 'reason': reason});
   }
 
+  /// Cancels the staff ID for good (owner, 13 Nov 2026): never reinstated or given again; their cell is free and their vendors move to
+  /// the office (functions/field-assistant.js cancelFieldStaff).
+  Future<void> _cancel(BuildContext context, String code) async {
+    final reason = TextEditingController();
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Cancel staff ID $code for good?'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('The ID is closed for good and never given again. Their cell becomes free and their linked vendors move to the office.'),
+            TextField(
+              key: const ValueKey('staff-cancel-reason'),
+              controller: reason,
+              maxLines: 2,
+              maxLength: 500,
+              onChanged: (_) => setDialogState(() {}),
+              decoration: const InputDecoration(labelText: 'Reason (required)'),
+            ),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Back')),
+            FilledButton(
+              key: const ValueKey('staff-cancel-go'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: reason.text.trim().length < 3 ? null : () => Navigator.pop(dialog, true),
+              child: const Text('Cancel the ID'),
+            ),
+          ],
+        ),
+      ),
+    );
+    // Not disposed here: the dialog may still be closing; the controller goes with this call.
+    final text = reason.text.trim();
+    if (go == true && context.mounted) await _decide(context, 'cancelFieldStaff', {'staffUid': staffUid, 'reason': text});
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Field staff profile')),
@@ -94,14 +131,28 @@ class StaffDetailPage extends StatelessWidget {
               OutlinedButton(onPressed: () => _review(context, approved: false), child: const Text('Reject')),
             ]),
           ]))),
-          if (!pending) Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (status == 'cancelled')
+            Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Status: Cancelled for good', key: ValueKey('staff-cancelled'), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+              if ('${data['cancelReason'] ?? ''}'.isNotEmpty) Text('Reason: ${data['cancelReason']}'),
+              const Text('This ID is closed and never given again. A new staff member gets a new ID.'),
+            ])))
+          else if (!pending) Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Status: ${suspended ? 'Suspended' : status}', style: const TextStyle(fontWeight: FontWeight.bold)),
             if (suspended && (data['decisionReason'] ?? '').toString().trim().isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 4), child: Text('Reason: ${data['decisionReason']}')),
             const SizedBox(height: 12),
-            suspended
-                ? FilledButton(onPressed: () => _setSuspension(context, name, suspend: false), child: const Text('Reinstate'))
-                : FilledButton.tonal(onPressed: () => _setSuspension(context, name, suspend: true), child: const Text('Suspend')),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              suspended
+                  ? FilledButton(onPressed: () => _setSuspension(context, name, suspend: false), child: const Text('Reinstate'))
+                  : FilledButton.tonal(onPressed: () => _setSuspension(context, name, suspend: true), child: const Text('Suspend')),
+              OutlinedButton(
+                key: const ValueKey('staff-cancel-id'),
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                onPressed: () => _cancel(context, code ?? staffUid),
+                child: const Text('Cancel staff ID'),
+              ),
+            ]),
           ]))),
         ]);
         },

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/store.dart';
 import 'area_map.dart';
-import 'staff_auto_area_page.dart';
+import 'staff_hex_cell_page.dart';
 import 'staff_area_model.dart';
 import 'staff_offer_form.dart';
 import 'staff_terms.dart';
@@ -82,7 +82,8 @@ class _StaffAreaDashboardState extends State<StaffAreaDashboard> {
       return StaffAreaDashboardView(
         today: snapshot.data!,
         onRefresh: _refresh,
-        onChoose: () => _open(Scaffold(appBar: AppBar(title: const Text('Your area')), body: StaffAutoAreaPage(store: widget.store))),
+        // New staff get a hexagon cell (owner, 13 Nov 2026); the older automatic areas page stays in the code, unused.
+        onChoose: () => _open(Scaffold(appBar: AppBar(title: const Text('My cell')), body: StaffHexCellPage(store: widget.store, onDone: _refresh))),
         onAddOffer: () => _open(StaffOfferForm(store: widget.store, shops: snapshot.data!.shops)),
         onTerms: () => _open(StaffTermsPage(store: widget.store)),
       );
@@ -117,11 +118,16 @@ class StaffAreaDashboardView extends StatelessWidget {
               child: Text(today.warning, style: TextStyle(color: error, fontWeight: FontWeight.w600)),
             ),
           if (area == null) ...[
-            const Text('You have no area yet. Go to a free area in your town and register it.'),
+            const Text('You have no cell yet. Go to a free (green) cell near your home and register it.'),
             const SizedBox(height: 8),
-            FilledButton.icon(key: const ValueKey('staff-area-choose'), onPressed: onChoose, icon: const Icon(Icons.map_outlined), label: const Text('Choose your area')),
+            FilledButton.icon(key: const ValueKey('staff-area-choose'), onPressed: onChoose, icon: const Icon(Icons.map_outlined), label: const Text('Choose your cell')),
           ] else ...[
-            Text('${area.town} • ${area.radiusKm.toStringAsFixed(area.radiusKm % 1 == 0 ? 0 : 1)} km${area.status == 'pending' ? ' • waiting for approval' : ''}'),
+            Text(
+              area.hex
+                  ? '${area.hexCode} • ${area.hexSizeKm} km cell • ${area.town}${area.status == 'pending' ? ' • waiting for approval' : ''}'
+                  : '${area.town} • ${area.radiusKm.toStringAsFixed(area.radiusKm % 1 == 0 ? 0 : 1)} km${area.status == 'pending' ? ' • waiting for approval' : ''}',
+              key: const ValueKey('staff-area-line'),
+            ),
             if (showMap) ...[
               const SizedBox(height: 8),
               AreaMap(areas: [area], selectedId: area.id, shops: today.shops, height: 220),
