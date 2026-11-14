@@ -73,6 +73,7 @@ class FieldModerationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AdminPageFrame(
     title: 'Field Assistant approvals',
+    actions: [RunAiCheckButton(call: store.call)],
     body: ListView(padding: const EdgeInsets.all(20), children: [
       // Vendors and service providers that staff added (Staff > Add): reviewed with a Google check of every photo.
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -108,6 +109,21 @@ class FieldModerationPage extends StatelessWidget {
           if (snapshot.hasError) const ListTile(title: Text('Pending field staff could not load.')),
           for (final doc in snapshot.data?.docs ?? const []) _staffTile(context, doc, pending: true),
           if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending field staff requests.')),
+        ]),
+      ),
+      const SizedBox(height: 24),
+      Text('Refused by the AI photo check', style: Theme.of(context).textTheme.titleLarge),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: store.firestore.collection('fieldStaff').where('autoRejected', isEqualTo: true).limit(100).snapshots(),
+        builder: (context, snapshot) => Column(children: [
+          if (snapshot.hasError) const ListTile(title: Text('Refused staff could not load.')),
+          for (final doc in snapshot.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+            Card(child: ListTile(
+              key: ValueKey('ai-refused-staff-${doc.id}'),
+              title: Text('${doc.data()['name'] ?? doc.id}'),
+              subtitle: Text('Staff ID: ${doc.data()['staffCode'] ?? ''} • ${doc.data()['decisionReason'] ?? ''}'),
+            )),
+          if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No staff refused by the AI check.')),
         ]),
       ),
       const SizedBox(height: 24),
@@ -149,8 +165,8 @@ class FieldModerationPage extends StatelessWidget {
       return Card(child: ListTile(
         key: ValueKey('pending-staff-${doc.id}'),
         title: SampleTitle(name, id: doc.id, data: data),
-        subtitle: Text([email, if (details.isNotEmpty) details].join('\n')),
-        isThreeLine: details.isNotEmpty,
+        subtitle: Text([email, if (details.isNotEmpty) details, if (data['autoApprovalHeld'] != null) 'AI check: waits for you (${data['autoApprovalHeld']})'].join('\n')),
+        isThreeLine: details.isNotEmpty || data['autoApprovalHeld'] != null,
         trailing: Wrap(children: [
           IconButton(tooltip: 'Approve', onPressed: () => _reviewStaff(context, doc.id, approved: true), icon: const Icon(Icons.check)),
           IconButton(tooltip: 'Reject', onPressed: () => _reviewStaff(context, doc.id, approved: false), icon: const Icon(Icons.close)),
@@ -163,7 +179,7 @@ class FieldModerationPage extends StatelessWidget {
     return Card(child: Column(children: [
       ListTile(
         title: SampleTitle(name, id: doc.id, data: data),
-        subtitle: Text('$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
+        subtitle: Text('${data['autoApproved'] == true ? 'Auto Approved • ' : ''}$email • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}${details.isEmpty ? '' : '\n$details'}'),
         isThreeLine: details.isNotEmpty,
         trailing: suspended
             ? OutlinedButton(onPressed: () => _setSuspension(context, doc.id, name, suspend: false), child: const Text('Reinstate'))

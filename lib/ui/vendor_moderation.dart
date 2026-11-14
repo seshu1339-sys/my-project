@@ -49,6 +49,7 @@ class VendorModerationPage extends StatelessWidget {
   Widget build(BuildContext context) => AdminPageFrame(
         title: 'Vendor approvals and publishing',
         actions: [
+          RunAiCheckButton(call: store.call),
           TextButton.icon(onPressed: () => _verifyShop(context), icon: const Icon(Icons.location_on), label: const Text('Verify shop')),
         ],
         body: ListView(padding: const EdgeInsets.all(20), children: [

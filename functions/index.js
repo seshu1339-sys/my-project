@@ -334,9 +334,9 @@ function approvedVendorWrites(batch, vendorId, data, extra = {}) {
 /// Auto Approval (owner, 13 Nov 2026; Business Profile > Auto Approval, OFF unless the admin turns it on). The owner and shop photos
 /// are checked (functions/photo-safety.js): nothing forbidden -> approved at once with the Vendor ID; drugs, weapons, alcohol, tobacco
 /// or adult content -> refused with the reason; not checked (no key, limit, error) -> waits for the admin as before.
-async function autoDecideVendor(uid, checkOptions = {}) {
-  const business = (await db.collection('settings').doc('business').get()).data() || {};
-  if (!flagOn(business.autoApproval)) return null;
+async function autoDecideVendor(uid, {force = false, ...checkOptions} = {}) {
+  const business = force ? {} : (await db.collection('settings').doc('business').get()).data() || {};
+  if (!force && !flagOn(business.autoApproval)) return null;
   const ref = db.collection('vendorApplications').doc(uid);
   const data = (await ref.get()).data();
   if (!data || data.status !== 'pending') return null;
@@ -351,7 +351,7 @@ async function autoDecideVendor(uid, checkOptions = {}) {
     return null;
   }
   const batch = db.batch();
-  batch.set(ref, {status: 'approved', autoApproved: true, feeRequired: false, feePaymentStatus: 'not_required', decisionReason: 'Auto approved', decidedAt: at}, {merge: true});
+  batch.set(ref, {status: 'approved', autoApproved: true, autoApprovalHeld: FieldValue.delete(), feeRequired: false, feePaymentStatus: 'not_required', decisionReason: 'Auto approved', decidedAt: at}, {merge: true});
   approvedVendorWrites(batch, uid, data, {autoApproved: true});
   await batch.commit();
   return 'approved';
@@ -659,5 +659,28 @@ exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{ord
 // are plain tasks now (functions/task.js); every one of them is exported above, so they are handed over by name.
 const {scheduledJobs, TASK_NAMES} = require('./scheduled-jobs');
 Object.assign(exports, scheduledJobs(Object.fromEntries(TASK_NAMES.map(name => [name, exports[name]]))));
+/// Admin: "Run AI check on pending" (owner, 14 Nov 2026). Every pending vendor, service provider and staff member (up to 25 of
+/// each) gets the same AI photo check as at registration, even while the Auto Approval switch is OFF: safe -> approved, forbidden ->
+/// refused with the reason, not checked -> stays in the pending list for the admin. The daily check allowance still applies.
+exports.runAutoApprovalOnPending = onCall({...options, memory: '512MiB', timeoutSeconds: 300, secrets: [photoSafetyKey]}, async request => {
+  await requireAdmin(request);
+  const {autoDecideProvider} = require('./providers')._autoApproval;
+  const {autoDecideStaff} = require('./field-assistant')._staffAutoApproval;
+  const counts = {approved: 0, rejected: 0, waiting: 0};
+  const run = async (collection, decide) => {
+    const docs = (await db.collection(collection).where('status', '==', 'pending').limit(25).get()).docs;
+    for (const doc of docs) {
+      let result = null;
+      try { result = await decide(doc.id, {force: true}); } catch (error) { console.warn('Auto approval run failed for', collection, doc.id, error.message); }
+      const status = result?.status || result;
+      counts[status === 'rejected' ? 'rejected' : status ? 'approved' : 'waiting'] += 1;
+    }
+  };
+  await run('vendorApplications', autoDecideVendor);
+  await run('providerApplications', autoDecideProvider);
+  await run('fieldStaff', autoDecideStaff);
+  return counts;
+});
+
 // For the tests only (a plain object, never a Cloud Function).
 exports._autoApproval = {autoDecideVendor};

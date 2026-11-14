@@ -68,7 +68,9 @@ class _FieldHomePageState extends State<FieldHomePage> {
             return const _Message(title: 'Staff ID closed', body: 'Your staff ID was cancelled by LOCAMARKET and is closed for good. Your cell is free for a new staff member. Contact the LOCAMARKET office if you have questions.');
           }
           if (status == 'rejected') {
-            return const _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved. Contact the administrator for details.');
+            // A photo refused by the AI check says why (functions/field-assistant.js autoDecideStaff).
+            final why = snapshot.data()?['autoRejected'] == true ? ' ${snapshot.data()?['decisionReason'] ?? ''}' : '';
+            return _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved.$why Contact the administrator for details.');
           }
           final code = '${snapshot.data()?['staffCode'] ?? ''}';
           // Registration finishes with the area: the staff member chooses a free one standing inside it and accepts the Terms

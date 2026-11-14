@@ -128,9 +128,9 @@ async function publishProvider(providerId, ref, data, reason = '', extra = {}) {
 
 /// Auto Approval for service providers (Business Profile > Auto Approval, OFF unless the admin turns it on): the same photo check as
 /// vendors (functions/photo-safety.js). Safe -> listed at once; forbidden -> refused with the reason; not checked -> the admin decides.
-async function autoDecideProvider(providerId, checkOptions = {}) {
-  const business = (await db.collection('settings').doc('business').get()).data() || {};
-  if (!flagOn(business.autoApproval)) return null;
+async function autoDecideProvider(providerId, {force = false, ...checkOptions} = {}) {
+  const business = force ? {} : (await db.collection('settings').doc('business').get()).data() || {};
+  if (!force && !flagOn(business.autoApproval)) return null;
   const ref = db.collection('providerApplications').doc(providerId);
   const data = (await ref.get()).data();
   if (!data || data.status !== 'pending') return null;

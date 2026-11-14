@@ -15,6 +15,8 @@ const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
 const {accountCodeFor} = require('./vendor-id');
+const {anthropicKey: photoSafetyKey, checkStoredPhotos, unsafeReason} = require('./photo-safety');
+const {flagOn} = require('./domain');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
@@ -43,7 +45,7 @@ async function requireAdmin(request) {
 // email may also be a customer, vendor or service provider, each with its own login, ID and records.
 // The Staff ID (STF-NRPM-116-001, functions/vendor-id.js) is made from the pincode right here; staff who registered before this keep
 // their earlier STF00001-style ID (functions/ids.js).
-exports.requestFieldStaffAccess = onCall(options, async request => {
+exports.requestFieldStaffAccess = onCall({...options, memory: '512MiB', secrets: [photoSafetyKey]}, async request => {
   // Only the email's staff login asks for staff access; the request stays 'pending' until an administrator approves it.
   const uid = requireRole(request, ['staff']);
   const ref = db.collection('fieldStaff').doc(uid);
@@ -62,8 +64,38 @@ exports.requestFieldStaffAccess = onCall(options, async request => {
     ...(details.gpsAddress ? {gpsAddress: details.gpsAddress} : {}),
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
+  const decided = await autoDecideStaff(uid);
+  if (decided) return {status: decided, staffCode, auto: true};
   return {status: 'pending', staffCode};
 });
+
+/// Auto Approval for staff (owner, 14 Nov 2026; the same Business Profile > Auto Approval switch as vendors and service providers).
+/// The staff photo is checked (functions/photo-safety.js): nothing forbidden -> active at once (the staffAreas trigger books their
+/// cell); drugs, weapons, alcohol, tobacco or adult content -> refused with the reason; not checked (no key, limit, error) -> waits
+/// for the admin as before. [force] is the admin's "Run AI check on pending" button: it runs even while the switch is OFF.
+async function autoDecideStaff(uid, {force = false, ...checkOptions} = {}) {
+  if (!force) {
+    const business = (await db.collection('settings').doc('business').get()).data() || {};
+    if (!flagOn(business.autoApproval)) return null;
+  }
+  const ref = db.collection('fieldStaff').doc(uid);
+  const data = (await ref.get()).data();
+  if (!data || data.status !== 'pending') return null;
+  const check = await checkStoredPhotos(db, [data.staffPhotoPath], {feature: 'auto_approval_staff', uid, ...checkOptions});
+  const at = FieldValue.serverTimestamp();
+  if (check.verdict === 'unsafe') {
+    await ref.set({status: 'rejected', decisionReason: unsafeReason(check.categories), autoRejected: true, photoSafety: check.categories, decidedAt: at, decidedBy: 'auto'}, {merge: true});
+    return 'rejected';
+  }
+  if (check.verdict !== 'safe') {
+    await ref.set({autoApprovalHeld: check.results.map(r => r.note).filter(Boolean).join(' ') || 'The photo check did not run.', autoApprovalCheckedAt: at}, {merge: true});
+    return null;
+  }
+  await ref.set({status: 'active', autoApproved: true, decisionReason: 'Auto approved', decidedAt: at, decidedBy: 'auto', autoApprovalHeld: FieldValue.delete()}, {merge: true});
+  return 'active';
+}
+// For index.js (the admin's "Run AI check on pending") and the tests: a plain object, never a Cloud Function.
+exports._staffAutoApproval = {autoDecideStaff};
 
 // Admin: approve or reject a pending field-staff request.
 exports.reviewFieldStaff = onCall(options, async request => {
