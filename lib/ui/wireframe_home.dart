@@ -1,3 +1,4 @@
+import 'home_catalog_lines.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
@@ -435,6 +436,9 @@ class WireframeHome extends StatelessWidget {
                                 ),
                               ),
                             );
+                    // Under Today's Offers: the category lines (owner, 16 Nov 2026), so the home page is never empty where vendors have not
+                    // posted yet. The app and the website show the same lines (the website with more items in a line).
+                    final catalogLines = HomeCatalogLines(store: store, android: android, onProduct: onProduct);
                     final nearbySection =
                         wrapSection(
                           'nearby',
@@ -461,6 +465,7 @@ class WireframeHome extends StatelessWidget {
                         'notice': noticeRow,
                         'quickFresh': QuickFreshToday(store: store),
                         'promo': wrapSection('promo', reorderedSections['promo']!),
+                        'catalogLines': catalogLines,
                         'strip': stripBand,
                         'popular': wrapSection('popular', reorderedSections['popular']!),
                         'localServices': wrapSection('localServices', reorderedSections['localServices']!),
@@ -485,7 +490,7 @@ class WireframeHome extends StatelessWidget {
                             reorderedSections[descriptor.key]!,
                           ),
                           // Under the Today's Offers cards: the product cards, with the Transport and Services boxes beside them (or below them on a phone).
-                          if (i == promoAt) stripBand,
+                          if (i == promoAt) ...[catalogLines, stripBand],
                         ],
                         nearbySection,
                       ],
