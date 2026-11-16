@@ -70,7 +70,8 @@ class ItemShopsPage extends StatelessWidget {
     body: ListenableBuilder(
       listenable: store,
       builder: (context, _) {
-        final offers = itemOffers(
+        // Shops with the "Today's rate" tick first, then the rest (owner, 16 Nov 2026).
+        final offers = todaysRatesFirst(itemOffers(
           store.visibleProducts(),
           store.visible('shops'),
           name: name,
@@ -78,7 +79,7 @@ class ItemShopsPage extends StatelessWidget {
           pincode: store.pincode,
           latitude: store.latitude,
           longitude: store.longitude,
-        );
+        ), ServerClock.now());
         final where = store.placeName.isEmpty ? 'near you' : 'near ${store.placeName}';
         final mapped = offers.where((o) => o.onMap).toList();
         return ListView(
@@ -98,7 +99,7 @@ class ItemShopsPage extends StatelessWidget {
               ItemShopsMap(offers: mapped, latitude: store.latitude, longitude: store.longitude, onShop: (o) => _showShop(context, o)),
               const SizedBox(height: 12),
             ],
-            if (offers.isNotEmpty) Text('Lowest price first'.tr(context), style: Theme.of(context).textTheme.titleSmall),
+            if (offers.isNotEmpty) Text("Today's rate first, then the lowest price".tr(context), style: Theme.of(context).textTheme.titleSmall),
             for (final (i, offer) in offers.indexed) ItemOfferTile(key: ValueKey('item-offer-$i'), offer: offer, onTap: () => _showShop(context, offer)),
           ],
         );
@@ -124,7 +125,7 @@ class ItemShopsPage extends StatelessWidget {
           Text(offer.shopName, style: Theme.of(sheet).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           Text('$name: ${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}', style: Theme.of(sheet).textTheme.titleMedium?.copyWith(color: AppTokens.primary)),
           if (offer.note.isNotEmpty) Text(offer.note, key: const ValueKey('item-shop-note')),
-          if (priceUpdatedToday(offer.product, ServerClock.now())) const Padding(padding: EdgeInsets.only(top: 4), child: Align(alignment: Alignment.centerLeft, child: UpdatedTodayTag())),
+          if (todaysRate(offer.product, offer.shop, ServerClock.now())) const Padding(padding: EdgeInsets.only(top: 4), child: Align(alignment: Alignment.centerLeft, child: TodaysRateTag())),
           if (offer.address.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(offer.address, key: const ValueKey('item-shop-address'))),
           if (offer.distanceKm != null) Text('${distanceText(offer.distanceKm)} from you'),
           if (offer.phone.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Phone: ${offer.phone}')),
@@ -188,8 +189,8 @@ class ItemOfferTile extends StatelessWidget {
         leading: _ItemPhoto(key: ValueKey('item-offer-photo-${offer.product.id}'), url: offer.itemPhoto, size: 56),
         title: Text('${offer.shopName}${ratingLabel(offer.shop).isEmpty ? '' : '  ${ratingLabel(offer.shop)}'}', style: const TextStyle(fontWeight: FontWeight.w600)),
         // A price set today carries the green "Updated today" label after it.
-        subtitle: priceUpdatedToday(offer.product, (now ?? ServerClock.now)())
-            ? Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [line, UpdatedTodayTag(key: ValueKey('updated-today-${offer.product.id}'))])
+        subtitle: todaysRate(offer.product, offer.shop, (now ?? ServerClock.now)())
+            ? Wrap(spacing: 6, runSpacing: 2, crossAxisAlignment: WrapCrossAlignment.center, children: [line, TodaysRateTag(key: ValueKey('todays-rate-${offer.product.id}'))])
             : line,
         trailing: const Icon(Icons.chevron_right),
       ),
@@ -197,14 +198,18 @@ class ItemOfferTile extends StatelessWidget {
   }
 }
 
-/// The small green "Updated today" label next to a price the vendor set today (India date).
-class UpdatedTodayTag extends StatelessWidget {
-  const UpdatedTodayTag({super.key});
+/// The small green tick "Today's rate" next to a price set or confirmed in the last 24 hours (lib/domain/item_shops.dart todaysRate).
+class TodaysRateTag extends StatelessWidget {
+  const TodaysRateTag({super.key});
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
     decoration: BoxDecoration(color: const Color(0xFFE8F5E9), border: Border.all(color: const Color(0xFF2E7D32)), borderRadius: BorderRadius.circular(4)),
-    child: Text('Updated today'.tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.check, size: 12, color: Color(0xFF2E7D32)),
+      const SizedBox(width: 3),
+      Text("Today's rate".tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+    ]),
   );
 }
 

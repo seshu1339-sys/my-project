@@ -2,7 +2,7 @@
 // One post duration for everyone (owner, 12 Nov 2026). The admin chooses it in Business Profile (settings/business.postDuration:
 // '24h', '7d' or '1m'; 24 hours when not set). Every post of a vendor or staff ends at the latest when this time has passed since it was
 // posted, paid plans included (a plan gives more photos and posts, not a longer time):
-//   vendor item prices      products.priceSetAt   -> priceExpiresAt, endsAt (ISO)
+//   (vendor item prices are not posts any more: they stay until the vendor changes them, owner 16 Nov 2026, vendor-prices.js)
 //   exclusive items         products.postedAt     -> expiresAt, endsAt (ISO)
 //   (Today's Offers boxes are not posts any more: they run with the vendor's plan, owner 13 Nov 2026)
 //   Vendor Offers           vendorOffers.postedAt (else createdAt) -> endsAt (Timestamp); staff offers end the same day anyway
@@ -40,19 +40,9 @@ const iso = ms => new Date(ms).toISOString();
 /// Recalculates the end of every post still running with the given duration. Writes only the documents whose end changes (and stores
 /// ownEndsAt the first time, so a longer duration later can give back the time the vendor chose). Returns how many changed.
 async function recapLivePosts(db, durationMs, now = Date.now()) {
-  const nowIso = iso(now);
   const writes = [];
   const plan = (ref, changes) => writes.push([ref, changes]);
 
-  // Vendor item prices (also the staff-added items, which carry the same price fields).
-  for (const doc of (await db.collection('products').where('priceExpiresAt', '>', nowIso).get()).docs) {
-    const item = doc.data();
-    if (item.priceExpired === true) continue;
-    const posted = millisOf(item.priceSetAt);
-    if (!Number.isFinite(posted)) continue;
-    const end = cappedEnd(posted, durationMs);
-    if (end !== millisOf(item.priceExpiresAt)) plan(doc.ref, {priceExpiresAt: iso(end), endsAt: iso(end)});
-  }
   // Exclusive items that are live.
   for (const doc of (await db.collection('products').where('isExclusive', '==', true).get()).docs) {
     const item = doc.data();
@@ -99,11 +89,17 @@ async function recapLivePosts(db, durationMs, now = Date.now()) {
 async function applyPostDurationIfChanged(db, now = Date.now()) {
   const durationMs = await readPostDurationMs(db);
   const state = db.collection('_jobState').doc('postDuration');
-  if ((await state.get()).data()?.durationMs === durationMs) return {changed: 0, durationMs};
-  const changed = await recapLivePosts(db, durationMs, now);
-  await state.set({durationMs, appliedAt: Timestamp.fromMillis(now), changed});
-  return {changed, durationMs};
+  const last = (await state.get()).data() || {};
+  // Once after the "prices never run out" rule (owner, 16 Nov 2026): the items' old price ends go (same state document, no extra read).
+  const pricesCleared = last.priceRule === PRICE_RULE ? 0 : await require('./vendor-prices').clearOldPriceEnds(db);
+  if (last.durationMs === durationMs && last.priceRule === PRICE_RULE) return {changed: 0, durationMs};
+  const changed = last.durationMs === durationMs ? 0 : await recapLivePosts(db, durationMs, now);
+  await state.set({durationMs, priceRule: PRICE_RULE, appliedAt: Timestamp.fromMillis(now), changed, pricesCleared});
+  return {changed, durationMs, pricesCleared};
 }
+
+/// The price rule applied (vendor-prices.js): prices never run out.
+const PRICE_RULE = 'never-expire';
 
 module.exports = {
   POST_DURATIONS, DEFAULT_POST_DURATION, DAY_MS,

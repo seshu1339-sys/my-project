@@ -43,7 +43,8 @@ async function runAll(pieces) {
 function quarterHourPieces(tasks) {
   return [
     ['postDuration', () => applyPostDurationIfChanged(getFirestore())],
-    ...['expireVendorPrices', 'expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers'].map(name => [name, () => tasks[name].run({})]),
+    // Vendor prices no longer run out (owner, 16 Nov 2026): the old expireVendorPrices piece is gone.
+    ...['expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers'].map(name => [name, () => tasks[name].run({})]),
   ];
 }
 
@@ -57,11 +58,13 @@ function hourlyPieces(tasks, now = Date.now()) {
   if (hour === 8) names.push('sendAdSummaries');
   if (hour === 17) names.push('staffAreaLastChance');
   if (hour % 6 === 0) names.push('aiAgentHealthCheck');
+  // "Are today's rates the same?" (functions/vendor-rates.js): every hour it reads the admin's hour and sends only at that hour.
+  names.push('rateReminder');
   return names.map(name => [name, () => tasks[name].run({})]);
 }
 
-const TASK_NAMES = ['expireVendorPrices', 'expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers', 'staffAreaNightly',
-  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck'];
+const TASK_NAMES = ['expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers', 'staffAreaNightly',
+  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck', 'rateReminder'];
 
 /// The two scheduled functions, given every task by name. A missing task stops the deploy rather than a job silently not running.
 function scheduledJobs(tasks) {

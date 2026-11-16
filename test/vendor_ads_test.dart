@@ -39,7 +39,7 @@ void main() {
     expect(vendorAdState(const Entry('a', {'active': false}), now), 'Inactive');
     expect(daysRemainingText(const Entry('a', {'endsAt': '2026-11-05T10:30:00'}), now), '10 days left');
     expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-26T20:00:00'}), now), 'ends today');
-    expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-20T10:30:00'}), now), 'ended 6 day(s) ago');
+    expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-20T10:30:00'}), now), 'ended', reason: 'never "days ago" (owner, 16 Nov 2026)');
     expect(daysRemainingText(const Entry('a', {}), now), '');
   });
 

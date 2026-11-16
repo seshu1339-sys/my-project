@@ -1,17 +1,28 @@
 import 'catalog.dart';
-import 'ist_time.dart';
 
 // Vendor spec section 8: the customer searches an item by name and chooses it; every shop in their town selling it shows on a map
 // (the shop's small photo and its price on each pin) and in a list from the lowest price up (photo, name, price, distance).
 
-/// Whether a vendor set this product's price today (India date, by [now], normally the server's clock): the customer list shows
-/// "Updated today" next to it. A price older than 24 hours is never shown at all (vendor-prices.js expires it), so a price without the
-/// tag is from yesterday. Products without priceSetAt (the admin's own) never carry the tag.
-bool priceUpdatedToday(Entry product, DateTime now) {
-  final set = DateTime.tryParse(product.text('priceSetAt'));
-  if (set == null) return false;
-  final a = istWallClock(set), b = istWallClock(now);
-  return a.year == b.year && a.month == b.month && a.day == b.day;
+/// How long the "Today's rate" tick shows after the vendor set a price or tapped "Yes, same rates" (owner, 16 Nov 2026).
+const todaysRateFor = Duration(hours: 24);
+
+/// Whether [product] shows the green "Today's rate" tick at [now] (normally the server's clock): its price was set, or its shop's
+/// vendor confirmed "Yes, same rates" (shops.ratesConfirmedAt), less than 24 hours ago. Only the tick goes after that; the price stays,
+/// with no date and no "old rate" text. Compared on the phone: nothing is read for it.
+bool todaysRate(Entry product, Entry? shop, DateTime now) {
+  for (final at in [product.text('priceSetAt'), shop?.text('ratesConfirmedAt') ?? '']) {
+    final t = DateTime.tryParse(at);
+    if (t == null) continue;
+    final age = now.difference(t);
+    if (!age.isNegative && age < todaysRateFor) return true;
+  }
+  return false;
+}
+
+/// The shops of an item with the tick first (each part from the lowest price up, as they came).
+List<ItemOffer> todaysRatesFirst(List<ItemOffer> offers, DateTime now) {
+  final fresh = [for (final o in offers) if (todaysRate(o.product, o.shop, now)) o];
+  return [...fresh, for (final o in offers) if (!fresh.contains(o)) o];
 }
 
 /// An item name as compared: "  Tomato " and "tomato" are the same item.

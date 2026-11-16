@@ -18,7 +18,7 @@ void main() {
     Entry('s1', {'name': 'Tomato repair', 'kind': 'service', 'price': 99}),
   ];
 
-  test('the strip follows the admin\'s order, each item at its lowest price, with the item\'s photo; unsold items are left out', () {
+  test('the strip follows the admin\'s order, each item at its lowest price, with the item\'s photo; an item no shop has a price for still shows', () {
     final record = const Entry('freshStrip', {
       'items': [
         {'name': 'Onion', 'productId': 'o1', 'imageUrl': 'http://x/onion.png'},
@@ -30,7 +30,8 @@ void main() {
     final items = freshStripItems(record);
     expect(items.map((i) => i.name), ['Onion', 'Tomato', 'Mango']);
     final cards = freshStripProducts(items, products, '');
-    expect(cards.map((c) => c.id), ['o1', 't2'], reason: 'the cheaper tomato; mango is not sold here');
+    expect(cards.map((c) => c.id), ['o1', 't2', 'fresh-Mango'], reason: 'the cheaper tomato; mango is not sold here but still shows (owner, 16 Nov 2026)');
+    expect(cards[2].price(''), 0, reason: 'shown with "Local vendor not updated item price"');
     expect(cards[1].text('imageUrl'), 'http://x/tomato.png', reason: 'the item\'s photo when the product has none');
     expect(freshStripItems(null), isEmpty);
     expect(pagesOf(List.generate(20, (i) => i)).map((p) => p.length), [9, 9, 2]);

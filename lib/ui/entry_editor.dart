@@ -499,6 +499,17 @@ class _EntryEditorState extends State<EntryEditor> {
         DropdownMenuItem(value: '', child: Text('Off (admin approves)')),
         DropdownMenuItem(value: 'true', child: Text('On (AI photo check)')),
       ];
+    } else if (key == 'rateReminder') {
+      // The daily "Are today's rates the same?" to every vendor app (functions/vendor-rates.js), ON unless switched off.
+      options = const [
+        DropdownMenuItem(value: '', child: Text('On (default)')),
+        DropdownMenuItem(value: 'false', child: Text('Off')),
+      ];
+    } else if (key == 'rateReminderHour') {
+      options = [
+        const DropdownMenuItem(value: '', child: Text('8:00 AM (default)')),
+        for (var h = 0; h < 24; h++) DropdownMenuItem(value: '$h', child: Text('${h % 12 == 0 ? 12 : h % 12}:00 ${h < 12 ? 'AM' : 'PM'}')),
+      ];
     } else if (key == 'postDuration') {
       // One post duration for everyone (lib/domain/post_duration.dart, functions/post-duration.js).
       options = [

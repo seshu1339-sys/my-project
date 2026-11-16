@@ -14,11 +14,9 @@ void main() {
     }
   });
 
-  test('a price that lasts days says so in days', () {
+  test('a vendor price never runs out (owner, 16 Nov 2026): no "valid for" and no date, whatever the post duration', () {
     final now = DateTime.utc(2026, 11, 12, 10);
-    final item = {'price': 40, 'unit': '1 kg', 'priceExpiresAt': now.add(const Duration(days: 6, hours: 23, minutes: 30)).toIso8601String()};
-    expect(vendorPriceLine(item, now), '₹40 for 1 kg • valid for 6 d 23 h');
-    item['priceExpiresAt'] = now.add(const Duration(hours: 5, minutes: 10)).toIso8601String();
-    expect(vendorPriceLine(item, now), '₹40 for 1 kg • valid for 5 h 10 min');
+    final item = {'price': 40, 'unit': '1 kg', 'priceExpiresAt': now.subtract(const Duration(days: 3)).toIso8601String()};
+    expect(vendorPriceLine(item, now), '₹40 for 1 kg', reason: 'an old end is ignored');
   });
 }

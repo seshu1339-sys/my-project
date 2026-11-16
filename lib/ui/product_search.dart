@@ -132,7 +132,7 @@ class _ProductSearchPageState extends State<ProductSearchPage> {
             for (final match in shopMatches)
               ListTile(
                 title: Text(match.product.text('name')),
-                subtitle: Text('${money(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km'),
+                subtitle: Text('${priceOrNotUpdated(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.pop(sheetContext);
@@ -263,7 +263,7 @@ class _ProductLocationTile extends StatelessWidget {
             ),
       title: Text(match.product.text('name')),
       subtitle: Text(
-        '${money(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km • ${match.shop.text('name')}${ratingLabel(match.shop).isEmpty ? '' : ' ${ratingLabel(match.shop)}'}\n${match.shop.text('address')}',
+        '${priceOrNotUpdated(match.product.price(store.pincode))} • ${match.distanceKm.toStringAsFixed(1)} km • ${match.shop.text('name')}${ratingLabel(match.shop).isEmpty ? '' : ' ${ratingLabel(match.shop)}'}\n${match.shop.text('address')}',
       ),
       isThreeLine: true,
       trailing: IconButton(

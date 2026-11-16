@@ -4,24 +4,28 @@ import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/item_shops.dart';
 import 'package:ecommerce_app/ui/item_shops_page.dart';
 
-// "Updated today": a price the vendor set today (India date) carries the tag; yesterday's does not; the admin's own products never do.
+// "Today's rate" (owner, 16 Nov 2026): a green tick for 24 hours from the moment the vendor set the price or tapped "Yes, same rates";
+// after that only the tick goes, the price stays, with no date and no "old rate" text. Shops with the tick come first.
 void main() {
-  // 6 Nov 2026, 10:00 India time = 04:30 UTC.
-  final now = DateTime.utc(2026, 11, 6, 4, 30);
+  final now = DateTime.utc(2026, 11, 16, 4, 30);
   Entry product(String? setAt) => Entry('p', {'name': 'Tomato', 'price': 30, 'priceSetAt': ?setAt});
 
-  test('set today in India counts, also just after midnight India time (still the day before in UTC)', () {
-    expect(priceUpdatedToday(product('2026-11-06T03:00:00.000Z'), now), isTrue);
-    expect(priceUpdatedToday(product('2026-11-05T18:40:00.000Z'), now), isTrue, reason: '00:10 on 6 Nov in India');
+  test('the tick lasts 24 hours from the price or from "Yes, same rates"', () {
+    expect(todaysRate(product('2026-11-15T05:00:00.000Z'), null, now), isTrue, reason: '23 h 30 min ago');
+    expect(todaysRate(product('2026-11-15T04:00:00.000Z'), null, now), isFalse, reason: 'more than 24 hours');
+    expect(todaysRate(product(null), null, now), isFalse);
+    expect(todaysRate(product('not a date'), null, now), isFalse);
+    const shop = Entry('s', {'ratesConfirmedAt': '2026-11-16T02:00:00.000Z'});
+    expect(todaysRate(product('2026-11-01T04:00:00.000Z'), shop, now), isTrue, reason: 'the vendor confirmed the same rates today');
   });
 
-  test('set yesterday in India, or with no time at all, has no tag', () {
-    expect(priceUpdatedToday(product('2026-11-05T18:20:00.000Z'), now), isFalse, reason: '23:50 on 5 Nov in India');
-    expect(priceUpdatedToday(product(null), now), isFalse);
-    expect(priceUpdatedToday(product('not a date'), now), isFalse);
+  test("the item's shops: the ones with the tick first, then the rest, each part as it came (lowest price first)", () {
+    ItemOffer offer(String id, double price, String? setAt) => ItemOffer(product: Entry(id, {'price': price, 'priceSetAt': ?setAt}), shop: null, price: price);
+    final offers = [offer('cheap-old', 20, '2026-11-10T00:00:00.000Z'), offer('mid-today', 25, '2026-11-16T01:00:00.000Z'), offer('dear-old', 30, null), offer('dear-today', 35, '2026-11-16T03:00:00.000Z')];
+    expect(todaysRatesFirst(offers, now).map((o) => o.product.id), ['mid-today', 'dear-today', 'cheap-old', 'dear-old']);
   });
 
-  testWidgets('the shop row shows the tag only for today\'s price', (tester) async {
+  testWidgets("the shop row shows the tick only for a price of the last 24 hours, and never a date", (tester) async {
     Widget tile(String setAt) => MaterialApp(
       home: Scaffold(
         body: ItemOfferTile(
@@ -31,11 +35,13 @@ void main() {
         ),
       ),
     );
-    await tester.pumpWidget(tile('2026-11-06T02:00:00.000Z'));
-    expect(find.byKey(const ValueKey('updated-today-p1')), findsOneWidget);
-    expect(find.text('Updated today'), findsOneWidget);
+    await tester.pumpWidget(tile('2026-11-16T02:00:00.000Z'));
+    expect(find.byKey(const ValueKey('todays-rate-p1')), findsOneWidget);
+    expect(find.text("Today's rate"), findsOneWidget);
     await tester.pumpWidget(tile('2026-11-05T10:00:00.000Z'));
-    expect(find.byKey(const ValueKey('updated-today-p1')), findsNothing);
+    expect(find.byKey(const ValueKey('todays-rate-p1')), findsNothing);
+    expect(find.textContaining('₹30'), findsOneWidget, reason: 'the price stays');
+    expect(find.textContaining('ago'), findsNothing);
   });
 
   test('searching a category offers its items (owner, 6 Nov 2026: items show for their item or their category)', () {

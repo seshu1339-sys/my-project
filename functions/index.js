@@ -37,9 +37,10 @@ exports.describeImageForSearch = require('./image-search').describeImageForSearc
 Object.assign(exports, require('./ids'));
 // All scheduled work runs from two Cloud Scheduler jobs (functions/scheduled-jobs.js); the old scheduled names below are plain tasks.
 // Vendor prices last the admin's post duration (post-duration.js); the expiry is a task of every15Minutes.
-const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
-const {readPostDurationMs} = require('./post-duration');
-exports.expireVendorPrices = expireVendorPrices;
+const {freshPriceFields, priceEndRemoved} = require('./vendor-prices');
+// "Today's rate": the vendor's "Yes, same rates" and the daily reminder (functions/vendor-rates.js).
+const {confirmTodaysRates, rateReminder} = require('./vendor-rates');
+Object.assign(exports, {confirmTodaysRates, rateReminder});
 // Service providers: a separate kind of account (only the callables are exported).
 const {registerProvider, approveProvider, updateProviderRate} = require('./providers');
 Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
@@ -508,7 +509,7 @@ exports.submitVendorChange = onCall(options, async request => {
       ...(ownPhotoRequired ? {awaitingOwnPhoto: true} : {}),
       name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', libraryImageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
       ...(custom ? {customItem: true} : {libraryItemId: safeChanges.libraryItemId}), unitType: safeChanges.unitType, quantity: safeChanges.quantity,
-      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)),
+      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now()),
       kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
       ...(String(safeChanges.note || '').trim() ? {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')} : {}),
     };
@@ -520,7 +521,8 @@ exports.submitVendorChange = onCall(options, async request => {
     if (!mine) throw new HttpsError('not-found', 'Public item not found.');
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
     // A new price for an item lasts the post duration again (vendor-prices.js removes it after that).
-    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields(Date.now(), await readPostDurationMs(db))};
+    // A new price stays until the vendor changes it (owner, 16 Nov 2026); it never runs out.
+    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields(Date.now())};
     if (type === 'note') newValue = {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')};
   }
   // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
@@ -539,7 +541,8 @@ exports.submitVendorChange = onCall(options, async request => {
       tx.set(db.collection('vendorChanges').doc(), change);
     });
   } else if (autoPublish) {
-    await target.set({...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    // A price set before this rule may still carry its old end: it goes with the new price.
+    await target.set({...newValue, ...(type === 'price' && collection === 'products' ? priceEndRemoved() : {}), ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     await db.collection('vendorChanges').add(change);
   } else await db.collection('vendorChanges').add(change);
   if (isNew) await countUsage(db, 'item_added', {key: newValue.libraryItemId || newValue.name, label: newValue.name, town: newValue.town || '', owners: [uid], uid});

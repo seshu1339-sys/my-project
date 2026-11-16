@@ -47,11 +47,13 @@ class FirestoreTodaysOfferStore implements TodaysOfferStore {
   });
 
   @override
-  Stream<List<TodaysOffer>> watchLive() => _offers
-      .where('endsAt', isGreaterThan: Timestamp.now())
-      .orderBy('endsAt')
-      .snapshots()
-      .map((snapshot) => [for (final doc in snapshot.docs) TodaysOffer.fromData(doc.id, doc.data())]);
+  Stream<List<TodaysOffer>> watchLive() {
+    Query<Map<String, dynamic>> live() => _offers.where('endsAt', isGreaterThan: Timestamp.now()).orderBy('endsAt');
+    List<TodaysOffer> offers(QuerySnapshot<Map<String, dynamic>> snapshot) => [for (final doc in snapshot.docs) TodaysOffer.fromData(doc.id, doc.data())];
+    // The customer app reads the offers once per open and per place (owner, 16 Nov 2026), never watching them.
+    if (store.loadsOnce) return store.loadedOnce(() async => offers(await live().get()));
+    return live().snapshots().map(offers);
+  }
 
   @override
   Future<Map<String, dynamic>> submit({String productId = '', String libraryItemId = '', String photoName = '', String name = '', String note = '', required num price, int? days, int? slot}) =>

@@ -15,6 +15,7 @@ import 'vendor_section_exclusives.dart';
 import 'vendor_section_kit.dart';
 import 'vendor_section_orders.dart';
 import 'vendor_section_products.dart';
+import 'vendor_section_rates.dart';
 import 'vendor_section_requests.dart';
 import 'vendor_section_shop_ad.dart';
 import 'vendor_section_shop_photos.dart';
@@ -48,6 +49,8 @@ class VendorWorkspace extends StatelessWidget {
     // The plan at the top: Free Plan + Upgrade, or the running plan and its end (owner, 13 Nov 2026).
     VendorPlanBadge(store: store, uid: uid, onUpgrade: () => openVendorPlans(context, store, uid)),
     const SizedBox(height: 8),
+    // "Are today's rates the same?" + "Yes, same rates" (owner, 16 Nov 2026), on top of the home; the daily reminder opens the app here.
+    VendorRatesCard(store: store, uid: uid),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
     const SizedBox(height: 12),
     // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).

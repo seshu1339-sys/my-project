@@ -26,7 +26,7 @@ String daysRemainingText(Entry ad, DateTime now) {
   final end = parseIstTime(ad.text('endsAt'));
   if (end == null) return '';
   final left = end.difference(now);
-  if (left.isNegative) return 'ended ${(-left.inDays).clamp(0, 9999)} day(s) ago';
+  if (left.isNegative) return 'ended';
   if (left.inHours < 24) return 'ends today';
   return '${(left.inHours / 24).ceil()} days left';
 }

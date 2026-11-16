@@ -131,7 +131,7 @@ class ShopPage extends StatelessWidget {
                     .where((e) => e.text('shopId') == shop.id))
               ListTile(
                 title: Text(p.text('name')),
-                subtitle: Text(money(p.price(store.pincode))),
+                subtitle: Text(priceOrNotUpdated(p.price(store.pincode))),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                   context,

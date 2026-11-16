@@ -58,5 +58,10 @@ Duration untilNextTurn(int seconds, DateTime now) {
 }
 
 /// The live showcase records (public), by vendor.
-Stream<Map<String, ShowcaseEntry>> watchShowcase(Store store) =>
-    store.firestore.collection('vendorShowcase').where('active', isEqualTo: true).snapshots().map((s) => {for (final d in s.docs) d.id: ShowcaseEntry.fromData(d.id, d.data())});
+Stream<Map<String, ShowcaseEntry>> watchShowcase(Store store) {
+  final query = store.firestore.collection('vendorShowcase').where('active', isEqualTo: true);
+  Map<String, ShowcaseEntry> read(QuerySnapshot<Map<String, dynamic>> s) => {for (final d in s.docs) d.id: ShowcaseEntry.fromData(d.id, d.data())};
+  // The customer app reads it once per open and per place (owner, 16 Nov 2026).
+  if (store.loadsOnce) return store.loadedOnce(() async => read(await query.get()));
+  return query.snapshots().map(read);
+}

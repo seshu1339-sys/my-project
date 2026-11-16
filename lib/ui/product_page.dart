@@ -103,7 +103,7 @@ class _ProductPageState extends State<ProductPage> {
         ],
         const SizedBox(height: 12),
         Text(
-          '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}',
+          p.price(store.pincode) > 0 ? '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}' : priceOrNotUpdated(0),
           key: const ValueKey('product-price'),
           style: const TextStyle(
             fontSize: 32,
@@ -408,7 +408,7 @@ class _ProductPageState extends State<ProductPage> {
                         child: ProductArt(item, height: 56),
                       ),
                       title: Text(item.text('name')),
-                      subtitle: Text(money(item.price(store.pincode))),
+                      subtitle: Text(priceOrNotUpdated(item.price(store.pincode))),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.pushReplacement(
                         context,

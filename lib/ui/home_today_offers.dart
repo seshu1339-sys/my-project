@@ -235,7 +235,13 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
             [for (final p in widget.boxes) _Box(promotion: p)],
             widget.visible,
           );
-          if (boxes.isEmpty && widget.empty != null) return widget.empty!;
+          // All 6 boxes always show, in every place (owner, 16 Nov 2026): a box with no offer keeps its colour and size, with "Today's
+          // Offer" and "Local vendor not updated offer" inside. The section never hides; with nothing here at all, the admin's own
+          // message (Business Profile: noOffersMessage) shows under the boxes, as before.
+          final nothingHere = boxes.isEmpty;
+          while (boxes.length < todayOfferBoxCount) {
+            boxes.add(_Box(offer: (look, i) => TodayOfferEmptyBox(key: ValueKey('today-offer-empty-${i + 1}'), look: look)));
+          }
           final looks = todayOfferBoxLooks(widget.looks ?? widget.boxes);
           return Column(
             key: const ValueKey('today-offers'),
@@ -250,6 +256,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
                 // Only offers are drawn here; the others are the promotions as before.
                 boxBuilder: (context, look, i) => i < boxes.length ? boxes[i].offer?.call(look, i) : null,
               ),
+              if (nothingHere && widget.empty != null) Padding(padding: const EdgeInsets.only(top: 6), child: widget.empty!),
               // A little room before the strip below (the boxes have no dots under them when all 6 fit).
               const SizedBox(height: 10),
             ],
@@ -258,6 +265,50 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
       ),
     ),
   );
+}
+
+/// What a box with no offer says (owner, 16 Nov 2026).
+const noLocalOfferText = 'Local vendor not updated offer';
+
+/// A box with no offer here: the same coloured frame and white inside as an offer box, "Today's Offer" across the top and
+/// "Local vendor not updated offer" in the middle.
+class TodayOfferEmptyBox extends StatelessWidget {
+  const TodayOfferEmptyBox({super.key, required this.look});
+  final Entry look;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = colorFromHex(look.text('backgroundColor'), AppTokens.primary);
+    final inner = max(clampedNumber(look, 'radius', 20, 0, 80) - TodayOfferBox.frame, 6.0);
+    return Container(
+      decoration: entryDecoration(look, fallback: AppTokens.primaryLight),
+      padding: const EdgeInsets.all(TodayOfferBox.frame),
+      child: Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(inner)),
+        padding: const EdgeInsets.all(4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FittedBox(
+              fit: BoxFit.fitWidth,
+              child: Text("Today's Offer".tr(context), style: TextStyle(color: colour, fontWeight: FontWeight.w900)),
+            ),
+            Expanded(
+              child: Center(
+                child: Text(
+                  noLocalOfferText.tr(context),
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// A box with its live item offer: the box's colour as a rounded frame, and inside it a plain white area with "Today's Offer" across

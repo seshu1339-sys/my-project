@@ -190,7 +190,8 @@ void main() {
       expect(find.text('Narsipatnam special'), findsNothing);
       expect(find.text('Narsipatnam ad'), findsNothing);
 
-      // No shop with an offer within the km: a message, never another place's offers or "general" ones, never empty boxes.
+      // No shop with an offer within the km: never another place's offers or "general" ones; the 6 boxes stay (owner, 16 Nov 2026), each
+      // "Local vendor not updated offer", with the message under them.
       await _goTo(store, 'Visakhapatnam');
       await tester.pump();
       expect(find.text("Today's Narsipatnam Offers"), findsNothing);
@@ -198,6 +199,7 @@ void main() {
       expect(find.text('Everyone offer'), findsNothing);
       expect(find.byKey(const ValueKey('no-offers-notice')), findsOneWidget);
       expect(find.text('No offers near you right now.'), findsOneWidget);
+      expect(find.text('Local vendor not updated offer'), findsWidgets);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       store.dispose();

@@ -442,38 +442,77 @@ class Store extends ChangeNotifier {
       if (kIsWeb && appRole != 'admin') {
         _subscriptions.add(googleIdTokens().listen((idToken) => unawaited(_finishGoogleQuietly(idToken))));
       }
-      for (final collection in collections) {
-        _subscriptions.add(
-          firestore
-              .collection(collection)
-              .limit(_catalogPageLimit)
-              .snapshots()
-              .listen(
-                (snapshot) {
-                  catalog[collection] = snapshot.docs
-                      .map((d) => Entry(d.id, d.data()))
-                      .toList();
-                  if (snapshot.docs.length >= _catalogPageLimit) {
-                    truncatedCollections.add(collection);
-                  } else {
-                    truncatedCollections.remove(collection);
-                  }
-                  notifyListeners();
-                },
-                onError: (Object e) {
-                  // The Ads collection is optional: if it cannot be read (yet) the site simply keeps its existing ad boxes.
-                  if (collection == 'ads') return;
-                  error =
-                      'Could not load $collection. Check your connection and Firebase permissions.';
-                  notifyListeners();
-                },
-              ),
-        );
+      // The customer app and website read the catalog ONCE when they open and again when the customer's place changes or they pull
+      // to refresh (owner, 16 Nov 2026: no reads while the app is open). The admin panel, vendor and staff apps keep watching it live.
+      if (loadsOnce) {
+        unawaited(reloadCatalog());
+      } else {
+        for (final collection in collections) {
+          _subscriptions.add(
+            firestore
+                .collection(collection)
+                .limit(_catalogPageLimit)
+                .snapshots()
+                .listen((snapshot) => _took(collection, snapshot), onError: (Object e) => _failed(collection)),
+          );
+        }
       }
     }
-    if (live) _watchQuickItems();
+    if (live && !loadsOnce) _watchQuickItems();
     ready = true;
     notifyListeners();
+  }
+
+  /// Whether this app reads the catalog once per open (the customer app and website) instead of watching it live.
+  bool get loadsOnce => live && appRole == 'user';
+
+  final _reloads = StreamController<void>.broadcast();
+
+  /// Fires after each [reloadCatalog] (the customer's place changed, or a pull to refresh): what is read once per open is read again.
+  Stream<void> get catalogReloads => _reloads.stream;
+
+  /// [load] once now, then again after every [reloadCatalog]: for the customer app's offers and showcase, which are read once per
+  /// open and per place, never watched.
+  Stream<T> loadedOnce<T>(Future<T> Function() load) async* {
+    yield await load();
+    await for (final _ in catalogReloads) {
+      yield await load();
+    }
+  }
+
+  void _took(String collection, QuerySnapshot<Map<String, dynamic>> snapshot) {
+    catalog[collection] = snapshot.docs.map((d) => Entry(d.id, d.data())).toList();
+    if (snapshot.docs.length >= _catalogPageLimit) {
+      truncatedCollections.add(collection);
+    } else {
+      truncatedCollections.remove(collection);
+    }
+    notifyListeners();
+  }
+
+  void _failed(String collection) {
+    // The Ads collection is optional: if it cannot be read (yet) the site simply keeps its existing ad boxes.
+    if (collection == 'ads') return;
+    error = 'Could not load $collection. Check your connection and Firebase permissions.';
+    notifyListeners();
+  }
+
+  Future<void>? _reloading;
+
+  /// The customer app's one read of the catalog (and the approved quick items): every collection once. Two calls at the same time share
+  /// one read.
+  Future<void> reloadCatalog() => _reloading ??= _reloadCatalog().whenComplete(() => _reloading = null);
+
+  Future<void> _reloadCatalog() async {
+    await Future.wait([
+      for (final collection in collections)
+        firestore.collection(collection).limit(_catalogPageLimit).get().then((s) => _took(collection, s), onError: (Object _) => _failed(collection)),
+      firestore.collection('quickItems').where('status', isEqualTo: 'approved').limit(_catalogPageLimit).get().then((s) {
+        catalog['quickItems'] = s.docs.map((d) => Entry(d.id, d.data())).toList();
+      }, onError: (Object _) {}),
+    ]);
+    notifyListeners();
+    _reloads.add(null);
   }
 
   // Customers read only APPROVED quick items (the rules allow nothing else); the clock decides
@@ -667,6 +706,7 @@ class Store extends ChangeNotifier {
     bool followGps = false,
   }) async {
     followsGps = followGps;
+    final movedFrom = (pincode, latitude, longitude);
     // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
     // coordinate refresh) must not forget a town the customer already picked.
     final unchanged = town == null && pin == pincode && value == address;
@@ -710,6 +750,16 @@ class Store extends ChangeNotifier {
       unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng, area: placeName));
     }
     notifyListeners();
+    if (loadsOnce && placeMoved(movedFrom, (pin, lat, lng))) unawaited(reloadCatalog());
+  }
+
+  /// Whether the customer's place really changed: another pincode, a place where there was none, or more than 1 km away.
+  static bool placeMoved((String, double?, double?) from, (String, double?, double?) to) {
+    if (from.$1 != to.$1) return true;
+    final (a, b) = (from.$2, from.$3);
+    final (c, d) = (to.$2, to.$3);
+    if (a == null || b == null || c == null || d == null) return (a == null) != (c == null);
+    return distanceKm(a, b, c, d) > 1;
   }
 
   Future<void> setLanguage(String value) async {

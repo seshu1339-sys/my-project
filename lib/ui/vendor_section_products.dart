@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
-import '../domain/post_duration.dart';
 import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'library_item_tile.dart';
@@ -321,7 +320,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             child: const Text('Cancel'),
           ),
       ],
-    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. A price stays for ${postDurationLabel(store.business)}; then it is removed and you enter a new price.');
+    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. Your price stays until you change it; for 24 hours after you set it (or tap "Yes, same rates") customers see the green Today\'s rate tick.');
   }
 }
 
@@ -388,7 +387,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                 subtitle: Text(
                   '${vendorPriceLine(doc.data(), DateTime.now())} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}',
                   key: ValueKey('vendor-price-line-${doc.id}'),
-                  style: vendorPriceExpired(doc.data(), DateTime.now()) ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
+                  style: vendorPriceMissing(doc.data()) ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
                 ),
                 trailing: Wrap(children: [
                   IconButton(
@@ -401,7 +400,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                           }),
                   ),
                   IconButton(
-                    tooltip: vendorPriceExpired(doc.data(), DateTime.now()) ? 'Enter a new price' : 'Update price',
+                    tooltip: vendorPriceMissing(doc.data()) ? 'Enter your price' : 'Update price',
                     icon: const Icon(Icons.sell_outlined),
                     onPressed: busy
                         ? null

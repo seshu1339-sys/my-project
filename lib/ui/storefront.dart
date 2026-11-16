@@ -282,7 +282,8 @@ class _StorefrontState extends State<Storefront> {
               )
             : null,
         // Below the phone's status bar (Android draws apps edge to edge): without this the logo sits under the clock.
-        body: SafeArea(bottom: false, child: WireframeHome(
+        // Pull down to read the shops' prices and offers again (the customer app reads them once per open, owner 16 Nov 2026).
+        body: SafeArea(bottom: false, child: RefreshIndicator(onRefresh: () => store.loadsOnce ? store.reloadCatalog() : Future<void>.value(), child: WireframeHome(
           scroll: scroll,
           categoriesKey: categoriesKey,
           productsKey: productsKey,
@@ -302,7 +303,7 @@ class _StorefrontState extends State<Storefront> {
             message(context, 'Added to bag');
           },
           onCategory: openCategory,
-        )),
+        ))),
       );
     },
   );

@@ -30,12 +30,8 @@ test('a post ends at its own end or the duration after it was posted, whichever 
   assert.equal(cappedEnd(NOW, DAY_MS, NaN), NOW + DAY_MS);
 });
 
-test('a vendor price lasts the given duration', () => {
-  const fields = freshPriceFields(NOW, 7 * DAY_MS);
-  assert.equal(fields.priceSetAt, iso(NOW));
-  assert.equal(fields.priceExpiresAt, iso(NOW + 7 * DAY_MS));
-  assert.equal(fields.endsAt, fields.priceExpiresAt);
-  assert.equal(freshPriceFields(NOW).priceExpiresAt, iso(NOW + DAY_MS), '24 hours when no duration is given');
+test('a vendor price never runs out (owner, 16 Nov 2026): only when it was set', () => {
+  assert.deepEqual(freshPriceFields(NOW), {priceSetAt: iso(NOW), priceExpired: false});
 });
 
 test('a changed duration recalculates the running posts once, and gives back time up to the vendor\'s own end', emulated, async () => {
@@ -43,7 +39,7 @@ test('a changed duration recalculates the running posts once, and gives back tim
   const tag = `pd${Date.now()}`;
   const now = Date.now();
   const posted = now - 2 * 60 * 60 * 1000;
-  await db.doc(`products/${tag}-price`).set({name: 'Rice', price: 40, ...freshPriceFields(posted, DAY_MS)});
+  await db.doc(`products/${tag}-price`).set({name: 'Rice', price: 40, ...freshPriceFields(posted)});
   await db.doc(`products/${tag}-excl`).set({name: 'Saree', isExclusive: true, active: true, createdAt: Timestamp.fromMillis(posted), expiresAt: iso(posted + 90 * DAY_MS)});
   await db.doc(`vendorTodaysOffers/${tag}_1`).set({vendorId: tag, submittedAt: Timestamp.fromMillis(posted), endsAt: Timestamp.fromMillis(posted + 7 * DAY_MS)});
   await db.doc(`vendorOffers/${tag}`).set({vendorId: tag, status: 'live', createdAt: Timestamp.fromMillis(posted), endsAt: Timestamp.fromMillis(posted + 30 * DAY_MS)});
@@ -63,7 +59,7 @@ test('a changed duration recalculates the running posts once, and gives back tim
   // 24 hours: every post ends a day after it was posted.
   await recapLivePosts(db, DAY_MS, now);
   let s = await read();
-  assert.equal(s.price.priceExpiresAt, iso(posted + DAY_MS));
+  assert.equal(s.price.priceExpiresAt, undefined, 'a vendor price is not a post: never given an end');
   assert.equal(s.excl.expiresAt, iso(posted + DAY_MS));
   assert.equal(s.excl.endsAt, iso(posted + DAY_MS), 'the website and the apps hide the exclusive item at that time');
   assert.equal(s.box.endsAt.toMillis(), posted + 7 * DAY_MS, "a Today's Offers box runs with the plan, never capped (owner, 13 Nov 2026)");
@@ -75,7 +71,7 @@ test('a changed duration recalculates the running posts once, and gives back tim
   // 1 month: each gets back time up to its own end (the box's 7 days, the offer's 30), the price lasts the month.
   await recapLivePosts(db, 30 * DAY_MS, now);
   s = await read();
-  assert.equal(s.price.priceExpiresAt, iso(posted + 30 * DAY_MS));
+  assert.equal(s.price.endsAt, undefined);
   assert.equal(s.excl.expiresAt, iso(posted + 30 * DAY_MS));
   assert.equal(s.box.endsAt.toMillis(), posted + 7 * DAY_MS);
   assert.equal(s.offer.endsAt.toMillis(), posted + 30 * DAY_MS);
@@ -93,6 +89,7 @@ test('the 15-minute job applies the admin\'s duration only when it changed', emu
   try {
     assert.equal((await applyPostDurationIfChanged(db)).durationMs, 7 * DAY_MS);
     assert.equal((await db.doc('_jobState/postDuration').get()).data().durationMs, 7 * DAY_MS);
+    assert.equal((await db.doc('_jobState/postDuration').get()).data().priceRule, 'never-expire', 'the old price ends were cleared once');
     assert.deepEqual(await applyPostDurationIfChanged(db), {changed: 0, durationMs: 7 * DAY_MS}, 'unchanged: two reads, no work');
   } finally {
     await db.doc('settings/business').set({postDuration: FieldValue.delete()}, {merge: true});
@@ -103,14 +100,14 @@ test('the 15-minute job applies the admin\'s duration only when it changed', emu
 test('the hourly job runs each piece at its hour in India; the 15-minute job runs the expiry pieces', () => {
   const tasks = Object.fromEntries(TASK_NAMES.map(name => [name, task(() => name)]));
   const at = (h, day = 16) => hourlyPieces(tasks, Date.UTC(2026, 10, day, h, 20) - 5.5 * 3600000).map(([name]) => name);
-  assert.deepEqual(at(0), ['staffAreaNightly', 'aiAgentHealthCheck']);
-  assert.deepEqual(at(3), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage'], '16 Nov 2026 is a Monday');
-  assert.deepEqual(at(3, 17), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup']);
-  assert.deepEqual(at(8), ['sendAdSummaries']);
-  assert.deepEqual(at(17), ['staffAreaLastChance']);
-  assert.deepEqual(at(6), ['aiAgentHealthCheck']);
-  assert.deepEqual(at(5), []);
-  assert.deepEqual(quarterHourPieces(tasks).map(([name]) => name), ['postDuration', 'expireVendorPrices', 'expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers']);
+  assert.deepEqual(at(0), ['staffAreaNightly', 'aiAgentHealthCheck', 'rateReminder'], 'the rate reminder looks every hour');
+  assert.deepEqual(at(3), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'rateReminder'], '16 Nov 2026 is a Monday');
+  assert.deepEqual(at(3, 17), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'rateReminder']);
+  assert.deepEqual(at(8), ['sendAdSummaries', 'rateReminder']);
+  assert.deepEqual(at(17), ['staffAreaLastChance', 'rateReminder']);
+  assert.deepEqual(at(6), ['aiAgentHealthCheck', 'rateReminder']);
+  assert.deepEqual(at(5), ['rateReminder']);
+  assert.deepEqual(quarterHourPieces(tasks).map(([name]) => name), ['postDuration', 'expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers']);
 });
 
 test('one failing piece does not stop the others', async () => {

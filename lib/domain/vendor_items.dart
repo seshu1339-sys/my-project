@@ -49,25 +49,27 @@ List<(String, String)> libraryCategories(List<Entry> library, List<Entry> catego
   ];
 }
 
-/// A vendor's price lasts the admin's post duration (lib/domain/post_duration.dart), 24 hours unless the admin changes it; then it is
-/// removed (functions/vendor-prices.js) and the vendor enters a new one. The price's own priceExpiresAt says when.
-const vendorPriceValidHours = 24;
+/// A vendor's price stays until the vendor changes or deletes it (owner, 16 Nov 2026); it never runs out. For 24 hours after it was set
+/// (or after "Yes, same rates", [ratesConfirmedAt]) customers see the green "Today's rate" tick next to it.
+const vendorTodaysRateHours = 24;
 
-/// Whether a vendor item's price has run out at [now]: it has no price any more, or its 24 hours are over (priceExpiresAt).
-bool vendorPriceExpired(Map<String, dynamic> item, DateTime now) {
-  if (item['price'] is! num) return true;
-  final expires = DateTime.tryParse('${item['priceExpiresAt'] ?? ''}');
-  return expires != null && !now.isBefore(expires);
+/// Whether a vendor item has no price (one the old 24-hour rule removed): the vendor enters one; customers see the item with
+/// "Local vendor not updated item price".
+bool vendorPriceMissing(Map<String, dynamic> item) => item['price'] is! num;
+
+/// Whether the vendor's price shows the "Today's rate" tick at [now].
+bool vendorPriceToday(Map<String, dynamic> item, DateTime now, {String ratesConfirmedAt = ''}) {
+  for (final at in ['${item['priceSetAt'] ?? ''}', ratesConfirmedAt]) {
+    final t = DateTime.tryParse(at);
+    if (t != null && !now.isBefore(t) && now.difference(t) < const Duration(hours: vendorTodaysRateHours)) return true;
+  }
+  return false;
 }
 
-/// The price as the vendor sees it: "₹50 for 2 kg • valid for 23 h 10 min", or "Price expired: enter a new price".
-String vendorPriceLine(Map<String, dynamic> item, DateTime now) {
-  if (vendorPriceExpired(item, now)) return 'Price expired: enter a new price';
+/// The price as the vendor sees it: "₹50 for 2 kg • Today's rate ✓", "₹50 for 2 kg", or "No price: enter your price". No date.
+String vendorPriceLine(Map<String, dynamic> item, DateTime now, {String ratesConfirmedAt = ''}) {
+  if (vendorPriceMissing(item)) return 'No price: enter your price';
   final unit = '${item['unit'] ?? ''}';
   final price = '₹${item['price']}${unit.isEmpty ? '' : ' for $unit'}';
-  final expires = DateTime.tryParse('${item['priceExpiresAt'] ?? ''}');
-  if (expires == null) return price;
-  final left = expires.difference(now);
-  if (left.inDays >= 1) return '$price • valid for ${left.inDays} d ${left.inHours % 24} h';
-  return '$price • valid for ${left.inHours} h ${left.inMinutes % 60} min';
+  return vendorPriceToday(item, now, ratesConfirmedAt: ratesConfirmedAt) ? "$price • Today's rate ✓" : price;
 }
