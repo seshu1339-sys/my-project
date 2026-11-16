@@ -70,7 +70,9 @@ async function vendorPhotosUsed(db, uid, except = {}) {
   ]);
   const live = d => ['pending', 'approved'].includes(d.data().status);
   return shop.docs.filter(d => live(d) && d.data().slot >= 2 && d.data().slot !== except.shopSlot).length
-    + items.docs.filter(d => live(d) && d.id !== except.productId).length;
+    // Owner, 16 Nov 2026: the photo of an item whose category has "Vendor photo compulsory" is part of the item (the item limit
+    // counts it), never an extra photo.
+    + items.docs.filter(d => live(d) && d.data().compulsory !== true && d.id !== except.productId).length;
 }
 
 module.exports = {planAllows, requirePlan, vendorItemLimitNow, vendorPhotoAllowance, vendorPhotosUsed, FREE_EXTRA_PHOTOS, MAX_SHOP_SLOT, PLAN_NEEDED};

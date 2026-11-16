@@ -273,8 +273,13 @@ const productChangeFields = {
   // (1-10 kg or 1-10 pieces) and the price for that quantity.
   // customName + categoryId instead of libraryItemId: an item that is not in the catalog (owner, 13 Nov 2026); it waits, hidden, for the
   // vendor's own photo (checked by Claude Haiku).
-  newProduct: ['libraryItemId', 'customName', 'categoryId', 'unitType', 'quantity', 'price'],
+  // note (owner, 16 Nov 2026): an optional short size / brand note, at most 40 letters ("20 litre", "Milton").
+  newProduct: ['libraryItemId', 'customName', 'categoryId', 'unitType', 'quantity', 'price', 'note'],
+  // The vendor changes the note of an item (published at once, like a price).
+  note: ['note'],
 };
+/// The longest size / brand note of a vendor item.
+const ITEM_NOTE_MAX = 40;
 // Validates the values a vendor proposes for a public change. Throws Error(message).
 function validateVendorChange(type, changes) {
   const money = key => { const v = changes[key]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 10000000) throw Error(`${key} must be a number from 0 to 10000000.`); };
@@ -288,6 +293,8 @@ function validateVendorChange(type, changes) {
     money('price');
     if (!(changes.price > 0)) throw Error('Enter the price for that quantity.');
   }
+  if (changes.note !== undefined && (typeof changes.note !== 'string' || changes.note.trim().length > ITEM_NOTE_MAX)) throw Error(`The note can have at most ${ITEM_NOTE_MAX} letters.`);
+  if (type === 'note' && changes.note === undefined) throw Error('Write the note.');
   if (changes.price !== undefined) money('price');
   if (changes.compareAtPrice !== undefined) money('compareAtPrice');
   if (changes.stock !== undefined && (!Number.isInteger(changes.stock) || changes.stock < 0 || changes.stock > 1000000)) throw Error('stock must be a whole number from 0 to 1000000.');
@@ -313,4 +320,4 @@ function vendorItemLimit(vendor = {}) {
   const limit = vendor.itemLimit;
   return typeof limit === 'number' && Number.isInteger(limit) && limit >= 0 && limit <= 100 ? limit : DEFAULT_VENDOR_ITEM_LIMIT;
 }
-module.exports = {parseDeliveryTiers, shopDeliveryCharge, cleanPhone, vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};
+module.exports = {ITEM_NOTE_MAX, parseDeliveryTiers, shopDeliveryCharge, cleanPhone, vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

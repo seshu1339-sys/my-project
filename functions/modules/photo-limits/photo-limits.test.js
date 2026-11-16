@@ -141,3 +141,39 @@ test('own item photo: a safe photo goes live at once, a forbidden one is refused
   await assert.rejects(S.addPhotoToCatalog(db, bucket, {productId: 'p2'}, T), /no approved own photo/);
   await db.collection('productImageLibrary').doc(added.libraryId).delete();
 });
+
+// Owner, 16 Nov 2026: "Vendor photo compulsory" categories (plastic, fancy ...).
+test('a compulsory category photo is part of the item: no extra-photo room needed, never trimmed; approved keeps one copy; a deleted item leaves no files', emulator, async () => {
+  const {db, bucket, product, upload, shopPhoto} = await setup();
+  await shopPhoto(1);
+  await shopPhoto(2);
+  await shopPhoto(3); // both free extra photos are used by shop photos
+  await product('bucket', 'sarees', {active: false, awaitingOwnPhoto: true});
+  await upload(S.privatePath('v1', 'bucket'));
+  assert.equal((await S.submitItemPhoto(db, bucket, 'v1', {productId: 'bucket'}, T)).status, 'pending', 'no extra-photo room needed');
+  assert.equal((await db.collection('vendorItemPhotos').doc('bucket').get()).data().compulsory, true);
+  assert.equal(await vendorPhotosUsed(db, 'v1'), 2, 'the compulsory photo is not counted');
+  await S.reviewItemPhoto(db, bucket, {productId: 'bucket', approved: true}, T);
+  assert.equal((await bucket.file(S.privatePath('v1', 'bucket')).exists())[0], false, 'the private upload is deleted after approval');
+  assert.equal((await bucket.file(S.publicPath('bucket')).exists())[0], true, 'one public copy stays');
+  assert.equal((await db.collection('products').doc('bucket').get()).data().active, true);
+  assert.equal(await S.trimAfterPlan(db, bucket, 'v1', 0, T), 2, 'only the 2 extra shop photos go at the end of a plan');
+  assert.equal((await db.collection('products').doc('bucket').get()).data().ownPhoto, true, 'the compulsory photo stays');
+  const item = (await db.collection('products').doc('bucket').get()).data();
+  await db.collection('products').doc('bucket').delete();
+  await S.cleanUpDeletedItem(db, bucket, 'bucket', item);
+  assert.equal((await bucket.file(S.publicPath('bucket')).exists())[0], false, 'no leftover file');
+  assert.equal((await db.collection('vendorItemPhotos').doc('bucket').get()).exists, false);
+});
+
+test('the size / brand note: optional, at most 40 letters, also as its own change', () => {
+  const {validateVendorChange, productChangeFields, ITEM_NOTE_MAX} = require('../../domain');
+  const base = {libraryItemId: 'lib-bucket', unitType: 'pcs', quantity: 1, price: 120};
+  assert.equal(ITEM_NOTE_MAX, 40);
+  assert.ok(productChangeFields.newProduct.includes('note'));
+  assert.doesNotThrow(() => validateVendorChange('newProduct', base));
+  assert.doesNotThrow(() => validateVendorChange('newProduct', {...base, note: '20 litre, Milton'}));
+  assert.throws(() => validateVendorChange('newProduct', {...base, note: 'x'.repeat(41)}), /at most 40/);
+  assert.throws(() => validateVendorChange('note', {}), /Write the note/);
+  assert.doesNotThrow(() => validateVendorChange('note', {note: 'Milton'}));
+});

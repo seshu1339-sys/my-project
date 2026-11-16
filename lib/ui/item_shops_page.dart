@@ -123,6 +123,7 @@ class ItemShopsPage extends StatelessWidget {
           const SizedBox(height: 12),
           Text(offer.shopName, style: Theme.of(sheet).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           Text('$name: ${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}', style: Theme.of(sheet).textTheme.titleMedium?.copyWith(color: AppTokens.primary)),
+          if (offer.note.isNotEmpty) Text(offer.note, key: const ValueKey('item-shop-note')),
           if (priceUpdatedToday(offer.product, ServerClock.now())) const Padding(padding: EdgeInsets.only(top: 4), child: Align(alignment: Alignment.centerLeft, child: UpdatedTodayTag())),
           if (offer.address.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(offer.address, key: const ValueKey('item-shop-address'))),
           if (offer.distanceKm != null) Text('${distanceText(offer.distanceKm)} from you'),
@@ -176,13 +177,15 @@ class ItemOfferTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final line = Text([
       '${money(offer.price)}${offer.unit.isEmpty ? '' : ' for ${offer.unit}'}',
+      if (offer.note.isNotEmpty) offer.note,
       if (offer.distanceKm != null) distanceText(offer.distanceKm),
     ].join(' • '));
     return Card(
       margin: const EdgeInsets.only(top: 8),
       child: ListTile(
         onTap: onTap,
-        leading: _ShopPhoto(url: offer.photo, size: 52),
+        // The vendor's own model photo (or the catalog photo); loaded only here, as the row comes into view.
+        leading: _ItemPhoto(key: ValueKey('item-offer-photo-${offer.product.id}'), url: offer.itemPhoto, size: 56),
         title: Text('${offer.shopName}${ratingLabel(offer.shop).isEmpty ? '' : '  ${ratingLabel(offer.shop)}'}', style: const TextStyle(fontWeight: FontWeight.w600)),
         // A price set today carries the green "Updated today" label after it.
         subtitle: priceUpdatedToday(offer.product, (now ?? ServerClock.now)())
@@ -202,6 +205,23 @@ class UpdatedTodayTag extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
     decoration: BoxDecoration(color: const Color(0xFFE8F5E9), border: Border.all(color: const Color(0xFF2E7D32)), borderRadius: BorderRadius.circular(4)),
     child: Text('Updated today'.tr(context), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+  );
+}
+
+class _ItemPhoto extends StatelessWidget {
+  const _ItemPhoto({super.key, required this.url, required this.size});
+  final String url;
+  final double size;
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: SizedBox(
+      width: size,
+      height: size,
+      child: url.isEmpty
+          ? const ColoredBox(color: Color(0xFFE5E7EB), child: Icon(Icons.image_outlined))
+          : Image.network(url, fit: BoxFit.cover, cacheWidth: (size * 3).round(), errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFFE5E7EB), child: Icon(Icons.image_outlined))),
+    ),
   );
 }
 

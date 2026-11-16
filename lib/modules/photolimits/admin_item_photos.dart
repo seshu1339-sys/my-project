@@ -124,8 +124,8 @@ class OwnPhotoCategoriesView extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.all(12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Categories that need the vendor\'s own photo', style: TextStyle(fontWeight: FontWeight.bold)),
-        const Text('Tick a category (for example Sarees) and its new items stay hidden until the vendor\'s own photo is approved. Other categories may use our standard photo.'),
+        const Text('Vendor photo compulsory', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text("Turn it on for categories where every shop's model differs (Plastics, Fancy ...): vendors take a photo of their own model before saving, and the item shows after the AI photo check. Off (Vegetables, Fruits ...): our catalog photo is used."),
         if (categories.isEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Text('No categories yet.')),
         for (final (id, name, on) in categories)
           SwitchListTile(
@@ -133,7 +133,7 @@ class OwnPhotoCategoriesView extends StatelessWidget {
             dense: true,
             contentPadding: EdgeInsets.zero,
             title: Text(name),
-            subtitle: Text(on ? 'Own photo required' : 'Standard photo allowed'),
+            subtitle: Text(on ? 'Vendor photo compulsory' : 'Catalog photo used'),
             value: on,
             onChanged: (v) async {
               final messenger = ScaffoldMessenger.of(context);

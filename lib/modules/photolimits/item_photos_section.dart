@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../data/store.dart';
+import '../../services/photo_compress.dart';
 import 'photo_allowance.dart';
 
 /// Vendor app: the photo of each item. Our standard photo, or the vendor's own (camera or gallery), which the admin checks first and
@@ -33,7 +34,8 @@ class _ItemPhotosSectionState extends State<ItemPhotosSection> {
     if (days == null) return;
     setState(() => busy = productId);
     try {
-      final bytes = await file.readAsBytes();
+      final bytes = await shrinkPhotoInBackground(await file.readAsBytes());
+      if (bytes == null) throw StateError('That file is not a photo. Choose another.');
       await FirebaseStorage.instance.ref('vendorItemPhotos/${widget.uid}/$productId').putData(bytes, SettableMetadata(contentType: 'image/jpeg', cacheControl: 'no-cache'));
       final result = await widget.store.call('submitItemPhoto', {'productId': productId, 'searchDays': days});
       // The photo is checked automatically (functions/photo-safety.js): approved at once, or the admin checks it when the check cannot run.

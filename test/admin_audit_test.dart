@@ -80,8 +80,8 @@ void main() {
           body: OwnPhotoCategoriesView(categories: const [('sarees', 'Sarees', true), ('veg', 'Vegetables', false)], onChanged: (id, on) async => changed.add('$id $on')),
         ),
       ));
-      expect(find.text("Categories that need the vendor's own photo"), findsOneWidget);
-      expect(find.text('Own photo required'), findsOneWidget);
+      expect(find.text('Vendor photo compulsory'), findsNWidgets(2), reason: 'the heading and the switched-on category');
+      expect(find.text('Catalog photo used'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('own-photo-category-veg')));
       await tester.pump();
       expect(changed, ['veg true']);

@@ -10,8 +10,9 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 //   reviewItemPhoto   admin   -> approve or reject an own item photo
 //   addPhotoToCatalog admin   -> an approved own photo becomes the item's standard photo in the Product Image Library
 //   trimPhotosOnPlanEnd trigger -> vendorPremium/<uid> went from active to not active
+//   itemPhotosOnItemDelete trigger -> products/<id> deleted: its own photo files go too
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onDocumentWritten} = require('firebase-functions/v2/firestore');
+const {onDocumentWritten, onDocumentDeleted} = require('firebase-functions/v2/firestore');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('../../admin-session');
@@ -59,4 +60,9 @@ exports.trimPhotosOnPlanEnd = onDocumentWritten({document: 'vendorPremium/{uid}'
   const db = getFirestore();
   const free = (await db.collection('planServiceGates').doc('main').get()).data()?.freeExtraPhotos;
   await S.trimAfterPlan(db, getStorage().bucket(), event.params.uid, Number.isInteger(free) && free >= 0 ? free : FREE_EXTRA_PHOTOS);
+});
+
+// An item was deleted (by the admin or the office): its own photo files and photo record are deleted too (owner, 16 Nov 2026).
+exports.itemPhotosOnItemDelete = onDocumentDeleted({document: 'products/{productId}', region: 'asia-south1', maxInstances: 3}, async event => {
+  await S.cleanUpDeletedItem(getFirestore(), getStorage().bucket(), event.params.productId, event.data?.data());
 });

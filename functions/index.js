@@ -510,6 +510,7 @@ exports.submitVendorChange = onCall(options, async request => {
       ...(custom ? {customItem: true} : {libraryItemId: safeChanges.libraryItemId}), unitType: safeChanges.unitType, quantity: safeChanges.quantity,
       unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now(), await readPostDurationMs(db)),
       kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
+      ...(String(safeChanges.note || '').trim() ? {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')} : {}),
     };
   } else {
     const current = await target.get();
@@ -520,10 +521,11 @@ exports.submitVendorChange = onCall(options, async request => {
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
     // A new price for an item lasts the post duration again (vendor-prices.js removes it after that).
     if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields(Date.now(), await readPostDurationMs(db))};
+    if (type === 'note') newValue = {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')};
   }
   // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
   // map and list; other changes follow the admin's policy (autoPublishVendorChanges).
-  const autoPublish = isNew || type === 'price' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
+  const autoPublish = isNew || type === 'price' || type === 'note' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
   const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId: targetId, oldValue, newValue, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
   if (isNew) {
     // Only [vendorItemLimitNow] items per vendor (free or plan, functions/plan-gate.js) (items the admin hid count too). Counted and saved in one transaction, so two quick

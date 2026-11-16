@@ -27,7 +27,7 @@ PhotoAllowance photoAllowance({Map<String, dynamic>? gates, Map<String, dynamic>
   final paid = premium?['active'] == true && ends is Timestamp && ends.toDate().isAfter(now);
   final plan = _n(premium?['extraPhotos']) ?? planExtraPhotosDefault;
   bool live(Map<String, dynamic> d) => d['status'] == 'pending' || d['status'] == 'approved';
-  final used = shopPhotos.where((d) => live(d) && (d['slot'] as num? ?? 0) >= 2).length + itemPhotos.where(live).length;
+  final used = shopPhotos.where((d) => live(d) && (d['slot'] as num? ?? 0) >= 2).length + itemPhotos.where((d) => live(d) && d['compulsory'] != true).length;
   return PhotoAllowance(extras: paid ? (plan > free ? plan : free) : free, used: used, paid: paid);
 }
 

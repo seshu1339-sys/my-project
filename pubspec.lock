@@ -614,7 +614,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: d701df3ef4761a22854c69b9661c9d8f25b264b3982985f25944247ce644761f

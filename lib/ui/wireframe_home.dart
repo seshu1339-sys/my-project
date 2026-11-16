@@ -1,3 +1,4 @@
+import '../domain/home_photo.dart';
 import 'home_catalog_lines.dart';
 import 'package:flutter/material.dart';
 
@@ -125,6 +126,7 @@ class WireframeHome extends StatelessWidget {
           store.visible('categories'),
         )
         .where((e) => e.text('kind') != 'service')
+        .map(homePhoto)
         .toList();
     // Distance only (lib/domain/reach.dart): the offers and ads of the shops within the admin's km of the customer; an offer that
     // is not linked to a shop is shown to nobody, and nothing is matched by town, district or pincode any more. The admin's preview

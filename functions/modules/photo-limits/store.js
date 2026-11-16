@@ -47,7 +47,10 @@ async function submitItemPhoto(db, bucket, uid, data = {}, now = Date.now(), che
   if (!exists) throw Error('Upload the photo first.');
   const ref = db.collection('vendorItemPhotos').doc(data.productId);
   const current = (await ref.get()).data();
-  if (!(current && live(current.status))) {
+  // "Vendor photo compulsory" (Categories, owner 16 Nov 2026): the photo is part of the item, so it is not an extra photo.
+  const category = product.categoryId ? (await db.collection('categories').doc(product.categoryId).get()).data() : null;
+  const compulsory = category?.ownPhotoRequired === true;
+  if (!compulsory && !(current && live(current.status))) {
     const {extras} = await vendorPhotoAllowance(db, uid, now);
     if ((await vendorPhotosUsed(db, uid, {productId: data.productId})) >= extras) throw Error(`You have used all ${extras} extra photos of your plan. Change or remove one first.`);
   }
@@ -59,7 +62,7 @@ async function submitItemPhoto(db, bucket, uid, data = {}, now = Date.now(), che
     throw Error(unsafeReason(check.categories));
   }
   const at = Timestamp.fromMillis(now);
-  await ref.set({vendorId: uid, productId: data.productId, name: product.name || '', path: privatePath(uid, data.productId), status: 'pending', submittedAt: at, decisionReason: FieldValue.delete()}, {merge: true});
+  await ref.set({vendorId: uid, productId: data.productId, name: product.name || '', path: privatePath(uid, data.productId), status: 'pending', compulsory, submittedAt: at, decisionReason: FieldValue.delete()}, {merge: true});
   await db.collection('products').doc(data.productId).update({ownPhotoStatus: 'pending', updatedAt: at, ...(searchDays ? {searchUntilMs: now + searchDays * DAY_MS} : {})});
   if (check.verdict === 'safe') {
     await reviewItemPhoto(db, bucket, {productId: data.productId, approved: true}, now);
@@ -109,6 +112,8 @@ async function reviewItemPhoto(db, bucket, data = {}, now = Date.now()) {
   }
   if (!product) throw Error('That item no longer exists.');
   await bucket.file(photo.path).copy(bucket.file(publicPath(data.productId)));
+  // Only the public copy is kept (owner, 16 Nov 2026): the private upload goes, so each photo is stored once.
+  await bucket.file(photo.path).delete({ignoreNotFound: true});
   const url = publicStorageUrl(bucket.name, publicPath(data.productId), `&v=${now}`);
   await ref.update({status: 'approved', decidedAt: at});
   await db.collection('products').doc(data.productId).update({
@@ -150,7 +155,8 @@ async function trimAfterPlan(db, bucket, uid, keep, now = Date.now()) {
   const shop = (await db.collection('vendorShopPhotos').where('vendorId', '==', uid).get()).docs
     .filter(d => d.data().slot >= 2 && live(d.data().status)).sort((a, b) => a.data().slot - b.data().slot);
   const items = (await db.collection('vendorItemPhotos').where('vendorId', '==', uid).get()).docs
-    .filter(d => live(d.data().status)).sort((a, b) => (a.data().submittedAt?.toMillis?.() ?? 0) - (b.data().submittedAt?.toMillis?.() ?? 0));
+    // A compulsory item photo is part of the item: it never counts and never goes at the end of a plan.
+    .filter(d => live(d.data().status) && d.data().compulsory !== true).sort((a, b) => (a.data().submittedAt?.toMillis?.() ?? 0) - (b.data().submittedAt?.toMillis?.() ?? 0));
   const extra = [...shop.map(d => ({kind: 'shop', doc: d})), ...items.map(d => ({kind: 'item', doc: d}))].slice(keep);
   for (const {kind, doc} of extra) {
     if (kind === 'shop') {
@@ -168,4 +174,16 @@ async function trimAfterPlan(db, bucket, uid, keep, now = Date.now()) {
   return extra.length;
 }
 
-module.exports = {addPhotoToCatalog, submitItemPhoto, setItemSearchTime, reviewItemPhoto, removeItemPhoto, trimAfterPlan, privatePath, publicPath, SEARCH_DAYS};
+/// An item was deleted: its own photo files and photo record go too (no leftover files).
+async function cleanUpDeletedItem(db, bucket, productId, product) {
+  if (!ID.test(productId)) return 0;
+  const owner = product?.ownerId || (await db.collection('vendorItemPhotos').doc(productId).get()).data()?.vendorId || '';
+  await Promise.all([
+    owner ? bucket.file(privatePath(owner, productId)).delete({ignoreNotFound: true}) : null,
+    bucket.file(publicPath(productId)).delete({ignoreNotFound: true}),
+    db.collection('vendorItemPhotos').doc(productId).delete(),
+  ]);
+  return 1;
+}
+
+module.exports = {cleanUpDeletedItem, addPhotoToCatalog, submitItemPhoto, setItemSearchTime, reviewItemPhoto, removeItemPhoto, trimAfterPlan, privatePath, publicPath, SEARCH_DAYS};

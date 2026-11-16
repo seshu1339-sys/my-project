@@ -76,6 +76,11 @@ class ItemOffer {
   String get phone => shop?.text('phone') ?? '';
   String get whatsapp => shop?.text('whatsapp') ?? '';
   String get unit => product.text('unit');
+  /// The item's photo in this shop's row: the vendor's own model photo once checked (products.imageUrl), else the catalog photo,
+  /// else the shop's photo.
+  String get itemPhoto => product.text('imageUrl', product.text('libraryImageUrl', photo));
+  /// The vendor's size / brand note ("20 litre", "Milton").
+  String get note => product.text('note');
   bool get onMap => latitude != null && longitude != null;
 }
 

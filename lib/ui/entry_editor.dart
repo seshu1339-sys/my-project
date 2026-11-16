@@ -958,8 +958,8 @@ class _EntryEditorState extends State<EntryEditor> {
                   key: const ValueKey('category-own-photo-required'),
                   value: ownPhotoRequired,
                   onChanged: (v) => setState(() => ownPhotoRequired = v),
-                  title: const Text('Own photo required'),
-                  subtitle: const Text("Vendors must add their own photo for items of this category (for example sarees); the item shows after the admin's photo check."),
+                  title: const Text('Vendor photo compulsory'),
+                  subtitle: const Text("Every shop's model differs (plastic, fancy ...): vendors take a photo of their own model before saving an item of this category; it shows after the AI photo check. Off: our catalog photo is used."),
                 ),
               SwitchListTile(
                 value: active,

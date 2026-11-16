@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/post_duration.dart';
@@ -7,12 +11,19 @@ import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'library_item_tile.dart';
 import 'vendor_section_kit.dart';
+import '../services/photo_compress.dart';
 import '../services/usage.dart';
 
 /// "Add an item": the vendor picks a category, then one of the admin's items (photo and name come with it, nothing is typed), the
 /// quantity (1-10 kg or 1-10 pieces) and the price for that quantity. Saved items go live at once at the vendor's location. A vendor
 /// has [vendorItemLimit] items (2 unless the admin allows more; hidden items count): "Add another item" shows only below the limit.
 /// Photo 1 of the shop is required first. Its own state and busy flag.
+/// The message while a "Vendor photo compulsory" item has no photo yet (Save stays off).
+const vendorModelPhotoNeeded = 'This category needs a photo of your own model. Take or choose one to save.';
+
+/// The longest size / brand note (functions/domain.js ITEM_NOTE_MAX).
+const vendorItemNoteMax = 40;
+
 class VendorAddProductSection extends StatefulWidget {
   const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview, this.onUpgrade});
   final Store store;
@@ -31,6 +42,9 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
   // Search the whole catalog by name (owner, 13 Nov 2026), and the item that is not in the catalog (named by the vendor).
   final search = TextEditingController();
   final customName = TextEditingController();
+  // The size / brand note (at most 40 letters), and the vendor's own model photo, shrunk on the phone (owner, 16 Nov 2026).
+  final note = TextEditingController();
+  Uint8List? ownPhoto;
   bool custom = false;
   String? categoryId;
   Entry? item;
@@ -46,6 +60,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     price.dispose();
     search.dispose();
     customName.dispose();
+    note.dispose();
     super.dispose();
   }
 
@@ -53,11 +68,33 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     price.clear();
     search.clear();
     customName.clear();
+    note.clear();
+    ownPhoto = null;
     custom = false;
     categoryId = null;
     item = null;
     unitType = 'kg';
     quantity = 1;
+  }
+
+  /// Whether the chosen item needs the vendor's own model photo before Save: its category has "Vendor photo compulsory" (Categories).
+  /// An item that is not in the catalog keeps its own way (saved first, its photo sent in Item photos).
+  bool get _needsPhoto {
+    if (custom) return false;
+    final category = item?.text('categoryId') ?? categoryId;
+    return store.entries('categories').any((c) => c.id == category && c.data['ownPhotoRequired'] == true);
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (file == null) return;
+    final small = await shrinkPhotoInBackground(await file.readAsBytes());
+    if (!mounted) return;
+    if (small == null) {
+      toast('That file is not a photo. Choose another.');
+      return;
+    }
+    setState(() => ownPhoto = small);
   }
 
   Future<void> _save() async {
@@ -66,16 +103,31 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     if (custom && customName.text.trim().length < 2) throw StateError('Enter the name of your item.');
     final p = double.tryParse(price.text.trim());
     if (p == null || p <= 0) throw StateError('Enter the price for ${vendorItemUnit(unitType, quantity)}.');
-    await store.submitVendorChange(type: 'newProduct', collection: 'products', docId: '', changes: {
+    final photo = ownPhoto;
+    if (_needsPhoto && photo == null) throw StateError(vendorModelPhotoNeeded);
+    // Called directly: the new item's id is needed for its photo.
+    final result = await store.call('submitVendorChange', {'type': 'newProduct', 'collection': 'products', 'docId': '', 'changes': {
       if (custom) ...{'customName': customName.text.trim(), 'categoryId': categoryId} else 'libraryItemId': chosen!.id,
       'unitType': unitType, 'quantity': quantity, 'price': p,
-    });
-    final wasCustom = custom;
+      if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
+    }});
+    var message = custom ? 'Saved. Add your own photo of this item in Item photos below; it shows to customers after the photo is checked.' : 'Saved. Your item is live at your shop\'s location.';
+    if (photo != null) {
+      // The item waits, hidden, until its photo passes the AI photo check (functions/modules/photo-limits submitItemPhoto).
+      final productId = '${result['docId'] ?? ''}';
+      try {
+        await FirebaseStorage.instance.ref('vendorItemPhotos/$uid/$productId').putData(photo, SettableMetadata(contentType: 'image/jpeg', cacheControl: 'no-cache'));
+        final check = await store.call('submitItemPhoto', {'productId': productId});
+        message = check['status'] == 'approved' ? 'Saved. Your photo passed the check: the item is live now.' : 'Saved. The item shows once its photo has been checked.';
+      } catch (e) {
+        message = 'Saved, but the photo was not accepted: $e Send another photo in Item photos below.';
+      }
+    }
     setState(() {
       _reset();
       adding = false;
     });
-    toast(wasCustom ? 'Saved. Add your own photo of this item in Item photos below; it shows to customers after the photo is checked.' : 'Saved. Your item is live at your shop\'s location.');
+    toast(message);
   }
 
   @override
@@ -205,6 +257,22 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           TextField(key: const ValueKey('vendor-custom-name'), controller: customName, decoration: const InputDecoration(labelText: 'Name of your item')),
           const Text('Your item shows to customers after you add your own photo of it (Item photos, below); the photo is checked automatically.', key: ValueKey('vendor-custom-note')),
         ],
+        // "Vendor photo compulsory" categories (buckets, fancy items ...): every shop's model differs, so the vendor's own photo first.
+        if ((item != null || custom) && _needsPhoto) ...[
+          const SizedBox(height: 12),
+          Text('Your model photo', style: Theme.of(context).textTheme.titleSmall),
+          const Text('Take a photo of the model you sell. Customers see it in your shop\'s row when they open this item.'),
+          const SizedBox(height: 6),
+          Row(children: [
+            if (ownPhoto != null)
+              Padding(padding: const EdgeInsets.only(right: 12), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(ownPhoto!, key: const ValueKey('vendor-model-photo'), width: 72, height: 72, fit: BoxFit.cover))),
+            Expanded(child: Wrap(spacing: 8, runSpacing: 8, children: [
+              OutlinedButton.icon(key: const ValueKey('vendor-model-camera'), onPressed: busy ? null : () => _pickPhoto(ImageSource.camera), icon: const Icon(Icons.photo_camera_outlined), label: Text(ownPhoto == null ? 'Take photo' : 'Retake')),
+              OutlinedButton.icon(key: const ValueKey('vendor-model-gallery'), onPressed: busy ? null : () => _pickPhoto(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Gallery')),
+            ])),
+          ]),
+          if (ownPhoto == null) Text(vendorModelPhotoNeeded, key: const ValueKey('vendor-model-photo-needed'), style: error),
+        ],
         if (item != null || custom) ...[
           const SizedBox(height: 12),
           SegmentedButton<String>(
@@ -226,10 +294,16 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(labelText: 'Price for ${vendorItemUnit(unitType, quantity)} (₹)', hintText: 'e.g. 50'),
           ),
+          TextField(
+            key: const ValueKey('vendor-item-note'),
+            controller: note,
+            maxLength: vendorItemNoteMax,
+            decoration: const InputDecoration(labelText: 'Size or brand (optional)', hintText: 'e.g. 20 litre, Milton'),
+          ),
           const SizedBox(height: 8),
           FilledButton(
             key: const ValueKey('vendor-item-save'),
-            onPressed: busy || !shopPhotoReady
+            onPressed: busy || !shopPhotoReady || (_needsPhoto && ownPhoto == null)
                 ? null
                 : () {
                     Usage.button('vendor_item_save');

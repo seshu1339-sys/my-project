@@ -43,6 +43,8 @@ dependencies:
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
   image_picker: ^1.2.0
+  # Shrinks a vendor's item photo on the phone to under 100 KB before upload (already in the app through another package).
+  image: ^4.3.0
   shared_preferences: ^2.5.3
   flutter_map: ^8.2.2
   google_maps_flutter: ^2.10.0
