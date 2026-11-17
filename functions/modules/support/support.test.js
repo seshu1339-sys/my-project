@@ -7,13 +7,15 @@ const {initializeApp, getApps} = require('firebase-admin/app');
 if (!getApps().length) initializeApp({projectId: 'demo-neighbourly'});
 const {getFirestore} = require('firebase-admin/firestore');
 const {openTicket, myTickets, answer, ask, solveTicketsOf, deviceKeyOf, problemIdOf, WORDS, TICKETS_PER_DAY} = require('.')._test;
-const appProblems = require('../app-problems')._test;
+const {createHash} = require('node:crypto');
+// The id functions/modules/app-problems gives a problem (index.js problemId), written out here: modules never require each other.
+const problemIdOfProblems = (app, platform, kind, message) => `${app}~${platform}~${kind}~${createHash('sha256').update(`${app}|${kind}|${message}`).digest('hex').slice(0, 16)}`;
 
 const emulated = {skip: !process.env.FIRESTORE_EMULATOR_HOST};
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]).toString('base64');
 
 test('a ticket finds its problem with the same id as the problem records', () => {
-  assert.equal(problemIdOf('vendor', 'android', 'tap', 'No answer to "Save" after 3 taps'), appProblems.problemId('vendor', 'android', 'tap', 'No answer to "Save" after 3 taps'));
+  assert.equal(problemIdOf('vendor', 'android', 'tap', 'No answer to "Save" after 3 taps'), problemIdOfProblems('vendor', 'android', 'tap', 'No answer to "Save" after 3 taps'));
   assert.equal(problemIdOf('vendor', 'android', '', 'x'), '');
 });
 
