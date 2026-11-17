@@ -120,8 +120,7 @@ async function openTicket(db, request, now = Date.now()) {
     if (!t || t.deviceKey !== deviceKey) throw new HttpsError('not-found', 'This problem report is not there any more.');
     if (!(await takeDevice(db, deviceKey, 'adds', 20, now))) throw new HttpsError('resource-exhausted', 'Thank you — our team has your messages.');
     const at = Timestamp.fromMillis(now);
-    await ref.update({text: [t.text, text].filter(Boolean).join('
-').slice(0, 3000), updatedAt: at, ...(shot ? {shot: true} : {}), ...(t.status === 'solved' ? {status: 'sent'} : {})});
+    await ref.update({text: [t.text, text].filter(Boolean).join(' / ').slice(0, 3000), updatedAt: at, ...(shot ? {shot: true} : {}), ...(t.status === 'solved' ? {status: 'sent'} : {})});
     if (shot) await db.collection('supportShots').doc(ref.id).set({data: shot, ticketId: ref.id, at, expiresAt: Timestamp.fromMillis(now + SHOT_DAYS * 86400000)});
     return {id: ref.id, status: t.status === 'solved' ? 'sent' : t.status};
   }

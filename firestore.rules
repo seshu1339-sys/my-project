@@ -486,6 +486,8 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /fixAgent/{id} { allow read: if admin(); allow write: if false; }
+    // The billing alert (functions/modules/app-problems/billing.js): which budget threshold was already alerted this month.
+    match /billingAlerts/{id} { allow read: if admin(); allow write: if false; }
     match /adminPushTokens/{token} {
       allow read: if admin();
       allow create: if admin() && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == request.auth.uid

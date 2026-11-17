@@ -19,6 +19,7 @@
 //   problemReports/<id>                      {app, platform, version, device, text, screen, screenshotPath, uid, role, userCode, status, at}
 //   appProblemDevices/<device hash>~<day>    {count, reports, shots}   the per-device daily cap (functions only)
 //   healthAlerts/<problemId>                 the burst alert (alerts.js); settings/health {burstCount, burstMinutes, burstSides}
+//   billingAlert (Pub/Sub "billing-alerts")  a Google Cloud budget passed a new threshold: red line + admin push (billing.js)
 //   solvedProblems/<id> {problemId, by, at}  written when the admin marks a problem solved or its fix goes live: the problem becomes
 //                                            'solved', its alert closes and its screenshots are deleted (problemSolved trigger)
 //
@@ -27,12 +28,14 @@
 // an automatic screenshot is at most 120 KB and a report's at most 400 KB.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
+const {onMessagePublished} = require('firebase-functions/v2/pubsub');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {createHash} = require('node:crypto');
 const {task} = require('../../task');
 const {healthConfig, deviceParts, sideOf, nextBurst, SIDES} = require('./cases');
 const {raiseBurstAlert} = require('./alerts');
+const {onBudgetMessage} = require('./billing');
 
 const APPS = ['customer', 'vendor', 'staff', 'admin'];
 // tap: the same option tapped again and again with no answer; freeze: the app hung; stuck: a screen kept loading; repeat: the same save
@@ -286,6 +289,10 @@ async function saveReport(db, bucket, request, now = Date.now()) {
 }
 
 exports.reportAppProblems = onCall(options, async request => saveProblems(getFirestore(), request));
+exports.billingAlert = onMessagePublished({topic: 'billing-alerts', region: 'asia-south1', maxInstances: 1}, async event => {
+  const alerted = await onBudgetMessage(getFirestore(), event.data?.message?.json || {});
+  if (alerted) console.log('Billing alert sent to the admin');
+});
 exports.problemSolved = onDocumentCreated({document: 'solvedProblems/{id}', region: 'asia-south1', maxInstances: 2}, async event => {
   const problemId = String(event.data?.data()?.problemId || '');
   if (problemId) console.log('Problem solved, screenshots deleted', await markSolved(getFirestore(), problemId));
