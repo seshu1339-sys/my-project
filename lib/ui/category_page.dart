@@ -97,7 +97,7 @@ class CategoryPage extends StatelessWidget {
                 child: ProductArt(product, height: 64),
               ),
               title: Text(product.text('name')),
-              subtitle: Text(money(product.price(store.pincode))),
+              subtitle: Text(priceOrNotUpdated(product.price(store.pincode), store)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
                 context,

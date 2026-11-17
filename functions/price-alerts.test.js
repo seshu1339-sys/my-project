@@ -20,7 +20,7 @@ test('price alerts: eligibility, manual send, no duplicates, automatic on/off, a
   const db = getFirestore();
   // oldest first (document ids are random)
   const dry = async () => (await db.collection('_pushDryRun').get()).docs.map(d => d.data()).sort((a, b) => a.createdAt.toMillis() - b.createdAt.toMillis());
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const pid = 'alert-p1';
@@ -86,7 +86,7 @@ test('price alerts: eligibility, manual send, no duplicates, automatic on/off, a
   const subset = await fns.sendPriceDropAlerts.run({...admin, data: {productId: pid, uids: ['ben']}});
   assert.equal(subset.sent, 0); assert.equal(subset.results[0].status, 'ineligible');
   await assert.rejects(() => fns.priceAlertAudience.run({data: {productId: pid}}), /Sign in/);
-  await assert.rejects(() => fns.priceAlertAudience.run({auth: {uid: 'ann', token: {email_verified: true}}, data: {productId: pid}}), /Administrator/);
-  await assert.rejects(() => fns.sendPriceDropAlerts.run({auth: {uid: 'ann', token: {email_verified: true}}, data: {productId: pid}}), /Administrator/);
+  await assert.rejects(() => fns.priceAlertAudience.run({auth: {uid: 'ann', token: {role: 'user', email_verified: true}}, data: {productId: pid}}), /Administrator/);
+  await assert.rejects(() => fns.sendPriceDropAlerts.run({auth: {uid: 'ann', token: {role: 'user', email_verified: true}}, data: {productId: pid}}), /Administrator/);
   await assert.rejects(() => fns.sendPriceDropAlerts.run({...admin, data: {productId: 'nope'}}), /not found/i);
 });

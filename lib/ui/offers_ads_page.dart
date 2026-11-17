@@ -4,7 +4,7 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import 'ad_box.dart';
-import 'screen_view.dart';
+import 'screen_view.dart';
 import '../services/strings.dart';
 
 /// "Offers & Ads": every ad that is live right now for the customer's location, one after another in the same box as on the home page.
@@ -20,7 +20,7 @@ class OffersAdsPage extends StatelessWidget {
     listenable: store,
     builder: (context, _) {
       final config = AdsConfig.from(store.entries('settings'));
-      final live = liveAds(customerAds(store.entries('ads')), DateTime.now(), town: store.town, district: store.district, state: store.state, latitude: store.latitude, longitude: store.longitude);
+      final live = liveAds(customerAds(store.entries('ads')), DateTime.now(), reaches: store.reaches);
       final width = MediaQuery.sizeOf(context).width;
       final columns = width >= 1100 ? 3 : width >= 700 ? 2 : 1;
       return Scaffold(

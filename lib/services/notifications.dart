@@ -47,7 +47,7 @@ class CustomerNotifications {
     }
   }
 
-  Future<void> enable({String? pincode, double? latitude, double? longitude}) async {
+  Future<void> enable({String? pincode, double? latitude, double? longitude, String? area}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('Sign in before enabling alerts.');
     if (!await _messaging.isSupported()) {
@@ -76,6 +76,7 @@ class CustomerNotifications {
       if (pincode != null && pincode.isNotEmpty) 'pincode': pincode,
       'latitude': ?latitude,
       'longitude': ?longitude,
+      if (area != null && area.isNotEmpty) 'area': area,
     });
     _enabled = true;
     await _refresh?.cancel();
@@ -96,6 +97,7 @@ class CustomerNotifications {
     String? pincode,
     double? latitude,
     double? longitude,
+    String? area,
   }) async {
     if (!_enabled) return;
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -107,6 +109,7 @@ class CustomerNotifications {
         if (pincode != null && pincode.isNotEmpty) 'pincode': pincode,
         'latitude': ?latitude,
         'longitude': ?longitude,
+        if (area != null && area.isNotEmpty) 'area': area,
       });
     } catch (_) {
       /* Best-effort; the next location change retries. */

@@ -11,12 +11,15 @@ import 'services/firebase_startup.dart';
 import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 
 // A separate entry point so the admin panel compiles into its own web
 // bundle, reachable only at its own build/deploy target, never from the
 // customer app. Build with: flutter build web -t lib/main_admin.dart
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'admin');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -26,6 +29,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
       await connectToEmulatorsIfConfigured();
+      // Problems with the app's version and device, and Crashlytics on Android (lib/services/app_monitoring.dart).
+      unawaited(AppMonitoring.firebaseReady());
       live = true;
     } catch (e) {
       startupError =
@@ -40,6 +45,8 @@ Future<void> main() async {
   }
   final firestore = live ? FirebaseFirestore.instance : null;
   final store = Store(live: live, database: firestore);
+  // The admin panel signs in with the email's own administrator login (functions/role-logins.js), never the customer one.
+  store.appRole = 'admin';
   await store.init();
   // Usage analytics (lib/services/usage.dart): only with Firebase connected.
   if (live) unawaited(startUsage(app: 'admin'));

@@ -3,6 +3,28 @@ import 'catalog.dart';
 // Vendor spec section 8: the customer searches an item by name and chooses it; every shop in their town selling it shows on a map
 // (the shop's small photo and its price on each pin) and in a list from the lowest price up (photo, name, price, distance).
 
+/// How long the "Today's rate" tick shows after the vendor set a price or tapped "Yes, same rates" (owner, 16 Nov 2026).
+const todaysRateFor = Duration(hours: 24);
+
+/// Whether [product] shows the green "Today's rate" tick at [now] (normally the server's clock): its price was set, or its shop's
+/// vendor confirmed "Yes, same rates" (shops.ratesConfirmedAt), less than 24 hours ago. Only the tick goes after that; the price stays,
+/// with no date and no "old rate" text. Compared on the phone: nothing is read for it.
+bool todaysRate(Entry product, Entry? shop, DateTime now) {
+  for (final at in [product.text('priceSetAt'), shop?.text('ratesConfirmedAt') ?? '']) {
+    final t = DateTime.tryParse(at);
+    if (t == null) continue;
+    final age = now.difference(t);
+    if (!age.isNegative && age < todaysRateFor) return true;
+  }
+  return false;
+}
+
+/// The shops of an item with the tick first (each part from the lowest price up, as they came).
+List<ItemOffer> todaysRatesFirst(List<ItemOffer> offers, DateTime now) {
+  final fresh = [for (final o in offers) if (todaysRate(o.product, o.shop, now)) o];
+  return [...fresh, for (final o in offers) if (!fresh.contains(o)) o];
+}
+
 /// An item name as compared: "  Tomato " and "tomato" are the same item.
 String itemNameKey(String name) => name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
@@ -18,15 +40,17 @@ class ItemChoice {
   final double lowest;
 }
 
-/// The items whose name has every word the customer typed, one per item, the ones starting with the words first, then the ones most
-/// shops sell. Only items with a price (a vendor's price runs out after 24 hours) count.
-List<ItemChoice> itemChoices(List<Entry> products, String query, {String pincode = '', int max = 8}) {
+/// The items whose name (or category name, [categoryNames] by category id) has every word the customer typed, one per item, the ones
+/// starting with the words first, then the ones most shops sell. Searching "sarees" offers every saree item. Only items with a price
+/// (a vendor's price runs out after 24 hours) count.
+List<ItemChoice> itemChoices(List<Entry> products, String query, {String pincode = '', int max = 8, Map<String, String> categoryNames = const {}}) {
   final words = itemNameKey(query).split(' ').where((w) => w.isNotEmpty).toList();
   if (words.isEmpty) return const [];
   final groups = <String, List<Entry>>{};
   for (final p in products) {
     final key = itemNameKey(p.text('name'));
-    if (key.isEmpty || p.price(pincode) <= 0 || !words.every(key.contains)) continue;
+    final category = itemNameKey(categoryNames[p.text('categoryId')] ?? '');
+    if (key.isEmpty || p.price(pincode) <= 0 || !words.every((w) => key.contains(w) || category.contains(w))) continue;
     groups.putIfAbsent(key, () => []).add(p);
   }
   final choices = [
@@ -63,6 +87,11 @@ class ItemOffer {
   String get phone => shop?.text('phone') ?? '';
   String get whatsapp => shop?.text('whatsapp') ?? '';
   String get unit => product.text('unit');
+  /// The item's photo in this shop's row: the vendor's own model photo once checked (products.imageUrl), else the catalog photo,
+  /// else the shop's photo.
+  String get itemPhoto => product.text('imageUrl', product.text('libraryImageUrl', photo));
+  /// The vendor's size / brand note ("20 litre", "Milton").
+  String get note => product.text('note');
   bool get onMap => latitude != null && longitude != null;
 }
 

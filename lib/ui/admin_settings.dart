@@ -2,11 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/module_admin.dart';
+import 'admin_abuse_reports.dart';
+import 'provider_moderation.dart';
+import 'admin_routes.dart';
+import 'admin_groups.dart';
+import 'admin_staff_work.dart';
+import 'admin_ratings.dart';
+import 'admin_ai_assistant.dart';
+import 'agent_ad_flow.dart';
+import 'agent_ai_settings.dart';
+import 'agent_log_page.dart';
+import 'design_pages.dart';
+import 'agent_ids.dart';
+import 'app_health_page.dart';
+import 'health_marks.dart';
+import 'health_page.dart';
 import 'admin_android_home.dart';
+import 'admin_area_names.dart';
 import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
+import 'admin_samples.dart';
 import 'admin_entry_list.dart';
+import 'admin_fields.dart';
 import 'admin_fresh_strip.dart';
 import 'admin_shops_location.dart';
 import 'animation_settings_form.dart';
@@ -29,7 +47,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('services', 'Services', Icons.home_repair_service_outlined, 'Service listings and the service types (their own collection)'),
   _SettingsSection('fieldAssistants', 'Field Assistants', Icons.badge_outlined, 'Approve and manage field staff'),
   _SettingsSection('cityCodes', 'City codes', Icons.pin_outlined, 'Four-letter town codes in vendor IDs (VEN-NRPM-116-325)'),
-  _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Name, address, phone, limits, payments'),
+  _SettingsSection('settings', 'Business Profile', Icons.business_outlined, 'Customers see shops and offers within (km); name, address, phone, limits, payments'),
   _SettingsSection('theme', 'Theme', Icons.palette_outlined, 'Colors and fonts of the whole site'),
   _SettingsSection('animations', 'Animations', Icons.animation, 'Turn animations on or off, choose the type and speed'),
   _SettingsSection('scrollingText', 'Scrolling Text', Icons.text_rotation_none, 'The moving red line at the top of the home page'),
@@ -43,9 +61,213 @@ final _sections = <_SettingsSection>[
   _SettingsSection('layout', 'Layout', Icons.dashboard_customize_outlined, 'Sizes, colors and the order of each part of the page'),
   _SettingsSection('androidHome', 'Android App', Icons.phone_android_outlined, 'Android app only: how many ad boxes show at the top, and whether they show'),
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
+  _SettingsSection('samples', 'Sample data', Icons.science_outlined, 'Records labelled SAMPLE, and the button that deletes them all'),
+  _SettingsSection('areaNames', 'Area names', Icons.place_outlined, 'Fix or stop the area names customers see (Kancharapalem S.O → Kancharapalem)'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
+  // The admin's AI assistant (Claude Sonnet 5.5, functions/modules/admin-assistant): last, so the numbers of the others stay the same.
+  _SettingsSection('aiAssistant', 'AI assistant', Icons.smart_toy_outlined, 'Ask about your numbers in plain words: vendors, offers, payments, tickets'),
+  // Abuse reports, the automatic temporary suspension and the permanent block list (functions/modules/abuse-reports).
+  _SettingsSection('reports', 'Reports', Icons.flag_outlined, 'Reported shops, providers and customers; restore or block for good'),
+  _SettingsSection('blockList', 'Block list', Icons.block, 'Emails and phones that cannot register or sign in again'),
+  _SettingsSection('ratings', 'Ratings', Icons.star_outline, 'Star ratings of shops and service providers; remove fake ones'),
+  // Staff work (functions/modules/staff-work, staff-links): performance, targets, pay slabs, ranking, ID report, links.
+  _SettingsSection('staffWork', 'Staff work and pay', Icons.badge_outlined, 'Each staff member: linked vendors, daily target (50), month, pay slabs, mark paid'),
+  _SettingsSection('staffRanking', 'Staff ranking', Icons.leaderboard_outlined, "This month's best staff: updates, active vendors, target done; by area"),
+  _SettingsSection('idReport', 'ID report', Icons.manage_search, 'Type a Vendor, provider or Staff ID: the full report, graphs, Excel and PDF'),
+  _SettingsSection('staffLinks', 'Staff links and requests', Icons.link, 'Link any vendor to staff of its area; vendors\' "connect me to local staff" requests'),
+  // The command box (owner spec A-C, I, 17 Nov 2026): its AI key and use, and the log of every agent action.
+  _SettingsSection('aiProvider', 'AI provider & usage', Icons.key_outlined, "The AI key (kept on the server), this month's AI use, and the AI explain switch"),
+  _SettingsSection('agentLog', 'Agent log', Icons.receipt_long_outlined, 'Every command-box action: who, what, when'),
+  // Health (owner spec F-H): the daily self-test of the website and admin, and what goes wrong in the apps for real people.
+  _SettingsSection('health', 'Health', Icons.monitor_heart_outlined, 'Daily self-test: pages, server functions, saves, photos, ads, remote config; server errors'),
+  // Ads by command (owner spec D): the admin's own ads made in the command box, with Stop.
+  _SettingsSection('adminAds', 'Ads by command', Icons.campaign, "The admin's ads made in the command box: where, who sees them, until when; Stop"),
+  // Design by command (owner spec E): the values that were fixed in the code, and every design change with one-click Undo.
+  _SettingsSection('designTexts', 'Design texts & sizes', Icons.format_size, "Right-side ad box height, Today's Offers box texts (were fixed in the app)"),
+  _SettingsSection('designHistory', 'Design history', Icons.history, 'Every design change made by command, newest first, with Undo'),
+  _SettingsSection('appHealth', 'App Health', Icons.phone_android, 'Vendor / Staff / User apps: crashes, login, OTP, location, upload, API, slow screens, reports'),
 ];
+
+/// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
+/// ("5.12 Business Profile › Post duration"). [serial] is its number in the Settings list.
+class AdminSettingHit {
+  const AdminSettingHit({required this.serial, required this.title, required this.sectionKey, this.section = '', this.hint = '', this.aliases = ''});
+  final String serial, title, sectionKey, section, hint;
+  // The page's Telugu name and other words from the route map (lib/ui/admin_routes.dart), " | " between them; searched, not shown.
+  final String aliases;
+  bool get isField => section.isNotEmpty;
+  String get label => isField ? '$section › $title' : title;
+}
+
+/// Every Settings section, numbered from 1 in the order of the list, and the fields of the sections that are one form (Business
+/// Profile, Theme, Scrolling Text: lib/ui/admin_fields.dart), numbered 5.1, 5.2 ...; then the other pages of the six groups (Orders,
+/// Products, Plans...), numbered P1, P2 ... Everything comes from the panel's own lists, so a new section, field or page is found
+/// by itself (and the AI search knows it).
+List<AdminSettingHit> adminSettingsIndex() => [
+  for (final (i, s) in _sections.indexed) ...[
+    AdminSettingHit(serial: '${i + 1}', title: s.label, sectionKey: s.key, hint: s.hint, aliases: adminRouteAliases(s.key)),
+    for (final (j, f) in (fields[s.key]?.entries ?? const Iterable<MapEntry<String, String>>.empty()).indexed)
+      AdminSettingHit(serial: '${i + 1}.${j + 1}', title: f.value, sectionKey: s.key, section: s.label, hint: f.key),
+  ],
+  for (final (i, item) in [for (final g in adminGroups) for (final it in g.items) if (it.kind != AdminItemKind.section) (g, it)].indexed)
+    AdminSettingHit(
+      serial: 'P${i + 1}',
+      title: item.$2.label,
+      sectionKey: item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}',
+      hint: item.$1.title,
+      aliases: adminRouteAliases(item.$2.kind == AdminItemKind.providers ? 'serviceProviders' : 'tab:${item.$2.id}'),
+    ),
+  // Parts of a page with no line of their own (owner, 14 Nov 2026), from the route map: "Cells" opens Staff Areas on its Cells tab.
+  for (final (i, r) in [for (final r in adminRoutes) if (r.extra) r].indexed)
+    AdminSettingHit(serial: 'R${i + 1}', title: r.en, sectionKey: r.key, hint: r.key.replaceFirst('tab:', ''), aliases: [r.te, ...r.words].join(' | ')),
+];
+
+/// Opens an earlier main tab (Orders, Products, Plans...) as a page; set by the admin panel (lib/ui/admin.dart).
+Widget Function(String name)? adminTabBuilder;
+
+/// The current value of a field hit (Business Profile, Theme and Scrolling Text are records of the settings collection), or ''.
+String adminSettingValue(Store store, AdminSettingHit hit) {
+  if (!hit.isField) return '';
+  final record = switch (hit.sectionKey) { 'settings' => 'business', final other => other };
+  final entry = store.entries('settings').where((e) => e.id == record).firstOrNull;
+  final value = entry?.data[hit.hint];
+  return value == null ? '' : '$value';
+}
+
+/// The settings that match what the admin typed or said: a number finds that serial (and the fields under a section number); words
+/// find every entry whose name, section or hint holds all of them. Sections come before fields.
+List<AdminSettingHit> searchAdminSettings(String query, {List<AdminSettingHit>? index}) {
+  final all = index ?? adminSettingsIndex();
+  final q = query.trim().toLowerCase().replaceAll(RegExp(r'^(no\.?|number|serial|నంబర్)\s*'), '');
+  if (q.isEmpty) return const [];
+  if (RegExp(r'^\d+(\.\d+)?$').hasMatch(q)) {
+    return [for (final h in all) if (h.serial == q || (!q.contains('.') && h.serial.startsWith('$q.'))) h];
+  }
+  final words = q.split(RegExp(r'\s+'));
+  final hits = [for (final h in all) if (words.every('${h.serial} ${h.title} ${h.section} ${h.hint} ${h.aliases}'.toLowerCase().contains)) h];
+  return [...hits.where((h) => !h.isField), ...hits.where((h) => h.isField)];
+}
+
+/// The one page that text names (typed, said, or an AI agent command like "Cells తెరువు"), or null when none or several fit. An exact
+/// name (English title or a route-map word) wins over a partial one.
+AdminSettingHit? bestAdminPage(String text, {List<AdminSettingHit>? index}) {
+  final q = adminCommandQuery(text);
+  if (q.isEmpty) return null;
+  final pages = [for (final h in searchAdminSettings(q, index: index)) if (!h.isField) h];
+  if (pages.isEmpty) return null;
+  final exact = [
+    for (final h in pages)
+      if (h.title.toLowerCase() == q || h.aliases.toLowerCase().split(' | ').contains(q)) h,
+  ];
+  if (exact.length == 1) return exact.first;
+  return pages.length == 1 ? pages.first : null;
+}
+
+/// One Settings section as its own page (the search opens it straight away). [focus] names the field the admin looked for.
+Widget adminSettingsSectionPage(Store store, String key, {String? focus}) {
+  final section = _sections.where((s) => s.key == key).firstOrNull;
+  return Scaffold(
+    appBar: AppBar(title: Text(focus == null ? (section?.label ?? 'Settings') : '${section?.label ?? 'Settings'} › $focus')),
+    body: adminSettingsContent(store, key),
+  );
+}
+
+/// What one Settings section shows.
+Widget adminSettingsContent(Store store, String key) {
+  if (key.startsWith('tab:')) return adminTabBuilder?.call(key.substring(4)) ?? const Center(child: Text('Open this page from its group in the top bar.'));
+  if (key == 'serviceProviders') return AdminNeedsFirebase(store: store, child: ProviderModerationPage(store: store));
+  switch (key) {
+      case 'aiAssistant':
+        return AdminAiAssistantPage(store: store);
+      case 'aiProvider':
+        return AgentAiSettingsPage(store: store);
+      case 'agentLog':
+        return AgentLogPage(store: store);
+      case 'health':
+        return HealthPage(store: store);
+      case 'designTexts':
+        return DesignTextsPage(store: store);
+      case 'designHistory':
+        return DesignHistoryPage(store: store);
+      case 'adminAds':
+        return AdminAdsPage(store: store);
+      case 'appHealth':
+        return AppHealthPage(store: store);
+      case 'reports':
+        return AdminReportsPage(store: store);
+      case 'blockList':
+        return AdminBlockListPage(store: store);
+      case 'ratings':
+        return AdminRatingsPage(store: store);
+      case 'staffWork':
+        return AdminStaffWorkPage(store: store);
+      case 'staffRanking':
+        return AdminStaffRankingPage(store: store);
+      case 'idReport':
+        return AdminIdReportPage(store: store);
+      case 'staffLinks':
+        return AdminLinkRequestsPage(store: store);
+      case 'fieldAssistants':
+        return AdminEmbedScope(child: AdminNeedsFirebase(store: store, child: FieldModerationPage(store: store)));
+      case 'layout':
+        return _LayoutMenu(store: store);
+      case 'animations':
+        return AdminAnimationsForm(store: store);
+      case 'scrollingText':
+        return AdminHomeSectionPage(store: store, part: 'scrollingText');
+      case 'homeOffers':
+        return AdminHomeSectionPage(store: store, part: 'notice');
+      case 'homePromo':
+        return AdminHomeSectionPage(store: store, part: 'promo');
+      case 'homeFresh':
+        return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: store));
+      case 'shopsLocation':
+        return ScreenView('admin_shops_location', child: AdminShopsLocationPage(store: store));
+      case 'ads':
+        return AdminHomeSectionPage(store: store, part: 'ads');
+      case 'androidHome':
+        return AdminAndroidHomePage(store: store);
+      case 'cityCodes':
+        return AdminCityCodesPage(store: store);
+      case 'areaNames':
+        return AdminAreaNamesPage(store: store);
+      case 'samples':
+        return ScreenView('admin_samples', child: AdminNeedsFirebase(store: store, child: AdminSamplesPage(store: store)));
+      case 'rightBoxes':
+        return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: store));
+      // One record each: the form opens directly, with no list and no "Add new".
+      case 'settings':
+      case 'theme':
+        return AdminSingleRecord(store: store, section: key);
+      default:
+        if (key.startsWith('module-')) {
+          final section = moduleAdminSections.where((s) => 'module-${s.id}' == key).firstOrNull;
+          if (section != null) return section.build(store);
+        }
+        return AdminEntryList(store: store, section: key);
+    }
+  }
+
+/// The sections in the order of the six groups (lib/ui/admin_groups.dart), each group's name before its first section.
+List<(String?, _SettingsSection)> _sectionsByGroup() {
+  final out = <(String?, _SettingsSection)>[];
+  final placed = <String>{};
+  for (final group in adminGroups) {
+    var first = true;
+    for (final item in group.items) {
+      final section = _sections.where((x) => x.key == item.id && item.kind == AdminItemKind.section).firstOrNull;
+      if (section == null || !placed.add(section.key)) continue;
+      out.add((first ? group.title : null, section));
+      first = false;
+    }
+  }
+  final rest = [for (final x in _sections) if (!placed.contains(x.key)) x];
+  for (final (i, x) in rest.indexed) {
+    out.add((i == 0 ? 'More' : null, x));
+  }
+  return out;
+}
 
 /// The Settings tab: a list of sections on the left (a plain list on a phone) and the chosen section beside it.
 class AdminSettingsPage extends StatefulWidget {
@@ -58,44 +280,7 @@ class AdminSettingsPage extends StatefulWidget {
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
   String selected = _sections.first.key;
 
-  Widget _content(String key) {
-    switch (key) {
-      case 'fieldAssistants':
-        return AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: FieldModerationPage(store: widget.store)));
-      case 'layout':
-        return _LayoutMenu(store: widget.store);
-      case 'animations':
-        return AdminAnimationsForm(store: widget.store);
-      case 'scrollingText':
-        return AdminHomeSectionPage(store: widget.store, part: 'scrollingText');
-      case 'homeOffers':
-        return AdminHomeSectionPage(store: widget.store, part: 'notice');
-      case 'homePromo':
-        return AdminHomeSectionPage(store: widget.store, part: 'promo');
-      case 'homeFresh':
-        return ScreenView('admin_fresh_strip', child: AdminFreshStripPage(store: widget.store));
-      case 'shopsLocation':
-        return ScreenView('admin_shops_location', child: AdminShopsLocationPage(store: widget.store));
-      case 'ads':
-        return AdminHomeSectionPage(store: widget.store, part: 'ads');
-      case 'androidHome':
-        return AdminAndroidHomePage(store: widget.store);
-      case 'cityCodes':
-        return AdminCityCodesPage(store: widget.store);
-      case 'rightBoxes':
-        return ScreenView('admin_right_boxes', child: AdminRightBoxesPage(store: widget.store));
-      // One record each: the form opens directly, with no list and no "Add new".
-      case 'settings':
-      case 'theme':
-        return AdminSingleRecord(store: widget.store, section: key);
-      default:
-        if (key.startsWith('module-')) {
-          final section = moduleAdminSections.where((s) => 'module-${s.id}' == key).firstOrNull;
-          if (section != null) return section.build(widget.store);
-        }
-        return AdminEntryList(store: widget.store, section: key);
-    }
-  }
+  Widget _content(String key) => adminSettingsContent(widget.store, key);
 
   void _open(_SettingsSection s) {
     final wide = MediaQuery.sizeOf(context).width >= 900;
@@ -115,16 +300,19 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     final list = ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        for (final s in _sections)
+        for (final s in _sectionsByGroup()) ...[
+          if (s.$1 != null) Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4), child: Text(s.$1!, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary))),
           ListTile(
-            key: ValueKey('settings-${s.key}'),
-            selected: wide && selected == s.key,
-            leading: Icon(s.icon),
-            title: Text(s.label),
-            subtitle: wide ? null : Text(s.hint),
+            key: ValueKey('settings-${s.$2.key}'),
+            selected: wide && selected == s.$2.key,
+            leading: Icon(s.$2.icon),
+            // A red mark when one of the health checks of this page fails (lib/ui/health_marks.dart).
+            title: withHealthMark(Text(s.$2.label), pageRegistryId(s.$2.key)),
+            subtitle: wide ? null : Text(s.$2.hint),
             trailing: wide ? null : const Icon(Icons.chevron_right),
-            onTap: () => _open(s),
+            onTap: () => _open(s.$2),
           ),
+        ],
       ],
     );
     if (!wide) return list;

@@ -1,13 +1,16 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../services/first_location.dart';
 import '../services/place_resolver.dart';
 import '../services/search.dart';
+import '../services/search_providers.dart';
 import 'account.dart';
 import 'android_layout.dart';
 import 'details.dart';
@@ -15,17 +18,25 @@ import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
 import '../modules/services/services_module.dart';
-import '../services/usage.dart';
+import '../modules/flash/flash_module.dart' show customerFlashButton;
+import '../services/usage.dart';
 import '../services/strings.dart';
 
 class Storefront extends StatefulWidget {
   const Storefront({
     super.key,
     required this.store,
-    this.searchService = const SmartSearch(),
+    this.searchService = const SmartSearch(
+      voice: DeviceVoiceSearch(),
+      image: CloudImageSearch(),
+    ),
+    this.firstPosition,
   });
   final Store store;
   final SmartSearch searchService;
+
+  /// The first open's location question and position ([positionWithPermission] by default); replaced in tests.
+  final Future<Position?> Function()? firstPosition;
   @override
   State<Storefront> createState() => _StorefrontState();
 }
@@ -49,7 +60,14 @@ class _StorefrontState extends State<Storefront> {
             'Image search provider is not connected yet. Please type your search.',
           );
         }
-        final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+        if (FirebaseAuth.instance.currentUser == null) {
+          throw StateError('Please sign in to search by photo.');
+        }
+        final file = await ImagePicker().pickImage(
+          source: isAndroidApp() ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 1024,
+          imageQuality: 70,
+        );
         if (file == null) {
           return;
         }
@@ -65,7 +83,9 @@ class _StorefrontState extends State<Storefront> {
             'Voice search provider is not connected yet. Please type your search.',
           );
         }
-        query = await provider.transcribe();
+        // The phone's own recogniser listens in the app's language (Telugu or English); no server, no AI cost.
+        final voice = provider is DeviceVoiceSearch && provider.localeId == null ? DeviceVoiceSearch(localeId: voiceLocaleFor(store.language)) : provider;
+        query = await voice.transcribe();
       }
       if (mounted) {
         setState(() => search.text = query);
@@ -79,30 +99,25 @@ class _StorefrontState extends State<Storefront> {
 
   bool _resolvingPlace = false;
   String _triedPlace = '';
-  // A customer whose stored location has a pincode but no town (typed by hand,
-  // or saved before towns existed) would otherwise see only the general offers.
-  // When some offer is aimed at specific places, look the pincode up once.
+  // A place saved before areas and distance-only offers (a pincode or town without a point, or a point without an area name) is
+  // completed once, so the customer sees the shops around them and their area's name without choosing again.
   void _resolvePlaceIfNeeded() {
-    if (_resolvingPlace || !needsPlaceResolution(store)) return;
-    final key = [store.pincode, store.town, store.district].join('|');
+    // Only with Firebase connected (the demo and the tests never look places up by themselves).
+    if (!store.live || _resolvingPlace || !needsPlaceResolution(store)) return;
+    final key = [store.pincode, store.town, store.latitude, store.longitude].join('|');
     if (key == _triedPlace) return; // already tried for this exact location
     _triedPlace = key;
     _resolvingPlace = true;
     completeStoredPlace(store).whenComplete(() => _resolvingPlace = false);
   }
 
-  /// Android app only: "Where are you shopping?" is shown the very first time the app opens, never again. The chosen place is saved on the
-  /// phone (Store), so every later start opens the home page with it; only the pin in the top row opens the picker after that.
+  /// The very first open, in the app and on the website alike: the location question, then GPS or the place picker
+  /// (lib/services/first_location.dart). Only with Firebase connected (not the demo or the tests).
   Future<void> _askLocationOnce() async {
-    if (!isAndroidApp() || store.hasPlace) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('locationAsked') ?? false) return;
-      await prefs.setBool('locationAsked', true);
-    } catch (_) {
-      return;
-    }
-    if (mounted && !store.hasPlace) await location();
+    if (!store.live) return;
+    await askLocationOnFirstOpen(store, position: widget.firstPosition, pick: () async {
+      if (mounted) await location();
+    });
   }
 
   @override
@@ -212,6 +227,8 @@ class _StorefrontState extends State<Storefront> {
       final mobile = MediaQuery.sizeOf(context).width < 700;
       return Scaffold(
         appBar: null,
+        // The Help chat (lib/modules/flash); signed out, it opens the account page to sign in first.
+        floatingActionButton: store.live ? customerFlashButton(store, onSignIn: (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => AccountPage(store: store)))) : null,
         bottomNavigationBar: mobile
             ? NavigationBar(
                 selectedIndex: navigationIndex,
@@ -265,7 +282,8 @@ class _StorefrontState extends State<Storefront> {
               )
             : null,
         // Below the phone's status bar (Android draws apps edge to edge): without this the logo sits under the clock.
-        body: SafeArea(bottom: false, child: WireframeHome(
+        // Pull down to read the shops' prices and offers again (the customer app reads them once per open, owner 16 Nov 2026).
+        body: SafeArea(bottom: false, child: RefreshIndicator(onRefresh: () => store.loadsOnce ? store.reloadCatalog() : Future<void>.value(), child: WireframeHome(
           scroll: scroll,
           categoriesKey: categoriesKey,
           productsKey: productsKey,
@@ -285,7 +303,7 @@ class _StorefrontState extends State<Storefront> {
             message(context, 'Added to bag');
           },
           onCategory: openCategory,
-        )),
+        ))),
       );
     },
   );

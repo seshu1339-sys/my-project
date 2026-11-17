@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -7,19 +8,6 @@ import 'admin_fields.dart';
 import 'admin_list_labels.dart';
 import 'entry_editor.dart';
 import 'shared.dart';
-
-String _promotionAreaLabel(Entry promotion) {
-  final shape = promotion.text('geoShape', 'circle');
-  if (shape == 'rectangle') {
-    return parseRectangleField(promotion.data['targetRectangle']) != null ? 'Rectangle area' : 'No area targeting';
-  }
-  if (shape == 'polygon') {
-    return parsePolygonField(promotion.data['targetPolygon']) != null ? 'Polygon area' : 'No area targeting';
-  }
-  return (promotion.number('targetLatitude') != 0 || promotion.number('targetLongitude') != 0)
-      ? 'Circle area'
-      : 'No area targeting';
-}
 
 /// The collections whose records have an order number the site follows; their lists can be dragged into a new order.
 const _orderedSections = {'products', 'services', 'categories', 'promotions', 'shops'};
@@ -183,8 +171,8 @@ class _AdminEntryListState extends State<AdminEntryList> {
     final state = e.active ? 'Published' : 'Hidden';
     switch (section) {
       case 'promotions':
-        return '${promotionStatusLabel(e)} • ${promotionPlacementLabel(e)} • $order'
-            ' • Location: ${promotionLocationLabel(e)} • ${_promotionAreaLabel(e)}';
+        final shopNames = {for (final s in store.entries('shops')) s.id: s.text('name', s.id)};
+        return '${promotionStatusLabel(e)} • ${promotionPlacementLabel(e)} • $order • ${promotionShopLabel(e, shopNames)}';
       case 'products':
         final categories = {for (final c in store.entries('categories')) c.id: c.text('name', c.id)};
         final shops = {for (final s in store.entries('shops')) s.id: s.text('name', s.id)};
@@ -338,7 +326,7 @@ class _AdminEntryListState extends State<AdminEntryList> {
               : reorderable
               ? ReorderableDragStartListener(index: i, child: const Icon(Icons.drag_indicator))
               : Icon(e.active ? Icons.check_circle_outline : Icons.pause_circle_outline),
-          title: Text(_title(e)),
+          title: SampleTitle(_title(e), id: e.id, data: e.data),
           subtitle: Text(_subtitle(e)),
           trailing: Wrap(
             spacing: 2,

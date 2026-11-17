@@ -14,6 +14,8 @@ import 'page_widgets.dart';
 import 'shared.dart';
 import 'shop_map.dart';
 import 'screen_view.dart';
+import 'report_abuse.dart';
+import 'shop_ratings.dart';
 
 class ShopPage extends StatelessWidget {
   const ShopPage({super.key, required this.store, required this.shop});
@@ -45,6 +47,11 @@ class ShopPage extends StatelessWidget {
               whatsapp: shop.text('whatsapp'),
               onUsed: (way) => trackShopContact(way, shop),
             ),
+            // A customer who ordered from this shop may report it (functions/modules/abuse-reports checks the order).
+            const SizedBox(height: 8),
+            // Stars, the latest comments and "Rate" (lib/ui/shop_ratings.dart).
+            RatingsSection(store: store, place: shop, target: {'kind': 'shop', 'shopId': shop.id}, label: shop.text('name')),
+            if (store.user != null) Align(alignment: Alignment.centerLeft, child: ReportButton(store: store, target: {'kind': 'shop', 'shopId': shop.id}, label: shop.text('name'))),
             const SizedBox(height: 20),
             ShopMap(
               shops: [shop],
@@ -124,7 +131,7 @@ class ShopPage extends StatelessWidget {
                     .where((e) => e.text('shopId') == shop.id))
               ListTile(
                 title: Text(p.text('name')),
-                subtitle: Text(money(p.price(store.pincode))),
+                subtitle: Text(priceOrNotUpdated(p.price(store.pincode), store)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                   context,

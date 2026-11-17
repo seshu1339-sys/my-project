@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
@@ -41,6 +42,28 @@ class StaffAdditionsReviewPage extends StatelessWidget {
       .snapshots()
       .map((s) => {for (final d in s.docs) '${d.data()['path']}': d.data()});
 
+  Future<void> _disableOld(BuildContext context) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const Text('Disable the old staff-added vendors?'),
+        content: const Text('Every vendor and service provider that staff created themselves (with no login of their own) is suspended and hidden from customers, and the old waiting additions are closed. Vendors who registered themselves are not touched.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
+          FilledButton(key: const ValueKey('disable-old-confirm'), onPressed: () => Navigator.pop(dialog, true), child: const Text('Disable')),
+        ],
+      ),
+    );
+    if (yes != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final r = await store.call('disableOldStaffAdded', const {});
+      messenger.showSnackBar(SnackBar(content: Text('Disabled ${r['vendors'] ?? 0} vendors and ${r['providers'] ?? 0} providers; closed ${r['waitingClosed'] ?? 0} waiting.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Added by staff')),
@@ -53,7 +76,26 @@ class StaffAdditionsReviewPage extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           children: [
             Text('Vendors and service providers added by staff', style: Theme.of(context).textTheme.headlineSmall),
-            Text(snapshot.hasData ? '${list.length} waiting for approval, oldest first. Check every photo with Google, then approve: it goes live at once.' : 'Loading...'),
+            // Closed on 6 November 2026: vendors and providers register themselves; staff link them by ID within 30 minutes.
+            Card(
+              key: const ValueKey('staff-additions-closed'),
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Adding by staff is closed', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Vendors and service providers now register themselves in the vendor app, and staff link them with their ID within 30 minutes. What staff added the old way can only be rejected here. Disable the old ones: they must register themselves and be linked again.'),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const ValueKey('disable-old-staff-added'),
+                    onPressed: () => _disableOld(context),
+                    icon: const Icon(Icons.block),
+                    label: const Text('Disable vendors and providers added the old way'),
+                  ),
+                ]),
+              ),
+            ),
+            Text(snapshot.hasData ? '${list.length} old addition${list.length == 1 ? '' : 's'} still waiting, oldest first.' : 'Loading...'),
             usage ?? PhotoCheckUsage(store: store),
             const SizedBox(height: 12),
             if (snapshot.hasData && list.isEmpty) const Text('Nothing is waiting.'),
@@ -155,7 +197,7 @@ class _AdditionCardState extends State<_AdditionCard> {
                 Row(children: [
                   Icon(provider ? Icons.home_repair_service_outlined : Icons.storefront_outlined),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('${person['name'] ?? ''}${provider ? ' • ${a.text('serviceName')}' : ''}', style: Theme.of(context).textTheme.titleMedium)),
+                  Expanded(child: SampleTitle('${person['name'] ?? ''}${provider ? ' • ${a.text('serviceName')}' : ''}', id: a.id, data: a.data, style: Theme.of(context).textTheme.titleMedium)),
                 ]),
                 Text('${provider ? 'Provider' : 'Vendor'} ID: $code • Phone: ${person['phone'] ?? ''}'),
                 Text('Added by ${a.text('staffName', 'staff')}${a.text('staffCode').isEmpty ? '' : ' (${a.text('staffCode')})'}${added.isEmpty ? '' : ' on $added'}'),
@@ -201,17 +243,10 @@ class _AdditionCardState extends State<_AdditionCard> {
                 const SizedBox(height: 12),
                 Text('$checked of ${photos.length} photos checked with Google', key: ValueKey('staff-review-checked-${a.id}'), style: TextStyle(fontWeight: FontWeight.bold, color: allChecked ? const Color(0xFF15803D) : null)),
                 const SizedBox(height: 8),
+                // Adding by staff is closed: an old addition can only be rejected (the vendor registers in the vendor app).
                 OverflowBar(
                   spacing: 8,
                   children: [
-                    Tooltip(
-                      message: allChecked ? 'Goes live at once' : 'Check every photo with Google first',
-                      child: FilledButton(
-                        key: ValueKey('staff-approve-${a.id}'),
-                        onPressed: allChecked && !deciding ? () => _decide(approved: true) : null,
-                        child: const Text('Approve'),
-                      ),
-                    ),
                     OutlinedButton(key: ValueKey('staff-reject-${a.id}'), onPressed: deciding ? null : () => _decide(approved: false), child: const Text('Reject')),
                   ],
                 ),

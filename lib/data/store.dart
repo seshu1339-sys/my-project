@@ -13,11 +13,15 @@ import '../domain/catalog.dart';
 import '../domain/delivery.dart';
 import '../domain/places.dart';
 import '../domain/quick_items.dart';
+import '../domain/reach.dart';
 import '../domain/towns.dart';
+import '../services/google_account.dart';
+import '../services/app_monitoring.dart';
 import '../services/usage.dart';
 import 'store_consent.dart';
 import '../services/localization.dart';
 import '../services/notifications.dart';
+import '../services/server_clock.dart';
 
 // Store's upload methods and vendor/complaint RPC-wrapper methods live in
 // their own extension files (zero call-site change — an extension method
@@ -77,13 +81,15 @@ class Store extends ChangeNotifier {
   final Set<String> wishlist = {};
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   String pincode = '',
+      // What the customer typed as their address: for delivery only, never shown as their place.
       address = '',
-      // The customer's town (e.g. "Narsipatnam"), which decides which
-      // location-tagged offers/ads they see and names the offers ticker.
-      // '' until a location is chosen.
+      // The customer's AREA (lib/domain/area_names.dart): the name everyone calls the part of town they are in, e.g. "Kancharapalem".
+      // Shown, through [placeName], in the location box, the greeting and "Today's ... Offers". '' until it is known.
+      area = '',
+      // The customer's town (e.g. "Narsipatnam"): the area's fallback name, and the town in the usage reports. What the customer sees
+      // is decided by distance only (lib/domain/reach.dart), never by the town.
       town = '',
-      // ...and the district/state of the place they picked, so an offer can
-      // target a whole district or state. '' when unknown.
+      // ...and the district/state of the place, for the reports. '' when unknown.
       district = '',
       state = '',
       profileName = '',
@@ -96,9 +102,34 @@ class Store extends ChangeNotifier {
   bool followsGps = false;
   double? latitude, longitude;
   bool admin = false, ready = false;
-  /// Which app this is: 'user' (customers, open to every email), 'vendor' (vendors and service providers) or 'staff'. The server
-  /// (functions/login.js claimAppRole) refuses a vendor/staff app login whose email holds the other role.
+  /// Which app this is: 'user' (customers), 'vendor' (vendors and service providers), 'staff', or 'admin' (the admin panel). Each
+  /// app signs in with the email's OWN login for its role (functions/role-logins.js): the person uses the same email (and Google
+  /// account) everywhere, and gets a separate account, with its own ID, records and block, in each app.
   String appRole = 'user';
+
+  /// The roles this app signs in as. The vendor app holds both the vendor and the service-provider login of an email.
+  List<String> get appRoles => switch (appRole) {
+    'vendor' => const ['vendor', 'provider'],
+    'staff' => const ['staff'],
+    'admin' => const ['admin'],
+    _ => const ['user'],
+  };
+
+  /// The role of the signed-in login ('user', 'vendor', 'provider', 'staff' or 'admin'); '' when nobody is signed in to this app.
+  String sessionRole = '';
+
+  /// The email the signed-in login belongs to (a role login has no email of its own in Firebase Auth).
+  String sessionEmail = '';
+  String? _sessionUid;
+
+  /// The last email that signed in on this phone: the email-code field starts with it.
+  String lastSignInEmail = '';
+
+  /// Vendor app only: the email is proven, and the person chooses Vendor or Service provider now.
+  bool choosingVendorRole = false;
+
+  /// The role a sign-in was refused for because it is blocked ([roleBlock] says so); null otherwise.
+  String? blockedRole;
 
   /// Agreement to the Terms & Conditions and the Privacy Policy (store_consent.dart). Only the customer, vendor and staff apps ask for it.
   bool requiresConsent = false;
@@ -109,11 +140,44 @@ class Store extends ChangeNotifier {
   /// This phone has already had an agreement saved, so the sign-in screen does not show the tick box again.
   bool deviceConsented = false;
 
-  /// The box was ticked on the sign-in screen; the agreement is saved right after sign-in.
+  /// The person continued on the sign-in screen, under "By continuing, you agree to ...": the agreement is saved right after sign-in.
   bool pendingConsent = false;
 
-  /// The sign-in screen shows the tick box (nobody has agreed on this phone yet).
+  /// The sign-in screen shows the agreement sentence (nobody has agreed on this phone yet).
   bool get asksConsentBeforeSignIn => requiresConsent && !deviceConsented;
+
+  /// The sign-in screen offers the 6-digit email code. Google always comes first: the code is offered only once Google did not work,
+  /// is not possible on this device, or the person closed the Google sheet without choosing an account. Hidden again after Log out.
+  bool emailCodeOffered = false;
+
+  /// Offers the email code on the sign-in screen (Google did not work or was closed).
+  void offerEmailCode() {
+    if (emailCodeOffered) return;
+    emailCodeOffered = true;
+    notifyListeners();
+  }
+
+  /// The Google sheet has already opened by itself in this run of the app (or the person just logged out), so it does not again.
+  bool _autoGoogleDone = false;
+
+  /// The customer app opened its sign-in sheet by itself once on this phone (the first open after install); never again after that.
+  bool _firstOpenOffered = false;
+
+  /// The sign-in screen may open the Google sheet by itself: live, nobody signed in, and not yet in this run of the app.
+  bool get opensGoogleByItself => live && user == null && !_autoGoogleDone;
+
+  /// The customer app's first open after install: its sign-in sheet opens by itself, once (customers may also shop without signing in).
+  bool get offersSignInOnFirstOpen => live && appRole == 'user' && user == null && !_firstOpenOffered && !_autoGoogleDone;
+
+  /// The sign-in screen opened the Google sheet by itself; it does not do so again in this run.
+  void googleOpenedByItself() => _autoGoogleDone = true;
+
+  /// The customer app's first-open sign-in sheet was shown; remembered on this phone.
+  Future<void> firstOpenSignInShown() async {
+    _firstOpenOffered = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('firstOpenSignInShown', true);
+  }
 
   /// The agreement screen covers the app: signed in, and no saved agreement for the current version.
   bool get showsConsentScreen => live && requiresConsent && user != null && consentNeeded;
@@ -121,10 +185,26 @@ class Store extends ChangeNotifier {
   /// Lets the consent extension (store_consent.dart) tell the screens that the agreement state changed.
   void consentChanged() => notifyListeners();
 
-  /// Why the last sign-in was refused (the email holds another role); shown on the login screen, null otherwise.
+  /// Why the last sign-in could not finish (that role is blocked, or no connection); shown on the login screen, null otherwise.
   String? roleBlock;
-  String? _gatedUid;
-  User? get user => live ? FirebaseAuth.instance.currentUser : null;
+
+  /// The signed-in login of this app: its role login once entered, or (customer app) the email's own login while its email waits for
+  /// verification. The email's own verified login is never "signed in" here: it only proves the email, and the app swaps it for its
+  /// role login straight away.
+  User? get user {
+    if (!live) return null;
+    final current = FirebaseAuth.instance.currentUser;
+    if (current == null) return null;
+    if (sessionRole.isNotEmpty && current.uid == _sessionUid) return current;
+    if (current.email != null && !current.emailVerified) return current;
+    return null;
+  }
+
+  /// The signed-in person's email is proven (always true for a role login).
+  bool get emailConfirmed => sessionRole.isNotEmpty || (user?.emailVerified ?? false);
+
+  /// The signed-in person's email, for display.
+  String get signedInEmail => sessionEmail.isNotEmpty ? sessionEmail : (user?.email ?? '');
   /// Completes the stored place from the places directory: the town (and its
   /// district/state) of a typed pincode, or the district/state of a town that
   /// came from a place-name search. Only ever fills what is missing, never
@@ -164,18 +244,41 @@ class Store extends ChangeNotifier {
     return true;
   }
 
-  /// Where the customer is, as offers are matched against it.
+  /// Where the customer is, by name (town, district, state).
   CustomerPlace get place =>
       CustomerPlace(town: town, district: district, state: state);
-  bool get hasPlace => !place.isEmpty;
+
+  /// The ONE name of the customer's place, shown everywhere (location box, greeting, "Today's ... Offers"): the area, else the
+  /// town; '' while neither is known. Never the typed address.
+  String get placeName => area.isNotEmpty ? area : town;
+
+  /// The customer's point is known (GPS or a place chosen by hand): what they see is measured from it.
+  bool get located => latitude != null && longitude != null && !(latitude == 0 && longitude == 0);
+
+  /// The customer has a place: a point, or at least a name or pincode still to be turned into one.
+  bool get hasPlace => located || !place.isEmpty || pincode.isNotEmpty;
+
+  /// The admin's one km (Settings > Business Profile): customers see the shops, products, services, offers and ads within it.
+  double get reachKm => reachKmOf(business);
+
+  /// The ids of the shops within [reachKm] of the customer (none until the customer's point is known).
+  Set<String> shopsInReach() => shopIdsWithin(visible('shops'), located ? latitude : null, located ? longitude : null, reachKm);
+
+  /// Only the demo (no Firebase: the previews and the tests) with no place chosen yet shows the whole catalogue, offers and ads,
+  /// like the admin's preview. The real app and website never do: there nothing shows until the customer's place is known.
+  bool get showsEverything => !live && !located;
+
+  /// [item]'s shop is within reach of the customer ([linkedShopId]); an item without a shop never is.
+  bool reaches(Entry item) => showsEverything || shopsInReach().contains(linkedShopId(item));
   Entry get business =>
       entries('settings').where((e) => e.id == 'business').firstOrNull ??
       const Entry('business', {'name': 'Local Market', 'radiusKm': 10});
   List<Entry> entries(String collection) =>
       List<Entry>.from(catalog[collection] ?? [])
         ..sort((a, b) => a.number('order').compareTo(b.number('order')));
+  // Start / end times are decided by the server's clock, never the phone's (lib/services/server_clock.dart).
   List<Entry> visible(String collection) =>
-      entries(collection).where((e) => e.visibleAt(DateTime.now())).toList();
+      entries(collection).where((e) => e.visibleAt(ServerClock.now())).toList();
   /// The town a product is sold in: its own, else its shop's (older products have no town of their own).
   String productTown(Entry product) {
     final own = product.text('town');
@@ -184,26 +287,25 @@ class Store extends ChangeNotifier {
     return shop?.text('town') ?? '';
   }
 
-  /// [items] of the customer's chosen town: items of other towns are hidden. Nothing is hidden while no town is chosen,
-  /// and an item with no known town shows everywhere. [all] (the admin preview) ignores the town.
-  List<Entry> _inTown(List<Entry> items, bool all) {
-    if (all || town.isEmpty) return items;
-    // Compared by town: a locality named "Krishna Bazar (Narsipatnam)" is in Narsipatnam.
-    final mine = townKey(town);
-    return items.where((p) {
-      final there = townKey(productTown(p));
-      return there.isEmpty || there == mine;
-    }).toList();
+  /// [items] of the shops within reach of the customer (distance only, lib/domain/reach.dart): an item of a farther shop, of a shop
+  /// with no saved location, or with no shop at all is hidden, and so is everything while the customer's place is not known yet.
+  /// [all] (the admin preview) shows every item.
+  List<Entry> _inReach(List<Entry> items, bool all) {
+    if (all || showsEverything) return items;
+    final shops = shopsInReach();
+    return items.where((p) => shops.contains(p.text('shopId'))).toList();
   }
 
-  /// Visible products for the customer's chosen town. Services are not products: they live in their own collection
+  /// Visible products of the shops within reach. Services are not products: they live in their own collection
   /// (see [visibleServices]), and a service record that is still in products is never listed here.
-  List<Entry> visibleProducts({bool all = false}) =>
-      _inTown(visible('products').where((e) => e.text('kind') != 'service').toList(), all);
+  List<Entry> visibleProducts({bool all = false}) => _inReach(
+    visible('products').where((e) => e.text('kind') != 'service' && inSearchAt(e, ServerClock.now())).toList(),
+    all,
+  );
 
-  /// Visible service listings (the services collection, without the service-type records) for the chosen town.
+  /// Visible service listings (the services collection, without the service-type records) of the shops within reach.
   List<Entry> visibleServices({bool all = false}) =>
-      _inTown(visible('services').where((e) => e.text('kind') != 'serviceType').toList(), all);
+      _inReach(visible('services').where((e) => e.text('kind') != 'serviceType').toList(), all);
 
   /// The fixed service types (Plumber, Electrician, ...) stored in the services collection, in their own order.
   List<Entry> serviceTypes() => visible('services').where((e) => e.text('kind') == 'serviceType').toList();
@@ -243,10 +345,25 @@ class Store extends ChangeNotifier {
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     if (live) {
+      // The website reads its saved login from the browser a moment after the start; without this wait every open would show the
+      // sign-in screen first (and, with no connection then, stay signed out). A phone has it at once. Never blocks for long.
+      if (kIsWeb) await _savedLoginLoaded();
+      // The app opens straight inside: the role of the login this phone is still signed in with is known before the first screen,
+      // without waiting for the network (the claims are checked again as soon as Firebase reports the login).
+      lastSignInEmail = prefs.getString('lastSignInEmail') ?? '';
+      _firstOpenOffered = prefs.getBool('firstOpenSignInShown') ?? false;
+      final saved = (prefs.getString('sessionRole') ?? '').split('|');
+      final current = FirebaseAuth.instance.currentUser;
+      if (saved.length == 3 && current != null && current.uid == saved[0] && appRoles.contains(saved[1])) {
+        _sessionUid = saved[0];
+        sessionRole = saved[1];
+        sessionEmail = saved[2];
+      }
     }
     pincode = prefs.getString('pincode') ?? '';
     await loadConsentDevice();
     address = prefs.getString('address') ?? '';
+    area = prefs.getString('area') ?? '';
     town = prefs.getString('town') ?? '';
     district = prefs.getString('district') ?? '';
     state = prefs.getString('state') ?? '';
@@ -288,14 +405,13 @@ class Store extends ChangeNotifier {
     } else {
       _subscriptions.add(
         FirebaseAuth.instance.idTokenChanges().listen((u) async {
-          if (u == null) _gatedUid = null;
-          if (u != null && u.emailVerified && _gatedUid != u.uid && !await _roleAllowed(u)) return;
-          if (u == null) consentNeeded = false;
-          if (u != null && u.emailVerified) await syncConsent();
-          admin =
-              u != null &&
-              u.emailVerified &&
-              (await u.getIdTokenResult()).claims?['admin'] == true;
+          if (u != null && !await _adoptLogin(u)) return;
+          if (u == null) {
+            if (FirebaseAuth.instance.currentUser != null) return;
+            await _setSession(null);
+            consentNeeded = false;
+          }
+          if (u != null && emailConfirmed) await syncConsent();
           profileName = u?.displayName ?? '';
           if (u != null) {
             try {
@@ -323,38 +439,81 @@ class Store extends ChangeNotifier {
           notifyListeners();
         }),
       );
-      for (final collection in collections) {
-        _subscriptions.add(
-          firestore
-              .collection(collection)
-              .limit(_catalogPageLimit)
-              .snapshots()
-              .listen(
-                (snapshot) {
-                  catalog[collection] = snapshot.docs
-                      .map((d) => Entry(d.id, d.data()))
-                      .toList();
-                  if (snapshot.docs.length >= _catalogPageLimit) {
-                    truncatedCollections.add(collection);
-                  } else {
-                    truncatedCollections.remove(collection);
-                  }
-                  notifyListeners();
-                },
-                onError: (Object e) {
-                  // The Ads collection is optional: if it cannot be read (yet) the site simply keeps its existing ad boxes.
-                  if (collection == 'ads') return;
-                  error =
-                      'Could not load $collection. Check your connection and Firebase permissions.';
-                  notifyListeners();
-                },
-              ),
-        );
+      // The website's One Tap prompt answers here, whenever the person clicks their account (lib/services/google_account.dart).
+      if (kIsWeb && appRole != 'admin') {
+        _subscriptions.add(googleIdTokens().listen((idToken) => unawaited(_finishGoogleQuietly(idToken))));
+      }
+      // The customer app and website read the catalog ONCE when they open and again when the customer's place changes or they pull
+      // to refresh (owner, 16 Nov 2026: no reads while the app is open). The admin panel, vendor and staff apps keep watching it live.
+      if (loadsOnce) {
+        unawaited(reloadCatalog());
+      } else {
+        for (final collection in collections) {
+          _subscriptions.add(
+            firestore
+                .collection(collection)
+                .limit(_catalogPageLimit)
+                .snapshots()
+                .listen((snapshot) => _took(collection, snapshot), onError: (Object e) => _failed(collection)),
+          );
+        }
       }
     }
-    if (live) _watchQuickItems();
+    if (live && !loadsOnce) _watchQuickItems();
     ready = true;
     notifyListeners();
+  }
+
+  /// Whether this app reads the catalog once per open (the customer app and website) instead of watching it live.
+  bool get loadsOnce => live && appRole == 'user';
+
+  final _reloads = StreamController<void>.broadcast();
+
+  /// Fires after each [reloadCatalog] (the customer's place changed, or a pull to refresh): what is read once per open is read again.
+  Stream<void> get catalogReloads => _reloads.stream;
+
+  /// [load] once now, then again after every [reloadCatalog]: for the customer app's offers and showcase, which are read once per
+  /// open and per place, never watched.
+  Stream<T> loadedOnce<T>(Future<T> Function() load) async* {
+    yield await load();
+    await for (final _ in catalogReloads) {
+      yield await load();
+    }
+  }
+
+  void _took(String collection, QuerySnapshot<Map<String, dynamic>> snapshot) {
+    catalog[collection] = snapshot.docs.map((d) => Entry(d.id, d.data())).toList();
+    if (snapshot.docs.length >= _catalogPageLimit) {
+      truncatedCollections.add(collection);
+    } else {
+      truncatedCollections.remove(collection);
+    }
+    notifyListeners();
+  }
+
+  void _failed(String collection) {
+    // The Ads collection is optional: if it cannot be read (yet) the site simply keeps its existing ad boxes.
+    if (collection == 'ads') return;
+    error = 'Could not load $collection. Check your connection and Firebase permissions.';
+    notifyListeners();
+  }
+
+  Future<void>? _reloading;
+
+  /// The customer app's one read of the catalog (and the approved quick items): every collection once. Two calls at the same time share
+  /// one read.
+  Future<void> reloadCatalog() => _reloading ??= _reloadCatalog().whenComplete(() => _reloading = null);
+
+  Future<void> _reloadCatalog() async {
+    await Future.wait([
+      for (final collection in collections)
+        firestore.collection(collection).limit(_catalogPageLimit).get().then((s) => _took(collection, s), onError: (Object _) => _failed(collection)),
+      firestore.collection('quickItems').where('status', isEqualTo: 'approved').limit(_catalogPageLimit).get().then((s) {
+        catalog['quickItems'] = s.docs.map((d) => Entry(d.id, d.data())).toList();
+      }, onError: (Object _) {}),
+    ]);
+    notifyListeners();
+    _reloads.add(null);
   }
 
   // Customers read only APPROVED quick items (the rules allow nothing else); the clock decides
@@ -381,13 +540,14 @@ class Store extends ChangeNotifier {
   List<Entry> get quickLocations =>
       entries('locations').where((l) => l.active).toList();
 
-  /// Live Quick Add items in the town the customer chose with "Choose your location" (the same
-  /// town that decides their offers), optionally one category. None until a town is chosen.
+  /// Live Quick Add items within the admin's km of the customer's place (distance only), optionally one category. None until the
+  /// customer's place is known.
   List<Entry> quickItemsHere({String? categoryId, DateTime? now}) => liveQuickItems(
     catalog['quickItems'] ?? const [],
     now ?? DateTime.now(),
-    town: town,
-    district: district,
+    latitude: located ? latitude : null,
+    longitude: located ? longitude : null,
+    km: reachKm,
     categoryId: categoryId,
   );
 
@@ -527,6 +687,14 @@ class Store extends ChangeNotifier {
           ),
         ),
       );
+  /// Changes only the typed address (for delivery): the place, its area and what the customer sees stay as they are.
+  Future<void> setDeliveryAddress(String value) async {
+    address = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('address', value);
+    notifyListeners();
+  }
+
   Future<void> setLocation(
     String pin,
     String value, {
@@ -535,12 +703,16 @@ class Store extends ChangeNotifier {
     String? town,
     String? district,
     String? state,
+    String? area,
     bool followGps = false,
   }) async {
     followsGps = followGps;
+    final movedFrom = (pincode, latitude, longitude);
     // A refresh that leaves the pincode/address untouched (e.g. the on-open GPS
     // coordinate refresh) must not forget a town the customer already picked.
     final unchanged = town == null && pin == pincode && value == address;
+    // The area goes with the place it was worked out for (lib/services/area_lookup.dart): kept only when nothing else changes.
+    this.area = area ?? (unchanged && lat == latitude && lng == longitude ? this.area : '');
     final nextTown = unchanged
         ? this.town
         : resolveTown(
@@ -563,6 +735,7 @@ class Store extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('pincode', pin);
     await prefs.setString('address', value);
+    await prefs.setString('area', this.area);
     await prefs.setString('town', this.town);
     await prefs.setString('district', this.district);
     await prefs.setString('state', this.state);
@@ -575,9 +748,19 @@ class Store extends ChangeNotifier {
       await prefs.remove('longitude');
     }
     if (live) {
-      unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng));
+      unawaited(notifications.updateLocationIfEnabled(pincode: pin, latitude: lat, longitude: lng, area: placeName));
     }
     notifyListeners();
+    if (loadsOnce && placeMoved(movedFrom, (pin, lat, lng))) unawaited(reloadCatalog());
+  }
+
+  /// Whether the customer's place really changed: another pincode, a place where there was none, or more than 1 km away.
+  static bool placeMoved((String, double?, double?) from, (String, double?, double?) to) {
+    if (from.$1 != to.$1) return true;
+    final (a, b) = (from.$2, from.$3);
+    final (c, d) = (to.$2, to.$3);
+    if (a == null || b == null || c == null || d == null) return (a == null) != (c == null);
+    return distanceKm(a, b, c, d) > 1;
   }
 
   Future<void> setLanguage(String value) async {
@@ -640,18 +823,13 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Entry> nearby() => visible('shops').where((s) {
-    if (latitude != null && longitude != null) {
-      return distanceKm(
-            latitude!,
-            longitude!,
-            s.number('latitude'),
-            s.number('longitude'),
-          ) <=
-          s.number('radiusKm', business.number('radiusKm', 10));
-    }
-    return pincode.isNotEmpty && s.text('pincode') == pincode;
-  }).toList();
+  /// The shops within the admin's km of the customer ([reachKm]; a shop's own radius no longer counts). None while the customer's
+  /// place is not known.
+  List<Entry> nearby() {
+    if (showsEverything) return visible('shops');
+    final ids = shopsInReach();
+    return visible('shops').where((s) => ids.contains(s.id)).toList();
+  }
   void add(Entry entry, [int quantity = 1]) {
     final next = (cart[entry.id] ?? 0) + quantity;
     if (next <= 0) {
@@ -673,7 +851,7 @@ class Store extends ChangeNotifier {
     if (user == null) {
       throw StateError('Please sign in first.');
     }
-    if (!user!.emailVerified) {
+    if (!emailConfirmed) {
       throw StateError('Verify your email in Your account before ordering.');
     }
     final result = await FirebaseFunctions.instance
@@ -697,72 +875,219 @@ class Store extends ChangeNotifier {
 
   Future<Map<String, dynamic>> call(String name, Map<String, dynamic> data) async {
     if (!live) throw StateError('This action requires a connected Firebase project.');
-    final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
-    return Map<String, dynamic>.from(result.data as Map);
-  }
-
-  Future<void> login(String email, String password) async {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-  }
-
-  /// Asks the server whether this app may let [u] in (one email is only one of vendor / service provider / staff; customers are
-  /// open to everyone). A refused email is signed out at once and [roleBlock] says why. A network failure does not lock anyone out:
-  /// the server checks again when they register or act.
-  Future<bool> _roleAllowed(User u) async {
     try {
-      await call('claimAppRole', {'app': appRole});
-      _gatedUid = u.uid;
-      return true;
+      final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
+      return Map<String, dynamic>.from(result.data as Map);
     } on FirebaseFunctionsException catch (e) {
-      if (e.code != 'failed-precondition') return true;
-      roleBlock = e.message ?? 'This email is already registered in another role. Please use a different email.';
-      await _forgetGoogle();
+      // Login / OTP / email failures and server breakdowns go to the App Health page (lib/services/app_monitoring.dart).
+      AppMonitoring.callFailed(name, e.code, e.message);
+      rethrow;
+    }
+  }
+
+  /// Password sign-in (the customer app's form and the admin panel): proves the email, then enters this app's role login.
+  Future<void> login(String email, String password) async {
+    roleBlock = null;
+    final UserCredential signedIn;
+    try {
+      signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      AppMonitoring.fail('login', 'Password sign-in: ${e.code}');
+      rethrow;
+    }
+    if (signedIn.user?.emailVerified == true) await enterAppRole();
+  }
+
+  /// Who [u] is, from its claims. True when [u] is this app's own role login (the session is set); false when it is the email's own
+  /// login (a verified one is swapped for the role login right away, an unverified one waits for the email check) or another app's
+  /// login (signed out: on the web the shop and the admin panel share the browser).
+  Future<bool> _adoptLogin(User u) async {
+    // A late event for a login that has already been swapped for another one.
+    if (FirebaseAuth.instance.currentUser?.uid != u.uid) return false;
+    Map<String, dynamic> claims;
+    try {
+      claims = (await u.getIdTokenResult()).claims ?? const {};
+    } catch (_) {
+      // No connection to refresh the token: keep the session this phone already knows for this login.
+      return sessionRole.isNotEmpty && _sessionUid == u.uid;
+    }
+    if (FirebaseAuth.instance.currentUser?.uid != u.uid) return false;
+    final role = claims['role']?.toString() ?? '';
+    if (role.isEmpty) {
+      await _setSession(null);
+      if (u.emailVerified) unawaited(_enterRoleQuietly());
+      notifyListeners();
+      return false;
+    }
+    if (!appRoles.contains(role)) {
+      await _setSession(null);
       await FirebaseAuth.instance.signOut();
       notifyListeners();
       return false;
-    } catch (_) {
-      return true;
     }
+    await _setSession(u.uid, role: role, email: claims['loginEmail']?.toString() ?? '', isAdmin: role == 'admin' && claims['admin'] == true);
+    return true;
   }
 
-  bool _googleReady = false;
-  Future<void> _forgetGoogle() async {
-    if (kIsWeb || !_googleReady) return;
+  /// Remembers (or, with a null [uid], forgets) the signed-in role login, so the app opens straight inside next time.
+  Future<void> _setSession(String? uid, {String role = '', String email = '', bool isAdmin = false}) async {
+    _sessionUid = uid;
+    sessionRole = uid == null ? '' : role;
+    sessionEmail = uid == null ? '' : email;
+    admin = uid != null && isAdmin;
+    final prefs = await SharedPreferences.getInstance();
+    if (uid == null) {
+      await prefs.remove('sessionRole');
+      return;
+    }
+    roleBlock = null;
+    blockedRole = null;
+    choosingVendorRole = false;
+    await prefs.setString('sessionRole', '$uid|$role|$email');
+    if (email.isNotEmpty) {
+      lastSignInEmail = email;
+      await prefs.setString('lastSignInEmail', email);
+    }
+    if (appRoles.length > 1) await prefs.setString('vendorAppRole', role);
+  }
+
+  Future<void>? _entering;
+
+  /// Swaps the email's own (proven) login for this app's login in [role] (the app's own role, or in the vendor app the remembered
+  /// choice): functions/role-logins.js enterRole makes it the first time. Throws, with [roleBlock] set, when that role is blocked or
+  /// the server cannot be reached.
+  Future<void> enterAppRole([String? role]) => _entering ??= _enterRole(role).whenComplete(() => _entering = null);
+
+  Future<void> _enterRoleQuietly() async {
     try {
-      await GoogleSignIn.instance.signOut();
+      await enterAppRole();
     } catch (_) {
-      /* Nothing to forget. */
+      /* roleBlock already says why; the sign-in screen shows it. */
     }
   }
 
-  /// Main sign-in: the phone's own Google account list; one tap, no typing, and Google has already verified the email.
-  /// Returns false when the person closed the account list without choosing.
-  Future<bool> signInWithGoogle() async {
+  Future<void> _enterRole(String? wanted) async {
+    final role = wanted ?? await _defaultRole();
+    if (role == null) {
+      // Vendor app, first sign-in: "Vendor or Service provider?" decides.
+      choosingVendorRole = true;
+      notifyListeners();
+      return;
+    }
+    try {
+      final result = await call('enterRole', {'role': role});
+      await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
+      final u = FirebaseAuth.instance.currentUser;
+      if (u != null) await _adoptLogin(u);
+    } catch (e) {
+      final refused = e is FirebaseFunctionsException && e.code == 'permission-denied';
+      roleBlock = e is FirebaseFunctionsException && (e.message ?? '').isNotEmpty
+          ? e.message
+          : 'Could not finish signing in. Check your connection and try again.';
+      final details = e is FirebaseFunctionsException ? e.details : null;
+      blockedRole = details is Map ? details['blocked']?.toString() : null;
+      if (appRoles.length > 1) {
+        // The vendor app offers the email's other login (Vendor or Service provider), which a block on this one never touches.
+        choosingVendorRole = true;
+      } else if (refused) {
+        await _forgetGoogle();
+        await FirebaseAuth.instance.signOut();
+      }
+      notifyListeners();
+      rethrow;
+    }
+    notifyListeners();
+  }
+
+  Future<String?> _defaultRole() async {
+    if (appRoles.length == 1) return appRoles.first;
+    final saved = (await SharedPreferences.getInstance()).getString('vendorAppRole');
+    return appRoles.contains(saved) ? saved : null;
+  }
+
+  /// Vendor app: the answer to "Vendor or Service provider?" after the first sign-in (remembered on this phone).
+  Future<void> chooseVendorRole(String role) async {
+    choosingVendorRole = false;
+    roleBlock = null;
+    blockedRole = null;
+    notifyListeners();
+    await enterAppRole(role);
+  }
+
+  /// Vendor app: moves to the same email's other login (Vendor <-> Service provider), each with its own ID, records and block.
+  Future<void> switchVendorRole(String to) async {
+    if (sessionRole == to) return;
+    final result = await call('switchRole', {'to': to});
+    await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null) await _adoptLogin(u);
+    notifyListeners();
+  }
+
+  /// Signs Google out on this phone or in this browser (lib/services/google_account.dart).
+  Future<void> _forgetGoogle() async {
+    if (kIsWeb && appRole == 'admin') return;
+    await forgetGoogleAccount();
+  }
+
+  /// Waits (at most a few seconds) until Firebase has read the website's saved login from the browser.
+  Future<void> _savedLoginLoaded() async {
+    try {
+      await FirebaseAuth.instance.authStateChanges().first.timeout(const Duration(seconds: 4));
+    } catch (_) {
+      /* Slow or no storage: the app starts and the login, if any, follows a moment later. */
+    }
+  }
+
+  /// Main sign-in: "Continue with Google", one tap on an account already on the phone (its email shown), no typing; Google has already
+  /// verified the email. Signing in and registering are the same step: the app's own account for this email is made on the first
+  /// sign-in. [automatic] is the sheet that opens by itself: only the sheet, never Google's full picker; on the website, the One Tap
+  /// prompt, whose answer comes later through [googleIdTokens].
+  /// Returns true when signed in, false when the person closed Google without choosing (or there is nothing to show), and null while
+  /// the website's One Tap prompt is waiting for a click.
+  Future<bool?> signInWithGoogle({bool automatic = false}) async {
     roleBlock = null;
     try {
       if (kIsWeb) {
+        if (automatic) {
+          await showWebOneTap();
+          return null;
+        }
         await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
       } else {
-        if (!_googleReady) {
-          await GoogleSignIn.instance.initialize();
-          _googleReady = true;
-        }
-        final account = await GoogleSignIn.instance.authenticate();
-        await FirebaseAuth.instance.signInWithCredential(
-          GoogleAuthProvider.credential(idToken: account.authentication.idToken),
-        );
+        final account = await pickGoogleAccount(sheetOnly: automatic);
+        if (account == null) return false;
+        final idToken = account.authentication.idToken;
+        if (idToken == null) throw StateError('Google did not send a sign-in token. Please try again, or use an email code.');
+        await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
       }
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) return false;
+      AppMonitoring.fail('login', 'Google sign-in: ${e.code.name}');
       rethrow;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return false;
+      AppMonitoring.fail('login', 'Google sign-in: ${e.code}');
       rethrow;
     }
+    await enterAppRole();
     return true;
+  }
+
+  /// The website: the person clicked their account in the One Tap prompt, which only opens on a sign-in screen, under the agreement
+  /// sentence ("By continuing, you agree to ...").
+  Future<void> _finishGoogleQuietly(String idToken) async {
+    if (sessionRole.isNotEmpty) return;
+    try {
+      roleBlock = null;
+      if (asksConsentBeforeSignIn) pendingConsent = true;
+      await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
+      await enterAppRole();
+    } catch (_) {
+      // roleBlock (when set) says why on the sign-in screen; Google did not work, so the email code is offered.
+      emailCodeOffered = true;
+      notifyListeners();
+    }
   }
 
   /// Backup sign-in: the server emails a 6-digit code to [email].
@@ -770,12 +1095,13 @@ class Store extends ChangeNotifier {
     await call('requestEmailLoginCode', {'email': email});
   }
 
-  /// Checks the code the person typed; the server marks the email verified and hands back a sign-in token.
+  /// Checks the code the person typed; the server marks the email verified and hands back a sign-in token for the email's own login,
+  /// which is then swapped for this app's role login.
   Future<void> verifyEmailCode(String email, String code) async {
     roleBlock = null;
     final result = await call('verifyEmailLoginCode', {'email': email, 'code': code});
     await FirebaseAuth.instance.signInWithCustomToken(result['token'] as String);
-    await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    await enterAppRole();
   }
 
   Future<void> registerEmail(String email, String password) async {
@@ -790,20 +1116,30 @@ class Store extends ChangeNotifier {
     final current = user;
     if (current == null) throw StateError('Sign in first.');
     await FirebaseAuth.instance.setLanguageCode(language);
-    await current.sendEmailVerification();
+    try {
+      await current.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      AppMonitoring.fail('email', 'Verification email: ${e.code}');
+      rethrow;
+    }
   }
 
+  /// After the person opened the verification link: once the email is verified, the app's role login is entered.
   Future<bool> refreshEmailVerification() async {
-    await user?.reload();
-    final current = user;
-    if (current == null) {
+    if (sessionRole.isNotEmpty) {
+      notifyListeners();
+      return true;
+    }
+    await FirebaseAuth.instance.currentUser?.reload();
+    final current = FirebaseAuth.instance.currentUser;
+    if (current == null || !current.emailVerified) {
       notifyListeners();
       return false;
     }
-    final token = await current.getIdTokenResult(true);
-    admin = current.emailVerified && token.claims?['admin'] == true;
+    await current.getIdToken(true);
+    await enterAppRole();
     notifyListeners();
-    return current.emailVerified;
+    return sessionRole.isNotEmpty;
   }
 
   Future<void> resetPassword(String email) async {
@@ -821,8 +1157,14 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    if (live && user?.emailVerified == true) await notifications.disable();
+    if (live && emailConfirmed) await notifications.disable();
+    await _forgetGoogle();
     await FirebaseAuth.instance.signOut();
+    await _setSession(null);
+    choosingVendorRole = false;
+    // Signed out on purpose: the sign-in screen shows Google first again, and does not pop the Google sheet up by itself.
+    emailCodeOffered = false;
+    _autoGoogleDone = true;
     cart.clear();
     // Clear per-account local caches so a different account signing in next
     // on this device never inherits this account's wishlist/payment display

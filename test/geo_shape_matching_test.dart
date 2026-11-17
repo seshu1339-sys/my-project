@@ -1,13 +1,6 @@
-// Unit tests for the shape geometry helpers, plus real-app coverage that
-// rectangle/polygon-targeted promotions actually reach only customers inside
-// their area — same "render the real MarketApp" precedent already
-// established in promotion_location_test.dart.
-import 'package:flutter/material.dart';
+// Unit tests for the shape geometry helpers.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
-import 'package:ecommerce_app/main.dart';
 
 // A simple square, roughly 1 degree on a side, centred near the equator so
 // degree-to-km math stays easy to reason about.
@@ -116,106 +109,6 @@ void main() {
       expect(promotionShapesOverlap(circle, untargeted), isFalse);
     });
   });
-
-  testWidgets('a rectangle-targeted promotion only shows to a customer inside it', (tester) async {
-    tester.view.physicalSize = const Size(1024, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    SharedPreferences.setMockInitialValues({});
-    final store = Store();
-    await store.init();
-    store.catalog['promotions']?.clear();
-    await store.save(
-      'promotions',
-      const Entry('promo1', {
-        'name': 'Inside the box',
-        'placement': 'carousel',
-        'geoShape': 'rectangle',
-        'targetRectangle': {'north': 13.0, 'south': 12.9, 'east': 77.7, 'west': 77.5},
-      }),
-    );
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    expect(find.text('Inside the box'), findsNothing);
-
-    await store.setLocation('', 'Outside', lat: 20.0, lng: 80.0);
-    await tester.pump();
-    expect(find.text('Inside the box'), findsNothing);
-
-    await store.setLocation('', 'Inside', lat: 12.95, lng: 77.6);
-    await tester.pump();
-    expect(find.text('Inside the box'), findsWidgets);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('a polygon-targeted promotion only shows to a customer inside it', (tester) async {
-    tester.view.physicalSize = const Size(1024, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    SharedPreferences.setMockInitialValues({});
-    final store = Store();
-    await store.init();
-    store.catalog['promotions']?.clear();
-    await store.save(
-      'promotions',
-      const Entry('promo2', {
-        'name': 'Inside the triangle',
-        'placement': 'carousel',
-        'geoShape': 'polygon',
-        'targetPolygon': [
-          {'lat': 12.90, 'lng': 77.50},
-          {'lat': 13.00, 'lng': 77.50},
-          {'lat': 12.95, 'lng': 77.70},
-        ],
-      }),
-    );
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-
-    await store.setLocation('', 'Outside', lat: 20.0, lng: 80.0);
-    await tester.pump();
-    expect(find.text('Inside the triangle'), findsNothing);
-
-    await store.setLocation('', 'Inside', lat: 12.95, lng: 77.55);
-    await tester.pump();
-    expect(find.text('Inside the triangle'), findsWidgets);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('a promotion saved before shape-targeting existed (no geoShape field) still matches as a circle', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1024, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    SharedPreferences.setMockInitialValues({});
-    final store = Store();
-    await store.init();
-    store.catalog['promotions']?.clear();
-    // No 'geoShape' key at all — simulates a doc saved before this phase.
-    await store.save(
-      'promotions',
-      const Entry('legacy', {
-        'name': 'Legacy circle ad',
-        'placement': 'carousel',
-        'targetLatitude': 12.9716,
-        'targetLongitude': 77.5946,
-        'targetRadiusKm': 5,
-      }),
-    );
-    await store.setLocation('', 'Nearby', lat: 12.99, lng: 77.60);
-    await tester.pumpWidget(MarketApp(store: store));
-    await tester.pump();
-    expect(find.text('Legacy circle ad'), findsWidgets);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
+  // Who sees an offer on the real page is decided by its shop's distance only (owner, 11 Nov 2026): see
+  // test/promotion_location_test.dart. The shape helpers above are still used by the admin's area tools.
 }

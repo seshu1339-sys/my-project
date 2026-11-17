@@ -27,8 +27,8 @@ test('a vendor ticks "Ad for your shop"; the admin links a Right Side Ad Box to 
   await db.collection('vendors').doc('adV1').set({vendorId: 'adV1', name: 'Lakshmi Kirana', shopId: 'adV1', status: 'approved', vendorCode: 'VEN-NRPM-116-001'});
   await db.collection('vendors').doc('adV2').set({vendorId: 'adV2', name: 'Ravi Fruits', shopId: 'adV2', status: 'approved'});
   await db.collection('vendors').doc('adOff').set({vendorId: 'adOff', name: 'Closed Shop', status: 'suspended'});
-  const as = uid => ({auth: {uid, token: {email_verified: true}}});
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const as = uid => ({auth: {uid, token: {role: 'user', email_verified: true}}});
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   const link = (box, vendorId) => fns.assignRightBoxVendor.run({...admin, data: {box, vendorId}});
 
   // ---- the tick: only an approved vendor, and only yes / no

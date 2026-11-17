@@ -1,6 +1,6 @@
 'use strict';
 const {vendorCodeFor} = require('./vendor-id');
-const {otherAccountMessage, claimEmailRole} = require('./accounts');
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
@@ -10,7 +10,10 @@ const {normalizeEvent, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
-const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit, vendorItemLimit} = require('./domain');
+const {quote, cleanPhone, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, vendorItemUnit} = require('./domain');
+const {vendorItemLimitNow} = require('./plan-gate');
+// The photo safety check of the Auto Approval (Claude Haiku: drugs, weapons, alcohol, tobacco, adult content).
+const {anthropicKey: photoSafetyKey, checkStoredPhotos, unsafeReason} = require('./photo-safety');
 initializeApp();
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
@@ -25,19 +28,28 @@ Object.assign(exports, require('./field-assistant'));
 Object.assign(exports, require('./exclusives'));
 Object.assign(exports, require('./storage-maintenance'));
 Object.assign(exports, require('./admin-otp'));
-Object.assign(exports, require('./login'));
+// A separate login per role of one email: enterRole after the email is proven, switchRole between Vendor and Service provider.
+const {enterRole, switchRole} = require('./role-logins');
+Object.assign(exports, {enterRole, switchRole});
 Object.assign(exports, require('./email-login'));
 Object.assign(exports, require('./consent'));
+exports.describeImageForSearch = require('./image-search').describeImageForSearch;
 Object.assign(exports, require('./ids'));
-// Vendor prices last 24 hours (only the scheduled function is exported; the helpers stay inside).
-const {expireVendorPrices, freshPriceFields} = require('./vendor-prices');
-exports.expireVendorPrices = expireVendorPrices;
+// All scheduled work runs from two Cloud Scheduler jobs (functions/scheduled-jobs.js); the old scheduled names below are plain tasks.
+// Vendor prices last the admin's post duration (post-duration.js); the expiry is a task of every15Minutes.
+const {freshPriceFields, priceEndRemoved} = require('./vendor-prices');
+// "Today's rate": the vendor's "Yes, same rates" and the daily reminder (functions/vendor-rates.js).
+const {confirmTodaysRates, rateReminder} = require('./vendor-rates');
+Object.assign(exports, {confirmTodaysRates, rateReminder});
 // Service providers: a separate kind of account (only the callables are exported).
 const {registerProvider, approveProvider, updateProviderRate} = require('./providers');
 Object.assign(exports, {registerProvider, approveProvider, updateProviderRate});
 // Shop ads in the Right Side Ad Boxes, arranged offline: the vendor's "Ad for your shop" tick and the admin linking a box to a vendor.
 const {setAdInterest, assignRightBoxVendor} = require('./shop-ads');
 Object.assign(exports, {setAdInterest, assignRightBoxVendor});
+// Sample data: how many sample records there are, and "Delete all samples" (functions/samples.js).
+const {sampleSummary, deleteAllSamples} = require('./samples');
+Object.assign(exports, {sampleSummary, deleteAllSamples});
 // Staff "Add": field staff add vendors and service providers for people without an account; the admin approves (only the callables are exported).
 const {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove} = require('./staff-additions');
 Object.assign(exports, {submitStaffVendor, submitStaffProvider, reviewStaffAddition, renewStaffVendorPrice, setStaffAutoApprove});
@@ -53,7 +65,8 @@ Object.assign(exports, {sendPushNotification, trackPushOpen, pushAudience, pushN
 // Inactive accounts: the list, disable / enable, delete a customer, and the daily sweep (off until the admin switches it on).
 const {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts} = require('./inactive-accounts');
 Object.assign(exports, {inactiveAccounts, setAccountDisabled, deleteInactiveAccount, sweepInactiveAccounts});
-// AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). Each
+// AI Admin Agent (optional admin-only module, functions/ai-agent-*.js). The callables that need the agent's own keys (PIN, GitHub,
+// OpenAI, agent Anthropic key) are OFF since 12 Nov 2026: those secrets were removed to stay inside the Secret Manager free limit. Each
 // file is independently removable: deleting its require/Object.assign line
 // here removes exactly that module's callables, nothing else. ai-agent-config.js
 // and ai-agent-confirmation.js each also export a plain helper function for the
@@ -62,14 +75,14 @@ Object.assign(exports, {inactiveAccounts, setAccountDisabled, deleteInactiveAcco
 // mistakenly offered to Firebase as a function to deploy.
 const {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting} = require('./ai-agent-config');
 Object.assign(exports, {getAgentConfig, setAgentMasterEnabled, setAiAgentModuleEnabled, setAgentLlmProvider, setAgentVoiceProvider, setAgentIntegrationSetting});
-const {setAgentPin} = require('./ai-agent-confirmation');
-Object.assign(exports, {setAgentPin});
+// OFF (Secret Manager cost, Nov 2026): const {setAgentPin} = require('./ai-agent-confirmation');
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, {setAgentPin});
 // ai-agent-actions.js exports only the whitelist data (no callables), so it's
 // never required here directly — only by the other ai-agent-*.js modules below.
-Object.assign(exports, require('./ai-agent-executor'));
-Object.assign(exports, require('./ai-agent-interpreter'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-executor'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-interpreter'));
 Object.assign(exports, require('./ai-agent-image-check'));
-Object.assign(exports, require('./ai-agent-trusted-device'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-trusted-device'));
 Object.assign(exports, require('./ai-agent-webauthn'));
 Object.assign(exports, require('./ai-agent-voice'));
 Object.assign(exports, require('./ai-agent-monitoring'));
@@ -79,15 +92,44 @@ Object.assign(exports, require('./ai-agent-backup'));
 // read-queries}.js export only plain functions/data, never onCall, so they
 // are required directly by ai-agent-executor.js/ai-agent-query.js and never
 // appear in this Object.assign list.
-Object.assign(exports, require('./ai-agent-query'));
+// OFF (Secret Manager cost, Nov 2026): Object.assign(exports, require('./ai-agent-query'));
 // Independent feature modules (functions/modules/<name>/). Each is one line here and shares nothing with the others.
 Object.assign(exports, require('./modules/plans'));
 Object.assign(exports, require('./modules/vendor-offers'));
 Object.assign(exports, require('./modules/premium-status'));
+// Offer Alerts: a vendor's offer with a 25 / 50 km alert reaches the customers inside that circle (functions/modules/offer-alerts).
+Object.assign(exports, require('./modules/offer-alerts'));
+// Staff Links: staff link a vendor / provider who registered themselves, by ID within 30 minutes (functions/modules/staff-links).
+Object.assign(exports, require('./modules/staff-links'));
+// Photo limits: own item photos, the shared photo allowance and the trim when a paid plan ends (functions/modules/photo-limits).
+Object.assign(exports, require('./modules/photo-limits'));
+// Plan items: when a paid plan ends only the vendor's first items stay live, the rest are hidden (not deleted) and come back on renewal (functions/modules/plan-items).
+Object.assign(exports, require('./modules/plan-items'));
+// Showcase: the paid vendors' boxes in Today's Offers and the right-side ad boxes, within the plan km (functions/modules/showcase).
+Object.assign(exports, require('./modules/showcase'));
+// Staff Area System: areas, daily targets, missed days and the staff's Today's Offers (functions/modules/staff-areas).
+Object.assign(exports, require('./modules/staff-areas'));
 Object.assign(exports, require('./modules/todays-offer'));
 Object.assign(exports, require('./modules/wholesale'));
 Object.assign(exports, require('./modules/payments'));
 Object.assign(exports, require('./modules/flash'));
+// Admin AI assistant: the admin's questions answered by Claude Sonnet 5.5 from today's counts (functions/modules/admin-assistant).
+Object.assign(exports, require('./modules/admin-assistant'));
+// Agent: the admin command box's AI key (server-only) and its status (functions/modules/agent).
+Object.assign(exports, require('./modules/agent'));
+// Health: the daily website / admin self-test, its status and the AI explain of a failure (functions/modules/health).
+Object.assign(exports, require('./modules/health'));
+// App problems: errors, key failures and "Report a problem" from every app, for the Health and App Health pages (functions/modules/app-problems).
+Object.assign(exports, require('./modules/app-problems'));
+// Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
+const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
+Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});
+// Shop and service-provider star ratings (functions/modules/shop-ratings).
+const {rateShop, removeShopRating} = require('./modules/shop-ratings');
+Object.assign(exports, {rateShop, removeShopRating});
+// Staff work: linked vendors' updates, targets, pay slabs, the ID report and the ranking (functions/modules/staff-work).
+const staffWork = require('./modules/staff-work');
+for (const name of ['countItemUpdate', 'countServiceUpdate', 'countOfferUpdate', 'countTodaysOfferUpdate', 'staffWorkOverview', 'staffRanking', 'idReport', 'saveStaffPayConfig', 'setStaffTargets', 'markStaffPaid']) exports[name] = staffWork[name];
 const db = getFirestore();
 // Firebase callable handlers validate user auth inside the function. The HTTP
 // transport must accept requests before login and Firebase ID-token requests.
@@ -106,12 +148,12 @@ async function rateLimit(key, limit, windowMs) {
 }
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 function requireCoordinate(value, name) {
@@ -130,12 +172,15 @@ function publicChangeFields(type, changes) {
 // The two mandatory application photos live at fixed, separate paths so they
 // can never be confused with each other or with public catalog images.
 const applicationPhotos = {vendorPhoto: 'Upload a clear personal photo of the vendor before submitting.', shopPhoto: 'Upload a photo of the actual shop before submitting.'};
+const OPTIONAL_APPLICATION_PHOTOS = ['shopPhoto'];
 async function requireApplicationPhotos(uid) {
   const bucket = getStorage().bucket();
   const paths = {};
   for (const [name, missing] of Object.entries(applicationPhotos)) {
     const file = bucket.file(`vendorApplications/${uid}/${name}`);
     const [exists] = await file.exists();
+    // Owner, 13 Nov 2026: only the owner photo is needed to register; the shop photo may come later (it is still needed before items).
+    if (!exists && OPTIONAL_APPLICATION_PHOTOS.includes(name)) continue;
     if (!exists) throw new HttpsError('failed-precondition', missing);
     const [metadata] = await file.getMetadata();
     if (!/^image\/(jpeg|png|webp)$/.test(metadata.contentType || '') || !(Number(metadata.size) > 0)) throw new HttpsError('failed-precondition', missing);
@@ -177,7 +222,8 @@ exports.pinLogin = retiredPhoneAuth;
 exports.setPin = retiredPhoneAuth;
 exports.placeOrder = onCall(options, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email before ordering.');
+  // Orders belong to the email's customer login only.
+  requireRole(request, ['user']);
   const {items, pincode, address, requestId} = request.data || {};
   const requestedPaymentMethod = request.data?.paymentMethod;
   const customer = {latitude: request.data?.latitude, longitude: request.data?.longitude};
@@ -245,8 +291,8 @@ exports.addComplaintMessage = onCall(options, async request => {
   if (!complaint || complaint.status === 'closed') throw new HttpsError('failed-precondition', 'This complaint is closed.');
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
   const allowed = complaint.customerId === uid || complaint.vendorId === uid || vendor?.shopId === complaint.vendorId;
-  if (!allowed && request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'You cannot reply to this complaint.');
-  await complaintRef.collection('messages').add({authorId: uid, authorRole: request.auth.token.admin === true ? 'admin' : complaint.customerId === uid ? 'customer' : 'vendor', body: body.trim(), createdAt: FieldValue.serverTimestamp()});
+  if (!allowed && !isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'You cannot reply to this complaint.');
+  await complaintRef.collection('messages').add({authorId: uid, authorRole: isAdminToken(request.auth.token) ? 'admin' : complaint.customerId === uid ? 'customer' : 'vendor', body: body.trim(), createdAt: FieldValue.serverTimestamp()});
   await complaintRef.update({updatedAt: FieldValue.serverTimestamp()});
   return {sent: true};
 });
@@ -258,13 +304,14 @@ exports.reviewComplaint = onCall(options, async request => {
   await db.collection('complaints').doc(complaintId).collection('messages').add({authorId: request.auth.uid, authorRole: 'admin', body: resolution.trim() || `Status changed to ${status}.`, createdAt: FieldValue.serverTimestamp()});
   return {status};
 });
-exports.registerVendor = onCall(options, async request => {
-  const uid = requireUser(request);
+// 512 MiB: checking the application photos needs more than 256 MiB (it ran out on 13 Nov 2026); still inside the free tier.
+exports.registerVendor = onCall({...options, memory: '512MiB', secrets: [photoSafetyKey]}, async request => {
+  // Only the email's vendor login registers a shop (its customer, provider or staff login has its own ID and records).
+  const uid = requireRole(request, ['vendor']);
   let details;
   try { details = vendorApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'vendor', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone, details.whatsapp]});
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const existing = await applicationRef.get();
   if (existing.exists && existing.data().status && existing.data().status !== 'rejected') throw new HttpsError('already-exists', 'This vendor application is already under review.');
@@ -272,17 +319,51 @@ exports.registerVendor = onCall(options, async request => {
   // The Vendor ID (VEN-NRPM-116-325, functions/vendor-id.js): made once, kept on a resubmission while the pincode still fits it.
   const vendorCode = await vendorCodeFor(db, {pincode: details.pincode, existing: existing.exists ? existing.data().vendorCode : '', owner: uid});
   await applicationRef.set({
-    vendorId: uid, ...details, ...photos, vendorCode, email: request.auth.token.email || null,
+    vendorId: uid, ...details, ...photos, vendorCode, email: loginEmail(request) || null,
     status: 'pending', submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     // A resubmission starts a fresh review: drop the previous decision so the admin never sees a stale one.
     ...Object.fromEntries(['decisionReason', 'decidedAt', 'feeRequired', 'feeAmount', 'feePaymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentDecisionAt'].map(key => [key, FieldValue.delete()])),
   }, {merge: true});
+  const decided = await autoDecideVendor(uid);
+  if (decided) return {status: decided, vendorCode, auto: true};
   await countUsage(db, 'vendor_register', {key: locationStamp({pincode: details.pincode}).town || details.pincode, label: locationStamp({pincode: details.pincode}).town || details.pincode, town: locationStamp({pincode: details.pincode}).town || '', uid});
-  await claimEmailRole(db, request.auth.token.email, 'vendor');
   return {status: 'pending', vendorCode};
 });
 /// The public shop record of an approved vendor (shops/<vendorId>): what customers see in search and on the map (vendor spec
 /// section 8: name, photo, address, phone to call, location). Merged, so a later verifyVendorShop or shop photo keeps its own fields.
+/// Makes an approved vendor: the vendor record and the public shop (the admin's approval and the Auto Approval). [extra] goes on both
+/// the application and the vendor (autoApproved).
+function approvedVendorWrites(batch, vendorId, data, extra = {}) {
+  batch.set(db.collection('vendors').doc(vendorId), {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), ...extra, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+  batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
+}
+
+/// Auto Approval (owner, 13 Nov 2026; Business Profile > Auto Approval, OFF unless the admin turns it on). The owner and shop photos
+/// are checked (functions/photo-safety.js): nothing forbidden -> approved at once with the Vendor ID; drugs, weapons, alcohol, tobacco
+/// or adult content -> refused with the reason; not checked (no key, limit, error) -> waits for the admin as before.
+async function autoDecideVendor(uid, {force = false, ...checkOptions} = {}) {
+  const business = force ? {} : (await db.collection('settings').doc('business').get()).data() || {};
+  if (!force && !flagOn(business.autoApproval)) return null;
+  const ref = db.collection('vendorApplications').doc(uid);
+  const data = (await ref.get()).data();
+  if (!data || data.status !== 'pending') return null;
+  const check = await checkStoredPhotos(db, [data.vendorPhotoPath, data.shopPhotoPath], {feature: 'auto_approval_vendor', uid, ...checkOptions});
+  const at = FieldValue.serverTimestamp();
+  if (check.verdict === 'unsafe') {
+    await ref.set({status: 'rejected', decisionReason: unsafeReason(check.categories), autoRejected: true, photoSafety: check.categories, decidedAt: at}, {merge: true});
+    return 'rejected';
+  }
+  if (check.verdict !== 'safe') {
+    await ref.set({autoApprovalHeld: check.results.map(r => r.note).filter(Boolean).join(' ') || 'The photo check did not run.', autoApprovalCheckedAt: at}, {merge: true});
+    return null;
+  }
+  const batch = db.batch();
+  batch.set(ref, {status: 'approved', autoApproved: true, autoApprovalHeld: FieldValue.delete(), feeRequired: false, feePaymentStatus: 'not_required', decisionReason: 'Auto approved', decidedAt: at}, {merge: true});
+  approvedVendorWrites(batch, uid, data, {autoApproved: true});
+  await batch.commit();
+  return 'approved';
+}
+
 function vendorShopRecord(vendorId, data) {
   const digits = String(data.phone || '').replace(/[^0-9]/g, '');
   return {
@@ -304,14 +385,12 @@ exports.approveVendor = onCall(options, async request => {
   const data = application.data();
   // A decision is made once: an approved vendor cannot be flipped to rejected here (the vendor record would stay active).
   if (data.status !== 'pending') throw new HttpsError('failed-precondition', 'Only a pending application can be approved or rejected.');
-  if (approved && (!data.vendorPhotoPath || !data.shopPhotoPath)) throw new HttpsError('failed-precondition', 'The application is missing the vendor or shop photo, so it cannot be approved.');
+  if (approved && !data.vendorPhotoPath) throw new HttpsError('failed-precondition', 'The application is missing the vendor photo, so it cannot be approved.');
   const batch = db.batch();
   const nextStatus = !approved ? 'rejected' : fee.required ? 'payment_required' : 'approved';
   batch.set(applicationRef, {status: nextStatus, feeRequired: fee.required, feeAmount: fee.amount, feePaymentStatus: fee.required ? 'not_started' : 'not_required', decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
   if (approved && !fee.required) {
-    const vendorRef = db.collection('vendors').doc(vendorId);
-    batch.set(vendorRef, {vendorId, name: data.name, shopId: vendorId, verified: false, status: 'approved', latitude: data.latitude, longitude: data.longitude, ...(data.vendorCode ? {vendorCode: data.vendorCode} : {}), updatedAt: FieldValue.serverTimestamp()}, {merge: true});
-    batch.set(db.collection('shops').doc(vendorId), vendorShopRecord(vendorId, data), {merge: true});
+    approvedVendorWrites(batch, vendorId, data);
   }
   await batch.commit();
   return {status: nextStatus, feeAmount: fee.amount};
@@ -319,24 +398,11 @@ exports.approveVendor = onCall(options, async request => {
 // Hides (or restores) everything a vendor sells: the products it created, the products of its
 // shop, and its shop. Only items this function hid are restored, so an admin's own choice to
 // hide something is never overridden.
+// The shop, products and services of a suspended vendor are hidden; the helper is shared with the automatic suspension after reports.
+const {setCatalogVisibility} = require('./catalog-visibility');
+const {assertNotBlocked} = require('./block-list');
 async function setVendorCatalogVisibility(vendorId, shopId, hide) {
-  const found = new Map();
-  const add = snapshot => snapshot.docs.forEach(doc => found.set(doc.ref.path, doc));
-  for (const name of ['products', 'services']) {
-    add(await db.collection(name).where('ownerId', '==', vendorId).get());
-    if (typeof shopId === 'string' && shopId) add(await db.collection(name).where('shopId', '==', shopId).get());
-  }
-  add(await db.collection('shops').where('ownerId', '==', vendorId).get());
-  let batch = db.batch(), pending = 0, changed = 0;
-  for (const doc of found.values()) {
-    const item = doc.data();
-    if (hide) { if (item.active === false) continue; batch.update(doc.ref, {active: false, hiddenBySuspension: vendorId}); }
-    else { if (item.hiddenBySuspension !== vendorId) continue; batch.update(doc.ref, {active: true, hiddenBySuspension: FieldValue.delete()}); }
-    changed++;
-    if (++pending === 400) { await batch.commit(); batch = db.batch(); pending = 0; }
-  }
-  if (pending) await batch.commit();
-  return changed;
+  return setCatalogVisibility(db, vendorId, shopId, hide);
 }
 exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async request => {
   await requireAdmin(request);
@@ -356,7 +422,7 @@ exports.setVendorSuspension = onCall({...options, timeoutSeconds: 120}, async re
   return {status: suspended ? 'suspended' : 'approved', itemsChanged: items};
 });
 exports.submitVendorFeePayment = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {paymentReference = ''} = request.data || {};
   const applicationRef = db.collection('vendorApplications').doc(uid);
   const application = (await applicationRef.get()).data();
@@ -404,7 +470,7 @@ exports.setVendorItemLimit = onCall(options, async request => {
   return {itemLimit};
 });
 exports.submitVendorChange = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {type, collection, docId, changes} = request.data || {};
   const isNew = type === 'newProduct';
   // A shop change targets shops. A new vendor item is a product (services are offered from a separate service-provider account);
@@ -432,15 +498,26 @@ exports.submitVendorChange = onCall(options, async request => {
   let oldValue = {}, newValue = safeChanges;
   if (isNew) {
     // The item is one the admin put in the library: its name, photo and category come from there, never from the vendor.
-    const libraryItem = (await db.collection('productImageLibrary').doc(safeChanges.libraryItemId).get()).data();
+    // Not in the catalog (owner, 13 Nov 2026): the vendor names it and picks the category; it stays hidden until their own photo is approved.
+    const custom = safeChanges.libraryItemId === undefined;
+    const libraryItem = custom
+      ? {name: String(safeChanges.customName || '').trim().replace(/\s+/g, ' '), imageUrl: '', categoryId: safeChanges.categoryId, active: true}
+      : (await db.collection('productImageLibrary').doc(safeChanges.libraryItemId).get()).data();
     if (!libraryItem || libraryItem.active === false) throw new HttpsError('failed-precondition', 'Choose an item from the list.');
+    if (custom && !(await db.collection('categories').doc(libraryItem.categoryId).get()).exists) throw new HttpsError('failed-precondition', 'Choose a category for the item.');
     // The product carries its shop's place (pincode, town, district, state, GPS) so it shows where it is.
     const shopPlace = vendor.shopId ? locationStamp((await db.collection('shops').doc(vendor.shopId).get()).data() || {}) : {};
+    // A category where the admin ticked "own photo required" (for example sarees): the item waits, hidden, until the vendor's own photo
+    // is approved (functions/modules/photo-limits). Otherwise the item uses our standard photo until the vendor adds their own.
+    const category = libraryItem.categoryId ? (await db.collection('categories').doc(libraryItem.categoryId).get()).data() : null;
+    const ownPhotoRequired = category?.ownPhotoRequired === true || custom;
     newValue = {
-      name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
-      libraryItemId: safeChanges.libraryItemId, unitType: safeChanges.unitType, quantity: safeChanges.quantity,
-      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(),
-      kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: true,
+      ...(ownPhotoRequired ? {awaitingOwnPhoto: true} : {}),
+      name: String(libraryItem.name || '').trim() || 'Item', imageUrl: libraryItem.imageUrl || '', libraryImageUrl: libraryItem.imageUrl || '', categoryId: libraryItem.categoryId || '',
+      ...(custom ? {customItem: true} : {libraryItemId: safeChanges.libraryItemId}), unitType: safeChanges.unitType, quantity: safeChanges.quantity,
+      unit: vendorItemUnit(safeChanges.unitType, safeChanges.quantity), price: safeChanges.price, ...freshPriceFields(Date.now()),
+      kind: 'product', stock: DEFAULT_VENDOR_ITEM_STOCK, shopId: vendor.shopId, ...shopPlace, active: !ownPhotoRequired,
+      ...(String(safeChanges.note || '').trim() ? {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')} : {}),
     };
   } else {
     const current = await target.get();
@@ -449,25 +526,29 @@ exports.submitVendorChange = onCall(options, async request => {
     const mine = current.exists && (data.ownerId ? data.ownerId === uid : (collection === 'shops' ? targetId === vendor.shopId : data.shopId === vendor.shopId));
     if (!mine) throw new HttpsError('not-found', 'Public item not found.');
     oldValue = Object.fromEntries(Object.keys(safeChanges).map(key => [key, data[key] ?? null]));
-    // A new price for an item lasts 24 hours again (vendor-prices.js removes it after that).
-    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields()};
+    // A new price for an item lasts the post duration again (vendor-prices.js removes it after that).
+    // A new price stays until the vendor changes it (owner, 16 Nov 2026); it never runs out.
+    if (type === 'price' && collection === 'products') newValue = {...safeChanges, ...freshPriceFields(Date.now())};
+    if (type === 'note') newValue = {note: String(safeChanges.note).trim().replace(/\s+/g, ' ')};
   }
   // A new item goes live at the vendor's location as soon as it is saved, and a price change shows at once in the customers' search,
   // map and list; other changes follow the admin's policy (autoPublishVendorChanges).
-  const autoPublish = isNew || type === 'price' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
+  const autoPublish = isNew || type === 'price' || type === 'note' || flagOn((await db.collection('settings').doc('business').get()).data()?.autoPublishVendorChanges);
   const change = {vendorId: uid, vendorName: vendor.name, type, collection, docId: targetId, oldValue, newValue, status: autoPublish ? 'approved' : 'pending', updatedAt: FieldValue.serverTimestamp()};
   if (isNew) {
-    // Only [vendorItemLimit] items per vendor (items the admin hid count too). Counted and saved in one transaction, so two quick
+    // Only [vendorItemLimitNow] items per vendor (free or plan, functions/plan-gate.js) (items the admin hid count too). Counted and saved in one transaction, so two quick
     // saves can never go over the limit.
-    const limit = vendorItemLimit(vendor);
+    const limit = await vendorItemLimitNow(db, uid, vendor);
     await db.runTransaction(async tx => {
       const mine = await tx.get(db.collection('products').where('ownerId', '==', uid));
-      if (mine.size >= limit) throw new HttpsError('resource-exhausted', `You can have ${limit} item${limit === 1 ? '' : 's'}. Ask the admin for permission to add more.`);
-      tx.set(target, {...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()});
+      if (mine.size >= limit) throw new HttpsError('resource-exhausted', `Your plan has ${limit} item${limit === 1 ? '' : 's'}, and they are all in use. A plan with more items is in Plans.`);
+      // createdAt: when a plan ends, the first items the vendor posted stay live (functions/modules/plan-items).
+      tx.set(target, {...newValue, ownerId: uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
       tx.set(db.collection('vendorChanges').doc(), change);
     });
   } else if (autoPublish) {
-    await target.set({...newValue, ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
+    // A price set before this rule may still carry its old end: it goes with the new price.
+    await target.set({...newValue, ...(type === 'price' && collection === 'products' ? priceEndRemoved() : {}), ownerId: uid, updatedAt: FieldValue.serverTimestamp()}, {merge: true});
     await db.collection('vendorChanges').add(change);
   } else await db.collection('vendorChanges').add(change);
   if (isNew) await countUsage(db, 'item_added', {key: newValue.libraryItemId || newValue.name, label: newValue.name, town: newValue.town || '', owners: [uid], uid});
@@ -490,7 +571,7 @@ exports.reviewVendorChange = onCall(options, async request => {
   });
 });
 exports.issuePurchaseCode = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['user']);
   const {orderId, latitude, longitude} = request.data || {};
   requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
   if (typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide an order.');
@@ -502,7 +583,7 @@ exports.issuePurchaseCode = onCall(options, async request => {
   return {code, expiresInSeconds: 300};
 });
 exports.redeemPurchaseCode = onCall(options, async request => {
-  const vendorId = requireUser(request);
+  const vendorId = requireRole(request, ['vendor']);
   const {code, orderId, latitude, longitude} = request.data || {};
   requireCoordinate(latitude, 'latitude'); requireCoordinate(longitude, 'longitude');
   if (typeof code !== 'string' || !/^\d{6}$/.test(code) || typeof orderId !== 'string') throw new HttpsError('invalid-argument', 'Provide a valid code and order.');
@@ -525,7 +606,7 @@ exports.redeemPurchaseCode = onCall(options, async request => {
   return {verified: true};
 });
 exports.submitVerifiedReview = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['user']);
   const {productId, rating, text, name} = request.data || {};
   if (typeof productId !== 'string' || !Number.isInteger(rating) || rating < 1 || rating > 5 || typeof text !== 'string' || !text.trim() || text.length > 1000) throw new HttpsError('invalid-argument', 'Provide a valid review.');
   const purchases = await db.collection('verifiedPurchases').where('customerId', '==', uid).where('status', '==', 'verified').limit(20).get();
@@ -556,7 +637,7 @@ exports.submitVerifiedReview = onCall(options, async request => {
   return {created: true};
 });
 exports.updateVendorOrder = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['vendor']);
   const {orderId, status} = request.data || {};
   if (typeof orderId !== 'string' || !['confirmed', 'fulfilled', 'cancelled'].includes(status)) throw new HttpsError('invalid-argument', 'Provide a valid order status.');
   const vendor = (await db.collection('vendors').doc(uid).get()).data();
@@ -584,3 +665,33 @@ exports.reconcileCancelledOrderStock = onDocumentUpdated({document: 'orders/{ord
     tx.update(orderRef, {stockRestored: true});
   });
 });
+
+// All scheduled work runs from two Cloud Scheduler jobs (owner, 12 Nov 2026: at most 3 jobs, 3 are free). The old scheduled functions
+// are plain tasks now (functions/task.js); every one of them is exported above, so they are handed over by name.
+const {scheduledJobs, TASK_NAMES} = require('./scheduled-jobs');
+Object.assign(exports, scheduledJobs(Object.fromEntries(TASK_NAMES.map(name => [name, exports[name]]))));
+/// Admin: "Run AI check on pending" (owner, 14 Nov 2026). Every pending vendor, service provider and staff member (up to 25 of
+/// each) gets the same AI photo check as at registration, even while the Auto Approval switch is OFF: safe -> approved, forbidden ->
+/// refused with the reason, not checked -> stays in the pending list for the admin. The daily check allowance still applies.
+exports.runAutoApprovalOnPending = onCall({...options, memory: '512MiB', timeoutSeconds: 300, secrets: [photoSafetyKey]}, async request => {
+  await requireAdmin(request);
+  const {autoDecideProvider} = require('./providers')._autoApproval;
+  const {autoDecideStaff} = require('./field-assistant')._staffAutoApproval;
+  const counts = {approved: 0, rejected: 0, waiting: 0};
+  const run = async (collection, decide) => {
+    const docs = (await db.collection(collection).where('status', '==', 'pending').limit(25).get()).docs;
+    for (const doc of docs) {
+      let result = null;
+      try { result = await decide(doc.id, {force: true}); } catch (error) { console.warn('Auto approval run failed for', collection, doc.id, error.message); }
+      const status = result?.status || result;
+      counts[status === 'rejected' ? 'rejected' : status ? 'approved' : 'waiting'] += 1;
+    }
+  };
+  await run('vendorApplications', autoDecideVendor);
+  await run('providerApplications', autoDecideProvider);
+  await run('fieldStaff', autoDecideStaff);
+  return counts;
+});
+
+// For the tests only (a plain object, never a Cloud Function).
+exports._autoApproval = {autoDecideVendor};

@@ -1,0 +1,10 @@
+{
+  "name": "india-hex-levels",
+  "private": true,
+  "description": "One-time script: WorldPop India population density to the hexagon cell sizes (functions/data/india-hex-levels.txt). Not deployed.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "geotiff": "3.0.5",
+    "h3-js": "4.5.0"
+  }
+}

@@ -11,7 +11,7 @@ import 'package:ecommerce_app/main.dart';
 
 // Roughly Bengaluru MG Road.
 const _customerLat = 12.9716, _customerLng = 77.5946;
-// A shop ~2.1km away (within a 5km radius, outside a 2km radius).
+// A shop ~2.1km away (within a 5km reach, outside a 2km one).
 const _shopLat = 12.99, _shopLng = 77.60;
 
 Future<Store> _seededStore() async {
@@ -47,7 +47,7 @@ Future<void> _openSearchPage(WidgetTester tester, Store store) async {
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(MarketApp(store: store));
   await tester.pump();
-  await tester.tap(find.byIcon(Icons.storefront_outlined).hitTestable());
+  await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.storefront_outlined)).hitTestable());
   await tester.pumpAndSettle();
   await tester.tap(find.text('Search products near me'));
   await tester.pumpAndSettle();
@@ -93,32 +93,27 @@ void main() {
     store.dispose();
   });
 
-  testWidgets('a shop outside the search radius is excluded', (tester) async {
+  testWidgets('a shop outside the admin km (Business Profile) is excluded; the page uses that one km, no slider', (tester) async {
     final store = await _seededStore();
-    // Default radius resolves to the preset nearest searchRadiusDefaultKm
-    // (2), so the shop at ~2.1km must be excluded.
-    await store.save('settings', const Entry('business', {'name': 'Local Market', 'searchRadiusDefaultKm': 2}));
+    // The one km of what customers see: the shop ~2.1 km away is outside 2 km.
+    await store.save('settings', const Entry('business', {'name': 'Local Market', 'radiusKm': 2}));
     await _openSearchPage(tester, store);
 
+    expect(find.text('Shops within 2 km'), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
     expect(find.text('Fresh Bread'), findsNothing);
-    expect(find.textContaining('No products found in this radius'), findsOneWidget);
+    expect(find.textContaining('No products near you yet.'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
   });
 
-  testWidgets('admin-configured radius presets are honored instead of the hardcoded defaults', (
-    tester,
-  ) async {
+  testWidgets("the admin's km decides: within 4 km the ~2.1 km shop is found", (tester) async {
     final store = await _seededStore();
-    await store.save(
-      'settings',
-      const Entry('business', {'name': 'Local Market', 'searchRadiusPresetsKm': '1,4', 'searchRadiusDefaultKm': 4}),
-    );
+    await store.save('settings', const Entry('business', {'name': 'Local Market', 'radiusKm': 4, 'searchRadiusPresetsKm': '1', 'searchRadiusDefaultKm': 1}));
     await _openSearchPage(tester, store);
 
-    // Nearest preset to a default of 4 is 4 itself; the ~2.1km shop is inside it.
-    expect(find.text('Search radius: 4 km'), findsOneWidget);
+    expect(find.text('Shops within 4 km'), findsOneWidget, reason: 'the old search presets no longer count');
     await _scrollToResultsEnd(tester);
     expect(find.text('Fresh Bread'), findsOneWidget);
     expect(tester.takeException(), isNull);

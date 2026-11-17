@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'quick_add.dart';
 import 'vendor_registration_form.dart';
 
 // The registration checks live with the registration form (a form must not depend on the page that shows it); re-exported for existing callers.
@@ -35,15 +35,16 @@ class _VendorPageState extends State<VendorPage> {
     if (user == null) return const SizedBox.shrink();
     final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     // The registration form only exists for a verified email address.
-    if (!user.emailVerified) {
+    if (!store.emailConfirmed) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Vendor studio'), actions: actions),
+        appBar: AppBar(title: const Text('Loca Market Vendor'), actions: actions),
         body: const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The vendor registration form opens after your email is verified.'),
       );
     }
     final uid = user.uid;
     return Scaffold(
-      appBar: AppBar(title: const Text('Vendor studio'), actions: actions),
+      floatingActionButton: vendorAppFlashButton(store),
+      appBar: AppBar(title: const Text('Loca Market Vendor'), actions: actions),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: store.firestore.collection('vendorApplications').doc(uid).snapshots(),
         builder: (context, snapshot) {
@@ -54,7 +55,7 @@ class _VendorPageState extends State<VendorPage> {
           // An account the admin created for Quick Add, with no vendor application of its own,
           // goes straight to Quick Add instead of the registration form.
           if (status != 'approved') {
-            return QuickAccountGate(store: store, role: 'vendor', quickOnly: () => QuickAddOnly(store: store), otherwise: () => _applicationStage(uid, user, application, status));
+            return _applicationStage(uid, user, application, status);
           }
           return _applicationStage(uid, user, application, status);
         },
@@ -66,7 +67,7 @@ class _VendorPageState extends State<VendorPage> {
     {
       {
         {
-          if (application == null || status == 'rejected') return VendorRegistrationForm(store: store, email: user.email ?? '', previous: application);
+          if (application == null || status == 'rejected') return VendorRegistrationForm(store: store, email: store.signedInEmail, previous: application);
           if (status == 'pending') return _pending(application);
           if (status == 'payment_required') return _feePayment(application);
           if (status == 'payment_submitted') return const _Message(title: 'Payment submitted', body: 'Your payment reference was submitted for administrator confirmation.');
@@ -132,7 +133,7 @@ class _VendorPageState extends State<VendorPage> {
     ]),
   ))));
 
-  Widget _demo() => Scaffold(appBar: AppBar(title: const Text('Vendor studio')), body: const Center(child: Text('Connect Firebase to apply and manage a vendor shop.')));
+  Widget _demo() => Scaffold(appBar: AppBar(title: const Text('Loca Market Vendor')), body: const Center(child: Text('Connect Firebase to apply and manage a vendor shop.')));
   @override
   void dispose() { paymentReference.dispose(); super.dispose(); }
 }

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.6+9
+version: 1.0.11+21
 environment:
   sdk: ^3.13.3
 
@@ -43,8 +43,11 @@ dependencies:
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
   image_picker: ^1.2.0
+  # Shrinks a vendor's item photo on the phone to under 100 KB before upload (already in the app through another package).
+  image: ^4.3.0
   shared_preferences: ^2.5.3
   flutter_map: ^8.2.2
+  google_maps_flutter: ^2.10.0
   latlong2: ^0.9.1
   firebase_messaging: ^16.6.0
   http: ^1.2.0
@@ -56,10 +59,15 @@ dependencies:
   archive: ^4.5.2
   pdf: ^3.11.3
   google_sign_in: ^7.2.0
+  firebase_crashlytics: ^5.4.1
+  package_info_plus: ^10.2.2
+  device_info_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # A fake Google account sheet for test/google_one_tap_test.dart (already installed with google_sign_in).
+  google_sign_in_platform_interface: ^3.1.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

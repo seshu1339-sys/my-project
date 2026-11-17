@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/admin.dart';
 import 'package:ecommerce_app/ui/home_section_config.dart';
+import 'package:ecommerce_app/ui/admin_groups.dart';
+import 'package:ecommerce_app/ui/admin_settings.dart';
 
 // The studio opens on Insights; the other pages are tabs, and everything else is a section of the Settings tab.
 Future<void> goTab(WidgetTester tester, int index) async {
@@ -15,7 +16,19 @@ Future<void> goTab(WidgetTester tester, int index) async {
 
 Future<void> goSettings(WidgetTester tester, String key) async {
   await goTab(tester, DefaultTabController.of(tester.element(find.byType(TabBar).first)).length - 1); // Settings is the last tab
-  await tester.tap(find.byKey(ValueKey('settings-$key')));
+  // The Settings index lists every section under the six group names; scroll to the section first.
+  final tile = find.byKey(ValueKey('settings-$key'));
+  await tester.scrollUntilVisible(tile, 200, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+  await tester.ensureVisible(tile);
+  await tester.pumpAndSettle();
+  await tester.tap(tile);
+  await tester.pumpAndSettle();
+}
+
+/// Opens one page of one of the six groups (lib/ui/admin_groups.dart).
+Future<void> goItem(WidgetTester tester, String group, String item) async {
+  await goTab(tester, adminGroups.indexWhere((g) => g.id == group));
+  await tester.tap(find.byKey(ValueKey('group-item-$item')));
   await tester.pumpAndSettle();
 }
 
@@ -52,6 +65,9 @@ void main() {
           )
           .first,
     );
+    // The category form has the "Own photo required" switch too: scroll the form to its end so Save is fully in view.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -2000));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -71,7 +87,7 @@ void main() {
     final store = Store();
     await store.init();
     await tester.pumpWidget(MaterialApp(home: AdminPage(store: store)));
-    await goTab(tester, 2); // Products
+    await goItem(tester, 'vendors', 'Products');
     await tester.tap(find.text('Add new'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -351,9 +367,7 @@ void main() {
     store.dispose();
   });
 
-  testWidgets('admin-set product search radius settings round-trip onto settings/business', (
-    tester,
-  ) async {
+  testWidgets('Business Profile has ONE km for what customers see, first in the form; no separate search radius', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
@@ -361,88 +375,23 @@ void main() {
       MaterialApp(home: EntryEditor(store: store, collection: 'settings', entry: null)),
     );
     await tester.pumpAndSettle();
+    const label = 'Customers see shops, offers and products within (km)';
+    final fields = tester.widgetList<TextFormField>(find.byType(TextFormField)).toList();
+    expect(find.widgetWithText(TextFormField, label), findsOneWidget);
+    expect(identical(fields.first, tester.widget(find.widgetWithText(TextFormField, label))), isTrue, reason: 'the first field');
+    expect(find.textContaining('search radius'), findsNothing);
+    await tester.enterText(find.widgetWithText(TextFormField, label), '15');
     final formScrollable = find
         .byWidgetPredicate(
           (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
         )
         .first;
-
-    for (final MapEntry(key: label, value: value) in {
-      'Product search radius presets, km (comma-separated, e.g. 2,5,10,25,50)': '1,3,7',
-      'Default product search radius (km)': '3',
-      'Maximum product search radius (km)': '7',
-    }.entries) {
-      await tester.scrollUntilVisible(find.text(label), 300, scrollable: formScrollable);
-      await tester.enterText(find.widgetWithText(TextFormField, label), value);
-    }
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
     await tester.tap(find.text('Save changes'));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-
-    expect(store.business.text('searchRadiusPresetsKm'), '1,3,7');
-    expect(store.business.number('searchRadiusDefaultKm'), 3);
-    expect(store.business.number('searchRadiusMaxKm'), 7);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox());
-    store.dispose();
-  });
-
-  testWidgets('picking a rectangle target area zeroes the old circle fields and saves the shape', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    final store = Store();
-    await store.init();
-    const original = Entry('promo1', {
-      'name': 'Circle ad',
-      'placement': 'carousel',
-      'targetLatitude': 12.9,
-      'targetLongitude': 77.5,
-      'targetRadiusKm': 10,
-    });
-    await tester.pumpWidget(
-      MaterialApp(home: EntryEditor(store: store, collection: 'promotions', entry: original)),
-    );
-    await tester.pumpAndSettle();
-    final formScrollable = find
-        .byWidgetPredicate(
-          (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
-        )
-        .first;
-
-    await tester.scrollUntilVisible(find.text('Choose area on map'), 300, scrollable: formScrollable);
-    expect(find.textContaining('Circle: 10 km'), findsOneWidget);
-    await tester.tap(find.text('Choose area on map'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Rectangle'));
-    await tester.pump();
-    final mapFinder = find.byType(FlutterMap);
-    final topLeft = tester.getTopLeft(mapFinder);
-    final mapSize = tester.getSize(mapFinder);
-    // flutter_map briefly holds a tap to see if it becomes a double-tap
-    // (zoom) gesture; the test must wait that out before the resulting
-    // onTap callback fires. The second point avoids the bottom-right corner,
-    // where the map's OpenStreetMap attribution control intercepts taps.
-    await tester.tapAt(topLeft + const Offset(20, 20));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tapAt(topLeft + Offset(mapSize.width - 20, mapSize.height / 2));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.text('Use this area'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Rectangle area set'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
-    await tester.tap(find.text('Save changes'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    final saved = store.entries('promotions').firstWhere((e) => e.id == 'promo1');
-    expect(saved.data['geoShape'], 'rectangle');
-    expect(saved.data['targetRectangle'], isA<Map>());
-    expect(saved.number('targetLatitude'), 0);
-    expect(saved.number('targetLongitude'), 0);
-    expect(saved.number('targetRadiusKm'), 0);
-    expect(saved.data.containsKey('targetPolygon'), isFalse);
+    expect(store.business.number('radiusKm'), 15);
+    expect(store.reachKm, 15);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     store.dispose();
@@ -458,9 +407,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
+    store.catalog['shops'] = [const Entry('shop-1', {'name': 'Suma Fresh Mart', 'latitude': 12.95, 'longitude': 77.6})];
     const original = Entry('promo2', {
       'name': 'Polygon ad',
       'placement': 'carousel',
+      'radiusShopId': 'shop-1',
       'geoShape': 'polygon',
       'targetPolygon': [
         {'lat': 12.90, 'lng': 77.50},
@@ -614,6 +565,10 @@ void main() {
     await tester.pump();
     await tester.enterText(find.widgetWithText(TextFormField, fieldLabel), '3');
     await tester.scrollUntilVisible(find.text('Save changes'), 300, scrollable: formScrollable);
+    await tester.ensureVisible(find.text('Save changes'));
+    // The first save's "Saved" message sits over the bottom of the form for a few seconds: let it go first.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save changes'));
     await tester.pumpAndSettle();
     expect(store.business.number('fieldPhotoLimit'), 3);

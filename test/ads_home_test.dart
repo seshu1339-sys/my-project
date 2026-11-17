@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
-import 'package:ecommerce_app/ui/ad_box.dart';
 import 'package:ecommerce_app/ui/ads_column.dart';
 
 Entry _ad(String id, int order) => Entry(id, {'title': 'Ad $id', 'contentType': 'text', 'backgroundColor': '#FFEEAA', 'order': order});
@@ -29,22 +28,26 @@ void main() {
       await tester.pump();
       expect(find.byType(AdsColumn), findsNothing, reason: 'width $width');
       expect(find.byType(AdsPager), findsNothing, reason: 'width $width');
-      expect(find.byType(AdBox), findsNothing, reason: 'width $width');
+      // Live ads now appear inside the Right Side Ad Boxes and Today's Offers (as AdBox), never in the old column or pager.
       expect(find.byKey(const ValueKey('open-offers-ads')), findsNothing, reason: 'customers see only the photo boxes');
       await tester.pumpWidget(const SizedBox());
       store.dispose();
     }
   });
 
-  testWidgets("radius: Today's Offers follow the same rule and the same location change", (tester) async {
+  testWidgets("distance only: Today's Offers follow their shop and the customer's location change", (tester) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = await _store(const []);
+    store.catalog['shops'] = const [
+      Entry('sn', {'name': 'Narsipatnam shop', 'latitude': 17.667, 'longitude': 82.612}),
+      Entry('sa', {'name': 'Anakapalle shop', 'latitude': 17.691, 'longitude': 83.003}),
+    ];
     store.catalog['promotions'] = const [
-      Entry('o1', {'name': 'Offer near Narsipatnam', 'placement': 'carousel', 'order': 1, 'radiusKm': 10, 'radiusLat': 17.667, 'radiusLng': 82.612, 'radiusShopId': 's'}),
-      Entry('o2', {'name': 'Offer near Anakapalle', 'placement': 'carousel', 'order': 2, 'radiusKm': 10, 'radiusLat': 17.691, 'radiusLng': 83.003, 'radiusShopId': 's'}),
+      Entry('o1', {'name': 'Offer near Narsipatnam', 'placement': 'carousel', 'order': 1, 'radiusShopId': 'sn'}),
+      Entry('o2', {'name': 'Offer near Anakapalle', 'placement': 'carousel', 'order': 2, 'radiusShopId': 'sa'}),
     ];
     await store.setLocation('531116', 'Narsipatnam', lat: 17.67, lng: 82.62);
     await tester.pumpWidget(MarketApp(store: store));

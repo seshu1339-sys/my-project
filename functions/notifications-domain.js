@@ -55,4 +55,44 @@ function locationNoticeCopy(place, offers) {
   const more = names.length > 3 ? ` +${names.length - 3} more` : '';
   return {title: `Offers in ${placeLabel(place)}`, body: (shown ? shown + more : 'New offers are available near you. Open the shop to explore.').slice(0, 180)};
 }
-module.exports = {locationOffers, locationNoticeKey, locationNoticeCopy, active, price, priceDrop, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};
+// ---- "Offers near you" by distance (owner, 11 Nov 2026: offers reach customers only within the admin's one km of their shop; the
+// same rule as the website and the apps, lib/domain/reach.dart). The town rule above stays for reference.
+const {distanceKm} = require('./radius');
+const DEFAULT_REACH_KM = 10;
+/// The admin's km (settings/business.radiusKm), 0.5 to 500, 10 when not set.
+function reachKmOf(business = {}) {
+  const km = Number(business.radiusKm);
+  return Number.isFinite(km) && km > 0 ? Math.min(500, Math.max(0.5, km)) : DEFAULT_REACH_KM;
+}
+/// The shop an offer belongs to: shopId, radiusShopId, a "shop" tap, or a "shop:ID" target. '' when it has none.
+function linkedShopId(item = {}) {
+  for (const key of ['shopId', 'radiusShopId']) if (typeof item[key] === 'string' && item[key].trim()) return item[key].trim();
+  if (item.tapAction === 'shop' && typeof item.tapValue === 'string' && item.tapValue.trim()) return item.tapValue.trim();
+  const target = String(item.target || '');
+  return target.startsWith('shop:') ? target.slice(5).trim() : '';
+}
+const millisOf = value => (typeof value?.toMillis === 'function' ? value.toMillis() : Date.parse(String(value ?? '')));
+/// The live offers within [km] of the point: the admin's promotions (carousel, ads, boxes) and the vendors' live offers, each by its
+/// shop's place. An offer without a shop, or a shop without a place, reaches nobody.
+function nearbyOffers({promotions = [], vendorOffers = [], shops = new Map(), latitude, longitude, km = DEFAULT_REACH_KM, now = Date.now()}) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || (latitude === 0 && longitude === 0)) return [];
+  const near = item => {
+    const shop = shops.get(linkedShopId(item));
+    const lat = Number(shop?.latitude), lng = Number(shop?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0) && distanceKm(latitude, longitude, lat, lng) <= km;
+  };
+  const admin = promotions.filter(({data}) => active(data, now) && LOCATION_OFFER_PLACEMENTS.includes(data.placement) && !isOff(data.notifySubscribers) && near(data));
+  const vendor = vendorOffers.filter(({data}) => data.status === 'live' && millisOf(data.endsAt) > now && near(data))
+    .map(({id, data}) => ({id: `vo:${id}`, data: {...data, name: data.title || data.name, startsAt: data.postedAt ?? data.createdAt}}));
+  return [...admin, ...vendor].sort((a, b) => (Number(a.data.order) || 0) - (Number(b.data.order) || 0) || String(a.id).localeCompare(String(b.id)));
+}
+/// One notice per area (about 1 km squares) and set of offers.
+const nearbyNoticeKey = (latitude, longitude, offers) =>
+  `nearby:${latitude.toFixed(2)},${longitude.toFixed(2)}:${offers.map(o => `${o.id}@${String(millisOf(o.data.startsAt) || '')}`).join(',')}`;
+function nearbyNoticeCopy(offers, area = '') {
+  const names = offers.map(o => String(o.data.name || o.data.title || '').trim()).filter(Boolean);
+  const shown = names.slice(0, 3).join(' • ');
+  const more = names.length > 3 ? ` +${names.length - 3} more` : '';
+  return {title: area ? `Offers near ${area}` : 'Offers near you', body: (shown ? shown + more : 'New offers are available near you. Open the shop to explore.').slice(0, 180)};
+}
+module.exports = {nearbyOffers, nearbyNoticeKey, nearbyNoticeCopy, reachKmOf, linkedShopId, locationOffers, locationNoticeKey, locationNoticeCopy, active, price, priceDrop, priceAlertKey, offerNotifiable, offerKey, offerCopy, INTEREST_WINDOW_MS, PRICE_ALERT_WINDOW_MS};

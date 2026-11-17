@@ -6,10 +6,10 @@ test('Special Category Exclusives: permission, publish, expiry lifecycle', {skip
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const vendor = {auth: {uid: 'exV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'exV', token: {role: 'user', email_verified: true}}};
   const wipe = async name => { for (const d of (await db.collection(name).get()).docs) await d.ref.delete(); };
   const setPermission = (data, ctx = admin) => fns.setVendorExclusivesPermission.run({...ctx, data});
   const submit = (data, ctx = vendor) => fns.submitExclusiveItem.run({...ctx, data});
@@ -43,7 +43,7 @@ test('Special Category Exclusives: permission, publish, expiry lifecycle', {skip
     assert.ok(product.expiresAt);
 
     // ---- another vendor without the permission cannot publish
-    await assert.rejects(() => submit({name: 'Design 2', price: 100, imageUrl: IMG, durationDays: 1}, {auth: {uid: 'other', token: {email_verified: true}}}), /not enabled/);
+    await assert.rejects(() => submit({name: 'Design 2', price: 100, imageUrl: IMG, durationDays: 1}, {auth: {uid: 'other', token: {role: 'user', email_verified: true}}}), /not enabled/);
 
     // ---- notify before expiry: an item expiring within the (default 2-day) notice window gets exactly one push
     const soon = db.collection('products').doc();

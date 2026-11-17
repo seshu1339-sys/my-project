@@ -5,6 +5,7 @@ import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/ads.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/radius.dart';
+import 'package:ecommerce_app/domain/reach.dart';
 import 'package:ecommerce_app/ui/admin_ads.dart';
 import 'package:ecommerce_app/ui/entry_editor.dart';
 
@@ -81,20 +82,30 @@ void main() {
     });
   });
 
-  group('ads and offers decide the same way', () {
+  group('ads follow the shop, distance only (owner, 11 Nov 2026)', () {
+    const shops = [
+      Entry('shop-n', {'latitude': 17.667, 'longitude': 82.612}),
+      Entry('shop-r', {'latitude': 17.000, 'longitude': 81.800}),
+    ];
     final ads = [
-      circle('near', 10, narsipatnam),
-      circle('wide', 100, narsipatnam),
-      circle('far', 5, rajahmundry),
+      // Their own old radius is still saved and no longer decides anything: the shop and the admin's km do.
+      circle('near', 10, narsipatnam, {'radiusShopId': 'shop-n'}),
+      circle('wide', 100, narsipatnam, {'radiusShopId': 'shop-n'}),
+      circle('far', 5, rajahmundry, {'radiusShopId': 'shop-r'}),
       const Entry('everywhere', {'title': 'x', 'contentType': 'text'}),
     ];
 
-    test('the ads shown follow the customer location', () {
-      List<String> at(double? lat, double? lng) => liveAds(ads, monday, latitude: lat, longitude: lng).map((a) => a.id).toList()..sort();
-      expect(at(17.67, 82.62), ['everywhere', 'near', 'wide']);
-      expect(at(anakapalle.$1, anakapalle.$2), ['everywhere', 'wide'], reason: 'moved 45 km: the 10 km ad drops out');
-      expect(at(rajahmundry.$1, rajahmundry.$2), ['everywhere', 'far'], reason: 'moved far away: only the ad around the new place');
-      expect(at(null, null), ['everywhere'], reason: 'location unknown: only ads without a radius');
+    test('the ads shown are those of the shops within the admin km of the customer', () {
+      List<String> at(double? lat, double? lng, {double km = 10}) {
+        final inReach = shopIdsWithin(shops, lat, lng, km);
+        return liveAds(ads, monday, reaches: (a) => inReach.contains(linkedShopId(a))).map((a) => a.id).toList()..sort();
+      }
+
+      expect(at(17.67, 82.62), ['near', 'wide']);
+      expect(at(anakapalle.$1, anakapalle.$2), isEmpty, reason: "moved 45 km: the shop is out of the 10 km, whatever the ad's own radius");
+      expect(at(anakapalle.$1, anakapalle.$2, km: 50), ['near', 'wide'], reason: "the admin's km decides");
+      expect(at(rajahmundry.$1, rajahmundry.$2), ['far']);
+      expect(at(null, null), isEmpty, reason: 'location unknown: nothing, and never the ad without a shop');
     });
 
     test('the admin preview shows everything', () {
@@ -176,69 +187,32 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('the radius comes from a fixed list; the centre is the shop location, filled in automatically', (tester) async {
+    testWidgets('the shop is all that decides who sees the ad: no radius list; its location is filled in automatically', (tester) async {
       final s = await store();
       await open(tester, s);
-      await tester.ensureVisible(find.byKey(const ValueKey('ad-radius-')));
-      await tester.tap(find.byKey(const ValueKey('ad-radius-')));
-      await tester.pumpAndSettle();
-      for (final km in ['5 km', '10 km', '25 km', '50 km', '100 km']) {
-        expect(find.text(km), findsWidgets, reason: km);
-      }
-      expect(find.text('20 km'), findsNothing, reason: 'no in-between values');
-      await tester.tap(find.text('25 km').last);
-      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('ad-radius-')), findsNothing, reason: 'no radius to choose any more');
       await pick(tester, 'ad-radius-shop-', 'Suma Fresh Mart');
       expect(find.text('Centre: 17.667, 82.612'), findsOneWidget);
-      expect(find.text('No location shop'), findsNothing, reason: 'only shops with a saved location can be a centre');
+      expect(find.text('No location shop'), findsNothing, reason: 'only shops with a saved location can be chosen');
       await save(tester);
       final saved = s.entries('ads').single;
-      expect(saved.number('radiusKm'), 25);
       expect(saved.text('radiusShopId'), 'shop-n');
       expect(saved.number('radiusLat'), 17.667);
       expect(saved.number('radiusLng'), 82.612);
+      expect(saved.data.containsKey('radiusKm'), isFalse);
     });
 
-    testWidgets('a radius without a shop is refused', (tester) async {
+    testWidgets('an ad without a shop is refused (nobody would see it)', (tester) async {
       final s = await store();
       await open(tester, s);
-      await tester.ensureVisible(find.byKey(const ValueKey('ad-radius-')));
-      await tester.tap(find.byKey(const ValueKey('ad-radius-')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('10 km').last);
-      await tester.pumpAndSettle();
       await save(tester);
-      expect(find.text('Choose the shop whose location is the centre of the radius.'), findsOneWidget);
+      expect(find.text('Choose the shop: only customers near that shop see the ad.'), findsOneWidget);
       expect(s.entries('ads'), isEmpty);
-    });
-
-    testWidgets('removing the radius removes the centre too', (tester) async {
-      final s = await store(ads: [circle('old', 10, narsipatnam, {'order': 1, 'radiusShopId': 'shop-n'})]);
-      tester.view.physicalSize = const Size(1200, 3600);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(MaterialApp(home: AdEditorPage(store: s, ad: s.entries('ads').single)));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('ad-radius-10')));
-      await tester.tap(find.byKey(const ValueKey('ad-radius-10')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('No radius').last);
-      await tester.pumpAndSettle();
-      await save(tester);
-      final saved = s.entries('ads').single;
-      expect(saved.data.containsKey('radiusKm'), isFalse);
-      expect(saved.data.containsKey('radiusLat'), isFalse);
     });
 
     testWidgets('the maximum per area stops one more ad over a full area', (tester) async {
       final s = await store(max: 1, ads: [circle('existing', 25, narsipatnam, {'order': 1})]);
       await open(tester, s);
-      await tester.ensureVisible(find.byKey(const ValueKey('ad-radius-')));
-      await tester.tap(find.byKey(const ValueKey('ad-radius-')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('10 km').last);
-      await tester.pumpAndSettle();
       await pick(tester, 'ad-radius-shop-', 'Suma Fresh Mart');
       await save(tester);
       expect(find.textContaining('already has 1 ads or offers'), findsOneWidget);
@@ -278,52 +252,40 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('has the same Radius list and shop centre, and saves them like an ad does', (tester) async {
+    const shopLabel = 'Shop (required) — customers within the km of Business Profile of this shop see it; without a shop nobody does';
+
+    testWidgets('requires the shop and saves its location; no radius, towns or target area to set', (tester) async {
       final s = await store();
       await show(tester, s);
       await choose(tester, 'Display location', 'carousel');
-      await choose(tester, 'Radius (shown only to customers inside this circle)', '50 km');
-      await choose(tester, 'Radius centre — the shop whose saved location is the middle of the circle', 'Suma Fresh Mart');
+      expect(find.text('Radius (shown only to customers inside this circle)'), findsNothing);
+      expect(find.text('Location — towns this shows in (blank = every town)'), findsNothing);
+      await choose(tester, shopLabel, 'Suma Fresh Mart');
       await tester.ensureVisible(find.text('Save changes'));
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
       final saved = s.entries('promotions').single;
-      expect(saved.number('radiusKm'), 50);
       expect(saved.text('radiusShopId'), 'shop-n');
       expect(saved.number('radiusLat'), 17.667);
       expect(saved.number('radiusLng'), 82.612);
     });
 
-    testWidgets('no radius chosen: nothing changes for the offer', (tester) async {
+    testWidgets('an offer without a shop is refused (nobody would see it)', (tester) async {
       final s = await store();
       await show(tester, s);
       await choose(tester, 'Display location', 'carousel');
-      await tester.ensureVisible(find.text('Save changes'));
-      await tester.tap(find.text('Save changes'));
-      await tester.pumpAndSettle();
-      final saved = s.entries('promotions').single;
-      expect(hasRadius(saved), isFalse);
-      expect(saved.data.containsKey('radiusLat'), isFalse);
-    });
-
-    testWidgets('a radius without a shop is refused', (tester) async {
-      final s = await store();
-      await show(tester, s);
-      await choose(tester, 'Display location', 'carousel');
-      await choose(tester, 'Radius (shown only to customers inside this circle)', '10 km');
       await tester.ensureVisible(find.text('Save changes'));
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
       expect(s.entries('promotions'), isEmpty);
-      expect(find.textContaining('Choose the shop whose location is the centre'), findsOneWidget);
+      expect(find.textContaining('Choose the shop: only customers near that shop see this offer.'), findsOneWidget);
     });
 
     testWidgets('the same maximum per area applies to offers', (tester) async {
       final s = await store(max: 1, offers: [circle('existing', 25, narsipatnam, {'placement': 'carousel', 'order': 1})]);
       await show(tester, s);
       await choose(tester, 'Display location', 'carousel');
-      await choose(tester, 'Radius (shown only to customers inside this circle)', '10 km');
-      await choose(tester, 'Radius centre — the shop whose saved location is the middle of the circle', 'Suma Fresh Mart');
+      await choose(tester, shopLabel, 'Suma Fresh Mart');
       await tester.ensureVisible(find.text('Save changes'));
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();

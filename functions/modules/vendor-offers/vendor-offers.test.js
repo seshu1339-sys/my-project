@@ -2,7 +2,7 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {initializeApp, getApps} = require('firebase-admin/app');
 if (!getApps().length) initializeApp({projectId: 'demo-neighbourly'});
-const {getFirestore, Timestamp} = require('firebase-admin/firestore');
+const {getFirestore, Timestamp, FieldValue} = require('firebase-admin/firestore');
 const {DAY_MS, MAX_RUNNING, photoPath, validateOffer, statusOnSave, isRunning} = require('./rules');
 const {saveOffer, deleteOffer, reviewOffer, saveConfig} = require('./store');
 
@@ -78,7 +78,10 @@ test('an approved vendor\'s offer goes live at once with their shop on it', emul
   assert.equal(saved.vendorId, uid);
   assert.equal(saved.shopId, `shop-${uid}`);
   assert.equal(saved.shopName, 'Lakshmi Sweets');
-  assert.equal(saved.endsAt.toMillis(), NOW + 7 * DAY_MS);
+  // The vendor chose 7 days; the admin's post duration (24 hours unless set, functions/post-duration.js) ends it first.
+  assert.equal(saved.endsAt.toMillis(), NOW + DAY_MS);
+  assert.equal(saved.ownEndsAt.toMillis(), NOW + 7 * DAY_MS);
+  assert.equal(saved.postedAt.toMillis(), NOW);
 });
 
 test('a vendor who is not approved cannot make an offer', emulated, async () => {
@@ -99,15 +102,22 @@ test('with the admin switch on, a new offer and an edit of a live one wait for a
 
 test('an edit may keep the end date, change it, and a finished offer needs a new one', emulated, async () => {
   const {db, uid, bucket, offer} = await setup();
-  const {offerId} = await saveOffer(db, bucket, uid, offer(), NOW);
-  await saveOffer(db, bucket, uid, offer({offerId, days: undefined}), NOW + DAY_MS);
-  assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), NOW + 7 * DAY_MS);
-  await saveOffer(db, bucket, uid, offer({offerId, days: 30}), NOW + DAY_MS);
-  const later = NOW + 40 * DAY_MS;
-  assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), NOW + 31 * DAY_MS);
-  await assert.rejects(saveOffer(db, bucket, uid, offer({offerId, days: undefined}), later), /days/);
-  await saveOffer(db, bucket, uid, offer({offerId, days: 3}), later);
-  assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), later + 3 * DAY_MS);
+  // With the longest post duration (1 month) the vendor's own days count; an edit keeps the posted time, so 30 more days are still
+  // capped at 30 days after it was posted.
+  await db.doc('settings/business').set({postDuration: '1m'}, {merge: true});
+  try {
+    const {offerId} = await saveOffer(db, bucket, uid, offer(), NOW);
+    await saveOffer(db, bucket, uid, offer({offerId, days: undefined}), NOW + DAY_MS);
+    assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), NOW + 7 * DAY_MS);
+    await saveOffer(db, bucket, uid, offer({offerId, days: 30}), NOW + DAY_MS);
+    const later = NOW + 40 * DAY_MS;
+    assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), NOW + 30 * DAY_MS);
+    await assert.rejects(saveOffer(db, bucket, uid, offer({offerId, days: undefined}), later), /days/);
+    await saveOffer(db, bucket, uid, offer({offerId, days: 3}), later);
+    assert.equal((await db.doc(`vendorOffers/${offerId}`).get()).data().endsAt.toMillis(), later + 3 * DAY_MS, 'running again is a new post');
+  } finally {
+    await db.doc('settings/business').set({postDuration: FieldValue.delete()}, {merge: true});
+  }
 });
 
 test('a vendor can never touch another vendor\'s offer', emulated, async () => {
@@ -149,4 +159,27 @@ test('a vendor runs at most the limit of offers, and a finished one does not cou
   await assert.rejects(saveOffer(db, bucket, uid, offer(), NOW), /at a time/);
   await saveOffer(db, bucket, uid, offer({offerId: made[0], title: 'Still fine to edit'}), NOW);
   assert.equal((await saveOffer(db, bucket, uid, offer(), NOW + 8 * DAY_MS)).status, 'live');
+});
+
+test('the nearby alert: on or off (the plan km decides how far); kept on a new offer; an edit of a running offer never asks again', emulated, async () => {
+  assert.equal(validateOffer(good(), 'v1').alert, false);
+  assert.equal(validateOffer(good({alert: true}), 'v1').alert, true);
+  assert.equal(validateOffer(good({alertRadiusKm: 50}), 'v1').alert, true, 'an older app sending 50 km means on');
+  assert.throws(() => validateOffer(good({alert: 'yes'}), 'v1'), /on or off/);
+  const {db, uid, bucket, offer} = await setup();
+  const {offerId} = await saveOffer(db, bucket, uid, offer({alert: true}), NOW);
+  const ref = db.doc(`vendorOffers/${offerId}`);
+  assert.equal((await ref.get()).data().alert, true);
+  await ref.update({alertClaimedAt: Timestamp.fromMillis(NOW), alertStatus: 'sent', alertRadiusKm: 25}); // what the Offer Alerts module writes
+  await saveOffer(db, bucket, uid, offer({offerId, title: 'New name', alert: false, days: undefined}), NOW + 1000);
+  const edited = (await ref.get()).data();
+  assert.equal(edited.alert, true, 'unchanged');
+  assert.equal(edited.alertStatus, 'sent', 'not asked again');
+  // Run again after it ended: a fresh choice, and it may alert again.
+  await saveOffer(db, bucket, uid, offer({offerId, days: 3, alert: true}), NOW + 8 * DAY_MS);
+  const again = (await ref.get()).data();
+  assert.equal(again.alert, true);
+  assert.equal(again.alertRadiusKm, undefined);
+  assert.equal(again.alertClaimedAt, undefined);
+  assert.equal(again.alertStatus, undefined);
 });

@@ -5,6 +5,7 @@ import '../domain/ads.dart';
 import '../domain/android_home.dart';
 import '../domain/catalog.dart';
 import 'admin_android_sizes.dart';
+import 'admin_catalog_lines.dart';
 import 'android_layout.dart';
 import 'shared.dart';
 
@@ -15,6 +16,7 @@ const androidPartInfo = <String, (String, String, IconData)>{
   'notice': ("Today's Offers banner", "The banner that names your town's offers, with the price chips.", Icons.campaign_outlined),
   'quickFresh': ('Fresh today', 'Showing items in your location, and the Fresh today strip.', Icons.bolt_outlined),
   'promo': ("Today's Offers cards", 'The offer cards, two side by side.', Icons.view_carousel_outlined),
+  'catalogLines': ('Category lines', "Lines of catalog items, one category each, with the area's lowest price; they change by themselves.", Icons.view_stream_outlined),
   'strip': ('Fresh Fruits & Vegetables and Transport', "The product cards and the Transport / Services boxes under Today's Offers.", Icons.eco_outlined),
   'popular': ('Products', 'Products and services.', Icons.shopping_bag_outlined),
   'localServices': ('Local Services', 'Local service listings.', Icons.home_repair_service_outlined),
@@ -140,6 +142,8 @@ class _AdminAndroidHomePageState extends State<AdminAndroidHomePage> {
           ),
         const SizedBox(height: 12),
         Align(alignment: Alignment.centerLeft, child: FilledButton(key: const ValueKey('save-android-home'), onPressed: busy ? null : _save, child: Text(busy ? 'Saving…' : 'Save'))),
+        const Divider(height: 40),
+        CatalogLinesEditor(store: store),
         const Divider(height: 40),
         AndroidSizesEditor(store: store),
       ],

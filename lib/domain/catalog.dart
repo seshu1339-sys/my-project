@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'feature_flags.dart';
+import 'ist_time.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -20,8 +21,9 @@ class Entry {
       : double.tryParse(text(key)) ?? fallback;
   bool get active => data['active'] != false;
   bool visibleAt(DateTime now) {
-    final start = DateTime.tryParse(text('startsAt'));
-    final end = DateTime.tryParse(text('endsAt'));
+    // Start / end without a zone are India time (ist_time.dart), the same on every phone.
+    final start = parseIstTime(text('startsAt'));
+    final end = parseIstTime(text('endsAt'));
     return active &&
         (start == null || !now.isBefore(start)) &&
         (end == null || now.isBefore(end));
@@ -33,6 +35,13 @@ class Entry {
         ? (prices[pincode] as num).toDouble()
         : number('price');
   }
+}
+
+/// Whether an item shows in the category and search results at [now]: the vendor chooses how long (searchUntilMs, 1 week to 3 months,
+/// functions/modules/photo-limits); an item without that choice shows as before.
+bool inSearchAt(Entry product, DateTime now) {
+  final until = product.data['searchUntilMs'];
+  return until is! num || now.millisecondsSinceEpoch < until;
 }
 
 double distanceKm(double lat1, double lon1, double lat2, double lon2) {

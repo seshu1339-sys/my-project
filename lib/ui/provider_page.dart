@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
 
 import '../data/store.dart';
 import 'my_numbers_card.dart';
@@ -7,6 +8,7 @@ import 'provider_registration_form.dart';
 import 'text_prompt_dialog.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
+import 'shop_ratings.dart';
 
 /// Services in the vendor app: the service provider's own flow. Registration (verified email first), then waiting for the admin, then
 /// the live service with the charge per hour, which the provider can change. A provider account is separate from vendor accounts.
@@ -20,9 +22,9 @@ class ServiceProviderPage extends StatelessWidget {
   Widget _page(BuildContext context) {
     final user = store.user;
     final actions = [if (store.live) IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
-    Widget page(Widget body) => Scaffold(appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
+    Widget page(Widget body) => Scaffold(floatingActionButton: store.live ? vendorAppFlashButton(store) : null, appBar: AppBar(title: const Text('Services'), actions: actions), body: body);
     if (!store.live || user == null) return page(const _Message(title: 'Services', body: 'Connect Firebase to register as a service provider.'));
-    if (!user.emailVerified) {
+    if (!store.emailConfirmed) {
       return page(const _Message(title: 'Verify your email first', body: 'Sign out and sign in again with Google or an email code so we can verify your email. The service-provider registration opens after that.'));
     }
     return page(
@@ -33,7 +35,7 @@ class ServiceProviderPage extends StatelessWidget {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final application = snapshot.data!.data();
           final status = application?['status'];
-          if (application == null || status == 'rejected') return ProviderRegistrationForm(store: store, email: user.email ?? '', previous: application);
+          if (application == null || status == 'rejected') return ProviderRegistrationForm(store: store, email: store.signedInEmail, previous: application);
           if (status == 'pending') return ProviderStatusView(application: application);
           // Live: the provider's own numbers (calls and WhatsApp from customers) under the status.
           return ListView(children: [
@@ -43,7 +45,11 @@ class ServiceProviderPage extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: MyNumbersCard(store: store, ownerId: user.uid, events: const ['worker_call', 'worker_whatsapp']),
+                  child: Column(children: [
+                    MyNumbersCard(store: store, ownerId: user.uid, events: const ['worker_call', 'worker_whatsapp']),
+                    // The provider's ratings from customers (lib/ui/shop_ratings.dart).
+                    MyRatingsCard(store: store, targetKey: 'provider_${user.uid}'),
+                  ]),
                 ),
               ),
             ),

@@ -28,17 +28,18 @@ test('role matrix: customer, vendor, staff, Quick Add accounts and admin each se
       await setDoc(doc(f, 'users/cust'), {name: 'Customer'});
       await setDoc(doc(f, 'products/p1'), {name: 'P', active: true});
     });
-    const as = (uid, claims = {}) => env.authenticatedContext(uid, {email_verified: true, ...claims}).firestore();
+    // Each kind of person is its own role login (functions/role-logins.js), with the role in its claims.
+    const as = (uid, claims = {}) => env.authenticatedContext(uid, {role: 'user', ...claims}).firestore();
     const who = {
       anonymous: env.unauthenticatedContext().firestore(),
       customer: as('cust'),
-      vendor: as('vend'),
-      otherVendor: as('other'),
-      staff: as('staff'),
-      otherStaff: as('staff2'),
-      quickStaff: as('qs'),
-      quickVendor: as('qv'),
-      admin: as('boss', {admin: true}),
+      vendor: as('vend', {role: 'vendor'}),
+      otherVendor: as('other', {role: 'vendor'}),
+      staff: as('staff', {role: 'staff'}),
+      otherStaff: as('staff2', {role: 'staff'}),
+      quickStaff: as('qs', {role: 'staff'}),
+      quickVendor: as('qv', {role: 'vendor'}),
+      admin: as('boss', {role: 'admin', admin: true}),
     };
     const can = (name, path, op = 'read') => {
       const ref = doc(who[name], path);

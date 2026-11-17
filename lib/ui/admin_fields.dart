@@ -80,7 +80,6 @@ const fields = <String, Map<String, String>>{
     'pincode': 'Pincode',
     'latitude': 'Latitude',
     'longitude': 'Longitude',
-    'radiusKm': 'Nearby radius (km)',
     'imageUrl': 'Shop image URL',
     'order': 'Display order',
   },
@@ -90,19 +89,7 @@ const fields = <String, Map<String, String>>{
     'placement': 'Display location',
     'notifySubscribers': 'Push notification to subscribers',
     'target': 'Click action (shops / shop:ID / services / category:ID / product:ID / https://…)',
-    'locations':
-        'Location — towns this shows in (blank = every town)',
-    'radiusShopId': 'Radius centre — the shop whose saved location is the middle of the circle',
-    'radiusKm': 'Radius (shown only to customers inside this circle)',
-    'targetPincode':
-        'Show only in this pincode (optional — blank shows everywhere)',
-    'targetLatitude':
-        'Show only near this latitude (optional, pairs with radius)',
-    'targetLongitude':
-        'Show only near this longitude (optional, pairs with radius)',
-    'targetRadiusKm':
-        'Radius around that point, km (default 10 if latitude/longitude set)',
-    'geoTargetArea': 'Target area (circle / rectangle / polygon)',
+    'radiusShopId': 'Shop (required) — customers within the km of Business Profile of this shop see it; without a shop nobody does',
     'imageUrl': 'Image URL',
     'width': 'Width (0 = automatic, up to 3840 px)',
     'height': 'Height (120-1200 px)',
@@ -131,6 +118,8 @@ const fields = <String, Map<String, String>>{
     'countdownSeconds': 'Countdown timer badge, seconds (e.g. 60 = 1 min, 120 = 2 min, 0 = hidden)',
   },
   'settings': {
+    // The ONE km of what customers see (lib/domain/reach.dart), first so the admin finds it at once.
+    'radiusKm': 'Customers see shops, offers and products within (km)',
     'quickItemsPerDayStaff': 'Quick Add: items per day for each Staff member (default 15)',
     'quickItemsPerDayVendor': 'Quick Add: items per day for each Vendor (default 6)',
     'name': 'Business name',
@@ -143,16 +132,12 @@ const fields = <String, Map<String, String>>{
     'serviceTowns':
         'Towns you serve (comma-separated; add =pincode|pincode to match by pincode, e.g. Narsipatnam=531116|531115, Anakapalle)',
     'noOffersMessage':
-        'Message when a town has no offers (blank = default; {town} = town name)',
+        'Message when no shop near the customer has an offer (blank = "No offers near you right now."; {town} = their area name)',
     'websiteUrl': 'Website URL',
     'vendorSignupUrl': 'Become a Seller URL (the separate vendor onboarding site; blank uses the default)',
     'description': 'Office / head office details',
     'headerContact': 'Header contact box (top right of the website and app): type anything, e.g. office address, phone, email',
     'imageUrl': 'Logo URL (or use the Upload logo button below)',
-    'radiusKm': 'Default nearby radius (km)',
-    'searchRadiusPresetsKm': 'Product search radius presets, km (comma-separated, e.g. 2,5,10,25,50)',
-    'searchRadiusDefaultKm': 'Default product search radius (km)',
-    'searchRadiusMaxKm': 'Maximum product search radius (km)',
     'vendorPhotoLimit': 'Vendor shop photo limit (1-9, default 3; photo 1 is the shop, required)',
     'fieldPhotoLimit': 'Field Assistant item photo limit (1-9, default 2)',
     'deliveryFeeTiers':
@@ -164,6 +149,15 @@ const fields = <String, Map<String, String>>{
         'Auto-publish approved vendor changes (true / false)',
     'priceDropAutoEnabled':
         'Automatic price-drop alerts (true / false; blank = on)',
+    'autoApproval': 'Auto Approval: register vendors and service providers at once when their photos pass the AI check (OFF by default)',
+    'photoSafetyChecksPerDay': 'AI photo safety checks per day (all photos; 300 when blank)',
+    'abuseReportsToSuspend': 'Reports for an automatic temporary suspension (vendors, providers and customers; 10 when blank)',
+    'photoSearchesPerDay': 'Photo searches per person per day (AI; 10 when blank)',
+    'adminSearchAiPerDay': 'Admin search "Ask AI" per admin per day (100 when blank)',
+    'adminAiPerDay': 'Admin AI assistant questions per admin per day (50 when blank)',
+    'postDuration': 'Post duration: offers, exclusive items and vendor ads hide after this time, for everyone (item prices never: they stay until the vendor changes them)',
+    'rateReminder': "Daily vendor reminder \"Are today's rates the same?\" (ON by default)",
+    'rateReminderHour': 'Reminder time (India time; sent at 20 past the hour)',
     'defaultPaymentMethod': 'Default payment (direct_vendor / cash_on_delivery / platform_collected)',
     'directVendorPaymentEnabled': 'Allow direct vendor payment (true / false)',
     'cashOnDeliveryEnabled': 'Allow cash on delivery (true / false)',

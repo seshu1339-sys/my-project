@@ -16,7 +16,7 @@ const androidHomeId = 'androidHome';
 const defaultAndroidAdSlots = 2;
 
 /// The parts of the Android home screen under the top row (logo, location, search, menu).
-const androidHomeParts = ['ads', 'scrollingText', 'notice', 'quickFresh', 'promo', 'strip', 'popular', 'localServices', 'nearby'];
+const androidHomeParts = ['ads', 'scrollingText', 'notice', 'quickFresh', 'promo', 'catalogLines', 'strip', 'popular', 'localServices', 'nearby'];
 
 class AndroidHomeConfig {
   const AndroidHomeConfig({required this.adSlots, this.showAds = true, this.order = const [], this.hidden = const {}});

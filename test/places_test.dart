@@ -16,7 +16,6 @@ import 'package:ecommerce_app/domain/towns.dart';
 import 'package:ecommerce_app/main.dart';
 import 'package:ecommerce_app/services/location_town.dart';
 import 'package:ecommerce_app/services/places_directory.dart';
-import 'package:ecommerce_app/ui/entry_editor.dart';
 import 'package:ecommerce_app/ui/location_picker_dialog.dart';
 import 'places_fixture.dart';
 
@@ -284,8 +283,9 @@ void main() {
       expect(store.district, 'East Godavari');
       expect(store.state, 'Andhra Pradesh');
       expect(store.pincode, '533101');
-      expect(store.latitude, isNull, reason: 'a picked town stays in pincode mode');
-      expect(store.address, 'Rajahmundry, East Godavari');
+      expect(store.located, isTrue, reason: 'a picked place has its point: what the customer sees is measured from it');
+      expect(store.placeName, 'Rajahmundry');
+      expect(store.address, isEmpty, reason: 'the typed address is for delivery only; the place name is not written into it');
       await tester.pumpWidget(const SizedBox());
       store.dispose();
     });
@@ -357,31 +357,8 @@ void main() {
 
   group('home page offers by district and state', () {
     setUp(usePlacesFixture);
-    testWidgets('a district-wide and a state-wide offer reach the right customers', (tester) async {
-      tester.view.physicalSize = const Size(1400, 1800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await _store([
-        const Entry('a', {'name': 'EAST GODAVARI WIDE', 'placement': 'carousel', 'locations': 'district:East Godavari', 'active': true, 'order': 0}),
-        const Entry('b', {'name': 'TELANGANA WIDE', 'placement': 'carousel', 'locations': 'state:Telangana', 'active': true, 'order': 1}),
-      ]);
-      await tester.pumpWidget(MarketApp(store: store));
-      await tester.pump();
-      await store.setLocation('533101', 'Rajahmundry, East Godavari', town: 'Rajahmundry', district: 'East Godavari', state: 'Andhra Pradesh');
-      await tester.pump();
-      expect(find.text('EAST GODAVARI WIDE'), findsWidgets);
-      expect(find.text('TELANGANA WIDE'), findsNothing);
-      expect(find.text("Today's Rajahmundry Offers"), findsOneWidget);
-      await store.setLocation('506002', 'Warangal, Warangal Urban', town: 'Warangal', district: 'Warangal Urban', state: 'Telangana');
-      await tester.pump();
-      expect(find.text('TELANGANA WIDE'), findsWidgets);
-      expect(find.text('EAST GODAVARI WIDE'), findsNothing);
-      expect(find.text("Today's Warangal Offers"), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
-
+    // District-wide and state-wide offers are gone (owner, 11 Nov 2026): who sees an offer is decided by its shop's distance only
+    // (test/promotion_location_test.dart, test/area_location_test.dart).
     test('"Use my location" is remembered and follows the phone; a hand-picked town never does', () async {
       final store = await _store();
       expect(store.followsGps, isFalse);
@@ -398,24 +375,28 @@ void main() {
       reopened.dispose();
     });
 
-    test('products are filtered to the chosen town; unknown-town items and no town show everything', () async {
+    test('products follow their shop by distance, never a town name; an item without a shop shows nowhere', () async {
       final store = await _store();
-      store.catalog['shops']!.clear();
+      store.catalog['shops']!
+        ..clear()
+        ..addAll(const [
+          Entry('s-raj', {'name': 'Rajahmundry shop', 'latitude': 17.0005, 'longitude': 81.804}),
+          Entry('s-war', {'name': 'Warangal shop', 'latitude': 17.97, 'longitude': 79.59, 'town': 'Rajahmundry'}),
+        ]);
       store.catalog['products']!
         ..clear()
         ..addAll(const [
           Entry('p1', {'name': 'RAJ ITEM', 'town': 'Rajahmundry', 'active': true}),
-          Entry('p2', {'name': 'WARANGAL ITEM', 'town': 'Warangal', 'active': true}),
-          Entry('p3', {'name': 'OLD ITEM', 'shopId': 's1', 'active': true}),
+          Entry('p2', {'name': 'WARANGAL ITEM', 'shopId': 's-war', 'active': true}),
+          Entry('p3', {'name': 'RAJ SHOP ITEM', 'shopId': 's-raj', 'active': true}),
           Entry('p4', {'name': 'NOWHERE ITEM', 'active': true}),
         ]);
-      store.catalog['shops']!.add(const Entry('s1', {'name': 'Shop', 'town': 'Warangal'}));
-      expect(store.visibleProducts().map((p) => p.id), ['p1', 'p2', 'p3', 'p4'], reason: 'no town chosen: nothing hidden');
-      await store.setLocation('533101', 'x', town: 'Rajahmundry', district: 'East Godavari', state: 'Andhra Pradesh');
-      expect(store.visibleProducts().map((p) => p.id), ['p1', 'p4']);
+      expect(store.visibleProducts().length, 4, reason: 'only the demo with no place shows everything');
+      await store.setLocation('533101', 'x', lat: 17.0, lng: 81.8, town: 'Rajahmundry');
+      expect(store.visibleProducts().map((p) => p.id), ['p3'], reason: "a town name on the product or its shop does not count");
       expect(store.visibleProducts(all: true).length, 4);
-      await store.setLocation('506002', 'x', town: 'Warangal', district: 'Warangal Urban', state: 'Telangana');
-      expect(store.visibleProducts().map((p) => p.id), ['p2', 'p3', 'p4'], reason: "an old product follows its shop's town");
+      await store.setLocation('506002', 'x', lat: 17.97, lng: 79.6, town: 'Warangal');
+      expect(store.visibleProducts().map((p) => p.id), ['p2']);
       store.dispose();
     });
 
@@ -445,76 +426,6 @@ void main() {
     });
   });
 
-  group('admin Location field', () {
-    late ({int Function() fetches}) counter;
-    setUp(() => counter = usePlacesFixture());
-
-    testWidgets('search towns, whole districts and whole states; pick several; leave empty for all', (tester) async {
-      tester.view.physicalSize = const Size(1000, 2600);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await _store();
-      await tester.pumpWidget(MaterialApp(home: EntryEditor(store: store, collection: 'promotions')));
-      await tester.pump();
-      expect(counter.fetches(), 0, reason: 'opening the editor must not download the list');
-      await tester.enterText(find.widgetWithText(TextFormField, 'Headline / ticker text'), 'Diwali');
-      final search = find.byKey(const ValueKey('place-search'));
-      await tester.ensureVisible(search);
-
-      Future<void> pick(String query, Key result) async {
-        await tester.enterText(search, query);
-        await tester.pump();
-        await tester.pump();
-        final row = find.byKey(result);
-        expect(row, findsOneWidget, reason: query);
-        await tester.ensureVisible(row);
-        tester.widget<ListTile>(row).onTap!();
-        await tester.pump();
-      }
-
-      await pick('Raj', const ValueKey('place-result-Rajahmundry-533101'));
-      expect(counter.fetches(), realManifest.states.length, reason: 'the admin searches all of India');
-      await pick('East God', const ValueKey('place-area-district:East Godavari'));
-      await pick('Telan', const ValueKey('place-area-state:Telangana'));
-      final field = tester.widget<TextFormField>(find.byKey(const ValueKey('locations-text')));
-      expect(field.controller!.text, 'Rajahmundry (East Godavari), district:East Godavari, state:Telangana');
-      expect(find.byKey(const ValueKey('location-token-state:Telangana')), findsOneWidget);
-      expect(find.byKey(const ValueKey('location-token-district:East Godavari')), findsOneWidget);
-
-      // Removing a chip removes just that place.
-      final chip = find.byKey(const ValueKey('location-token-state:Telangana'));
-      tester.widget<InputChip>(chip).onDeleted!();
-      await tester.pump();
-      expect(field.controller!.text, 'Rajahmundry (East Godavari), district:East Godavari');
-
-      await tester.scrollUntilVisible(
-        find.text('Save changes'),
-        300,
-        scrollable: find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down).first,
-      );
-      await tester.drag(find.byType(ListView).first, const Offset(0, -300));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Save changes'));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      final saved = store.entries('promotions').firstWhere((e) => e.text('name') == 'Diwali');
-      expect(saved.text('locations'), 'Rajahmundry (East Godavari), district:East Godavari');
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
-
-    testWidgets('a new offer left blank shows everywhere', (tester) async {
-      tester.view.physicalSize = const Size(1000, 2600);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await _store();
-      await tester.pumpWidget(MaterialApp(home: EntryEditor(store: store, collection: 'promotions')));
-      await tester.pump();
-      expect(find.text('Nothing chosen: this shows in every town.'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    });
-  });
+  // The admin's Location field (towns, districts, states) is gone from the offer form (owner, 11 Nov 2026): an offer is shown near
+  // its shop only (test/radius_test.dart, the offer form).
 }

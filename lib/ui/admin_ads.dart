@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -5,13 +6,17 @@ import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/radius.dart';
+import '../domain/reach.dart';
+import 'location_picker_dialog.dart' show kmLabel;
 import '../domain/catalog.dart';
-import '../domain/towns.dart';
+import '../domain/ist_time.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_reports_page.dart';
 import 'admin_list_labels.dart';
 import 'ads_column.dart';
 import 'color_picker_field.dart';
+import 'ist_date_time_picker.dart';
 import 'shared.dart';
 
 /// The number the Ads section carries everywhere (the old "Advertisement boxes" number); each ad is a sub-number, e.g. 23.2.
@@ -78,7 +83,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
       reason = asked;
     }
     try {
-      final km = approveRadius[submission.id] ?? 10;
+      // The server still records a circle for its own checks: the admin's km, as the next of its fixed sizes.
+      final km = approveRadius[submission.id] ?? nextRadiusOption(store.reachKm) ?? radiusOptionsKm.last;
       final decide = widget.decide ?? (id, ok, why, radius) => store.call('decideVendorAd', {'submissionId': id, 'approved': ok, 'reason': why, if (radius > 0) 'radiusKm': radius});
       await decide(submission.id, approved, reason, km);
       if (mounted) message(context, approved ? 'Approved. The ad is live now.' : 'Rejected. The vendor has been told why.');
@@ -121,20 +127,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
               ],
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: 280,
-              child: DropdownButtonFormField<int>(
-                key: ValueKey('approve-radius-${s.id}-${approveRadius[s.id] ?? 10}'),
-                isExpanded: true,
-                initialValue: approveRadius[s.id] ?? 10,
-                decoration: const InputDecoration(labelText: 'Radius around the vendor shop', isDense: true, border: OutlineInputBorder()),
-                items: [
-                  const DropdownMenuItem(value: 0, child: Text('No radius')),
-                  for (final km in radiusOptionsKm) DropdownMenuItem(value: km, child: Text('@km km')),
-                ],
-                onChanged: (v) => setState(() => approveRadius[s.id] = v ?? 10),
-              ),
-            ),
+            // Distance only (lib/domain/reach.dart): the ad reaches the customers within the km of Business Profile of the vendor's shop.
+            Text("Shown to customers within ${kmLabel(store.reachKm)} km of the vendor's shop (Business Profile).", key: ValueKey('approve-reach-${s.id}'), style: const TextStyle(fontSize: 12)),
             const SizedBox(height: 8),
             Row(children: [
               FilledButton.icon(key: ValueKey('approve-${s.id}'), onPressed: () => _decide(s, true), icon: const Icon(Icons.check), label: const Text('Approve')),
@@ -158,14 +152,15 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
   }
 
   Future<void> _renew(Entry ad, String by) async {
-    var end = renewedEnd(ad, DateTime.now(), by: by);
+    final now = ServerClock.now();
+    var end = renewedEnd(ad, now, by: by);
     if (by == 'custom') {
-      final picked = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 30)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 1500)));
+      final picked = await pickIstDateTime(context, initial: now.add(const Duration(days: 30)), helpText: 'Run until (India time)', endOfDay: true);
       if (picked == null) return;
-      end = DateTime(picked.year, picked.month, picked.day, 23, 59).toIso8601String();
+      end = istIso(picked);
     }
     await store.updateFields('ads', ad.id, {'endsAt': end, 'active': true});
-    if (mounted) message(context, 'Renewed: now runs until ${end.substring(0, 10)}.');
+    if (mounted) message(context, 'Renewed: now runs until ${istLabel(parseIstTime(end))}.');
   }
 
   /// Copies the old ad boxes into the unified list (the old ones stay where they are). Switched on as they were.
@@ -194,7 +189,8 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
   Widget _body(BuildContext context, List<Entry> pendingSubmissions) => ListenableBuilder(
     listenable: store,
     builder: (context, _) {
-      final now = DateTime.now();
+      // The server's time decides Live / Scheduled / Expired, as for customers (lib/services/server_clock.dart).
+      final now = ServerClock.now();
       final all = sortedByOrder(store.entries('ads'));
       final shown = status == 'pending' ? <Entry>[] : filterAds(all, now, status: status, query: search.text);
       final adsConfig = AdsConfig.from(store.entries('settings'));
@@ -239,7 +235,7 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
             key: const ValueKey('ads-common-settings'),
             tilePadding: EdgeInsets.zero,
             title: Text('Common settings for all ads  ·  $adsSectionNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Slots, box size, corners, gap, border, shadow, animation, speed, seconds'),
+            subtitle: const Text('Seconds each box shows (also Today\'s Offers), slots, box size, corners, gap, border, shadow, animation, speed'),
             children: [AdsConfigForm(store: store)],
           ),
           const Divider(),
@@ -327,11 +323,12 @@ class _AdminAdsPageState extends State<AdminAdsPage> {
             ],
           ),
         ),
-        title: Text(ad.text('title', ad.text('name', '(no title)'))),
+        title: SampleTitle(ad.text('title', ad.text('name', '(no title)')), id: ad.id, data: ad.data),
         subtitle: Text([
           if (ad.text('shopName').isNotEmpty) ad.text('shopName'),
           if (ad.text('vendorCode').isNotEmpty) ad.text('vendorCode'),
-          if (left != null) st == 'expired' ? 'ended' : '$left day(s) left',
+          if (left != null) st == 'expired' ? 'ended ${istLabel(parseIstTime(ad.text('endsAt')))}' : '$left day(s) left, until ${istLabel(parseIstTime(ad.text('endsAt')))}',
+          if (st == 'scheduled') 'starts ${istLabel(parseIstTime(ad.text('startsAt')))}',
           adPackages[ad.text('package')] ?? 'Normal',
         ].join('  ·  ')),
         trailing: Wrap(
@@ -456,7 +453,7 @@ class _AdsConfigFormState extends State<AdsConfigForm> {
                 _number('gap', 'Gap between boxes', c.gap.round(), suffix: 'px'),
                 _number('borderWidth', 'Border thickness', c.borderWidth.round(), suffix: 'px'),
                 _number('shadow', 'Shadow strength (0–1)', c.shadow),
-                _number('seconds', 'Seconds each ad stays (default)', c.seconds),
+                _number('seconds', "Seconds each box shows before the next one (ads, Today's Offers boxes and right-side boxes)", c.seconds),
                 _number('maxPerArea', 'Maximum ads or offers over the same area (0 = no limit)', c.maxPerArea),
                 _number('animationSpeed', 'Animation speed (1 slow – 10 fast)', c.animationSpeed),
                 SizedBox(
@@ -581,8 +578,6 @@ class _AdEditorPageState extends State<AdEditorPage> {
 
   String s(String key) => values[key] == null ? '' : '${values[key]}';
 
-  /// The radius as the list shows it ("10"), whether it was saved as 10 or 10.0.
-  String get radiusText => (values['radiusKm'] is num && (values['radiusKm'] as num) > 0) ? '${(values['radiusKm'] as num).round()}' : '';
   void _set(String key, Object? v) => setState(() => v == null || '$v'.isEmpty ? values.remove(key) : values[key] = v);
 
   Widget _field(String key, String label, {int lines = 1, TextInputType? type, String? hint}) => TextField(
@@ -609,11 +604,12 @@ class _AdEditorPageState extends State<AdEditorPage> {
     }
   }
 
+  /// The start or end: a date and then a time, both India time, saved with the zone (+05:30) so every phone reads the same moment.
   Future<void> _pickDate(String key, {required bool end}) async {
-    final initial = DateTime.tryParse(s(key)) ?? DateTime.now();
-    final picked = await showDatePicker(context: context, initialDate: initial, firstDate: DateTime(2024), lastDate: DateTime(2100));
+    final initial = parseIstTime(s(key)) ?? ServerClock.now();
+    final picked = await pickIstDateTime(context, initial: initial, helpText: end ? 'Ends (India time)' : 'Starts (India time)', endOfDay: end && s(key).isEmpty);
     if (picked == null) return;
-    _set(key, (end ? DateTime(picked.year, picked.month, picked.day, 23, 59) : DateTime(picked.year, picked.month, picked.day)).toIso8601String());
+    _set(key, istIso(picked));
   }
 
   Future<void> _addSlot() async {
@@ -625,20 +621,7 @@ class _AdEditorPageState extends State<AdEditorPage> {
     _set('slots', slotsToText(slots));
   }
 
-  /// The common radius: pick a size from the list and the shop whose saved location is the centre (copied in automatically).
-  void _setRadius(String? km) {
-    setState(() {
-      if (km == null || km.isEmpty) {
-        for (final k in ['radiusKm', 'radiusShopId', 'radiusLat', 'radiusLng']) {
-          values.remove(k);
-        }
-      } else {
-        values['radiusKm'] = int.parse(km);
-        _centreFromShop();
-      }
-    });
-  }
-
+  /// The ad's shop (required): its saved location is copied in automatically.
   void _setRadiusShop(String? shopId) {
     setState(() {
       if (shopId == null || shopId.isEmpty) {
@@ -661,21 +644,27 @@ class _AdEditorPageState extends State<AdEditorPage> {
 
   String? _validate() {
     if (s('title').isEmpty && s('imageUrl').isEmpty) return 'Add a title or a picture.';
-    final start = DateTime.tryParse(s('startsAt')), end = DateTime.tryParse(s('endsAt'));
-    if (start != null && end != null && end.isBefore(start)) return 'The end date is before the start date.';
+    final start = parseIstTime(s('startsAt')), end = parseIstTime(s('endsAt'));
+    if (start != null && end != null && !end.isAfter(start)) return 'The end is not after the start.';
     final action = s('tapAction');
     if ((action == 'call' || action == 'whatsapp') && s('tapValue').replaceAll(RegExp(r'[^0-9]'), '').length < 10) return 'Enter a 10-digit phone number for the tap action.';
     if ((action == 'link') && !s('tapValue').startsWith('https://')) return 'A link must start with https://';
     if (action == 'shop' && s('tapValue').isEmpty) return 'Choose the shop.';
-    if (hasRadius(Entry(id, values))) {
-      if (!radiusOptionsKm.contains(values['radiusKm'])) return 'Choose a radius from the list.';
-      final shop = widget.store.entries('shops').where((x) => x.id == s('radiusShopId')).firstOrNull;
-      if (shop == null) return 'Choose the shop whose location is the centre of the radius.';
-      if (shop.number('latitude') == 0 && shop.number('longitude') == 0) return '"${shop.text('name')}" has no saved location yet. Add the shop location first.';
-      final others = [...widget.store.entries('ads'), for (final p in widget.store.entries('promotions')) if (p.text('placement') == 'ad') p];
-      final full = areaFullMessage(Entry(id, values), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
-      if (full != null) return full;
-    }
+    // Customers see an ad only within the km of Business Profile of its shop (lib/domain/reach.dart): an ad for customers needs a
+    // shop with a saved location (the Shop box, or the shop it opens). Ads only for the vendor and staff apps follow their own rules.
+    if (!adAudience(Entry(id, values)).contains('customers')) return null;
+    final shopId = linkedShopId(Entry(id, values));
+    final shop = widget.store.entries('shops').where((x) => x.id == shopId).firstOrNull;
+    if (shop == null) return 'Choose the shop: only customers near that shop see the ad.';
+    if (shop.number('latitude') == 0 && shop.number('longitude') == 0) return '"${shop.text('name')}" has no saved location yet. Add the shop location first.';
+    final km = widget.store.reachKm;
+    Entry withKm(Entry e) => Entry(e.id, {...e.data, 'radiusKm': km});
+    final others = [
+      for (final a in widget.store.entries('ads')) if (linkedShopId(a).isNotEmpty) withKm(a),
+      for (final p in widget.store.entries('promotions')) if (p.text('placement') == 'ad' && linkedShopId(p).isNotEmpty) withKm(p),
+    ];
+    final full = areaFullMessage(withKm(Entry(id, {...values, 'radiusLat': shop.number('latitude'), 'radiusLng': shop.number('longitude')})), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
+    if (full != null) return full;
     return null;
   }
 
@@ -723,8 +712,6 @@ class _AdEditorPageState extends State<AdEditorPage> {
     final package = s('package').isEmpty ? 'normal' : s('package');
     final type = s('contentType');
     final shops = widget.store.entries('shops');
-    final towns = parseServiceTowns(widget.store.business.text('serviceTowns')).map((t) => t.name).toList();
-    final chosenTowns = parseLocationList(s('locations')).map((t) => t.toLowerCase()).toSet();
     final audience = adAudience(Entry(id, values));
     final chosenCategories = adCategories(Entry(id, values));
     // The categories the shops have, as their owners typed them; each spelling once.
@@ -873,13 +860,13 @@ class _AdEditorPageState extends State<AdEditorPage> {
             ],
             if (!audience.contains('customers')) const Text('Places and radius below apply to customers only.', style: TextStyle(fontSize: 12)),
             Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-              OutlinedButton.icon(key: const ValueKey('ad-start'), onPressed: () => _pickDate('startsAt', end: false), icon: const Icon(Icons.event), label: Text(s('startsAt').isEmpty ? 'Start date: from now' : 'Start: ${s('startsAt').substring(0, 10)}')),
+              OutlinedButton.icon(key: const ValueKey('ad-start'), onPressed: () => _pickDate('startsAt', end: false), icon: const Icon(Icons.event), label: Text(s('startsAt').isEmpty ? 'Start: from now' : 'Start: ${istLabel(parseIstTime(s('startsAt')))}')),
               if (s('startsAt').isNotEmpty) TextButton(onPressed: () => _set('startsAt', null), child: const Text('Clear')),
-              OutlinedButton.icon(key: const ValueKey('ad-end'), onPressed: () => _pickDate('endsAt', end: true), icon: const Icon(Icons.event_busy), label: Text(s('endsAt').isEmpty ? 'End date: never' : 'End: ${s('endsAt').substring(0, 10)}')),
+              OutlinedButton.icon(key: const ValueKey('ad-end'), onPressed: () => _pickDate('endsAt', end: true), icon: const Icon(Icons.event_busy), label: Text(s('endsAt').isEmpty ? 'End: never' : 'End: ${istLabel(parseIstTime(s('endsAt')))}')),
               if (s('endsAt').isNotEmpty) TextButton(onPressed: () => _set('endsAt', null), child: const Text('Clear')),
               if (widget.ad != null) ...[
-                TextButton(key: const ValueKey('ad-renew-week'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), DateTime.now(), by: 'week')), child: const Text('Renew +1 week')),
-                TextButton(key: const ValueKey('ad-renew-month'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), DateTime.now(), by: 'month')), child: const Text('Renew +1 month')),
+                TextButton(key: const ValueKey('ad-renew-week'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), ServerClock.now(), by: 'week')), child: const Text('Renew +1 week')),
+                TextButton(key: const ValueKey('ad-renew-month'), onPressed: () => _set('endsAt', renewedEnd(Entry(id, values), ServerClock.now(), by: 'month')), child: const Text('Renew +1 month')),
               ],
             ]),
             Text(_label('Days of the week', days.length == 7 ? 'every day' : days.map((d) => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]).join(', ')), style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -906,58 +893,24 @@ class _AdEditorPageState extends State<AdEditorPage> {
                 ),
               ActionChip(key: const ValueKey('ad-add-slot'), avatar: const Icon(Icons.add), label: const Text('Add time slot'), onPressed: _addSlot),
             ]),
-            Text(_label('Show only in these places', s('locations').isEmpty ? 'everywhere' : s('locations')), style: const TextStyle(fontWeight: FontWeight.w600)),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              FilterChip(
-                key: const ValueKey('ad-loc-ap'),
-                label: const Text('All Andhra Pradesh'),
-                selected: chosenTowns.contains('andhra pradesh'),
-                onSelected: (on) => _set('locations', on ? 'Andhra Pradesh' : null),
+            // Who sees the ad is decided by its SHOP only (distance only, lib/domain/reach.dart): customers within the km of Business
+            // Profile of the shop's saved location. Places, towns and an ad's own radius no longer count; without a shop nobody sees it.
+            Text(_label('Shop', shops.where((x) => x.id == s('radiusShopId')).firstOrNull?.text('name') ?? 'not chosen'), style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('Required. Only customers within ${kmLabel(widget.store.reachKm)} km of this shop (Business Profile) see the ad.', style: const TextStyle(fontSize: 12)),
+            SizedBox(
+              width: 300,
+              child: DropdownButtonFormField<String>(
+                key: ValueKey('ad-radius-shop-${s('radiusShopId')}'),
+                isExpanded: true,
+                initialValue: shops.any((x) => x.id == s('radiusShopId')) ? s('radiusShopId') : '',
+                decoration: const InputDecoration(labelText: 'Shop', isDense: true, border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('Choose the shop')),
+                  for (final x in shops) if (x.number('latitude') != 0 || x.number('longitude') != 0) DropdownMenuItem(value: x.id, child: Text(x.text('name'), overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: _setRadiusShop,
               ),
-              for (final t in towns)
-                FilterChip(
-                  label: Text(t),
-                  selected: chosenTowns.contains(t.toLowerCase()),
-                  onSelected: (on) {
-                    final next = parseLocationList(s('locations')).where((x) => x.toLowerCase() != t.toLowerCase() && x.toLowerCase() != 'andhra pradesh').toList();
-                    if (on) next.add(t);
-                    _set('locations', next.isEmpty ? null : next.join(', '));
-                  },
-                ),
-            ]),
-            _field('locations', 'Places (comma-separated; blank = everywhere)'),
-            Text(_label('Radius around a shop', values['radiusKm'] == null ? 'none' : '${values['radiusKm']} km'), style: const TextStyle(fontWeight: FontWeight.w600)),
-            const Text('Shown only to customers inside the circle. The centre is the saved location of the chosen shop.', style: TextStyle(fontSize: 12)),
-            Wrap(spacing: 12, runSpacing: 12, children: [
-              SizedBox(
-                width: 240,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('ad-radius-$radiusText'),
-                  isExpanded: true,
-                  initialValue: radiusText,
-                  decoration: const InputDecoration(labelText: 'Radius', isDense: true, border: OutlineInputBorder()),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('No radius')),
-                    for (final km in radiusOptionsKm) DropdownMenuItem(value: '$km', child: Text('$km km')),
-                  ],
-                  onChanged: _setRadius,
-                ),
-              ),
-              SizedBox(
-                width: 300,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('ad-radius-shop-${s('radiusShopId')}'),
-                  isExpanded: true,
-                  initialValue: shops.any((x) => x.id == s('radiusShopId')) ? s('radiusShopId') : '',
-                  decoration: const InputDecoration(labelText: 'Centre: shop location', isDense: true, border: OutlineInputBorder()),
-                  items: [
-                    const DropdownMenuItem(value: '', child: Text('None')),
-                    for (final x in shops) if (x.number('latitude') != 0 || x.number('longitude') != 0) DropdownMenuItem(value: x.id, child: Text(x.text('name'), overflow: TextOverflow.ellipsis)),
-                  ],
-                  onChanged: _setRadiusShop,
-                ),
-              ),
-            ]),
+            ),
             if (values['radiusLat'] != null) Text('Centre: ${values['radiusLat']}, ${values['radiusLng']}', key: const ValueKey('ad-radius-centre'), style: const TextStyle(fontSize: 12)),
           ]),
           _group('3 · How much', 'howmuch', [

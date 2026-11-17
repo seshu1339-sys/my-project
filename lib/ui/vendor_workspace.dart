@@ -3,20 +3,25 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import '../modules/offers/offers_module.dart';
+import '../modules/photolimits/photolimits_module.dart';
+import '../modules/showcase/showcase_module.dart';
 import 'my_numbers_card.dart';
-import 'quick_add.dart';
 import 'vendor_ads_page.dart';
+import '../modules/plans/plans_module.dart' show VendorPlanBadge;
+import 'vendor_plans_page.dart';
 import 'vendor_plans_payment.dart';
 import 'vendor_premium_entry.dart';
 import 'vendor_section_exclusives.dart';
 import 'vendor_section_kit.dart';
 import 'vendor_section_orders.dart';
 import 'vendor_section_products.dart';
+import 'vendor_section_rates.dart';
 import 'vendor_section_requests.dart';
 import 'vendor_section_shop_ad.dart';
 import 'vendor_section_shop_photos.dart';
 import 'screen_view.dart';
 import '../services/usage.dart';
+import 'shop_ratings.dart';
 
 /// Business features. Only built once the application status is approved; the
 /// server independently refuses every one of these actions for anyone else.
@@ -41,23 +46,36 @@ class VendorWorkspace extends StatelessWidget {
         return Padding(padding: const EdgeInsets.only(top: 4), child: Text('Vendor ID: $code', style: Theme.of(context).textTheme.bodyMedium));
       },
     ),
+    // The plan at the top: Free Plan + Upgrade, or the running plan and its end (owner, 13 Nov 2026).
+    VendorPlanBadge(store: store, uid: uid, onUpgrade: () => openVendorPlans(context, store, uid)),
     const SizedBox(height: 8),
+    // "Are today's rates the same?" + "Yes, same rates" (owner, 16 Nov 2026), on top of the home; the daily reminder opens the app here.
+    VendorRatesCard(store: store, uid: uid),
     const Text('Your application is approved. Public changes are either published immediately by policy or held for administrator approval.'),
-    QuickAddHome(store: store),
     const SizedBox(height: 12),
     // How many called, messaged and took directions to the shop (Analytics, functions/usage.js).
     MyNumbersCard(store: store, ownerId: uid, events: const ['shop_call', 'shop_whatsapp', 'shop_directions', 'item_added', 'price_changed']),
+    // The shop's ratings from customers: names, stars, comments (lib/ui/shop_ratings.dart).
+    for (final shop in store.entries('shops').where((s) => s.text('ownerId') == uid || s.id == uid).take(1)) MyRatingsCard(store: store, targetKey: 'shop_${shop.id}'),
     const SizedBox(height: 20),
     VendorPremiumEntry(store: store, uid: uid),
+    // Paid vendors: their right-side ad box photo and reach (lib/modules/showcase).
+    VendorShowcaseSection(store: store, uid: uid),
     VendorPlansWithPayment(store: store, uid: uid),
     VendorOffersSection(store: store, uid: uid),
-    VendorShopPhotosSection(store: store, uid: uid),
-    VendorShopAdSection(store: store, uid: uid),
+    // The shop photo slots follow the vendor's extra photos (free 2, or the paid plan's number).
+    StreamBuilder<PhotoAllowance>(
+      stream: watchPhotoAllowance(store, uid),
+      builder: (context, allowance) => VendorShopPhotosSection(store: store, uid: uid, allowance: allowance.data),
+    ),
+    VendorShopAdSection(store: store, uid: uid, uploadPhotoPage: (_) => VendorAdEditor(store: store, uid: uid)),
     VendorMyAdsCard(store: store, uid: uid),
     const SizedBox(height: 20),
-    VendorAddProductSection(store: store, uid: uid),
+    VendorAddProductSection(store: store, uid: uid, onUpgrade: () => openVendorPlans(context, store, uid)),
     // The vendor's own shop's products (including ones the office added for the shop), not only the ones the vendor submitted itself.
     VendorMyProductsSection(store: store, uid: uid),
+    // Our standard photo or the vendor's own, per item (lib/modules/photolimits).
+    ItemPhotosSection(store: store, uid: uid),
     VendorChangeRequestSection(store: store, uid: uid),
     VendorVerifyPurchaseSection(store: store),
     VendorExclusivesSection(store: store, uid: uid),

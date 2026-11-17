@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -10,6 +11,13 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+// The Google Maps key of the staff app's area map (Maps SDK for Android), kept out of git in android/local.properties as
+// MAPS_API_KEY=... . Without it the apps build as before and the staff app uses its free OpenStreetMap map.
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
 }
 
 android {
@@ -34,6 +42,7 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
     }
 
     // Three Android apps from this one project, all on the same Firebase backend. Each flavor has its own
@@ -48,17 +57,17 @@ android {
         create("customer") {
             dimension = "app"
             applicationId = "in.locamarket.locamark"
-            resValue("string", "app_name", "Loca Market")
+            resValue("string", "app_name", "LOCAMARKET")
         }
         create("vendor") {
             dimension = "app"
             applicationId = "in.locamarket.vendor"
-            resValue("string", "app_name", "V Loca Market")
+            resValue("string", "app_name", "Loca Market Vendor")
         }
         create("staff") {
             dimension = "app"
             applicationId = "in.locamarket.staff"
-            resValue("string", "app_name", "S Loca Market")
+            resValue("string", "app_name", "Loca Market staff")
         }
     }
 
@@ -75,6 +84,11 @@ android {
 
     buildTypes {
         release {
+            // Crashlytics: the build id only. The apps start Firebase from dart-define values (no google-services.json plugin), so the
+            // R8 mapping upload, which needs that plugin's app id, is off; Flutter crashes carry their own Dart stack anyway.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
             // Falls back to the debug key only if key.properties/upload-keystore.jks
             // haven't been generated yet (see https://flutter.dev/to/reference-keystore).
             signingConfig = if (keystorePropertiesFile.exists()) {

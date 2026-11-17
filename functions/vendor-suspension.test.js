@@ -5,10 +5,10 @@ test('admin can suspend and reinstate a vendor; access and catalog follow', {ski
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const vendor = {auth: {uid: 'susV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'susV', token: {role: 'vendor', email_verified: true}}};
   const suspend = (data, ctx = admin) => fns.setVendorSuspension.run({...ctx, data});
   await db.collection('vendors').doc('susV').set({vendorId: 'susV', name: 'Sus Shop', shopId: 'susShop', status: 'approved', verified: true});
   await db.collection('vendors').doc('pendingV').set({vendorId: 'pendingV', name: 'Not approved', shopId: 'pendingV', status: 'payment_required'});
@@ -20,7 +20,7 @@ test('admin can suspend and reinstate a vendor; access and catalog follow', {ski
   const flag = async id => (await db.collection('products').doc(id).get()).data();
 
   // ---- who may do it, and to whom
-  await assert.rejects(() => suspend({vendorId: 'susV', suspended: true, reason: 'x'}, {auth: {uid: 'susV', token: {email_verified: true}}}), /Administrator/);
+  await assert.rejects(() => suspend({vendorId: 'susV', suspended: true, reason: 'x'}, {auth: {uid: 'susV', token: {role: 'vendor', email_verified: true}}}), /Administrator/);
   await assert.rejects(() => suspend({vendorId: 'susV', suspended: true, reason: 'x'}, {}), /Sign in/);
   await assert.rejects(() => suspend({vendorId: 'susV', suspended: true, reason: ''}), /reason/i);           // a reason is required
   await assert.rejects(() => suspend({vendorId: 'nobody', suspended: true, reason: 'because'}), /not found/i);

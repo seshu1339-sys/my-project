@@ -5,8 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../domain/post_duration.dart';
 import '../domain/radius.dart';
+import '../domain/reach.dart';
 import 'admin_fields.dart';
+import 'agent_focus.dart';
 import 'color_picker_field.dart';
 import '../domain/towns.dart';
 import 'geo_target_picker.dart';
@@ -71,6 +74,8 @@ class _EntryEditorState extends State<EntryEditor> {
   bool active = true, busy = false;
   // Shops only, and only the admin can change it: this shop's delivery charge is waived.
   bool freeDelivery = false;
+  // Categories: the vendor must add their own photo for items of this category (for example sarees).
+  bool ownPhotoRequired = false;
   // Set only once the geo-target picker is actually used this session; null
   // means "leave whatever shape data this promotion already has untouched"
   // (the spread in save() below already carries that forward).
@@ -91,6 +96,11 @@ class _EntryEditorState extends State<EntryEditor> {
     'searchRadiusDefaultKm',
     'searchRadiusMaxKm',
     'vendorPhotoLimit',
+    'photoSearchesPerDay',
+    'abuseReportsToSuspend',
+    'photoSafetyChecksPerDay',
+    'adminAiPerDay',
+    'adminSearchAiPerDay',
     'fieldPhotoLimit',
     'quickItemsPerDayStaff',
     'quickItemsPerDayVendor',
@@ -119,6 +129,7 @@ class _EntryEditorState extends State<EntryEditor> {
     super.initState();
     active = widget.entry?.active ?? true;
     freeDelivery = widget.entry?.data['freeDelivery'] == true;
+    ownPhotoRequired = widget.entry?.data['ownPhotoRequired'] == true;
     controllers = fields[widget.collection]!.map((key, label) {
       final value = widget.entry?.data[key];
       final text = key == 'translations' && value is Map
@@ -188,30 +199,26 @@ class _EntryEditorState extends State<EntryEditor> {
     super.dispose();
   }
 
-  /// The common radius (same rule for Ads and Today's Offers): the radius must be one of the fixed options, the centre is the chosen shop's saved
-  /// location (copied here), and the area may not already be full (Settings > Ads > maximum per area).
-  void _applyRadius(Map<String, dynamic> data) {
-    final km = (data['radiusKm'] as num?)?.toDouble() ?? 0;
-    if (km <= 0) {
-      for (final k in ['radiusKm', 'radiusShopId', 'radiusLat', 'radiusLng']) {
-        data.remove(k);
-      }
-      return;
-    }
-    if (!radiusOptionsKm.contains(km.round())) throw StateError('Choose a radius from the list: 5, 10, 25, 50 or 100 km.');
+  /// Who sees an offer is decided by its SHOP only (distance only, lib/domain/reach.dart): customers within the admin's km of the
+  /// shop's saved location. The shop is required (an offer without one is shown to nobody), its location is copied here, and the
+  /// area may not already be full (Settings > Ads > maximum per area, counted with the admin's km). An old offer's own radius,
+  /// pincode or target area is kept in its record but no longer used.
+  void _applyShop(Map<String, dynamic> data) {
     final shop = widget.store.entries('shops').where((s) => s.id == data['radiusShopId']).firstOrNull;
-    if (shop == null) throw StateError('Choose the shop whose location is the centre of the radius.');
+    if (shop == null) throw StateError('Choose the shop: only customers near that shop see this offer.');
     final lat = shop.number('latitude'), lng = shop.number('longitude');
     if (lat == 0 && lng == 0) throw StateError('"${shop.text('name')}" has no saved location yet. Add the shop location first.');
     data['radiusLat'] = lat;
     data['radiusLng'] = lng;
+    final km = widget.store.reachKm;
+    Entry withKm(Entry e) => Entry(e.id, {...e.data, 'radiusKm': km});
     final id = widget.entry?.id ?? '';
     final same = data['placement']?.toString() ?? '';
     final others = [
-      for (final p in widget.store.entries('promotions')) if (p.id != id && p.text('placement') == same) p,
-      if (same == 'ad') ...widget.store.entries('ads'),
+      for (final p in widget.store.entries('promotions')) if (p.id != id && p.text('placement') == same && linkedShopId(p).isNotEmpty) withKm(p),
+      if (same == 'ad') ...[for (final a in widget.store.entries('ads')) if (linkedShopId(a).isNotEmpty) withKm(a)],
     ];
-    final problem = areaFullMessage(Entry(id, data), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
+    final problem = areaFullMessage(withKm(Entry(id, data)), others, AdsConfig.from(widget.store.entries('settings')).maxPerArea);
     if (problem != null) throw StateError(problem);
   }
 
@@ -223,6 +230,7 @@ class _EntryEditorState extends State<EntryEditor> {
     try {
       final data = <String, dynamic>{...?widget.entry?.data, 'active': active};
       if (widget.collection == 'shops') data['freeDelivery'] = freeDelivery;
+      if (widget.collection == 'categories') data['ownPhotoRequired'] = ownPhotoRequired;
       for (final field in controllers.entries) {
         final value = field.value.text.trim();
         if (numeric.contains(field.key)) {
@@ -263,7 +271,7 @@ class _EntryEditorState extends State<EntryEditor> {
           data[field.key] = value;
         }
       }
-      if (widget.collection == 'promotions') _applyRadius(data);
+      if (widget.collection == 'promotions') _applyShop(data);
       // A record of the services collection is a service listing unless it is one of the fixed service types.
       if (widget.collection == 'services' && data['kind'] == null) data['kind'] = 'service';
       if (pickedShape != null) {
@@ -486,6 +494,29 @@ class _EntryEditorState extends State<EntryEditor> {
           child: Text('Never notify subscribers'),
         ),
       ];
+    } else if (key == 'autoApproval') {
+      // Auto Approval (functions/photo-safety.js checks the photos with AI): OFF unless the admin turns it on.
+      options = const [
+        DropdownMenuItem(value: '', child: Text('Off (admin approves)')),
+        DropdownMenuItem(value: 'true', child: Text('On (AI photo check)')),
+      ];
+    } else if (key == 'rateReminder') {
+      // The daily "Are today's rates the same?" to every vendor app (functions/vendor-rates.js), ON unless switched off.
+      options = const [
+        DropdownMenuItem(value: '', child: Text('On (default)')),
+        DropdownMenuItem(value: 'false', child: Text('Off')),
+      ];
+    } else if (key == 'rateReminderHour') {
+      options = [
+        const DropdownMenuItem(value: '', child: Text('8:00 AM (default)')),
+        for (var h = 0; h < 24; h++) DropdownMenuItem(value: '$h', child: Text('${h % 12 == 0 ? 12 : h % 12}:00 ${h < 12 ? 'AM' : 'PM'}')),
+      ];
+    } else if (key == 'postDuration') {
+      // One post duration for everyone (lib/domain/post_duration.dart, functions/post-duration.js).
+      options = [
+        const DropdownMenuItem(value: '', child: Text('24 hours (default)')),
+        for (final MapEntry(key: value, value: label) in postDurationChoices.entries) DropdownMenuItem(value: value, child: Text(label)),
+      ];
     } else if (key == 'defaultPaymentMethod') {
       options = const [
         DropdownMenuItem(
@@ -508,7 +539,7 @@ class _EntryEditorState extends State<EntryEditor> {
       ];
     } else if (widget.collection == 'promotions' && key == 'radiusShopId') {
       options = [
-        const DropdownMenuItem(value: '', child: Text('None')),
+        const DropdownMenuItem(value: '', child: Text('Choose the shop')),
         for (final shop in widget.store.entries('shops'))
           if (shop.number('latitude') != 0 || shop.number('longitude') != 0) DropdownMenuItem(value: shop.id, child: Text(shop.text('name'), overflow: TextOverflow.ellipsis)),
       ];
@@ -859,7 +890,8 @@ class _EntryEditorState extends State<EntryEditor> {
         constraints: const BoxConstraints(maxWidth: 760),
         child: Form(
           key: form,
-          child: ListView(
+          // Opened by the command box at one field: the whole form is built at once, so the field far down can be scrolled to.
+          child: AgentFormList(
             padding: const EdgeInsets.all(24),
             children: [
               const Text(
@@ -873,7 +905,8 @@ class _EntryEditorState extends State<EntryEditor> {
               for (final f in fields[widget.collection]!.entries)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 18),
-                  child: field(f.key, f.value),
+                  // The command box's field glows and scrolls into view (lib/ui/agent_focus.dart).
+                  child: AgentFocusTarget(fieldKey: f.key, child: field(f.key, f.value)),
                 ),
               if (controllers.containsKey('imageUrl'))
                 OutlinedButton.icon(
@@ -933,6 +966,14 @@ class _EntryEditorState extends State<EntryEditor> {
                   onChanged: (v) => setState(() => freeDelivery = v),
                   title: const Text('Free delivery'),
                   subtitle: const Text('This shop pays no delivery charge. Only the admin can change this.'),
+                ),
+              if (widget.collection == 'categories')
+                SwitchListTile(
+                  key: const ValueKey('category-own-photo-required'),
+                  value: ownPhotoRequired,
+                  onChanged: (v) => setState(() => ownPhotoRequired = v),
+                  title: const Text('Vendor photo compulsory'),
+                  subtitle: const Text("Every shop's model differs (plastic, fancy ...): vendors take a photo of their own model before saving an item of this category; it shows after the AI photo check. Off: our catalog photo is used."),
                 ),
               SwitchListTile(
                 value: active,

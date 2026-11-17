@@ -1,13 +1,13 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
 
   const uid = 'agentExecAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentexec1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentexec1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 60 * 60 * 1000)});
   // Explicit, not relying on the RBAC bootstrap carve-out — other test files
   // (ai-agent-rbac.test.js) also write to aiAgentRoles, so this cannot assume
@@ -51,14 +51,14 @@ test('AI Agent executor: whitelist, module gating, propose/confirm/reject', {ski
   assert.equal(rejectResult.status, 'rejected');
 
   // ---- only the admin who proposed an action may decide it.
-  const other = {auth: {uid: 'agentExecAdmin2', token: {admin: true, email_verified: true, email: 'agentexec2@example.test'}}};
+  const other = {auth: {uid: 'agentExecAdmin2', token: {role: 'admin', admin: true, email_verified: true, email: 'agentexec2@example.test'}}};
   await db.collection('_adminSessions').doc('agentExecAdmin2').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc('agentExecAdmin2').set({role: 'owner'});
   const anotherProposal = await fns.proposeAgentAction.run({...admin, data: {action: 'resizeSection', params: {layoutKey: 'popular', height: 400}}});
   await assert.rejects(() => fns.confirmAgentAction.run({...other, data: {pendingActionId: anotherProposal.pendingActionId}}), /Only the admin who proposed/);
 });
 
-test('AI Agent executor: serverAction branch calls the integration write function directly, existing kinds unaffected', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent executor: serverAction branch calls the integration write function directly, existing kinds unaffected', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
@@ -66,7 +66,7 @@ test('AI Agent executor: serverAction branch calls the integration write functio
   const github = require('./ai-agent-github');
 
   const uid = 'agentServerActionAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentserveraction1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentserveraction1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc(uid).set({role: 'owner'});
   await db.collection('aiAgentConfig').doc('global').set({enabled: true, modules: {}, llmProvider: 'none', voiceProvider: 'text-match'});

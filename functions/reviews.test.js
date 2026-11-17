@@ -5,7 +5,7 @@ test('submitVerifiedReview keeps a precomputed avgRating/reviewCount on the prod
   const {getFirestore} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const submit = (uid, data) => fns.submitVerifiedReview.run({auth: {uid, token: {email_verified: true}}, data});
+  const submit = (uid, data) => fns.submitVerifiedReview.run({auth: {uid, token: {role: 'user', email_verified: true}}, data});
 
   await db.collection('products').doc('p1').set({name: 'Rated product', price: 100, active: true});
   // Two different verified-purchase customers, each with their own order

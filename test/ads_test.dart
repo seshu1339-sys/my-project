@@ -2,6 +2,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ecommerce_app/domain/ads.dart';
+import 'package:ecommerce_app/domain/reach.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/ad_box.dart';
 import 'package:ecommerce_app/ui/ad_transitions.dart';
@@ -44,17 +45,19 @@ void main() {
       expect(adLiveNow(ad('a', {'status': 'pending'}), monday), isFalse);
     });
 
-    test('location: ads for the customer\'s town, else the general ones; pinned first, then the admin\'s order', () {
+    test("location: only ads of shops within reach (distance only), never by town and never for everyone; pinned first, then the admin's order", () {
       final all = [
-        ad('3', {'locations': 'Narsipatnam'}),
-        ad('1', {'locations': 'Vizag'}),
-        ad('2', {'pinned': true, 'locations': 'Narsipatnam'}),
+        ad('3', {'locations': 'Narsipatnam', 'shopId': 'near'}),
+        ad('1', {'locations': 'Vizag', 'radiusShopId': 'far'}),
+        ad('2', {'pinned': true, 'tapAction': 'shop', 'tapValue': 'near'}),
         ad('4'),
       ];
-      expect(liveAds(all, monday, town: 'Narsipatnam').map((a) => a.id), ['2', '3']);
-      expect(liveAds(all, monday, town: 'Vizag').map((a) => a.id), ['1']);
-      expect(liveAds(all, monday, town: 'Guntur').map((a) => a.id), ['4'], reason: 'nothing for the town: the all-town ads');
-      expect(liveAds(all, monday).map((a) => a.id), ['4'], reason: 'no town chosen: only the all-town ads');
+      bool inReach(Set<String> shops, Entry a) => shops.contains(linkedShopId(a));
+      expect(liveAds(all, monday, reaches: (a) => inReach({'near'}, a)).map((a) => a.id), ['2', '3']);
+      expect(liveAds(all, monday, reaches: (a) => inReach({'far'}, a)).map((a) => a.id), ['1']);
+      expect(liveAds(all, monday, reaches: (a) => inReach({}, a)), isEmpty, reason: 'no shop within reach: nothing, not the ads without a shop');
+      expect(liveAds(all, monday), isEmpty, reason: 'without a place: nothing');
+      expect(liveAds(all, monday, showAll: true).map((a) => a.id), ['2', '1', '3', '4'], reason: "the admin's preview shows them all");
     });
 
     test('the rotation shows 2x and 3x ads more often and never twice in a row', () {

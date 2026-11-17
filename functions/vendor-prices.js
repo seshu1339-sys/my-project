@@ -1,28 +1,31 @@
 'use strict';
-// A vendor's item price lasts 24 hours (set when the item is saved or the price is changed, see submitVendorChange in index.js:
-// priceSetAt / priceExpiresAt, and endsAt so the site hides the item and an order is refused the moment it passes). Every half hour
-// this removes the expired prices, so the vendor's app shows "price expired, enter today's price" until the vendor sets a new one.
-const {onSchedule} = require('firebase-functions/v2/scheduler');
-const {getFirestore, FieldValue} = require('firebase-admin/firestore');
-const db = getFirestore();
+// A vendor's item price stays until the vendor changes or deletes it (owner, 16 Nov 2026): it never runs out and never hides by
+// itself. The admin's post duration (post-duration.js) no longer applies to item prices. What a price carries:
+//   priceSetAt        when the vendor (or staff, for a staff-added item) set the price: the "Today's rate" tick shows for 24 hours
+//                     from it, or from the vendor's "Yes, same rates" (shops/<id>.ratesConfirmedAt, functions/vendor-rates.js)
+// Items saved before carry priceExpiresAt / endsAt (and priceExpired when the old 15-minute job removed the price): they are cleared
+// once by clearOldPriceEnds, run by the 15-minute job's post-duration piece (post-duration.js), with no extra reads afterwards.
+const {FieldValue} = require('firebase-admin/firestore');
 
-const VENDOR_PRICE_VALID_MS = 24 * 60 * 60 * 1000;
-
-/// The fields a fresh vendor price carries: when it was set, when it expires (also endsAt, which the site and placeOrder already obey).
+/// The fields a fresh vendor price carries.
 function freshPriceFields(now = Date.now()) {
-  const expires = new Date(now + VENDOR_PRICE_VALID_MS).toISOString();
-  return {priceSetAt: new Date(now).toISOString(), priceExpiresAt: expires, endsAt: expires, priceExpired: false};
+  return {priceSetAt: new Date(now).toISOString(), priceExpired: false};
 }
 
-/// Removes the price of every vendor item whose 24 hours are over. Returns how many prices were removed.
-async function expireVendorPrices(now = Date.now()) {
-  const due = await db.collection('products').where('priceExpiresAt', '<=', new Date(now).toISOString()).get();
-  let batch = db.batch(), pending = 0, removed = 0;
+/// For an update of an item's price (never a new document): the old end of the price goes.
+const priceEndRemoved = () => ({priceExpiresAt: FieldValue.delete(), endsAt: FieldValue.delete()});
+
+/// Once: the items that still carry the old price end lose it (their end, and the "expired" mark of a price the old job removed), so
+/// they show again; a removed price shows "Local vendor not updated item price" until the vendor sets one. Returns how many changed.
+async function clearOldPriceEnds(db) {
+  const due = await db.collection('products').where('priceExpiresAt', '>', '').get();
+  let batch = db.batch(), pending = 0, changed = 0;
   for (const doc of due.docs) {
     const item = doc.data();
-    if (item.priceExpired === true && item.price === undefined) continue;
-    batch.update(doc.ref, {price: FieldValue.delete(), priceExpired: true, priceExpiredAt: FieldValue.serverTimestamp()});
-    removed++;
+    // An exclusive item keeps its own end (expiresAt / endsAt); only the price's end goes.
+    const sameEnd = item.endsAt === item.priceExpiresAt;
+    batch.update(doc.ref, {priceExpiresAt: FieldValue.delete(), priceExpired: FieldValue.delete(), ...(sameEnd ? {endsAt: FieldValue.delete()} : {})});
+    changed++;
     if (++pending === 400) {
       await batch.commit();
       batch = db.batch();
@@ -30,11 +33,7 @@ async function expireVendorPrices(now = Date.now()) {
     }
   }
   if (pending) await batch.commit();
-  return removed;
+  return changed;
 }
 
-exports.expireVendorPrices = onSchedule({schedule: 'every 30 minutes', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300}, () => expireVendorPrices());
-
-exports.freshPriceFields = freshPriceFields;
-exports.expireVendorPricesNow = expireVendorPrices;
-exports.VENDOR_PRICE_VALID_MS = VENDOR_PRICE_VALID_MS;
+module.exports = {freshPriceFields, priceEndRemoved, clearOldPriceEnds};

@@ -17,6 +17,22 @@
       ]
     },
     {
+      "collectionGroup": "flashPremiumChats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "uid", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "flashProviderChats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "uid", "order": "ASCENDING"},
+        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "flashStaffChats",
       "queryScope": "COLLECTION",
       "fields": [

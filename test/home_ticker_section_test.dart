@@ -39,7 +39,7 @@ void main() {
       await tester.pump();
 
       final label = tester.widget<Text>(
-        find.textContaining("Today's Best Offers in", findRichText: false),
+        find.textContaining("Today's Offers", findRichText: false),
       );
       expect(label.style?.fontSize, 20.0, reason: 'label must use the admin-set font size, not a hardcoded 13');
       expect(label.style?.fontWeight, FontWeight.w700);

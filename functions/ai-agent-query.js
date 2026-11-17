@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole: requireRoleLogin, isAdminToken} = require('./role-auth');
 // Read-only sibling of ai-agent-executor.js. A query has nothing to confirm
 // (nothing changes), so it bypasses the propose/confirm pipeline entirely:
 // validate -> run -> audit-log -> return the data directly. No
@@ -15,12 +16,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public', sec
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRoleLogin(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }

@@ -18,17 +18,22 @@ List<ItemPick> freshStripItems(Entry? record) => [
 ];
 
 /// The strip's cards, in the admin's order: for each item, its product with the lowest price among [products] (the customer's
-/// town), showing the item's photo when that product has none. Items no shop there sells are left out.
+/// town), showing the item's photo when that product has none. An item no shop there has a price for still shows (owner, 16 Nov 2026:
+/// never hidden), with its photo and name and "Local vendor not updated item price" instead of a price.
 List<Entry> freshStripProducts(List<ItemPick> items, List<Entry> products, String pincode) {
   final out = <Entry>[];
   for (final item in items) {
-    Entry? best;
+    Entry? best, unpriced;
     for (final p in products) {
-      if (p.text('kind') == 'service' || p.price(pincode) <= 0) continue;
+      if (p.text('kind') == 'service') continue;
       if (p.id != item.productId && !isSameItem(p, name: item.name, libraryItemId: item.libraryItemId)) continue;
+      if (p.price(pincode) <= 0) {
+        unpriced ??= p;
+        continue;
+      }
       if (best == null || p.price(pincode) < best.price(pincode)) best = p;
     }
-    if (best == null) continue;
+    best ??= unpriced ?? Entry('fresh-${item.libraryItemId.isNotEmpty ? item.libraryItemId : item.name}', {'name': item.name, 'imageUrl': item.imageUrl, 'kind': 'product'});
     out.add(best.text('imageUrl').isEmpty && item.imageUrl.isNotEmpty ? Entry(best.id, {...best.data, 'imageUrl': item.imageUrl}) : best);
   }
   return out;

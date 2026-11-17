@@ -65,7 +65,9 @@ test('approval makes the ad live for the chosen days and tells the vendor; the v
   assert.equal(ad.vendorId, 'v1');
   assert.equal(ad.title, 'Diwali sale');
   assert.equal(ad.rounds, 2, 'the silver plan');
-  assert.equal(new Date(ad.endsAt).getTime() - new Date(ad.startsAt).getTime(), 30 * 86400000);
+  // The vendor chose 30 days; the admin's post duration (24 hours unless set, functions/post-duration.js) ends it first, for everyone.
+  assert.equal(new Date(ad.endsAt).getTime() - new Date(ad.startsAt).getTime(), 86400000);
+  assert.equal(new Date(ad.ownEndsAt).getTime() - new Date(ad.startsAt).getTime(), 30 * 86400000);
   assert.equal((await db.collection('adsPrivate').doc(decided.adId).get()).data().paid, false);
   const notices = (await db.collection('vendorNotices').where('vendorId', '==', 'v1').get()).docs.map(d => d.data());
   assert.equal(notices.length, 1);

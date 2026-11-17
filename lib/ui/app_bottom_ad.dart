@@ -3,13 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../domain/reach.dart';
 import '../data/store.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/right_boxes.dart' show rightBoxPlaceholder;
 import '../services/ad_tracker.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_visibility.dart';
+
+/// True while the plans page is open: the bottom ad is then about 30% of the screen's height (owner, 13 Nov 2026), so the vendor sees
+/// the ads right where they choose a plan. It is 72 px everywhere else.
+final ValueNotifier<bool> appBottomAdTall = ValueNotifier<bool>(false);
+const appBottomAdTallShare = 0.3;
 
 /// Puts [AppBottomAd] under every page of the vendor or staff app once someone is signed in. Hidden while the keyboard is open, so
 /// it never pushes a form field off the screen.
@@ -47,7 +54,8 @@ class _AppBottomAdState extends State<AppBottomAd> {
   String? viewedId;
   DateTime? viewedAt;
 
-  DateTime get now => (widget.now ?? DateTime.now)();
+  // The server's time, never the phone's: an ad leaves the box exactly when it ends (lib/services/server_clock.dart).
+  DateTime get now => (widget.now ?? ServerClock.now)();
   AdsTracker? get tracker => widget.tracker ?? AdsTracker.instance;
 
   String get shopCategory {
@@ -56,7 +64,27 @@ class _AppBottomAdState extends State<AppBottomAd> {
     return widget.store.entries('shops').where((s) => s.id == uid || s.text('ownerId') == uid).firstOrNull?.text('category') ?? '';
   }
 
-  List<Entry> get ads => appAds(widget.store.entries('ads'), now, staff: widget.staff, shopCategory: shopCategory);
+  /// Where the viewer is: a vendor at their own shop, staff (or a vendor without a shop point) where the app's location is.
+  (double, double)? get place {
+    final store = widget.store;
+    if (!widget.staff) {
+      final uid = widget.uid ?? store.user?.uid;
+      final shop = store.entries('shops').where((s) => s.id == uid || s.text('ownerId') == uid).firstOrNull;
+      final lat = shop?.number('latitude'), lng = shop?.number('longitude');
+      if (lat != null && lng != null && !(lat == 0 && lng == 0)) return (lat, lng);
+    }
+    return store.located ? (store.latitude!, store.longitude!) : null;
+  }
+
+  /// An ad posted for a place shows only within the admin's km of its shop (lib/domain/ads.dart appAds).
+  bool _reaches(Entry ad) {
+    final here = place;
+    if (here == null) return false;
+    final shop = widget.store.entries('shops').where((s) => s.id == linkedShopId(ad)).firstOrNull;
+    return shopWithinKm(shop, here.$1, here.$2, widget.store.reachKm);
+  }
+
+  List<Entry> get ads => appAds(widget.store.entries('ads'), now, staff: widget.staff, shopCategory: shopCategory, reaches: _reaches);
 
   Entry? get current {
     final list = ads;
@@ -141,8 +169,9 @@ class _AppBottomAdState extends State<AppBottomAd> {
       elevation: 6,
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: AppBottomAd.height,
+        child: ValueListenableBuilder<bool>(
+          valueListenable: appBottomAdTall,
+          builder: (context, tall, child) => SizedBox(height: tall ? MediaQuery.sizeOf(context).height * appBottomAdTallShare : AppBottomAd.height, child: child),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: ad == null

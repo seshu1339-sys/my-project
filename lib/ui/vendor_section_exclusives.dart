@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/post_duration.dart';
 import 'vendor_section_kit.dart';
 
 /// Special Category Exclusives: shown only to vendors the admin switched it on for; its own form, lists and busy flag.
@@ -51,7 +52,10 @@ class _ExclusivesCardState extends State<_ExclusivesCard> with VendorSectionStat
     return vendorCard('Special Category Exclusives', [
       TextField(controller: name, decoration: const InputDecoration(labelText: 'Item or design name')),
       TextField(controller: price, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'Price')),
-      TextField(controller: duration, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Active duration in days (up to $maxDays)')),
+      // The days stay in the code but are hidden (lib/domain/post_duration.dart): the vendor's longest days are sent and the admin's post
+      // duration ends the item first.
+      if (showPostDayChoices) TextField(controller: duration, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Active duration in days (up to $maxDays)')),
+      Text(postDurationNotice(store.business), key: const ValueKey('exclusive-duration-note')),
       const SizedBox(height: 8),
       if (imageBytes != null) ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(imageBytes!, height: 120, fit: BoxFit.cover)),
       Wrap(spacing: 8, children: [
@@ -78,7 +82,7 @@ class _ExclusivesCardState extends State<_ExclusivesCard> with VendorSectionStat
               ? null
               : () => run(() async {
                   final p = double.tryParse(price.text.trim());
-                  final days = int.tryParse(duration.text.trim());
+                  final days = showPostDayChoices ? int.tryParse(duration.text.trim()) : maxDays;
                   if (name.text.trim().length < 2) throw StateError('Enter a name for the item.');
                   if (p == null || p < 0) throw StateError('Enter a valid price.');
                   if (days == null || days < 1) throw StateError('Enter the active duration in days.');
@@ -126,7 +130,7 @@ class _ExclusivesCardState extends State<_ExclusivesCard> with VendorSectionStat
                 onPressed: busy
                     ? null
                     : () => run(() async {
-                        final days = await askVendorNumber(context, 'Reactivate item', 'Active duration in days (up to $maxDays)', integer: true);
+                        final days = showPostDayChoices ? await askVendorNumber(context, 'Reactivate item', 'Active duration in days (up to $maxDays)', integer: true) : maxDays;
                         if (days == null) return;
                         await store.call('reactivateExclusiveItem', {'productId': doc.id, 'durationDays': days.toInt()});
                         toast('Item reactivated');

@@ -5,14 +5,16 @@
 // business data — the only writes it ever makes are its own audit-log entry
 // and (via its own small mail snippet, not shared with admin-otp.js, per this
 // codebase's existing "duplicate small helpers" convention) sending mail.
-const {onSchedule} = require('firebase-functions/v2/scheduler');
-const {defineSecret} = require('firebase-functions/params');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
+const {defineSecret, defineString} = require('firebase-functions/params');
 const {getFirestore} = require('firebase-admin/firestore');
 const {getConfigData} = require('./ai-agent-config');
 const {writeAuditLog} = require('./ai-agent-audit-log');
 const db = getFirestore();
 
-const mailUser = defineSecret('ADMIN_MAIL_USER');
+// The sending Gmail address is not a secret: a plain setting in functions/.env.<project> (Secret Manager cost, Nov 2026).
+const mailUser = defineString('ADMIN_MAIL_USER');
 const mailPassword = defineSecret('ADMIN_MAIL_PASSWORD');
 const LOOKBACK_MS = 6 * 60 * 60 * 1000;
 const BACKUP_STALE_MS = 48 * 60 * 60 * 1000;
@@ -27,7 +29,7 @@ async function sendAlertEmail(subject, text) {
   await transport.sendMail({from: mailUser.value(), to: mailUser.value(), subject, text});
 }
 
-exports.aiAgentHealthCheck = onSchedule({schedule: 'every 6 hours', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300, secrets: [mailUser, mailPassword]}, async () => {
+exports.aiAgentHealthCheck = task(async () => {
   const config = await getConfigData();
   if (!config.enabled || config.modules?.monitoring === false) return;
 

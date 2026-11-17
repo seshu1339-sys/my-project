@@ -19,7 +19,7 @@ class OffersPage extends StatefulWidget {
 
 class _OffersPageState extends State<OffersPage> {
   Store get store => widget.store;
-  bool get located => store.latitude != null || store.pincode.isNotEmpty;
+  bool get located => store.located;
 
   // Made once, so a rebuild keeps the same listener. Ended offers never come back from the server.
   late final stream = !store.live
@@ -27,7 +27,8 @@ class _OffersPageState extends State<OffersPage> {
       : store.firestore.collection('vendorOffers').where('status', isEqualTo: 'live').where('endsAt', isGreaterThan: Timestamp.now()).orderBy('endsAt').limit(300).snapshots();
 
   Widget _view(List<VendorOffer> offers) {
-    final shops = located ? store.nearby() : store.visible('shops');
+    // Distance only: the offers of the shops within the admin's km (none until the customer's place is known).
+    final shops = store.nearby();
     return OffersView(
       offers: offersForCustomer(offers, {for (final shop in shops) shop.id}, DateTime.now()),
       located: located,

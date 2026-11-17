@@ -23,7 +23,9 @@ function radiusCovers(item, lat, lng) {
   return distanceKm(lat, lng, c.lat, c.lng) <= num(item.radiusKm);
 }
 
-const dateOf = value => { const t = Date.parse(value); return Number.isNaN(t) ? null : t; };
+// Saved times without a zone are India time (functions/ist-time.js), as in the apps.
+const {parseIst} = require('./ist-time');
+const dateOf = value => parseIst(value);
 function runsTogether(a, b) {
   const aStart = dateOf(a.startsAt), aEnd = dateOf(a.endsAt), bStart = dateOf(b.startsAt), bEnd = dateOf(b.endsAt);
   return (aStart === null || bEnd === null || aStart < bEnd) && (bStart === null || aEnd === null || bStart < aEnd);

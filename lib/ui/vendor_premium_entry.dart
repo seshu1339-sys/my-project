@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -51,6 +53,19 @@ class _VendorPremiumPageState extends State<VendorPremiumPage> {
   late final premium = FirestorePremiumStatus(widget.store.firestore).watch(widget.uid);
   late final offers = FirestoreTodaysOfferStore(widget.store);
   late final own = offers.watchOwn(widget.uid);
+  // The plan's number of boxes and the vendor's own items (an item's photo is what its box shows).
+  late final plan = widget.store.firestore.collection('vendorPremium').doc(widget.uid).snapshots();
+  late final items = widget.store.firestore.collection('products').where('ownerId', isEqualTo: widget.uid).snapshots();
+
+  /// Uploads the vendor's own photo first (vendorTodaysOffers/<uid>/, public; storage.rules), then asks the server to put the offer live.
+  Future<void> _submit(OfferFormResult r) async {
+    var photoName = '';
+    if (r.photo != null) {
+      photoName = 'offer_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await FirebaseStorage.instance.ref('vendorTodaysOffers/${widget.uid}/$photoName').putData(r.photo!, SettableMetadata(contentType: 'image/jpeg'));
+    }
+    await offers.submit(productId: r.productId, libraryItemId: r.libraryItemId, photoName: photoName, name: r.name, note: r.note, price: r.price, days: r.days, slot: r.slot);
+  }
 
   Future<void> _call(String phone) async {
     try {
@@ -67,16 +82,49 @@ class _VendorPremiumPageState extends State<VendorPremiumPage> {
     builder: (context, status) {
       if (status.data == false) return const PremiumEndedScreen();
       return PremiumOfferScreen(
-        offerBox: StreamBuilder<TodaysOffer?>(
-          stream: own,
-          builder: (context, offer) {
-            final running = offer.data;
-            return TodaysOfferPanel(
-              offer: running == null ? null : RunningOffer(photoUrl: running.photoUrl, price: running.price, endsAt: running.endsAt),
-              hourOptions: todaysOfferHours,
-              onSubmit: (result) => offers.submit(widget.uid, result.photo.file!, result.price, result.hours),
-            );
-          },
+        offerBox: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: plan,
+          builder: (context, premium) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: items,
+            builder: (context, products) => StreamBuilder<List<TodaysOffer>>(
+              stream: own,
+              builder: (context, running) => TodaysOfferPanel(
+                boxes: todaysOfferBoxesOf(premium.data?.data()),
+                offers: [
+                  for (final o in running.data ?? const <TodaysOffer>[])
+                    RunningOffer(
+                      photoUrl: o.photoUrl,
+                      price: o.price,
+                      endsAt: o.endsAt,
+                      slot: o.slot,
+                      productId: o.productId,
+                      name: o.name,
+                      days: o.days,
+                      libraryItemId: o.libraryItemId,
+                      note: o.note,
+                      untilPlanEnds: o.untilPlanEnds,
+                      hidden: o.hidden,
+                      waitingCheck: o.waitingCheck,
+                    ),
+                ],
+                items: [
+                  for (final d in products.data?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+                    if (d.data()['active'] != false && '${d.data()['imageUrl'] ?? ''}'.startsWith('http'))
+                      OfferItemChoice(id: d.id, name: '${d.data()['name'] ?? ''}', photoUrl: '${d.data()['imageUrl']}', price: d.data()['price'] as num?),
+                ],
+                // The catalog: the admin's Product Image Library items with a photo.
+                catalog: [
+                  for (final e in widget.store.entries('productImageLibrary'))
+                    if (e.active && e.text('imageUrl').startsWith('http')) OfferItemChoice(id: e.id, name: e.text('name'), photoUrl: e.text('imageUrl'), keywords: e.text('tags')),
+                ],
+                dayOptions: todaysOfferDays,
+                // Owner, 13 Nov 2026: a box runs with the plan; the post duration does not apply to it.
+                durationNote: todaysOfferPlanNote,
+                onSubmit: _submit,
+                onRemove: offers.remove,
+              ),
+            ),
+          ),
         ),
         largeBox: WholesaleBox(source: FirestoreWholesaleOffers(widget.store.firestore), onCall: _call),
       );

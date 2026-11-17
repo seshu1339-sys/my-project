@@ -10,16 +10,16 @@ const {getFirestore} = require('firebase-admin/firestore');
 const skip = !process.env.FIRESTORE_EMULATOR_HOST;
 const db = getFirestore();
 const version = /POLICY_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(__dirname, 'consent.js'), 'utf8'))[1];
-const auth = uid => ({auth: {uid, token: {email_verified: true, email: `${uid}@example.com`}}});
+const auth = uid => ({auth: {uid, token: {role: 'user', loginEmail: `${uid}@example.com`}}});
 
 test('the app and the server name the same version of the terms', () => {
   const dart = fs.readFileSync(path.join(__dirname, '..', 'lib', 'domain', 'consent.dart'), 'utf8');
   assert.match(dart, new RegExp(`policyVersion = '${version}'`));
 });
 
-test('nobody who is not signed in with a verified email can use the consent functions', async () => {
+test('nobody without a role login can use the consent functions', async () => {
   await assert.rejects(consentStatus.run({data: {}}), /Sign in/);
-  await assert.rejects(recordConsent.run({auth: {uid: 'x', token: {email_verified: false}}, data: {app: 'customer', version}}), /Verify/);
+  await assert.rejects(recordConsent.run({auth: {uid: 'x', token: {email_verified: false}}, data: {app: 'customer', version}}), /Sign in again/);
 });
 
 test('an agreement is recorded with who, when and which version, and a stale version is refused', {skip}, async () => {

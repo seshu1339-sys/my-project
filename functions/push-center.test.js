@@ -2,6 +2,7 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 require('./index'); // starts the Firebase app
 const {_pushCenter} = require('./push-center');
+const {_roleLogins} = require('./role-logins');
 
 test('a push needs a title, a message and who gets it', () => {
   const ok = {title: 'Diwali offers', body: 'Big savings today', audience: 'all'};
@@ -22,16 +23,20 @@ test('the admin sends to everyone, a town or one person; opens are counted once;
   const db = getFirestore();
   for (const c of ['notificationSubscribers', 'pushLog', 'pushTypeDaily', '_pushDryRun']) for (const d of (await db.collection(c).get()).docs) await d.ref.delete();
   await db.collection('_adminSessions').doc('pushAdmin').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
-  const admin = {auth: {uid: 'pushAdmin', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'pushAdmin', token: {role: 'admin', admin: true, email_verified: true}}};
   for (const [uid, pincode, enabled, token] of [['pushS1', '531116', true, true], ['pushS2', '533401', true, true], ['pushS3', '531116', true, false], ['pushS4', '531116', false, true]]) {
     await db.collection('notificationSubscribers').doc(uid).set({enabled, pincode});
     if (token) await db.collection('users').doc(uid).collection('pushTokens').doc('t1').set({token: `token-${uid}`});
+    // a customer role login: no email of its own (it is in the loginEmail claim), found by email through roleLogins
+    const email = `${uid.toLowerCase()}@example.test`;
     try { await getAuth().deleteUser(uid); } catch (_) { /* not there */ }
-    await getAuth().createUser({uid, email: `${uid.toLowerCase()}@example.test`});
+    await getAuth().createUser({uid});
+    await getAuth().setCustomUserClaims(uid, _roleLogins.claimsFor('user', email));
+    await db.collection('roleLogins').doc(_roleLogins.loginDocId('user', email)).set({role: 'user', email, uid});
   }
   const send = data => fns.sendPushNotification.run({...admin, data: {title: 'Diwali offers', body: 'Big savings today', ...data}});
 
-  await assert.rejects(() => fns.sendPushNotification.run({auth: {uid: 'pushS1', token: {email_verified: true}}, data: {title: 'Hi there', body: 'Hello all', audience: 'all'}}), /Administrator/);
+  await assert.rejects(() => fns.sendPushNotification.run({auth: {uid: 'pushS1', token: {role: 'user', email_verified: true}}, data: {title: 'Hi there', body: 'Hello all', audience: 'all'}}), /Administrator/);
   const all = await send({audience: 'all'});
   assert.deepEqual([all.recipients, all.sent, all.noToken, all.off], [3, 2, 1, 0], 'the 3 with notifications on; one has no device');
   const town = await send({audience: 'town', town: 'Narsipatnam'});

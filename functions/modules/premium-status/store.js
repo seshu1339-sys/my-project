@@ -12,7 +12,10 @@ const endOf = plan => plan?.endsAt?.toMillis?.() ?? 0;
 /// Copies a vendor's plan end into their Premium status. No plan document means not Premium.
 async function syncStatus(db, uid, plan, now = Date.now()) {
   const endsAt = endOf(plan);
-  await db.collection('vendorPremium').doc(uid).set({uid, active: endsAt > now, endsAt: Timestamp.fromMillis(endsAt), updatedAt: Timestamp.fromMillis(now)});
+  // The plan's kind, extra photos and km travel with the status, so the other modules (photos, showcase boxes) read one document.
+  const extra = {};
+  for (const key of ['tier', 'planName', 'extraPhotos', 'radiusKm', 'offerBoxes']) if (plan?.[key] !== undefined) extra[key] = plan[key];
+  await db.collection('vendorPremium').doc(uid).set({uid, active: endsAt > now, endsAt: Timestamp.fromMillis(endsAt), ...extra, updatedAt: Timestamp.fromMillis(now)});
 }
 
 /// Turns off everyone whose plan has ended. Returns how many.

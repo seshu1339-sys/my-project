@@ -10,9 +10,9 @@ const later = () => Timestamp.fromMillis(Date.now() + 3600000);
 test('vendors read only whether payments are open and their own requests; the switch and payment ids stay with the admin; only functions write', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly-payments', firestore: {rules: readFileSync(resolve(root, 'firestore.rules'), 'utf8')}});
   try {
-    const vendor = env.authenticatedContext('vendor1', {email_verified: true}).firestore();
+    const vendor = env.authenticatedContext('vendor1', {role: 'user', email_verified: true}).firestore();
     const anonymous = env.unauthenticatedContext().firestore();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).firestore();
     await env.withSecurityRulesDisabled(async ctx => {
       const db = ctx.firestore();
       await setDoc(doc(db, '_adminSessions/owner'), {expiresAt: later()});

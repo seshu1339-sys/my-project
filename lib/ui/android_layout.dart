@@ -39,5 +39,6 @@ List<Entry> androidSettings(List<Entry> settings) => AndroidSizes.from(settings)
 /// it, then the sections in the order the home page has them, then the shops.
 List<String> androidDefaultOrder(List<Entry> settings) {
   final sections = [...reorderableHomeSections]..sort((a, b) => sectionOrder(settings, a.key).compareTo(sectionOrder(settings, b.key)));
-  return ['ads', 'scrollingText', 'notice', 'quickFresh', for (final d in sections) ...[d.key, if (d.key == 'promo') 'strip'], 'nearby'];
+  // The category lines (lib/ui/home_catalog_lines.dart) come right under Today's Offers, before the band.
+  return ['ads', 'scrollingText', 'notice', 'quickFresh', for (final d in sections) ...[d.key, if (d.key == 'promo') ...['catalogLines', 'strip']], 'nearby'];
 }

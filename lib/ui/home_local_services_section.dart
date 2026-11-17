@@ -8,6 +8,7 @@ import 'home_product_grid.dart';
 import 'home_product_tile.dart';
 import 'home_section_heading.dart';
 import 'layout_settings.dart';
+import 'shared.dart' show noPriceText;
 import 'home_section_config.dart';
 
 /// The "Local Services" homepage section — a preview grid over the exact
@@ -57,6 +58,7 @@ class HomeLocalServicesSection extends StatelessWidget {
             appearance: layout.entry,
             smallestCard: isAndroidApp() ? 100 : null,
             itemBuilder: (entry) => HomeProductTile(
+              noPrice: noPriceText(store),
               entry: entry,
               price: entry.price(store.pincode),
               appearance: layout.styled(context, fontSize: 16),

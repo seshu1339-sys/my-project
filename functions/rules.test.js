@@ -7,11 +7,11 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
   const env = await initializeTestEnvironment({projectId: 'demo-neighbourly', firestore: {rules: readFileSync(resolve(__dirname, '../firestore.rules'), 'utf8')}});
   try {
     const anonymous = env.unauthenticatedContext().firestore();
-    const alice = env.authenticatedContext('alice', {email_verified: true}).firestore();
-    const bob = env.authenticatedContext('bob', {email_verified: true}).firestore();
-    const admin = env.authenticatedContext('owner', {admin: true, email_verified: true}).firestore();
-    const staleAdmin = env.authenticatedContext('staleOwner', {admin: true, email_verified: true}).firestore();
-    const expiredAdmin = env.authenticatedContext('expiredOwner', {admin: true, email_verified: true}).firestore();
+    const alice = env.authenticatedContext('alice', {role: 'user', email_verified: true}).firestore();
+    const bob = env.authenticatedContext('bob', {role: 'user', email_verified: true}).firestore();
+    const admin = env.authenticatedContext('owner', {role: 'admin', admin: true, email_verified: true}).firestore();
+    const staleAdmin = env.authenticatedContext('staleOwner', {role: 'admin', admin: true, email_verified: true}).firestore();
+    const expiredAdmin = env.authenticatedContext('expiredOwner', {role: 'admin', admin: true, email_verified: true}).firestore();
     const unverified = env.authenticatedContext('new', {admin: true, email_verified: false}).firestore();
     // The admin claim alone no longer grants access: a fresh, unexpired
     // _adminSessions doc (written only by functions/admin-otp.js after a
@@ -145,18 +145,23 @@ test('Firestore denies escalation, PIN access and forged orders; isolates custom
     await assertFails(setDoc(doc(bob, 'notificationSubscribers/alice'), {enabled: true, updatedAt: serverTimestamp(), latitude: 12.9716, longitude: 77.5946}));
     await assertFails(setDoc(doc(alice, '_notificationDeliveries/fake'), {sent: true}));
     // Field Assistant: a staff role doc and a submission queue, both function-write-only.
+    // Alice's staff login is a separate login (its own uid) from her customer login.
+    const aliceStaff = env.authenticatedContext('aliceStaff', {role: 'staff', loginEmail: 'alice@example.test'}).firestore();
     await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), 'fieldStaff/aliceStaff'), {uid: 'aliceStaff', status: 'active'});
       await setDoc(doc(ctx.firestore(), 'fieldStaff/alice'), {uid: 'alice', status: 'active'});
-      await setDoc(doc(ctx.firestore(), 'fieldSubmissions/s1'), {staffUid: 'alice', status: 'pending'});
+      await setDoc(doc(ctx.firestore(), 'fieldSubmissions/s1'), {staffUid: 'aliceStaff', status: 'pending'});
     });
-    await assertSucceeds(getDoc(doc(alice, 'fieldStaff/alice')));
-    await assertSucceeds(getDoc(doc(admin, 'fieldStaff/alice')));
-    await assertFails(getDoc(doc(bob, 'fieldStaff/alice')));
-    await assertFails(setDoc(doc(alice, 'fieldStaff/alice'), {status: 'active'}));
-    await assertSucceeds(getDoc(doc(alice, 'fieldSubmissions/s1')));
+    await assertSucceeds(getDoc(doc(aliceStaff, 'fieldStaff/aliceStaff')));
+    await assertSucceeds(getDoc(doc(admin, 'fieldStaff/aliceStaff')));
+    await assertFails(getDoc(doc(bob, 'fieldStaff/aliceStaff')));
+    await assertFails(getDoc(doc(alice, 'fieldStaff/alice')), 'a customer login never reads a staff record, even under its own uid');
+    await assertFails(setDoc(doc(aliceStaff, 'fieldStaff/aliceStaff'), {status: 'active'}));
+    await assertSucceeds(getDoc(doc(aliceStaff, 'fieldSubmissions/s1')));
     await assertSucceeds(getDoc(doc(admin, 'fieldSubmissions/s1')));
     await assertFails(getDoc(doc(bob, 'fieldSubmissions/s1')));
-    await assertFails(setDoc(doc(alice, 'fieldSubmissions/s1'), {status: 'approved'}));
+    await assertFails(getDoc(doc(alice, 'fieldSubmissions/s1')), 'the same email\'s customer login');
+    await assertFails(setDoc(doc(aliceStaff, 'fieldSubmissions/s1'), {status: 'approved'}));
     await assertFails(getDoc(doc(admin, '_pins/alice')));
     await assertFails(setDoc(doc(alice, 'orders/fake'), {userId: 'alice', total: 0}));
     await env.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), 'orders/o1'), {userId: 'alice', total: 100, status: 'submitted'}));

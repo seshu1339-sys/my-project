@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Second factor for the admin panel: after password sign-in proves the admin
 // custom claim, the client calls requestAdminOtp to get a 6-digit code emailed
 // to that account's own registered (verified) address, then verifyAdminOtp to
@@ -10,14 +11,15 @@
 // pepper (ADMIN_OTP_PEPPER, set once via `firebase functions:secrets:set`,
 // never in source or Git) is persisted, compared with a constant-time check.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {defineSecret} = require('firebase-functions/params');
+const {defineSecret, defineString} = require('firebase-functions/params');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {createHmac, randomInt, timingSafeEqual} = require('node:crypto');
 const {requireAdminSession} = require('./admin-session');
 const db = getFirestore();
 
 const otpPepper = defineSecret('ADMIN_OTP_PEPPER');
-const mailUser = defineSecret('ADMIN_MAIL_USER');
+// The sending Gmail address is not a secret: a plain setting in functions/.env.<project> (Secret Manager cost, Nov 2026).
+const mailUser = defineString('ADMIN_MAIL_USER');
 const mailPassword = defineSecret('ADMIN_MAIL_PASSWORD');
 
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -28,8 +30,8 @@ const options = {region: 'us-central1', maxInstances: 5, invoker: 'public'};
 
 function requireAdminClaim(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  requireRole(request);
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   return request.auth.uid;
 }
 
@@ -71,9 +73,9 @@ async function sendOtpEmail(to, code) {
   });
 }
 
-exports.requestAdminOtp = onCall({...options, secrets: [otpPepper, mailUser, mailPassword]}, async request => {
+exports.requestAdminOtp = onCall({...options, secrets: [otpPepper, mailPassword]}, async request => {
   const uid = requireAdminClaim(request);
-  const email = request.auth.token.email;
+  const email = loginEmail(request);
   if (!email) throw new HttpsError('failed-precondition', 'No email on this account.');
   await otpRateLimit(uid, 5, 15 * 60 * 1000);
   const ref = db.collection('_adminOtps').doc(uid);

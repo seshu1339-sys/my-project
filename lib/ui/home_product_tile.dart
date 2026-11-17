@@ -16,7 +16,10 @@ class HomeProductTile extends StatelessWidget {
     this.preview = false,
     this.appearance,
     this.shopName = '',
+    this.noPrice = 'Local vendor not updated item price',
   });
+  // The words for an item with no price (Settings > Design texts & sizes, read by whoever builds this tile).
+  final String noPrice;
   final Entry entry;
   final double price;
   final VoidCallback? onOpen, onAdd;
@@ -178,15 +181,15 @@ class HomeProductTile extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          money(price),
-                          maxLines: 1,
+                          price > 0 ? money(price) : noPrice,
+                          key: price > 0 ? null : ValueKey('no-price-${entry.id}'),
+                          maxLines: price > 0 ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: price > 0
+                              ? const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)
+                              : const TextStyle(fontSize: 11, color: Colors.black54),
                         ),
-                        Text(
+                        if (price > 0) Text(
                           entry.data['unit'] == null
                               ? 'each'.tr(context)
                               : entry.text('unit'),

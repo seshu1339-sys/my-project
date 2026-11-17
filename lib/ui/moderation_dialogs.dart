@@ -170,3 +170,34 @@ Future<void> runModerationAction(
     }
   }
 }
+
+/// "Run AI check on pending" (owner, 14 Nov 2026; runAutoApprovalOnPending in functions/index.js): every pending vendor, service
+/// provider and staff member gets the AI photo check now, even while the Auto Approval switch is OFF. Safe ones are approved, forbidden
+/// photos refused with the reason; the ones the check could not decide stay in the pending lists for the admin.
+class RunAiCheckButton extends StatefulWidget {
+  const RunAiCheckButton({super.key, required this.call});
+  final Future<Map<String, dynamic>> Function(String function, Map<String, dynamic> data) call;
+  @override
+  State<RunAiCheckButton> createState() => _RunAiCheckButtonState();
+}
+
+class _RunAiCheckButtonState extends State<RunAiCheckButton> {
+  bool busy = false;
+  Future<void> _run() async {
+    setState(() => busy = true);
+    await runModerationAction(context, () => widget.call('runAutoApprovalOnPending', const {}), onSuccess: aiCheckSummary);
+    if (mounted) setState(() => busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    key: const ValueKey('run-ai-check-pending'),
+    onPressed: busy ? null : _run,
+    icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome),
+    label: Text(busy ? 'Checking photos...' : 'Run AI check on pending'),
+  );
+}
+
+/// "AI check: 4 approved, 0 refused, 1 waiting for you".
+String aiCheckSummary(Map<String, dynamic> r) =>
+    'AI check: ${r['approved'] ?? 0} approved, ${r['rejected'] ?? 0} refused, ${r['waiting'] ?? 0} waiting for you';

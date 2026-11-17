@@ -43,7 +43,7 @@ test('a vendor gets VEN-<CITY>-<PIN>-<NNN> when applying, keeps it on resubmissi
   const {reserveVendorCode} = require('./vendor-id');
   const db = getFirestore();
   const bucket = getStorage().bucket();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const application = pincode => ({
     ownerName: 'Ramu', phone: '9876500009', name: 'Ramu Kirana', shopCategory: 'Kirana',
@@ -52,7 +52,7 @@ test('a vendor gets VEN-<CITY>-<PIN>-<NNN> when applying, keeps it on resubmissi
   const stagePhotos = async uid => {
     for (const name of ['vendorPhoto', 'shopPhoto']) await bucket.file(`vendorApplications/${uid}/${name}`).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
   };
-  const register = (uid, data) => fns.registerVendor.run({auth: {uid, token: {email_verified: true}}, data});
+  const register = (uid, data) => fns.registerVendor.run({auth: {uid, token: {role: 'vendor', email_verified: true}}, data});
 
   await stagePhotos('idV1');
   const out = await register('idV1', application('531116'));

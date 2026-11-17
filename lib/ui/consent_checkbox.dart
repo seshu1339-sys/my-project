@@ -5,9 +5,9 @@ import '../data/store.dart';
 import '../services/strings.dart';
 import 'policy_links.dart';
 
-/// "I agree to the Terms & Conditions and the Privacy Policy", with both names opening the pages of locamarket.in. It shows English
-/// unless the person chose another language in the customer app. The box is [Store.pendingConsent]: the sign-in screen and the
-/// register form share it, and the agreement is saved on the server right after sign-in (lib/data/store_consent.dart).
+/// "I agree to the Terms & Conditions and the Privacy Policy", with both names opening the pages of locamarket.in: the tick box of the
+/// agreement screen for people already signed in ([ConsentScreen]). It shows English unless the person chose another language in the
+/// customer app. The sign-in screens use [ConsentNotice] instead (no tick, so Google stays one tap).
 class ConsentCheckbox extends StatefulWidget {
   const ConsentCheckbox({super.key, required this.store, this.enabled = true});
   final Store store;
@@ -16,37 +16,9 @@ class ConsentCheckbox extends StatefulWidget {
   State<ConsentCheckbox> createState() => _ConsentCheckboxState();
 }
 
-class _ConsentCheckboxState extends State<ConsentCheckbox> {
-  late final TapGestureRecognizer _terms = TapGestureRecognizer()..onTap = () => PolicyLinks.open('/terms');
-  late final TapGestureRecognizer _privacy = TapGestureRecognizer()
-    ..onTap = () => PolicyLinks.open(PolicyLinks.privacyPath(widget.store.appRole));
-
+class _ConsentCheckboxState extends State<ConsentCheckbox> with _PolicySentence<ConsentCheckbox> {
   @override
-  void dispose() {
-    _terms.dispose();
-    _privacy.dispose();
-    super.dispose();
-  }
-
-  /// The sentence with {terms} and {privacy} replaced by tappable names, in whatever order the language puts them.
-  List<InlineSpan> _sentence(BuildContext context) {
-    final link = TextStyle(color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline);
-    final spans = <InlineSpan>[];
-    var rest = 'I agree to the {terms} and the {privacy}.'.tr(context);
-    final marker = RegExp(r'\{terms\}|\{privacy\}');
-    for (var match = marker.firstMatch(rest); match != null; match = marker.firstMatch(rest)) {
-      if (match.start > 0) spans.add(TextSpan(text: rest.substring(0, match.start)));
-      final isTerms = match.group(0) == '{terms}';
-      spans.add(TextSpan(
-        text: (isTerms ? 'Terms & Conditions' : 'Privacy Policy').tr(context),
-        style: link,
-        recognizer: isTerms ? _terms : _privacy,
-      ));
-      rest = rest.substring(match.end);
-    }
-    if (rest.isNotEmpty) spans.add(TextSpan(text: rest));
-    return spans;
-  }
+  Store get store => widget.store;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -70,7 +42,7 @@ class _ConsentCheckboxState extends State<ConsentCheckbox> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: Text.rich(TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: _sentence(context)), key: const ValueKey('consent-sentence')),
+                child: Text.rich(TextSpan(style: Theme.of(context).textTheme.bodyMedium, children: sentence(context, 'I agree to the {terms} and the {privacy}.')), key: const ValueKey('consent-sentence')),
               ),
             ),
           ],
@@ -85,6 +57,69 @@ class _ConsentCheckboxState extends State<ConsentCheckbox> {
             ),
           ),
       ],
+    ),
+  );
+}
+
+/// The two tappable page names (Terms & Conditions, Privacy Policy) inside a sentence, shared by the tick box and the sign-in notice.
+mixin _PolicySentence<T extends StatefulWidget> on State<T> {
+  Store get store;
+  late final TapGestureRecognizer _terms = TapGestureRecognizer()..onTap = () => PolicyLinks.open('/terms');
+  late final TapGestureRecognizer _privacy = TapGestureRecognizer()..onTap = () => PolicyLinks.open(PolicyLinks.privacyPath(store.appRole));
+
+  @override
+  void dispose() {
+    _terms.dispose();
+    _privacy.dispose();
+    super.dispose();
+  }
+
+  /// [template] (translated) with {terms} and {privacy} replaced by tappable names, in whatever order the language puts them.
+  List<InlineSpan> sentence(BuildContext context, String template) {
+    final link = TextStyle(color: Theme.of(context).colorScheme.primary, decoration: TextDecoration.underline);
+    final spans = <InlineSpan>[];
+    var rest = template.tr(context);
+    final marker = RegExp(r'\{terms\}|\{privacy\}');
+    for (var match = marker.firstMatch(rest); match != null; match = marker.firstMatch(rest)) {
+      if (match.start > 0) spans.add(TextSpan(text: rest.substring(0, match.start)));
+      final isTerms = match.group(0) == '{terms}';
+      spans.add(TextSpan(
+        text: (isTerms ? 'Terms & Conditions' : 'Privacy Policy').tr(context),
+        style: link,
+        recognizer: isTerms ? _terms : _privacy,
+      ));
+      rest = rest.substring(match.end);
+    }
+    if (rest.isNotEmpty) spans.add(TextSpan(text: rest));
+    return spans;
+  }
+}
+
+/// The sign-in screens: "By continuing, you agree to the Terms & Conditions and the Privacy Policy", with both names opening the pages.
+/// No tick box, so Google stays one tap: continuing with Google (or an email code) under this sentence is the agreement, saved on the
+/// server right after sign-in as a tick was ([Store.pendingConsent], lib/data/store_consent.dart). Shown until an agreement is saved on
+/// this phone.
+class ConsentNotice extends StatefulWidget {
+  const ConsentNotice({super.key, required this.store});
+  final Store store;
+  @override
+  State<ConsentNotice> createState() => _ConsentNoticeState();
+}
+
+class _ConsentNoticeState extends State<ConsentNotice> with _PolicySentence<ConsentNotice> {
+  @override
+  Store get store => widget.store;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text.rich(
+      TextSpan(
+        style: Theme.of(context).textTheme.bodySmall,
+        children: sentence(context, 'By continuing, you agree to the {terms} and the {privacy}.'),
+      ),
+      key: const ValueKey('consent-notice'),
+      textAlign: TextAlign.center,
     ),
   );
 }

@@ -10,6 +10,8 @@ import 'package:ecommerce_app/ui/home_section_config.dart';
 import 'package:ecommerce_app/ui/layout_settings.dart';
 import 'package:ecommerce_app/ui/section_animations.dart';
 import 'package:ecommerce_app/ui/text_animation.dart';
+import 'package:ecommerce_app/ui/admin_groups.dart';
+import 'package:ecommerce_app/ui/admin_settings.dart';
 
 List<Entry> _settings(Map<String, dynamic> animations, {Map<String, Map<String, dynamic>> sections = const {}}) => [
   for (final e in sections.entries) Entry('section_${e.key}', e.value),
@@ -191,12 +193,17 @@ void main() {
       final tabs = DefaultTabController.of(tester.element(find.byType(TabBar).first));
       tabs.animateTo(tabs.length - 1); // Settings is the last tab
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('settings-animations')));
+      // The Settings index lists every section under the six group names: scroll to Animations first.
+      final tile = find.byKey(const ValueKey('settings-animations'));
+      await tester.scrollUntilVisible(tile, 200, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(tile);
       await tester.pumpAndSettle();
       return store;
     }
 
-    testWidgets('it sits between Theme and Scrolling Text and lists every part of the page', (tester) async {
+    testWidgets('it sits right after Theme (Settings group) and lists every part of the page', (tester) async {
       await open(tester);
       expect(find.byKey(const ValueKey('anim-global-enabled')), findsOneWidget);
       for (final part in animationParts.keys) {
@@ -204,7 +211,8 @@ void main() {
       }
       final order = tester.widgetList<ListTile>(find.byType(ListTile)).map((t) => (t.key as ValueKey<String>?)?.value).whereType<String>().toList();
       expect(order.indexOf('settings-animations'), order.indexOf('settings-theme') + 1);
-      expect(order.indexOf('settings-scrollingText'), order.indexOf('settings-animations') + 1);
+      // Scrolling Text is with the other parts of the home page, in Ads & Offers (owner, 13 Nov 2026: six groups).
+      expect(adminGroupOf('scrollingText'), 'Ads & Offers');
     });
 
     testWidgets('turning a part off, choosing a type and a speed, then saving writes the Animations record', (tester) async {

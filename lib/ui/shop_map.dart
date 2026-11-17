@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../domain/catalog.dart';
 import 'design_tokens.dart';
+import 'shop_ratings.dart';
 
 /// A small OpenStreetMap view with a pin per shop in [shops], and an optional
 /// second "my location" pin at [latitude]/[longitude]. Shared by the customer
@@ -83,7 +84,7 @@ class ShopMap extends StatelessWidget {
                     width: 50,
                     height: 50,
                     child: Tooltip(
-                      message: shop.text('name'),
+                      message: '${shop.text('name')}${ratingLabel(shop).isEmpty ? '' : ' ${ratingLabel(shop)}'}',
                       child: IconButton(
                         onPressed: onShop == null ? null : () => onShop!(shop),
                         icon: const Icon(

@@ -10,9 +10,9 @@ const path = require('node:path');
 const apkDir = path.join(__dirname, '..', 'build', 'app', 'outputs', 'flutter-apk');
 // text that must be present / must be absent in each app's compiled code
 const rules = {
-  customer: { has: ['Choose your location', "Today's"], hasNot: ['jyothi9', 'Business Studio', 'Vendor studio', 'Field Assistant', 'Staff sign-in', 'approveVendor', 'reviewQuickItems', 'createQuickAccount'] },
-  vendor: { has: ['Vendor studio'], hasNot: ['jyothi9', 'Business Studio', 'Field Assistant', 'Staff sign-in', 'approveVendor', 'reviewQuickItems', 'createQuickAccount', "Today's Best Offers"] },
-  staff: { has: ['Field Assistant', 'Staff sign-in'], hasNot: ['jyothi9', 'Business Studio', 'Vendor studio', 'approveVendor', 'reviewQuickItems', 'createQuickAccount', "Today's Best Offers"] },
+  customer: { has: ['Choose your location', "Today's"], hasNot: ['jyothi9', 'Business Studio', 'Loca Market Vendor', 'Loca Market staff', 'Staff sign-in', 'approveVendor', 'reviewQuickItems', 'createQuickAccount'] },
+  vendor: { has: ['Loca Market Vendor'], hasNot: ['jyothi9', 'Business Studio', 'Loca Market staff', 'Staff sign-in', 'approveVendor', 'reviewQuickItems', 'createQuickAccount', "Today's Best Offers"] },
+  staff: { has: ['Loca Market staff', 'Staff sign-in'], hasNot: ['jyothi9', 'Business Studio', 'Loca Market Vendor', 'approveVendor', 'reviewQuickItems', 'createQuickAccount', "Today's Best Offers"] },
 };
 // A minimal zip reader (an APK is a zip): finds one entry by name and inflates it.
 function readZipEntry(file, name) {

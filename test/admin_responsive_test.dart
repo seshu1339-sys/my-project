@@ -26,12 +26,13 @@ void main() {
 
       // The main tabs, in this order, and nothing else in the tab bar.
       final labels = tester.widgetList<Tab>(find.byType(Tab)).map((t) => t.text).toList();
-      expect(labels, ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', 'Plans', 'Vendor Offers', 'Premium', 'Payments', 'Flash', 'Settings']);
+      expect(labels, ['Business', 'Vendors & Shops', 'Services', 'Staff', 'Ads & Offers', 'Settings']);
       // Insights is the first page you see.
       expect(DefaultTabController.of(tester.element(find.byType(TabBar).first)).index, 0);
-      // The top bar has only Search, AI Agent (and Sign out when live), each with a visible text label, and no bare icons.
+      // The top bar has only Search (Command on a short window, and Sign out when live), each with a visible text label, and no bare
+      // icons. The AI Agent button is in the command box's menu now (owner spec A, 17 Nov 2026).
       expect(find.widgetWithText(TextButton, 'Search'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'AI Agent'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'AI Agent'), findsNothing);
       expect(find.descendant(of: find.byType(AppBar), matching: find.byType(IconButton)), findsNothing);
       expect(find.byTooltip('More'), findsNothing);
 

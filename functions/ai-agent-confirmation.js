@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Confirmation for sensitive/critical AI Agent actions. 'sensitive' tier uses a
 // short Agent PIN, separate from the admin's login password, hashed the same
 // way admin-otp.js hashes OTP codes (HMAC-SHA256 with its own secret pepper —
@@ -18,12 +19,12 @@ const pinPepper = defineSecret('AI_AGENT_PIN_PEPPER');
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }

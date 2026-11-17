@@ -1,4 +1,5 @@
 import 'catalog.dart';
+import 'ist_time.dart';
 
 // Today's Offers: the 6 coloured boxes under the "Today's Offers" heading on the home page. Each box is one of the Today's Offers
 // Box promotions (placement 'carousel', in their order) unless an offer fills it. An item offer is a promotion with
@@ -21,7 +22,7 @@ int todayOfferSlot(Entry offer) {
   return n >= 1 && n <= todayOfferBoxCount ? n : 0;
 }
 
-DateTime? _time(Entry e, String key) => DateTime.tryParse(e.text(key));
+DateTime? _time(Entry e, String key) => parseIstTime(e.text(key));
 
 /// The offers live at [now], by their box number, then by who started first.
 List<Entry> liveTodayOffers(Iterable<Entry> offers, DateTime now) => [

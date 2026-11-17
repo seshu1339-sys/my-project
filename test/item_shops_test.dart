@@ -107,15 +107,15 @@ void main() {
     s.dispose();
   });
 
-  test('a customer located in a locality named with its town in brackets sees the town\'s shops', () async {
+  test('a customer near the shops sees them, whatever the place is named; a customer in another town does not (distance only)', () async {
     expect(townKey('Krishna Bazar (Narsipatnam)'), 'narsipatnam');
     expect(townKey(' Narsipatnam '), 'narsipatnam');
     expect(townKey('Tuni'), 'tuni');
     final s = await store();
     await s.setLocation('531118', 'Krishna Bazar (Narsipatnam)', lat: 17.667, lng: 82.611, town: 'Krishna Bazar (Narsipatnam)');
     expect(itemOffers(s.visibleProducts(), s.visible('shops'), name: 'Tomato').length, 3);
-    await s.setLocation('533401', 'Tuni', town: 'Tuni');
-    expect(itemOffers(s.visibleProducts(), s.visible('shops'), name: 'Tomato'), isEmpty, reason: 'another town');
+    await s.setLocation('533401', 'Tuni', lat: 17.359, lng: 82.546, town: 'Tuni');
+    expect(itemOffers(s.visibleProducts(), s.visible('shops'), name: 'Tomato'), isEmpty, reason: 'about 35 km away: outside the km');
     s.dispose();
   });
 

@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -164,7 +165,7 @@ class _AdminSearchPageState extends State<AdminSearchPage> {
                     final kindIcon = switch (r.kind) { _Kind.vendor => Icons.storefront, _Kind.staff => Icons.badge_outlined, _Kind.shop => Icons.store_outlined, _Kind.quick => Icons.bolt };
                     return Card(child: ListTile(
                       leading: Icon(kindIcon),
-                      title: Text(r.name),
+                      title: SampleTitle(r.name, id: r.id, data: const {}),
                       subtitle: Text('$kindLabel${r.code != null ? ' • ${r.code}' : ''}'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _open(r),

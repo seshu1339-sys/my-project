@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Scheduled Firestore export + admin-only listing. Deliberately NOT automated
 // restore: getRollbackInstructions only ever RETURNS the exact `gcloud
 // firestore import` command for a human to run themselves — restoring
@@ -11,7 +12,8 @@
 //   gcloud projects add-iam-policy-binding <project> \
 //     --member="serviceAccount:<project>@appspot.gserviceaccount.com" \
 //     --role="roles/datastore.importExportAdmin"
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
@@ -25,12 +27,12 @@ const auth = new GoogleAuth({scopes: ['https://www.googleapis.com/auth/datastore
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }
@@ -51,7 +53,7 @@ async function exportFirestore() {
   return {gcsPath, operationName: json.name};
 }
 
-exports.aiAgentDailyBackup = onSchedule({schedule: 'every 24 hours', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 540}, async () => {
+exports.aiAgentDailyBackup = task(async () => {
   const config = await getConfigData();
   if (!config.enabled || config.modules?.backup === false) return;
   try {

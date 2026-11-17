@@ -16,8 +16,8 @@ test('vendors read plans and only their own plan data; only functions write', {s
       await setDoc(doc(db, 'vendorPlanStatus/v1'), {uid: 'v1'});
       await setDoc(doc(db, 'paymentRequests/r1'), {uid: 'v1', amount: 4999});
     });
-    const v1 = env.authenticatedContext('v1', {email_verified: true}).firestore();
-    const v2 = env.authenticatedContext('v2', {email_verified: true}).firestore();
+    const v1 = env.authenticatedContext('v1', {role: 'user', email_verified: true}).firestore();
+    const v2 = env.authenticatedContext('v2', {role: 'user', email_verified: true}).firestore();
     const unverified = env.authenticatedContext('v3', {email_verified: false}).firestore();
     const anonymous = env.unauthenticatedContext().firestore();
 

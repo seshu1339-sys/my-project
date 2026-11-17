@@ -195,6 +195,8 @@ function text(value, min, max, label) {
   if (v.length < min || v.length > max) throw Error(`Provide ${label} (${min}-${max} characters).`);
   return v;
 }
+/// Trimmed text up to [max] letters, '' when not given.
+const optionalText = (value, max) => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, max) : '');
 function vendorApplication(data = {}) {
   const phone = typeof data.phone === 'string' ? data.phone.trim() : '';
   if (!/^\+?[0-9][0-9 -]{6,17}$/.test(phone)) throw Error('Provide a valid contact phone number.');
@@ -207,7 +209,8 @@ function vendorApplication(data = {}) {
   return {
     ownerName: text(data.ownerName, 2, 100, "the owner's full name"), phone,
     name: text(data.name, 2, 120, 'the shop name'), shopCategory: text(data.shopCategory, 2, 80, 'the shop category'),
-    address: text(data.address, 5, 500, 'the shop address'), pincode, description: text(data.description, 10, 1000, 'a shop description'),
+    // Owner, 13 Nov 2026: the address (else the one worked out from the GPS) and the description are optional.
+    address: optionalText(data.address, 500) || optionalText(data.gpsAddress, 500), pincode, description: optionalText(data.description, 1000),
     latitude: data.latitude, longitude: data.longitude,
     // The address the app worked out from the GPS (the vendor may have corrected the typed one); shown to the admin.
     ...(typeof data.gpsAddress === 'string' && data.gpsAddress.trim() ? {gpsAddress: data.gpsAddress.trim().replace(/\s+/g, ' ').slice(0, 500)} : {}),
@@ -268,18 +271,30 @@ const productChangeFields = {
   shop: ['name', 'description', 'address', 'phone', 'whatsapp', 'imageUrl'],
   // A new vendor item: an item from the admin's library (its name, photo and category come from there, never typed), the quantity
   // (1-10 kg or 1-10 pieces) and the price for that quantity.
-  newProduct: ['libraryItemId', 'unitType', 'quantity', 'price'],
+  // customName + categoryId instead of libraryItemId: an item that is not in the catalog (owner, 13 Nov 2026); it waits, hidden, for the
+  // vendor's own photo (checked by Claude Haiku).
+  // note (owner, 16 Nov 2026): an optional short size / brand note, at most 40 letters ("20 litre", "Milton").
+  newProduct: ['libraryItemId', 'customName', 'categoryId', 'unitType', 'quantity', 'price', 'note'],
+  // The vendor changes the note of an item (published at once, like a price).
+  note: ['note'],
 };
+/// The longest size / brand note of a vendor item.
+const ITEM_NOTE_MAX = 40;
 // Validates the values a vendor proposes for a public change. Throws Error(message).
 function validateVendorChange(type, changes) {
   const money = key => { const v = changes[key]; if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 10000000) throw Error(`${key} must be a number from 0 to 10000000.`); };
   if (type === 'newProduct') {
-    if (typeof changes.libraryItemId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.libraryItemId)) throw Error('Choose an item from the list.');
+    if (changes.libraryItemId === undefined && changes.customName !== undefined) {
+      if (typeof changes.customName !== 'string' || changes.customName.trim().length < 2 || changes.customName.trim().length > 60) throw Error('Enter the item name (2 to 60 letters).');
+      if (typeof changes.categoryId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.categoryId)) throw Error('Choose a category for the item.');
+    } else if (typeof changes.libraryItemId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(changes.libraryItemId)) throw Error('Choose an item from the list.');
     if (!['kg', 'pcs'].includes(changes.unitType)) throw Error('Choose Kg or Pieces.');
     if (!Number.isInteger(changes.quantity) || changes.quantity < 1 || changes.quantity > 10) throw Error('Choose a quantity from 1 to 10.');
     money('price');
     if (!(changes.price > 0)) throw Error('Enter the price for that quantity.');
   }
+  if (changes.note !== undefined && (typeof changes.note !== 'string' || changes.note.trim().length > ITEM_NOTE_MAX)) throw Error(`The note can have at most ${ITEM_NOTE_MAX} letters.`);
+  if (type === 'note' && changes.note === undefined) throw Error('Write the note.');
   if (changes.price !== undefined) money('price');
   if (changes.compareAtPrice !== undefined) money('compareAtPrice');
   if (changes.stock !== undefined && (!Number.isInteger(changes.stock) || changes.stock < 0 || changes.stock > 1000000)) throw Error('stock must be a whole number from 0 to 1000000.');
@@ -305,4 +320,4 @@ function vendorItemLimit(vendor = {}) {
   const limit = vendor.itemLimit;
   return typeof limit === 'number' && Number.isInteger(limit) && limit >= 0 && limit <= 100 ? limit : DEFAULT_VENDOR_ITEM_LIMIT;
 }
-module.exports = {parseDeliveryTiers, shopDeliveryCharge, cleanPhone, vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};
+module.exports = {ITEM_NOTE_MAX, parseDeliveryTiers, shopDeliveryCharge, cleanPhone, vendorItemUnit, vendorItemLimit, DEFAULT_VENDOR_ITEM_LIMIT, hashPin, verifyPin, quote, distanceKm, validCoordinate, paymentOptions, vendorFee, flagOn, flagOff, orderTransitionAllowed, vendorApplication, validateVendorChange, productChangeFields, pointInRectangle, pointInPolygon, promotionMatchesLocation, promotionMatchesPlace, locationTokenMatches, parseLocationList, fieldShopDetails, fieldItemDetails, fieldStaffDetails};

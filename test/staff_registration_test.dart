@@ -4,7 +4,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/places.dart';
 import 'package:ecommerce_app/services/geocoding.dart';
-import 'package:ecommerce_app/ui/field_home_page.dart';
 import 'package:ecommerce_app/ui/field_registration_form.dart';
 
 /// Records the server calls (Store.call is the one place every server call goes through).
@@ -37,16 +36,6 @@ void main() {
       {'name': 'Kiran Kumar', 'phone': '9876543210', 'latitude': 17.6685, 'longitude': 82.6126, 'pincode': '531116', 'gpsAddress': 'Gandhi Nagar, Narsipatnam, 531116'},
     );
     expect(fieldStaffRequest(name: 'K K', phone: '1', latitude: 1, longitude: 2, pincode: '531116').containsKey('gpsAddress'), isFalse);
-  });
-
-  test('a vendor or service-provider login cannot register as staff (the accounts are separate)', () {
-    expect(fieldAccountBlock(), isNull);
-    expect(fieldAccountBlock(vendorApplication: {'status': 'pending'}), startsWith('This account is a vendor account.'));
-    expect(fieldAccountBlock(vendor: {'status': 'approved'}), startsWith('This account is a vendor account.'));
-    expect(fieldAccountBlock(quickAccount: {'role': 'vendor'}), startsWith('This account is a vendor account.'));
-    expect(fieldAccountBlock(quickAccount: {'role': 'staff'}), isNull);
-    expect(fieldAccountBlock(providerApplication: {'status': 'pending'}), startsWith('This account is a service-provider account.'));
-    expect(fieldAccountBlock(provider: {'status': 'approved'}), startsWith('This account is a service-provider account.'));
   });
 
   Future<void> show(WidgetTester tester, Future<Position> Function() locate) async {

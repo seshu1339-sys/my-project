@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('../../role-auth');
 // Wholesale module: offers the administrator adds for Premium vendors (see store.js). Removing its line from functions/index.js removes all of it.
 //
 //   saveWholesaleOffer    admin -> add or edit an offer
@@ -12,8 +13,8 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 async function requireAdmin(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  requireRole(request);
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 

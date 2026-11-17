@@ -12,9 +12,8 @@ import 'notice_independence.dart';
 import 'shared.dart';
 import 'text_animation.dart';
 
-/// The "Today's Best Offers" strip at the top of the homepage: a label
-/// (admin-overridable, defaults to "Today's Best Offers in `<location>`") plus
-/// a horizontally scrollable row of real product/price chips — matches the
+/// The "Today's <area> Offers" strip at the top of the homepage: the label (always the customer's area name, never the admin's own
+/// wording) plus a horizontally scrollable row of real product/price chips — matches the
 /// reference design's price-chip ticker rather than a scrolling marquee.
 /// Chips prefer genuinely discounted products (`compareAtPrice` > `price`); if
 /// none are discounted, the first few catalog products fill the row instead.
@@ -47,26 +46,10 @@ class HomeTickerSection extends StatelessWidget {
       ...?borrowed?.data,
       ...noticeLayout.entry.data,
     });
-    final translations = ticker.data['translations'];
-    final location = store.address.isNotEmpty
-        ? store.address
-        : store.pincode.isNotEmpty
-        ? store.pincode
-        : 'your area'.tr(context);
-    final customText = translations is Map && translations[store.language] != null
-        ? translations[store.language].toString()
-        : ticker.text('text');
-    // With a town chosen the label names it automatically and follows every
-    // location change; custom wording is used only if it opts in with {town}.
-    final label = store.town.isNotEmpty
-        ? (customText.contains('{town}')
-              ? customText.replaceAll('{town}', store.town)
-              : 'Today\'s {town} Offers'.tr(context, {'town': store.town}))
-        : customText.isNotEmpty
-        ? customText
-        : 'Today\'s Best Offers in {location}'.tr(context, {
-            'location': location,
-          });
+    // Always "Today's <area> Offers", the customer's one place name (owner, 11 Nov 2026): the admin's own wording is never used for
+    // this title, so no fixed place name can stay on it. Before a place is known, just "Today's Offers".
+    final place = store.placeName;
+    final label = place.isNotEmpty ? 'Today\'s {town} Offers'.tr(context, {'town': place}) : 'Today\'s Offers'.tr(context);
     final discounted = products
         .where((p) => p.number('compareAtPrice', 0) > p.number('price', 0))
         .toList();

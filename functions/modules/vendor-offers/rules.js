@@ -7,11 +7,18 @@ const FOLDER = 'vendorOffers';
 const text = value => (typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '');
 const money = value => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_PRICE && Math.round(value * 100) === Number((value * 100).toFixed(6));
 
+/// Google's Storage address; while testing in the local Firebase emulators (FUNCTIONS_EMULATOR=true) also the Storage emulator's.
+/// Kept inside this module so the module stays independent.
+function storageHost(parsed) {
+  if (parsed.protocol === 'https:' && parsed.hostname === 'firebasestorage.googleapis.com') return true;
+  return process.env.FUNCTIONS_EMULATOR === 'true' && parsed.protocol === 'http:' && ['127.0.0.1', 'localhost', '10.0.2.2'].includes(parsed.hostname) && parsed.port === '9199';
+}
+
 /// The Storage path of a photo, only when it is a download link of this vendor's own offer folder.
 function photoPath(url, uid) {
   let parsed;
   try { parsed = new URL(url); } catch { return null; }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'firebasestorage.googleapis.com' || String(url).length > 2000) return null;
+  if (!storageHost(parsed) || String(url).length > 2000) return null;
   const match = parsed.pathname.match(/\/o\/([^/]+)$/);
   if (!match) return null;
   let path;
@@ -33,7 +40,11 @@ function validateOffer(data, uid, keepEnd = false) {
   if (new Set(photos).size !== photos.length || photos.some(url => typeof url !== 'string' || !photoPath(url, uid))) throw new Error('Upload the photos from your own vendor app.');
   const days = data.days ?? null;
   if (days === null ? !keepEnd : !Number.isInteger(days) || days < 1 || days > MAX_DAYS) throw new Error(`Choose 1 to ${MAX_DAYS} days.`);
-  return {title, details, offerPrice: data.offerPrice, regularPrice: regular, photos, days};
+  // An alert to customers' phones nearby: on or off. How far it reaches is the vendor's plan km (owner, 7 Nov 2026), so the Offer
+  // Alerts module decides the km when it sends; this module only keeps the choice. An older app may still send 25 or 50 (= on).
+  const alert = data.alert ?? (typeof data.alertRadiusKm === 'number' && data.alertRadiusKm > 0);
+  if (typeof alert !== 'boolean') throw new Error('Choose alert on or off.');
+  return {title, details, offerPrice: data.offerPrice, regularPrice: regular, photos, days, alert};
 }
 
 /// The status a saved offer gets: live at once, unless the admin switched on approval.

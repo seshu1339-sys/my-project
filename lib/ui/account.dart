@@ -1,3 +1,4 @@
+import 'report_problem.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -104,7 +105,7 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                   Text('Email sign-in and orders become available when Firebase is connected. Browse products and try the cart freely.'.tr(context)),
                 ] else if (widget.store.user != null &&
-                    !widget.store.user!.emailVerified) ...[
+                    !widget.store.emailConfirmed) ...[
                   Text(
                     'Verify your email'.tr(context),
                     style: const TextStyle(fontSize: 24),
@@ -145,7 +146,7 @@ class _AccountPageState extends State<AccountPage> {
                   ),
                 ] else if (widget.store.user != null) ...[
                   Text(
-                    widget.store.user!.email ?? 'Your profile'.tr(context),
+                    widget.store.signedInEmail.isNotEmpty ? widget.store.signedInEmail : 'Your profile'.tr(context),
                     style: const TextStyle(fontSize: 24),
                   ),
                   const SizedBox(height: 20),
@@ -178,21 +179,6 @@ class _AccountPageState extends State<AccountPage> {
                     cardBrand: cardBrand,
                     cardLast4: cardLast4,
                   ),
-                  OutlinedButton(
-                    onPressed: busy
-                        ? null
-                        : () => run(() async {
-                            await sendPasswordReset(
-                              widget.store,
-                              currentUserEmail: widget.store.user?.email,
-                              typedEmail: '',
-                            );
-                            if (context.mounted) {
-                              message(context, 'If an account exists, a password reset email has been sent.'.tr(context));
-                            }
-                          }),
-                    child: Text('Reset password by email'.tr(context)),
-                  ),
                   TextButton(
                     onPressed: () => run(widget.store.logout),
                     child: Text('Log out'.tr(context)),
@@ -207,6 +193,7 @@ class _AccountPageState extends State<AccountPage> {
                               pincode: widget.store.pincode,
                               latitude: widget.store.latitude,
                               longitude: widget.store.longitude,
+                              area: widget.store.placeName,
                             );
                             if (context.mounted) {
                               message(context, 'Price-drop and offer alerts enabled'.tr(context));
@@ -258,6 +245,8 @@ class _AccountPageState extends State<AccountPage> {
                 ] else
                   AccountAuthForm(store: widget.store),
                 if (busy) const LinearProgressIndicator(),
+                // "Report a problem" for everyone, signed in or not (lib/ui/report_problem.dart, owner spec G); only on a live app.
+                if (widget.store.live) Padding(padding: const EdgeInsets.only(top: 16), child: Align(alignment: Alignment.centerLeft, child: ReportProblemButton(store: widget.store))),
               ],
             ),
           ),

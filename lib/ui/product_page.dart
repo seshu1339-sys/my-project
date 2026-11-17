@@ -15,6 +15,8 @@ import 'shared.dart';
 import 'item_shops_page.dart';
 import 'item_shop_list.dart';
 import 'shop_page.dart';
+import 'report_abuse.dart';
+import 'shop_ratings.dart';
 
 class ProductPage extends StatefulWidget {
   const ProductPage({super.key, required this.store, required this.entry});
@@ -101,7 +103,7 @@ class _ProductPageState extends State<ProductPage> {
         ],
         const SizedBox(height: 12),
         Text(
-          '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}',
+          p.price(store.pincode) > 0 ? '${money(p.price(store.pincode))} / ${p.text('unit', 'each').tr(context)}' : priceOrNotUpdated(0, store),
           key: const ValueKey('product-price'),
           style: const TextStyle(
             fontSize: 32,
@@ -383,6 +385,9 @@ class _ProductPageState extends State<ProductPage> {
                     whatsapp: p.text('whatsapp'),
                     onUsed: (way) => Usage.track(way == 'call' ? 'worker_call' : 'worker_whatsapp', key: p.id, label: p.text('name'), town: p.text('town')),
                   ),
+                  // A customer who called or messaged this provider from the app may report them (the server checks).
+                  RatingsSection(store: store, place: p, target: {'kind': 'provider', 'listingId': p.id}, label: p.text('name')),
+                  if (store.user != null) Align(alignment: Alignment.centerLeft, child: ReportButton(store: store, target: {'kind': 'provider', 'listingId': p.id}, label: p.text('name'))),
                 ],
                 const Divider(height: 40),
                 if (related.isNotEmpty) ...[
@@ -403,7 +408,7 @@ class _ProductPageState extends State<ProductPage> {
                         child: ProductArt(item, height: 56),
                       ),
                       title: Text(item.text('name')),
-                      subtitle: Text(money(item.price(store.pincode))),
+                      subtitle: Text(priceOrNotUpdated(item.price(store.pincode), store)),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.pushReplacement(
                         context,

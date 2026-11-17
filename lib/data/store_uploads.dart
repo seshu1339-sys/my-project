@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../services/app_monitoring.dart';
 import '../services/image_compress.dart';
 import 'store.dart';
 
@@ -21,8 +22,13 @@ extension StoreUploads on Store {
     final ref = FirebaseStorage.instance.ref(
       '$folder/${DateTime.now().microsecondsSinceEpoch}.${image.ext}',
     );
-    await ref.putData(image.bytes, SettableMetadata(contentType: image.type));
-    return ref.getDownloadURL();
+    try {
+      await ref.putData(image.bytes, SettableMetadata(contentType: image.type));
+      return await ref.getDownloadURL();
+    } on FirebaseException catch (e) {
+      AppMonitoring.fail('upload', 'Photo upload ($folder): ${e.code}');
+      rethrow;
+    }
   }
 
   /// Stores one of the two mandatory vendor-application photos at its own fixed
@@ -69,7 +75,7 @@ extension StoreUploads on Store {
   /// bound matching the storage.rules ceiling). The caller still has to call
   /// the submitShopPhoto function afterwards so it goes to pending admin review.
   Future<Uint8List> uploadShopPhoto(int slot, XFile file) async {
-    if (slot < 1 || slot > 9) throw ArgumentError('Shop photo slot must be from 1 to 9.');
+    if (slot < 1 || slot > 31) throw ArgumentError('Shop photo slot must be from 1 to 31.');
     final uid = user?.uid;
     if (uid == null) throw StateError('Sign in first.');
     final image = await _readImage(this, file);

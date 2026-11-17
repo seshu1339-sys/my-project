@@ -17,10 +17,10 @@ test('a vendor item goes live on save at the shop\'s place; 2 items by default (
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('settings').doc('business').set({name: 'Test', autoPublishVendorChanges: false});
-  const vendor = {auth: {uid: 'itemV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'itemV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('itemV').set({vendorId: 'itemV', name: 'Ravi Stores', shopId: 'itemShop', status: 'approved'});
   await db.collection('shops').doc('itemShop').set({name: 'Ravi Stores', pincode: '531116', latitude: 17.668, longitude: 82.612, ownerId: 'itemV', active: true});
   await db.collection('vendorShopPhotos').doc('itemV_1').set({vendorId: 'itemV', slot: 1, status: 'approved'});
@@ -45,9 +45,9 @@ test('a vendor item goes live on save at the shop\'s place; 2 items by default (
   // ---- two items, then the limit; an item the admin hid still counts
   const second = await add('lib-soap', 'pcs', 3, 90);
   assert.equal((await db.collection('products').doc(second.docId).get()).data().unit, '3 pcs');
-  await assert.rejects(() => add('lib-onion', 'kg', 1, 28), /You can have 2 items/);
+  await assert.rejects(() => add('lib-onion', 'kg', 1, 28), /Your plan has 2 items/);
   await db.collection('products').doc(second.docId).update({active: false}); // hidden by the admin
-  await assert.rejects(() => add('lib-onion', 'kg', 1, 28), /You can have 2 items/, 'a hidden item still counts');
+  await assert.rejects(() => add('lib-onion', 'kg', 1, 28), /Your plan has 2 items/, 'a hidden item still counts');
 
   // ---- only the admin can allow more, and only a sensible number
   await assert.rejects(() => fns.setVendorItemLimit.run({...vendor, data: {vendorId: 'itemV', itemLimit: 10}}), /Administrator/);
@@ -56,7 +56,7 @@ test('a vendor item goes live on save at the shop\'s place; 2 items by default (
   assert.deepEqual(await fns.setVendorItemLimit.run({...admin, data: {vendorId: 'itemV', itemLimit: 3}}), {itemLimit: 3});
   const third = await add('lib-onion', 'kg', 1, 28);
   assert.equal(third.status, 'approved');
-  await assert.rejects(() => add('lib-onion', 'kg', 5, 130), /You can have 3 items/);
+  await assert.rejects(() => add('lib-onion', 'kg', 5, 130), /Your plan has 3 items/);
 
   // ---- a price change shows at once (customers' search, map and list read the product); a stock change still follows the policy
   const priced = await fns.submitVendorChange.run({...vendor, data: {type: 'price', collection: 'products', docId: first.docId, changes: {price: 46}}});

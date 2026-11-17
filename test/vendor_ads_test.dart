@@ -1,3 +1,4 @@
+import 'package:ecommerce_app/domain/post_duration.dart' show showPostDayChoices;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,9 @@ void _phone(WidgetTester tester, [Size size = const Size(1000, 3000)]) {
 }
 
 void main() {
+  // These tests check the vendor's own day choices, which the app hides (lib/domain/post_duration.dart): switched on here.
+  setUp(() => showPostDayChoices = true);
+  tearDown(() => showPostDayChoices = false);
   test('what the vendor is told about an ad', () {
     expect(vendorAdState(const Entry('a', {'endsAt': '2026-12-01T00:00:00'}), now), 'Live');
     expect(vendorAdState(const Entry('a', {'endsAt': '2026-10-01T00:00:00'}), now), 'Expired');
@@ -35,7 +39,7 @@ void main() {
     expect(vendorAdState(const Entry('a', {'active': false}), now), 'Inactive');
     expect(daysRemainingText(const Entry('a', {'endsAt': '2026-11-05T10:30:00'}), now), '10 days left');
     expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-26T20:00:00'}), now), 'ends today');
-    expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-20T10:30:00'}), now), 'ended 6 day(s) ago');
+    expect(daysRemainingText(const Entry('a', {'endsAt': '2026-10-20T10:30:00'}), now), 'ended', reason: 'never "days ago" (owner, 16 Nov 2026)');
     expect(daysRemainingText(const Entry('a', {}), now), '');
   });
 

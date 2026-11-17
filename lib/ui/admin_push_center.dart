@@ -25,6 +25,12 @@ const automaticNotifications = [
     'A customer\'s place changes and there are offers there.',
   ),
   (
+    'vendorOfferAlertsEnabled',
+    'shopOffer',
+    'Nearby shop offers',
+    'A paid vendor posts an offer with the alert on. It reaches customers within the plan km of that vendor (one a day per vendor).',
+  ),
+  (
     'orderStatusNotificationsEnabled',
     'orderStatus',
     'Order updates',

@@ -1,3 +1,5 @@
+import 'admin_routes.dart';
+import 'admin_settings.dart' show bestAdminPage, adminSettingsSectionPage;
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
@@ -15,8 +17,10 @@ class _ChatLine {
 /// proposeAgentAction (write a preview for AiAgentPendingActions to show).
 /// This widget never executes anything itself.
 class AiAgentChat extends StatefulWidget {
-  const AiAgentChat({super.key, required this.store, required this.voiceEnabled});
+  const AiAgentChat({super.key, required this.store, required this.voiceEnabled, this.openPage});
   final Store store;
+  // Test seam: what an "open ..." command opens (the page itself by default).
+  final void Function(String sectionKey)? openPage;
   final bool voiceEnabled;
   @override
   State<AiAgentChat> createState() => _AiAgentChatState();
@@ -41,6 +45,21 @@ class _AiAgentChatState extends State<AiAgentChat> {
       busy = true;
       input.clear();
     });
+    // "Cells తెరువు", "Plans చూపించు", "open staff areas": the page opens here, from the route map (lib/ui/admin_routes.dart). No server
+    // call and no AI cost (owner, 14 Nov 2026); other commands go to the agent as before.
+    final page = bestAdminPage(trimmed);
+    if (page != null && (adminAsksToOpen(trimmed) || adminCommandQuery(trimmed) == page.title.toLowerCase())) {
+      setState(() {
+        lines.add(_ChatLine('Opening ${page.title}', fromAdmin: false));
+        busy = false;
+      });
+      if (widget.openPage != null) {
+        widget.openPage!(page.sectionKey);
+      } else {
+        await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => adminSettingsSectionPage(widget.store, page.sectionKey)));
+      }
+      return;
+    }
     try {
       final interpretation = await widget.store.call('interpretAgentCommand', {'text': trimmed});
       if (interpretation['kind'] == 'readOnly') {

@@ -1,5 +1,6 @@
 import 'ads.dart';
 import 'catalog.dart';
+import 'ist_time.dart';
 
 // Rules the admin's Ads screens use. Kept apart from the widgets so they can be tested on their own.
 
@@ -39,30 +40,33 @@ List<Entry> filterAds(List<Entry> ads, DateTime now, {String? status, String que
 List<Entry> adsEndingSoon(List<Entry> ads, DateTime now, {int days = 3}) => [
   for (final ad in ads)
     if (const {'live', 'scheduled'}.contains(adStatus(ad, now)))
-      if (DateTime.tryParse(ad.text('endsAt')) case final end? when end.difference(now) <= Duration(days: days)) ad,
+      if (parseIstTime(ad.text('endsAt')) case final end? when end.difference(now) <= Duration(days: days)) ad,
 ];
 
 /// Whole days left for an ad (rounded up), or null when it has no end date.
 int? adDaysLeft(Entry ad, DateTime now) {
-  final end = DateTime.tryParse(ad.text('endsAt'));
+  final end = parseIstTime(ad.text('endsAt'));
   if (end == null) return null;
   final left = end.difference(now);
   return left.isNegative ? 0 : (left.inHours / 24).ceil();
 }
 
-DateTime _addMonth(DateTime d) {
+/// One calendar month later, counted on the India calendar.
+DateTime _addMonth(DateTime moment) {
+  final d = istWallClock(moment);
   final month = d.month == 12 ? 1 : d.month + 1;
   final year = d.month == 12 ? d.year + 1 : d.year;
-  final lastDay = DateTime(year, month + 1, 0).day;
-  return DateTime(year, month, d.day > lastDay ? lastDay : d.day, d.hour, d.minute);
+  final lastDay = DateTime.utc(year, month + 1, 0).day;
+  return istMoment(year, month, d.day > lastDay ? lastDay : d.day, d.hour, d.minute);
 }
 
 /// The new end for a renewal: an ad that is still running gets the time added to its current end, an expired one starts again from now.
+/// Saved in India time with its zone ("...+05:30").
 String renewedEnd(Entry ad, DateTime now, {required String by}) {
-  final current = DateTime.tryParse(ad.text('endsAt'));
+  final current = parseIstTime(ad.text('endsAt'));
   final from = current != null && current.isAfter(now) ? current : now;
   final to = by == 'month' ? _addMonth(from) : from.add(const Duration(days: 7));
-  return to.toIso8601String();
+  return istIso(to);
 }
 
 /// A copy to edit: same content, a new id, switched off until the admin checks it, at the end of the order.

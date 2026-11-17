@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/main.dart';
+import 'package:ecommerce_app/services/place_resolver.dart';
 import 'places_fixture.dart';
 
 Entry _offer(String name, String locations) => Entry(name, {
@@ -69,23 +70,20 @@ void main() {
   group('home page for a pincode-only customer', () {
     setUp(usePlacesFixture);
 
-    testWidgets('sees their own place\'s offers once resolved, never another place\'s', (tester) async {
-      tester.view.physicalSize = const Size(1400, 1800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      final store = await _store([
-        _offer('RAJAHMUNDRY OFFER', 'Rajahmundry (East Godavari)'),
-        _offer('VIJAYAWADA OFFER', 'Vijayawada (Krishna)'),
-      ]);
-      await store.setLocation('533101', ''); // a pincode typed by hand: no town yet
-      await tester.pumpWidget(MarketApp(store: store));
-      await tester.pumpAndSettle(const Duration(milliseconds: 200));
+    test('a place saved as a pincode only becomes a point with its name, so the shops near it show (distance only)', () async {
+      final store = await _store(const []);
+      store.catalog['shops'] = const [
+        Entry('rjy', {'name': 'Rajahmundry shop', 'latitude': 17.0005, 'longitude': 81.804}),
+        Entry('vjw', {'name': 'Vijayawada shop', 'latitude': 16.5062, 'longitude': 80.648}),
+      ];
+      await store.setLocation('533101', ''); // a pincode typed by hand, saved before places had a point
+      expect(needsPlaceResolution(store), isTrue);
+      await completeStoredPlace(store);
+      expect(store.located, isTrue);
       expect(store.town, 'Rajahmundry', reason: 'resolved from the pincode');
-      expect(find.text('RAJAHMUNDRY OFFER'), findsWidgets);
-      expect(find.text('VIJAYAWADA OFFER'), findsNothing);
-      expect(find.text("Today's Rajahmundry Offers"), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
+      expect(store.placeName, isNotEmpty);
+      expect(needsPlaceResolution(store), isFalse);
+      expect(store.nearby().map((s) => s.id), ['rjy'], reason: "never another place's shop");
       store.dispose();
     });
 

@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Vendor ads. A vendor submits an ad (or a change to one of their ads) from the vendor app; NOTHING goes live by itself: no automatic
 // publishing and no automatic scanner. Every new ad and every change, including a new photo, waits in adSubmissions as 'pending' until the
 // admin approves it by hand. While a change is pending, the approved ad on the site keeps showing its old photo and text.
@@ -10,11 +11,14 @@
 //   sendAdSummaries     every morning -> the chosen summaries, as notices in the vendor app (and a push when the vendor has them on)
 // The vendor is told of every decision in vendorNotices.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('./admin-session');
 const {OPTIONS, areaFullMessage} = require('./radius');
 const {requirePlan} = require('./plan-gate');
+const {readPostDurationMs, cappedEnd} = require('./post-duration');
+const {isStorageUrl} = require('./storage-url');
 
 const PLANS = {normal: {rounds: 1, seconds: 5}, silver: {rounds: 2, seconds: 7}, gold: {rounds: 3, seconds: 10}};
 const CONTENT = ['image', 'text', 'imageText'];
@@ -38,7 +42,7 @@ function validateSubmission(data = {}, uid) {
   const imageUrl = text(data.imageUrl, 1000, 'the picture link');
   if (imageUrl) {
     // Only a picture the vendor uploaded to their own folder in this project's storage.
-    const ok = /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/[^/]+\/o\/vendorProducts%2F/.test(imageUrl) && imageUrl.includes(`vendorProducts%2F${uid}%2F`);
+    const ok = isStorageUrl(imageUrl) && /\/o\/vendorProducts%2F/.test(imageUrl) && imageUrl.includes(`vendorProducts%2F${uid}%2F`);
     if (!ok) throw Error('Upload the picture again; it has to come from your own uploads.');
   }
   const title = text(data.title, 80, 'the title');
@@ -122,7 +126,9 @@ async function decideAd(db, data, now = Date.now()) {
     adId = `vad${now}${Math.floor(Math.random() * 1000)}`;
     const plan = PLANS[submission.package] || PLANS.normal;
     const vendor = (await db.collection('vendors').doc(submission.vendorId).get()).data() || {};
-    const startsAt = new Date(now).toISOString(), endsAt = new Date(now + submission.durationDays * 86400000).toISOString();
+    // The days chosen are the ad's own end; the admin's post duration (post-duration.js) caps it for everyone.
+    const ownEndsAt = new Date(now + submission.durationDays * 86400000).toISOString();
+    const startsAt = new Date(now).toISOString(), endsAt = new Date(cappedEnd(now, await readPostDurationMs(db), Date.parse(ownEndsAt))).toISOString();
     // The radius is centred on the vendor's registered shop location; the area may not already be full.
     let circle = {};
     if (radiusKm) {
@@ -137,7 +143,7 @@ async function decideAd(db, data, now = Date.now()) {
     await db.collection('ads').doc(adId).set({
       ...content, ...circle, status: 'approved', active: true, vendorId: submission.vendorId, vendorCode: submission.vendorCode, shopName: submission.shopName, shopId: submission.shopId,
       package: submission.package, rounds: plan.rounds, seconds: plan.seconds, maxPerDay: 0,
-      startsAt, endsAt,
+      startsAt, endsAt, ownEndsAt,
       order: Math.floor(now / 1000), source: 'vendor',
     });
     await db.collection('adsPrivate').doc(adId).set({paid: false, contactPerson: vendor.name || '', notes: 'Submitted from the vendor app'}, {merge: true});
@@ -201,12 +207,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 const fail = error => { throw new HttpsError('failed-precondition', error.message); };
 function requireVerified(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireVerified(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
 }
 exports.submitVendorAd = onCall(options, async request => {
@@ -225,7 +231,7 @@ exports.setAdSummary = onCall(options, async request => {
   const uid = requireVerified(request);
   try { return await setSummary(getFirestore(), uid, request.data || {}); } catch (error) { return fail(error); }
 });
-exports.sendAdSummaries = onSchedule({schedule: '30 8 * * *', timeZone: 'Asia/Kolkata', region: 'asia-south1', maxInstances: 1, timeoutSeconds: 300}, async () => {
+exports.sendAdSummaries = task(async () => {
   await sendSummaries(getFirestore());
 });
 exports._ads = {validateSubmission, submitAd, decideAd, removeAd, setSummary, sendSummaries, PLANS};

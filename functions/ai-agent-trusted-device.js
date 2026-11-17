@@ -1,4 +1,5 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // "Registered trusted Admin iPhone" — honestly, this is a persistent-token
 // gate (like a long-lived cookie), not hardware attestation. It exists to
 // reduce friction and scope WHO can even reach the WebAuthn/Face ID step that
@@ -18,12 +19,12 @@ const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   const uid = requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(uid);
   return uid;
 }

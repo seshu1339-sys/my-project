@@ -1,29 +1,33 @@
 'use strict';
+const {assertNotBlocked} = require('./block-list');
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Field Assistant: staff visit vendor shops in person and submit a photo + item
 // name/price/stock + the shop's GPS (an existing shop by id, or a brand-new one).
 // Nothing reaches customers until an admin approves — mirrors the vendor
 // onboarding shape (a status-gated `fieldStaff/{uid}` role doc, a pending-then-
 // approved `fieldSubmissions` queue) but is a fully separate pipeline, reviewed
 // in its own admin section, never merged with vendor moderation.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
 const {fieldShopDetails, fieldItemDetails, fieldStaffDetails, validCoordinate} = require('./domain');
-const {otherAccountMessage, claimEmailRole} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
+const {anthropicKey: photoSafetyKey, checkStoredPhotos, unsafeReason} = require('./photo-safety');
+const {flagOn} = require('./domain');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -37,30 +41,61 @@ async function requireAdmin(request) {
 // fieldStaffApplications/{uid}/staffPhoto (storage.rules only allows that
 // upload before this doc exists, or again after a rejection, matching the
 // vendor application photo's own lifecycle).
-// Registration is by location (GPS on, its pincode), and a field-staff account is never also a vendor or a service-provider account.
+// Registration is by location (GPS on, its pincode). The staff login is the email's own staff login (functions/role-logins.js): the same
+// email may also be a customer, vendor or service provider, each with its own login, ID and records.
 // The Staff ID (STF-NRPM-116-001, functions/vendor-id.js) is made from the pincode right here; staff who registered before this keep
 // their earlier STF00001-style ID (functions/ids.js).
-exports.requestFieldStaffAccess = onCall(options, async request => {
-  const uid = requireUser(request);
+exports.requestFieldStaffAccess = onCall({...options, memory: '512MiB', secrets: [photoSafetyKey]}, async request => {
+  // Only the email's staff login asks for staff access; the request stays 'pending' until an administrator approves it.
+  const uid = requireRole(request, ['staff']);
   const ref = db.collection('fieldStaff').doc(uid);
   const existing = await ref.get();
   if (existing.exists) return {status: existing.data().status, staffCode: existing.data().staffCode || null};
   let details;
   try { details = fieldStaffDetails(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  const taken = await otherAccountMessage(db, uid, 'staff', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone]});
   await verifyUploadedPhoto(`fieldStaffApplications/${uid}/staffPhoto`, 'your photo');
   const staffCode = await accountCodeFor(db, 'STF', {pincode: details.pincode, existing: '', owner: uid});
   await ref.set({
-    uid, name: details.name, phone: details.phone, email: request.auth.token.email || null,
+    uid, name: details.name, phone: details.phone, email: loginEmail(request) || null,
     staffPhotoPath: `fieldStaffApplications/${uid}/staffPhoto`, staffCode,
     ...locationStamp({pincode: details.pincode, latitude: details.latitude, longitude: details.longitude}),
     ...(details.gpsAddress ? {gpsAddress: details.gpsAddress} : {}),
     status: 'pending', requestedAt: FieldValue.serverTimestamp(),
   });
-  await claimEmailRole(db, request.auth.token.email, 'staff');
+  const decided = await autoDecideStaff(uid);
+  if (decided) return {status: decided, staffCode, auto: true};
   return {status: 'pending', staffCode};
 });
+
+/// Auto Approval for staff (owner, 14 Nov 2026; the same Business Profile > Auto Approval switch as vendors and service providers).
+/// The staff photo is checked (functions/photo-safety.js): nothing forbidden -> active at once (the staffAreas trigger books their
+/// cell); drugs, weapons, alcohol, tobacco or adult content -> refused with the reason; not checked (no key, limit, error) -> waits
+/// for the admin as before. [force] is the admin's "Run AI check on pending" button: it runs even while the switch is OFF.
+async function autoDecideStaff(uid, {force = false, ...checkOptions} = {}) {
+  if (!force) {
+    const business = (await db.collection('settings').doc('business').get()).data() || {};
+    if (!flagOn(business.autoApproval)) return null;
+  }
+  const ref = db.collection('fieldStaff').doc(uid);
+  const data = (await ref.get()).data();
+  if (!data || data.status !== 'pending') return null;
+  const check = await checkStoredPhotos(db, [data.staffPhotoPath], {feature: 'auto_approval_staff', uid, ...checkOptions});
+  const at = FieldValue.serverTimestamp();
+  if (check.verdict === 'unsafe') {
+    await ref.set({status: 'rejected', decisionReason: unsafeReason(check.categories), autoRejected: true, photoSafety: check.categories, decidedAt: at, decidedBy: 'auto'}, {merge: true});
+    return 'rejected';
+  }
+  if (check.verdict !== 'safe') {
+    await ref.set({autoApprovalHeld: check.results.map(r => r.note).filter(Boolean).join(' ') || 'The photo check did not run.', autoApprovalCheckedAt: at}, {merge: true});
+    return null;
+  }
+  await ref.set({status: 'active', autoApproved: true, decisionReason: 'Auto approved', decidedAt: at, decidedBy: 'auto', autoApprovalHeld: FieldValue.delete()}, {merge: true});
+  return 'active';
+}
+// For index.js (the admin's "Run AI check on pending") and the tests: a plain object, never a Cloud Function.
+exports._staffAutoApproval = {autoDecideStaff};
 
 // Admin: approve or reject a pending field-staff request.
 exports.reviewFieldStaff = onCall(options, async request => {
@@ -92,6 +127,25 @@ exports.setFieldStaffSuspension = onCall(options, async request => {
   return {status: suspended ? 'suspended' : 'active'};
 });
 
+// Admin: cancels a staff ID for good (owner, 13 Nov 2026). The ID is closed and never given again (staff IDs stay reserved in
+// _vendorCodes; a new staff member always gets a new ID). The same login cannot register again (requestFieldStaffAccess returns the
+// cancelled record) and a cancelled ID cannot be reinstated (setFieldStaffSuspension needs 'suspended'). The fieldStaff triggers do the
+// rest: the cell is free again (functions/modules/staff-areas) and the linked vendors and providers move under the admin
+// (functions/modules/staff-links), ready for the admin's one-click link to the cell's next staff member.
+exports.cancelFieldStaff = onCall(options, async request => {
+  await requireAdmin(request);
+  const {staffUid, reason = ''} = request.data || {};
+  if (typeof staffUid !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(staffUid)) throw new HttpsError('invalid-argument', 'Choose the staff member.');
+  const note = String(reason).trim().slice(0, 500);
+  if (note.length < 3) throw new HttpsError('invalid-argument', 'Give a reason for cancelling the staff ID.');
+  const ref = db.collection('fieldStaff').doc(staffUid);
+  const staff = (await ref.get()).data();
+  if (!staff) throw new HttpsError('not-found', 'Field staff member not found.');
+  if (staff.status === 'cancelled') throw new HttpsError('failed-precondition', 'This staff ID is already cancelled.');
+  await ref.update({status: 'cancelled', previousStatus: staff.status || '', cancelReason: note, cancelledAt: FieldValue.serverTimestamp(), cancelledBy: request.auth.uid});
+  return {status: 'cancelled', staffCode: staff.staffCode || ''};
+});
+
 // Configurable, admin-set max item photos per field submission — defaults to
 // 2. Deliberately a separate, un-shared implementation from vendor-photos.js's
 // vendorPhotoLimit(): the two settings must never affect each other.
@@ -115,8 +169,11 @@ async function verifyUploadedPhoto(path, label = 'the item photo') {
 // callable verifies every one of them, validates the shop (only when onboarding
 // a brand-new one) and item details, and queues a 'pending' record. Nothing
 // here touches products/shops directly.
+// CLOSED (owner, 6 Nov 2026): staff no longer send "New entry" items with shop prices; they add Today's Offers with live photos
+// (functions/modules/staff-areas). Reviewing old entries (reviewFieldEntry) keeps working.
 exports.submitFieldEntry = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['staff']);
+  if (uid) throw new HttpsError('failed-precondition', "New entry is closed. Add Today's Offers with a live photo from your dashboard.");
   const staff = (await db.collection('fieldStaff').doc(uid).get()).data();
   if (!staff || staff.status !== 'active') throw new HttpsError('permission-denied', 'Your field staff access must be approved before you can submit entries.');
   const {shopId = '', shop, item, submissionId, visitLatitude, visitLongitude, photoCount} = request.data || {};
@@ -191,7 +248,7 @@ exports.reviewFieldEntry = onCall({...options, timeoutSeconds: 120}, async reque
   for (let i = 0; i < photoPaths.length; i++) {
     const publicPath = `catalog/${productRef.id}_${i + 1}.jpg`;
     await bucket.file(photoPaths[i]).copy(bucket.file(publicPath));
-    imageUrls.push(`https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`);
+    imageUrls.push(publicStorageUrl(bucket.name, publicPath));
   }
   batch.set(productRef, {
     name: data.item.name, price: data.item.price, stock: data.item.stock, kind: 'product', categoryId: data.item.categoryId || '',

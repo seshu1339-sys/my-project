@@ -128,6 +128,7 @@ class _HomePopularSectionState extends State<HomePopularSection> {
               appearance: widget.productLayout.entry,
               smallestCard: isAndroidApp() ? 100 : null,
               itemBuilder: (entry) => HomeProductTile(
+              noPrice: noPriceText(widget.store),
                 entry: entry,
                 price: entry.price(widget.store.pincode),
                 appearance: widget.productLayout.styled(context, fontSize: 16),

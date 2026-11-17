@@ -137,15 +137,26 @@ void main() {
       restored.dispose();
     },
   );
-  test('nearby shops respects pincode or GPS radius', () async {
+  test('nearby shops: distance only, within the admin km of the customer point (pincodes and shop radii do not count)', () async {
     SharedPreferences.setMockInitialValues({});
     final store = Store();
     await store.init();
-    expect(store.nearby(), isEmpty);
-    await store.setLocation('560001', '');
-    expect(store.nearby().single.id, 's1');
-    await store.setLocation('', '', lat: 0, lng: 0);
-    expect(store.nearby(), isEmpty);
+    final s1 = store.entries('shops').firstWhere((s) => s.id == 's1');
+    expect(store.nearby().length, store.visible('shops').length, reason: 'only the demo with no place shows every shop');
+    await store.setLocation('', '', lat: s1.number('latitude'), lng: s1.number('longitude'));
+    expect(store.nearby().map((s) => s.id), contains('s1'));
+    for (final shop in store.nearby()) {
+      expect(distanceKm(s1.number('latitude'), s1.number('longitude'), shop.number('latitude'), shop.number('longitude')), lessThanOrEqualTo(store.reachKm));
+    }
+    await store.setLocation('', '', lat: 28.61, lng: 77.21);
+    expect(store.nearby(), isEmpty, reason: 'nothing within the km of New Delhi');
     store.dispose();
+
+    // The real app (with Firebase): nothing until the customer's place is known.
+    final live = Store(live: true)..catalog = {'shops': [s1]};
+    expect(live.nearby(), isEmpty);
+    live.latitude = s1.number('latitude');
+    live.longitude = s1.number('longitude');
+    expect(live.nearby().single.id, 's1');
   });
 }

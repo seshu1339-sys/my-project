@@ -1,21 +1,34 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/catalog.dart';
 import '../domain/vendor_items.dart';
 import 'library_item_tile.dart';
 import 'vendor_section_kit.dart';
+import '../services/photo_compress.dart';
 import '../services/usage.dart';
 
 /// "Add an item": the vendor picks a category, then one of the admin's items (photo and name come with it, nothing is typed), the
 /// quantity (1-10 kg or 1-10 pieces) and the price for that quantity. Saved items go live at once at the vendor's location. A vendor
 /// has [vendorItemLimit] items (2 unless the admin allows more; hidden items count): "Add another item" shows only below the limit.
 /// Photo 1 of the shop is required first. Its own state and busy flag.
+/// The message while a "Vendor photo compulsory" item has no photo yet (Save stays off).
+const vendorModelPhotoNeeded = 'This category needs a photo of your own model. Take or choose one to save.';
+
+/// The longest size / brand note (functions/domain.js ITEM_NOTE_MAX).
+const vendorItemNoteMax = 40;
+
 class VendorAddProductSection extends StatefulWidget {
-  const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview});
+  const VendorAddProductSection({super.key, required this.store, required this.uid, this.preview, this.onUpgrade});
   final Store store;
   final String uid;
+  // Opens the plans page (the workspace passes it; sections never import each other).
+  final VoidCallback? onUpgrade;
 
   /// For tests: (items the vendor has, items allowed, photo 1 ready) instead of reading them from Firestore.
   final (int, int, bool)? preview;
@@ -25,6 +38,13 @@ class VendorAddProductSection extends StatefulWidget {
 
 class _VendorAddProductSectionState extends State<VendorAddProductSection> with VendorSectionState {
   final price = TextEditingController();
+  // Search the whole catalog by name (owner, 13 Nov 2026), and the item that is not in the catalog (named by the vendor).
+  final search = TextEditingController();
+  final customName = TextEditingController();
+  // The size / brand note (at most 40 letters), and the vendor's own model photo, shrunk on the phone (owner, 16 Nov 2026).
+  final note = TextEditingController();
+  Uint8List? ownPhoto;
+  bool custom = false;
   String? categoryId;
   Entry? item;
   String unitType = 'kg';
@@ -37,30 +57,76 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
   @override
   void dispose() {
     price.dispose();
+    search.dispose();
+    customName.dispose();
+    note.dispose();
     super.dispose();
   }
 
   void _reset() {
     price.clear();
+    search.clear();
+    customName.clear();
+    note.clear();
+    ownPhoto = null;
+    custom = false;
     categoryId = null;
     item = null;
     unitType = 'kg';
     quantity = 1;
   }
 
+  /// Whether the chosen item needs the vendor's own model photo before Save: its category has "Vendor photo compulsory" (Categories).
+  /// An item that is not in the catalog keeps its own way (saved first, its photo sent in Item photos).
+  bool get _needsPhoto {
+    if (custom) return false;
+    final category = item?.text('categoryId') ?? categoryId;
+    return store.entries('categories').any((c) => c.id == category && c.data['ownPhotoRequired'] == true);
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (file == null) return;
+    final small = await shrinkPhotoInBackground(await file.readAsBytes());
+    if (!mounted) return;
+    if (small == null) {
+      toast('That file is not a photo. Choose another.');
+      return;
+    }
+    setState(() => ownPhoto = small);
+  }
+
   Future<void> _save() async {
     final chosen = item;
-    if (chosen == null) throw StateError('Choose an item.');
+    if (chosen == null && !custom) throw StateError('Choose an item.');
+    if (custom && customName.text.trim().length < 2) throw StateError('Enter the name of your item.');
     final p = double.tryParse(price.text.trim());
     if (p == null || p <= 0) throw StateError('Enter the price for ${vendorItemUnit(unitType, quantity)}.');
-    await store.submitVendorChange(type: 'newProduct', collection: 'products', docId: '', changes: {
-      'libraryItemId': chosen.id, 'unitType': unitType, 'quantity': quantity, 'price': p,
-    });
+    final photo = ownPhoto;
+    if (_needsPhoto && photo == null) throw StateError(vendorModelPhotoNeeded);
+    // Called directly: the new item's id is needed for its photo.
+    final result = await store.call('submitVendorChange', {'type': 'newProduct', 'collection': 'products', 'docId': '', 'changes': {
+      if (custom) ...{'customName': customName.text.trim(), 'categoryId': categoryId} else 'libraryItemId': chosen!.id,
+      'unitType': unitType, 'quantity': quantity, 'price': p,
+      if (note.text.trim().isNotEmpty) 'note': note.text.trim(),
+    }});
+    var message = custom ? 'Saved. Add your own photo of this item in Item photos below; it shows to customers after the photo is checked.' : 'Saved. Your item is live at your shop\'s location.';
+    if (photo != null) {
+      // The item waits, hidden, until its photo passes the AI photo check (functions/modules/photo-limits submitItemPhoto).
+      final productId = '${result['docId'] ?? ''}';
+      try {
+        await FirebaseStorage.instance.ref('vendorItemPhotos/$uid/$productId').putData(photo, SettableMetadata(contentType: 'image/jpeg', cacheControl: 'no-cache'));
+        final check = await store.call('submitItemPhoto', {'productId': productId});
+        message = check['status'] == 'approved' ? 'Saved. Your photo passed the check: the item is live now.' : 'Saved. The item shows once its photo has been checked.';
+      } catch (e) {
+        message = 'Saved, but the photo was not accepted: $e Send another photo in Item photos below.';
+      }
+    }
     setState(() {
       _reset();
       adding = false;
     });
-    toast('Saved. Your item is live at your shop\'s location.');
+    toast(message);
   }
 
   @override
@@ -74,11 +140,27 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
         builder: (context, mine) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
           // Photo 1 (the shop itself) is required before items can be added; it may still be waiting for the admin.
           stream: store.firestore.collection('vendorShopPhotos').doc('${uid}_1').snapshots(),
-          builder: (context, photo) => _card(
-            context,
-            itemCount: mine.data?.size ?? 0,
-            itemLimit: vendorItemLimit(vendor.data?.data()),
-            shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status']),
+          builder: (context, photo) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            // The free number and the running plan's number (Admin > Plans); the server checks the same on every new item.
+            stream: store.firestore.collection('planServiceGates').doc('main').snapshots(),
+            builder: (context, gates) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: store.firestore.collection('vendorPlanStatus').doc(uid).snapshots(),
+              builder: (context, plan) {
+                final endsAt = plan.data?.data()?['endsAt'];
+                return _card(
+                  context,
+                  itemCount: mine.data?.size ?? 0,
+                  itemLimit: vendorItemLimitNow(
+                    vendor.data?.data(),
+                    planGates: gates.data?.data(),
+                    planEndsAt: endsAt is Timestamp ? endsAt.toDate() : null,
+                    planItemLimit: plan.data?.data()?['itemLimit'],
+                    now: DateTime.now(),
+                  ),
+                  shopPhotoReady: const ['pending', 'approved'].contains(photo.data?.data()?['status']),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -90,13 +172,21 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
     final open = !full && (adding ?? itemCount == 0);
     final library = store.entries('productImageLibrary');
     final categories = libraryCategories(library, store.visible('categories'));
-    final items = categoryId == null ? const <Entry>[] : libraryItemsIn(library, categoryId!);
+    final query = search.text.trim().toLowerCase();
+    // A search looks through the whole catalog (name and keywords); without one, the chosen category's items show.
+    final items = query.isNotEmpty
+        ? [for (final e in library) if (e.active && ('${e.text('name')} ${e.text('tags')}').toLowerCase().contains(query)) e]
+        : categoryId == null ? const <Entry>[] : libraryItemsIn(library, categoryId!);
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
     return vendorCard('Add an item', [
       Text('Items: $itemCount of $itemLimit', key: const ValueKey('vendor-item-count'), style: const TextStyle(fontWeight: FontWeight.bold)),
       if (!shopPhotoReady) Text('Add photo 1, a photo of your shop (Shop photos above), first: it is required before you add items.', key: const ValueKey('shop-photo-required'), style: error),
       if (full)
-        Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, your limit. Ask the admin for permission to add more.', key: const ValueKey('vendor-item-limit-reached'))
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('You have $itemLimit item${itemLimit == 1 ? '' : 's'}, all your plan allows. You can change their prices any day; Plans shows the plans with more items.', key: const ValueKey('vendor-item-limit-reached')),
+          const SizedBox(height: 8),
+          if (widget.onUpgrade != null) FilledButton.icon(key: const ValueKey('vendor-item-upgrade'), onPressed: widget.onUpgrade, icon: const Icon(Icons.workspace_premium), label: const Text('Upgrade for more items')),
+        ])
       else if (!open)
         FilledButton.icon(
           key: const ValueKey('vendor-add-another'),
@@ -110,6 +200,15 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           label: Text(itemCount == 0 ? 'Add an item' : 'Add another item'),
         )
       else ...[
+        TextField(
+          key: const ValueKey('vendor-item-search'),
+          controller: search,
+          decoration: const InputDecoration(labelText: 'Search the item catalog', prefixIcon: Icon(Icons.search)),
+          onChanged: (_) => setState(() {
+            custom = false;
+            item = null;
+          }),
+        ),
         DropdownButtonFormField<String>(
           key: ValueKey('vendor-item-category-$categoryId'),
           initialValue: categoryId,
@@ -122,10 +221,10 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
           }),
         ),
         if (categories.isEmpty) const Text('The admin has not added any items yet. Please check again later.'),
-        if (categoryId != null) ...[
+        if (categoryId != null || query.isNotEmpty) ...[
           const SizedBox(height: 8),
           const Text('Choose your item:'),
-          if (items.isEmpty) const Text('No items in this category yet.'),
+          if (items.isEmpty) Text(query.isNotEmpty ? 'Nothing in the catalog matches "${search.text.trim()}".' : 'No items in this category yet.'),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -135,12 +234,45 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
                   key: ValueKey('vendor-library-item-${e.id}'),
                   item: e,
                   selected: item?.id == e.id,
-                  onTap: () => setState(() => item = e),
+                  onTap: () => setState(() {
+                    item = e;
+                    custom = false;
+                  }),
                 ),
             ],
           ),
         ],
-        if (item != null) ...[
+        // Only when the item is missing from the catalog: the vendor names it and later adds their own photo (checked by AI).
+        if (categoryId != null && !custom)
+          TextButton(
+            key: const ValueKey('vendor-item-missing'),
+            onPressed: () => setState(() {
+              custom = true;
+              item = null;
+            }),
+            child: const Text('My item is not in the catalog'),
+          ),
+        if (custom) ...[
+          TextField(key: const ValueKey('vendor-custom-name'), controller: customName, decoration: const InputDecoration(labelText: 'Name of your item')),
+          const Text('Your item shows to customers after you add your own photo of it (Item photos, below); the photo is checked automatically.', key: ValueKey('vendor-custom-note')),
+        ],
+        // "Vendor photo compulsory" categories (buckets, fancy items ...): every shop's model differs, so the vendor's own photo first.
+        if ((item != null || custom) && _needsPhoto) ...[
+          const SizedBox(height: 12),
+          Text('Your model photo', style: Theme.of(context).textTheme.titleSmall),
+          const Text('Take a photo of the model you sell. Customers see it in your shop\'s row when they open this item.'),
+          const SizedBox(height: 6),
+          Row(children: [
+            if (ownPhoto != null)
+              Padding(padding: const EdgeInsets.only(right: 12), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(ownPhoto!, key: const ValueKey('vendor-model-photo'), width: 72, height: 72, fit: BoxFit.cover))),
+            Expanded(child: Wrap(spacing: 8, runSpacing: 8, children: [
+              OutlinedButton.icon(key: const ValueKey('vendor-model-camera'), onPressed: busy ? null : () => _pickPhoto(ImageSource.camera), icon: const Icon(Icons.photo_camera_outlined), label: Text(ownPhoto == null ? 'Take photo' : 'Retake')),
+              OutlinedButton.icon(key: const ValueKey('vendor-model-gallery'), onPressed: busy ? null : () => _pickPhoto(ImageSource.gallery), icon: const Icon(Icons.photo_library_outlined), label: const Text('Gallery')),
+            ])),
+          ]),
+          if (ownPhoto == null) Text(vendorModelPhotoNeeded, key: const ValueKey('vendor-model-photo-needed'), style: error),
+        ],
+        if (item != null || custom) ...[
           const SizedBox(height: 12),
           SegmentedButton<String>(
             key: const ValueKey('vendor-item-unit'),
@@ -161,10 +293,16 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(labelText: 'Price for ${vendorItemUnit(unitType, quantity)} (₹)', hintText: 'e.g. 50'),
           ),
+          TextField(
+            key: const ValueKey('vendor-item-note'),
+            controller: note,
+            maxLength: vendorItemNoteMax,
+            decoration: const InputDecoration(labelText: 'Size or brand (optional)', hintText: 'e.g. 20 litre, Milton'),
+          ),
           const SizedBox(height: 8),
           FilledButton(
             key: const ValueKey('vendor-item-save'),
-            onPressed: busy || !shopPhotoReady
+            onPressed: busy || !shopPhotoReady || (_needsPhoto && ownPhoto == null)
                 ? null
                 : () {
                     Usage.button('vendor_item_save');
@@ -182,7 +320,7 @@ class _VendorAddProductSectionState extends State<VendorAddProductSection> with 
             child: const Text('Cancel'),
           ),
       ],
-    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. A price stays for $vendorPriceValidHours hours; then it is removed and you enter a new price.');
+    ], note: 'Choose from the items the admin has added; you only set the quantity and your price. Your item goes live at your shop\'s location as soon as you save it. Your price stays until you change it; for 24 hours after you set it (or tap "Yes, same rates") customers see the green Today\'s rate tick.');
   }
 }
 
@@ -245,11 +383,11 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                     ? const Icon(Icons.inventory_2_outlined)
                     : SizedBox(width: 44, height: 44, child: Image.network('${doc.data()['imageUrl']}', fit: BoxFit.cover, errorBuilder: (_, _, _) => const Icon(Icons.image_not_supported_outlined))),
                 title: Text('${doc.data()['name']}'),
-                // Prices last 24 hours: an expired one is shown in red until the vendor enters a new price.
+                // Prices last the admin's post duration: an expired one is shown in red until the vendor enters a new price.
                 subtitle: Text(
                   '${vendorPriceLine(doc.data(), DateTime.now())} • Stock ${doc.data()['stock'] ?? 0}${doc.data()['active'] == false ? ' • Hidden from customers' : ''}',
                   key: ValueKey('vendor-price-line-${doc.id}'),
-                  style: vendorPriceExpired(doc.data(), DateTime.now()) ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
+                  style: vendorPriceMissing(doc.data()) ? TextStyle(color: Theme.of(context).colorScheme.error) : null,
                 ),
                 trailing: Wrap(children: [
                   IconButton(
@@ -262,7 +400,7 @@ class _VendorMyProductsSectionState extends State<VendorMyProductsSection> with 
                           }),
                   ),
                   IconButton(
-                    tooltip: vendorPriceExpired(doc.data(), DateTime.now()) ? 'Enter a new price' : 'Update price',
+                    tooltip: vendorPriceMissing(doc.data()) ? 'Enter your price' : 'Update price',
                     icon: const Icon(Icons.sell_outlined),
                     onPressed: busy
                         ? null

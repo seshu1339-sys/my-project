@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// A vendor's offer in a box: the box's colour as a frame, the item's photo on top and the price below. Nothing else.
+/// A vendor's offer in a box: the box's colour as a frame, the item's photo on top, the price below and the vendor's short text (if any).
 class VendorOfferBox extends StatelessWidget {
-  const VendorOfferBox({super.key, required this.photoUrl, required this.price, required this.frame, required this.colour, required this.radius, required this.onTap});
+  const VendorOfferBox({super.key, required this.photoUrl, required this.price, required this.frame, required this.colour, required this.radius, required this.onTap, this.note = ''});
   final String photoUrl, price;
+  // The vendor's short offer text (owner, 13 Nov 2026), under the price; empty shows nothing.
+  final String note;
 
   /// The box's own decoration, so it matches the boxes beside it.
   final Decoration frame;
@@ -39,6 +41,8 @@ class VendorOfferBox extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 child: Text(price, key: const ValueKey('vendor-offer-price'), style: TextStyle(color: colour, fontWeight: FontWeight.w900, fontSize: 18)),
               ),
+              if (note.isNotEmpty)
+                Text(note, key: const ValueKey('vendor-offer-note'), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.black87)),
             ]),
           ),
         ),

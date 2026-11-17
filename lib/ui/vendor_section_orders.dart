@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/store.dart';
 import 'vendor_section_kit.dart';
+import 'report_abuse.dart';
 
 /// Orders for the vendor's shop. Orders carry the shops they include (shopIds), not a vendor id, and the rules only let a vendor read orders
 /// containing its own shop.
@@ -61,6 +62,8 @@ class _VendorOrdersSectionState extends State<VendorOrdersSection> with VendorSe
           Text('$lines • Total ${order['total']}'),
           Text('${order['address']}'),
           SelectableText('Customer phone: ${order['customerPhone'] ?? '-'}', key: ValueKey('order-customer-phone-${doc.id}')),
+          // The vendor who got this order may report its customer (functions/modules/abuse-reports).
+          ReportButton(store: store, target: {'kind': 'customer', 'orderId': doc.id}, label: 'the customer of this order'),
           if (delivery != null && delivery['distanceKm'] != null) Text('Distance: ${delivery['distanceKm']} km'),
           if (delivery != null && delivery['talkToVendor'] == true) const Text('Delivery charge for this distance: agree it with the customer by phone.'),
           if (delivery != null && delivery['fee'] is num && delivery['fee'] > 0) Text('Delivery charge: ${delivery['fee']}'),

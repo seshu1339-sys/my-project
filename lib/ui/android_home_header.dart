@@ -8,13 +8,15 @@ import '../services/strings.dart';
 import '../services/usage.dart';
 import 'android_layout.dart';
 import 'design_tokens.dart';
+import 'greeting.dart';
 import 'layout_settings.dart';
 import 'responsive_header.dart';
 
-/// The top of the Android home page: one small row, left to right: logo, location (a pin and the town), the search box (with its mic
-/// and camera) and a small settings icon. The settings icon opens a menu with what used to sit in the header: Notifications, Wishlist,
-/// Shopping bag, Settings (your account), Become a Seller, Office and the language choices. Each does what it did before.
-/// No "Welcome" and no tagline. Used only in the Android app (see wireframe_home.dart); the website keeps [ResponsiveHeader].
+/// The top of the Android home page: one small row, left to right: logo, location (a pin and the area name), the search box (with its
+/// mic and camera) and a small settings icon. The settings icon opens a menu with what used to sit in the header: Notifications,
+/// Wishlist, Shopping bag, Settings (your account), Become a Seller, Office and the language choices. Each does what it did before.
+/// Under the row, the same greeting as the website (lib/ui/greeting.dart): "Hello, Ravi" with the area under it, or "Hello,
+/// Kancharapalem People". No tagline. Used only in the Android app (see wireframe_home.dart); the website keeps [ResponsiveHeader].
 class AndroidHomeHeader extends StatelessWidget {
   const AndroidHomeHeader({
     super.key,
@@ -35,8 +37,9 @@ class AndroidHomeHeader extends StatelessWidget {
   final ValueChanged<Entry> onProduct;
   final double edgePadding;
 
-  /// The town, else the address, else the pincode; empty when no location is chosen yet (the pin alone is shown).
-  String get place => store.town.isNotEmpty ? store.town : store.address.isNotEmpty ? store.address : store.pincode;
+  /// The customer's one place name (the area, else the town), never the typed address; empty when no location is chosen yet (the pin
+  /// alone is shown).
+  String get place => store.placeName;
 
   @override
   Widget build(BuildContext context) {
@@ -64,12 +67,8 @@ class AndroidHomeHeader extends StatelessWidget {
       onProduct: onProduct,
     );
     final label = place;
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Padding(
-        key: const ValueKey('android-header'),
-        padding: EdgeInsets.symmetric(horizontal: edgePadding, vertical: 2),
-        child: Row(
+    final greeting = greetingLines(context, store);
+    final row = Row(
           children: [
             Semantics(
               label: 'App logo',
@@ -146,6 +145,31 @@ class AndroidHomeHeader extends StatelessWidget {
                 const PopupMenuDivider(),
                 for (final locale in AppLocale.enabled(store.business.text('enabledLanguages'))) PopupMenuItem(value: locale.languageCode, child: Text(AppLocale.names[locale.languageCode]!)),
               ],
+            ),
+          ],
+        );
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Padding(
+        key: const ValueKey('android-header'),
+        padding: EdgeInsets.symmetric(horizontal: edgePadding, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            row,
+            Padding(
+              key: const ValueKey('home-greeting'),
+              padding: const EdgeInsets.only(left: 4, bottom: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(greeting.line, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  if (greeting.under.isNotEmpty)
+                    Text(greeting.under, key: const ValueKey('home-greeting-area'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                ],
+              ),
             ),
           ],
         ),

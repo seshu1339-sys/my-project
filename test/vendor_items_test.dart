@@ -45,17 +45,17 @@ void main() {
     expect(libraryCategories(_library, _categories), [('cat-veg', 'Vegetables'), ('cat-kirana', 'Kirana'), ('', 'Other items')], reason: 'only categories with items, then Other');
   });
 
-  test('a vendor price lasts 24 hours, then the vendor sees it has expired', () {
+  test('a vendor price stays until the vendor changes it; the Today\'s rate tick for 24 hours from setting or "Yes, same rates"', () {
     final now = DateTime.utc(2026, 10, 25, 9, 0);
-    final fresh = {'price': 50, 'unit': '2 kg', 'priceExpiresAt': now.add(const Duration(hours: 23, minutes: 10)).toIso8601String()};
-    expect(vendorPriceExpired(fresh, now), isFalse);
-    expect(vendorPriceLine(fresh, now), '₹50 for 2 kg • valid for 23 h 10 min');
-    final due = {...fresh, 'priceExpiresAt': now.subtract(const Duration(minutes: 1)).toIso8601String()};
-    expect(vendorPriceExpired(due, now), isTrue, reason: 'past its 24 hours, even before the price is removed');
-    expect(vendorPriceLine(due, now), 'Price expired: enter a new price');
-    expect(vendorPriceExpired({'unit': '2 kg', 'priceExpired': true}, now), isTrue, reason: 'the price was removed');
-    expect(vendorPriceLine({'price': 60, 'unit': '1 kg'}, now), '₹60 for 1 kg', reason: 'an item from before prices expired keeps showing its price');
-    expect(vendorPriceValidHours, 24);
+    final fresh = {'price': 50, 'unit': '2 kg', 'priceSetAt': now.subtract(const Duration(hours: 2)).toIso8601String()};
+    expect(vendorPriceMissing(fresh), isFalse);
+    expect(vendorPriceLine(fresh, now), "₹50 for 2 kg • Today's rate ✓");
+    final old = {...fresh, 'priceSetAt': now.subtract(const Duration(days: 3)).toIso8601String()};
+    expect(vendorPriceLine(old, now), '₹50 for 2 kg', reason: 'only the tick goes: no date, no "old rate"');
+    expect(vendorPriceLine(old, now, ratesConfirmedAt: now.subtract(const Duration(hours: 1)).toIso8601String()), "₹50 for 2 kg • Today's rate ✓", reason: 'Yes, same rates');
+    expect(vendorPriceMissing({'unit': '2 kg', 'priceExpired': true}), isTrue, reason: 'a price the old rule removed');
+    expect(vendorPriceLine({'unit': '2 kg'}, now), 'No price: enter your price');
+    expect(vendorTodaysRateHours, 24);
   });
 
   Future<_RecordingStore> pumpSection(WidgetTester tester, (int, int, bool) preview) async {
@@ -73,7 +73,7 @@ void main() {
   testWidgets('a first item: category, then an admin item (no typing), Pieces 1-10, the price for that quantity, Save', (tester) async {
     final store = await pumpSection(tester, (0, 2, true));
     expect(find.text('Items: 0 of 2'), findsOneWidget);
-    expect(find.byType(TextField), findsNothing, reason: 'nothing to type before an item is chosen');
+    expect(find.byKey(const ValueKey('vendor-item-price')), findsNothing, reason: 'no price to type before an item is chosen (only the catalog search)');
     await tester.tap(find.byKey(const ValueKey('vendor-item-category-null')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Vegetables').last);

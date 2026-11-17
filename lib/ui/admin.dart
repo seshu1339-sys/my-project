@@ -4,12 +4,20 @@ import '../data/store.dart';
 import '../modules/module_admin.dart';
 import '../services/admin_route.dart';
 import 'admin_entry_list.dart';
+import 'sample_tag.dart';
 import 'admin_frame.dart';
 import 'admin_insights.dart';
+import 'admin_groups.dart';
 import 'admin_settings.dart';
+import 'agent_command_box.dart';
+import 'agent_hooks.dart';
+import 'agent_open.dart';
+import 'agent_registry_build.dart';
+import 'health_page.dart';
+import '../services/health_watch.dart';
 
-// admin.dart is the admin shell: the tabs (Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, Settings)
-// and the three top-bar buttons (Search, AI Agent, Sign out). Each moderation/editing concern lives in its own file with no
+// admin.dart is the admin shell: the six groups, the command box at the top (lib/ui/agent_command_box.dart: it took the place of the
+// "Find a setting" bar and the "AI Agent" button, which is now in its menu) and the top-bar buttons (Search, Sign out). Each moderation/editing concern lives in its own file with no
 // shared private helpers between them. Exported (not just imported) so that existing code importing only 'admin.dart' --
 // main_admin.dart, admin_auth.dart, and test/admin_test.dart's direct `EntryEditor` usage -- keeps working unchanged.
 import 'admin_orders.dart';
@@ -38,6 +46,10 @@ class _AdminPageState extends State<AdminPage> {
   @override
   void initState() {
     super.initState();
+    // The search opens an earlier main tab (Orders, Products, Plans...) as a page with this (lib/ui/admin_settings.dart).
+    adminTabBuilder = _tab;
+    // The sample accounts, for the SAMPLE label on their records (lib/ui/sample_tag.dart).
+    if (widget.store.live) SampleOwners.watch(() => widget.store.firestore);
     // A Home Screen shortcut to `<admin route>?open=ai-agent` lands here straight after the normal password+OTP login; this is
     // the only effect of that query param -- nothing about login itself changes. Scheduled for after the first frame since
     // Navigator needs a built context.
@@ -46,9 +58,42 @@ class _AdminPageState extends State<AdminPage> {
         if (mounted) Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: widget.store)));
       });
     }
+    // Any page may open a command-box option by its ID (Health, a design change): lib/ui/agent_hooks.dart.
+    agentOpenById = (context, store, id, {String command = ''}) async {
+      final entry = buildAgentRegistry().where((e) => e.id == id).firstOrNull;
+      if (entry != null) await openAgentEntry(context, store, entry, command: command);
+    };
+    agentOptionName = (id) => buildAgentRegistry().where((e) => e.id == id).firstOrNull?.name ?? '';
+    // The health status for the red marks and the Health badge (lib/services/health_watch.dart): one small listener.
+    if (widget.store.live && widget.store.admin) HealthWatch.instance.start(widget.store);
+    // A deep link to one option (`?open=field.settings.postDuration`): it opens at its field once the panel is up.
+    final linked = agentDeepLinkId;
+    if (linked != null) {
+      final entry = buildAgentRegistry().where((e) => e.id == linked).firstOrNull;
+      if (entry != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) openAgentEntry(context, widget.store, entry, command: 'link');
+        });
+      }
+    }
   }
 
-  static final _tabs = ['Insights', 'Orders', 'Products', 'Vendors', 'Shops', 'Complaints', 'Promotions', for (final m in moduleAdminTabs) m.title, 'Settings'];
+  // Owner, 13 Nov 2026: six groups, so the panel is clear at a glance; every earlier page is one item of one group (lib/ui/admin_groups.dart).
+  static final _tabs = [for (final g in adminGroups) g.title];
+
+  /// One group: its items beside (wide) or above (phone) the open item. Settings is the index of every setting, by group.
+  Widget _group(AdminGroup group) {
+    if (group.id == 'settings') return AdminEmbedScope(child: AdminSettingsPage(store: widget.store));
+    return AdminGroupPage(
+      key: ValueKey('admin-group-${group.id}'),
+      items: group.items,
+      build: (item) => switch (item.kind) {
+        AdminItemKind.tab => _tab(item.id),
+        AdminItemKind.section => AdminEmbedScope(child: adminSettingsContent(widget.store, item.id)),
+        AdminItemKind.providers => AdminEmbedScope(child: AdminNeedsFirebase(store: widget.store, child: ProviderModerationPage(store: widget.store))),
+      },
+    );
+  }
 
   Widget _tab(String name) {
     final store = widget.store;
@@ -79,21 +124,42 @@ class _AdminPageState extends State<AdminPage> {
         );
       }
       final store = widget.store;
-      // The three top-bar buttons always carry a text label. On a phone they sit in a row under the title instead of beside it.
+      // The top-bar buttons always carry a text label. On a phone they sit in a row under the title instead of beside it.
       final narrow = MediaQuery.sizeOf(context).width < 760;
+      // The command box sits at the top of the panel; on a short window (under 700 px high) it opens from a top-bar button instead,
+      // so the pages keep their room.
+      final tall = MediaQuery.sizeOf(context).height >= 700;
       final buttons = <Widget>[
+        if (!tall)
+          TextButton.icon(
+            key: const ValueKey('top-find-setting'),
+            onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(
+              appBar: AppBar(title: const Text('Command box')),
+              body: Column(children: [AdminSettingsSearchBar(store: store)]),
+            ))),
+            icon: const Icon(Icons.smart_toy_outlined),
+            label: const Text('Command'),
+          ),
         TextButton.icon(
           key: const ValueKey('top-search'),
           onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminSearchPage(store: store))),
           icon: const Icon(Icons.search),
           label: const Text('Search'),
         ),
-        TextButton.icon(
-          key: const ValueKey('top-ai-agent'),
-          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: store))),
-          icon: const Icon(Icons.smart_toy_outlined),
-          label: const Text('AI Agent'),
-        ),
+        // Health with a red count when a check fails or a new "Report a problem" came in (owner spec H: the admin notification).
+        if (store.live)
+          ListenableBuilder(
+            listenable: HealthWatch.instance,
+            builder: (context, _) {
+              final n = HealthWatch.instance.alertCount;
+              return TextButton.icon(
+                key: const ValueKey('top-health'),
+                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Health')), body: HealthPage(store: store)))),
+                icon: Badge(isLabelVisible: n > 0, label: Text('$n'), child: Icon(n > 0 ? Icons.monitor_heart : Icons.monitor_heart_outlined, color: n > 0 ? Colors.red : null)),
+                label: const Text('Health'),
+              );
+            },
+          ),
         if (store.live)
           TextButton.icon(
             key: const ValueKey('top-sign-out'),
@@ -124,6 +190,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
           body: Column(
             children: [
+              // The command box: find and open any option, ask a number, check health, ads and design by command (lib/ui/agent_command_box.dart).
+              if (tall) AdminSettingsSearchBar(store: store),
               if (!store.live)
                 Container(
                   width: double.infinity,
@@ -136,7 +204,7 @@ class _AdminPageState extends State<AdminPage> {
                 final controller = DefaultTabController.of(context);
                 return ListenableBuilder(
                   listenable: controller,
-                  builder: (context, _) => KeyedSubtree(key: ValueKey(controller.index), child: _tab(_tabs[controller.index])),
+                  builder: (context, _) => KeyedSubtree(key: ValueKey(controller.index), child: _group(adminGroups[controller.index])),
                 );
               })),
             ],
@@ -167,7 +235,8 @@ class _VendorsTab extends StatelessWidget {
                 child: AdminEmbedScope(
                   child: switch (controller.index) {
                     0 => VendorModerationPage(store: store),
-                    1 => ProviderModerationPage(store: store),
+                    // Service providers are under Services > Service providers (one place); this tab only points there.
+                    1 => const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Service providers are now under Services > Service providers.', key: ValueKey('providers-moved'), textAlign: TextAlign.center))),
                     2 => QuickAccountsPage(store: store),
                     _ => QuickItemsAdminPage(store: store),
                   },

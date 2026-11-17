@@ -1,14 +1,17 @@
 'use strict';
+const {requireRole, isAdminToken} = require('./role-auth');
 // Quick Add Item. Staff (any town in the pincode directory) and Vendors (their own shop, locked by GPS)
 // add short-lived items from a phone: photo, rate, category, start time and how long to show it.
 // Every item waits as 'pending' for the admin; only an approved item is public, and only between
 // startsAt and expiresAt (the clock starts at the later of approval and the requested start).
 // Expired items are hidden, never deleted. All writes go through these callables.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
-const {onSchedule} = require('firebase-functions/v2/scheduler');
+// The schedule is in functions/scheduled-jobs.js (one 15-minute and one hourly job for all).
+const {task} = require('./task');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
-const {getAuth} = require('firebase-admin/auth');
+const {roleLoginFor} = require('./role-logins');
 const {requireAdminSession} = require('./admin-session');
 const {quickItemDetails, approvedWindow, dailyLimit, dayKey} = require('./quick-domain');
 const {nearestPlace, findPlace} = require('./places');
@@ -21,12 +24,12 @@ const MAX_BATCH = 5;
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 const clean = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
@@ -45,8 +48,13 @@ async function nextCode(kind, prefix) {
 /// (ST001.. / VN001..) and a password-reset link to set their own password -- no password is ever
 /// chosen or shared by the admin. A vendor's shop location is NOT typed in: the vendor takes GPS
 /// at the shop (setQuickShopLocation) and the nearest town and pincode are found automatically.
+// CLOSED (owner, 6 Nov 2026): Quick Add is closed on the server. Making accounts, shop locations and items is refused; the admin's
+// calls for what already exists (update, switch off, cancel, review, expiry) keep working.
+const QUICK_CLOSED = "Quick Add is closed. Vendors register and add their own items in the vendor app; staff add Today's Offers with live photos.";
+
 exports.createQuickAccount = onCall(options, async request => {
   await requireAdmin(request);
+  throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const {role, name, phone, email, photoUrl = '', shopName = ''} = request.data || {};
   if (!['staff', 'vendor'].includes(role)) throw new HttpsError('invalid-argument', 'Choose Staff or Vendor.');
   const cleanName = clean(name, 100), cleanPhone = clean(phone, 20), cleanEmail = clean(email, 200).toLowerCase();
@@ -55,23 +63,18 @@ exports.createQuickAccount = onCall(options, async request => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) throw new HttpsError('invalid-argument', 'Enter a valid email address.');
   const photo = clean(photoUrl, 1000);
   if (!/^https:\/\//.test(photo)) throw new HttpsError('invalid-argument', 'Add the person\'s photo.');
-  const auth = getAuth();
-  let user;
-  try { user = await auth.getUserByEmail(cleanEmail); }
-  catch (error) {
-    if (error.code !== 'auth/user-not-found') throw error;
-    user = await auth.createUser({email: cleanEmail, displayName: cleanName, emailVerified: true});
-  }
+  // The email's own login for that role (functions/role-logins.js): the person later signs in to the staff or vendor app with the
+  // same email (Google or an email code) and lands in this login. Their other roles stay separate logins.
+  const user = {uid: await roleLoginFor(role, cleanEmail)};
   if ((await db.collection('quickAccounts').doc(user.uid).get()).exists) throw new HttpsError('already-exists', 'This email already has a Quick Add account.');
-  if (!user.emailVerified) await auth.updateUser(user.uid, {emailVerified: true});
   const code = await nextCode(role === 'staff' ? 'quickStaff' : 'quickVendor', role === 'staff' ? 'ST' : 'VN');
   await db.collection('quickAccounts').doc(user.uid).set({
     uid: user.uid, role, code, name: cleanName, phone: cleanPhone, email: cleanEmail, photoUrl: photo,
     shopLocked: false, shopName: role === 'vendor' ? clean(shopName, 120) || cleanName : '',
     active: true, createdAt: FieldValue.serverTimestamp(), createdBy: request.auth.uid,
   });
-  const resetLink = await auth.generatePasswordResetLink(cleanEmail);
-  return {uid: user.uid, code, resetLink};
+  // No password: the person signs in with Google or an emailed code, as in every app.
+  return {uid: user.uid, code, resetLink: null};
 });
 
 /// Admin: change an account's details, or unlock a vendor's shop location so it can be set again.
@@ -128,6 +131,7 @@ const placeFields = place => ({locationId: '', locationName: place.town, locatio
 /// and are then locked for good (only the admin can unlock it).
 exports.setQuickShopLocation = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   if (account.role !== 'vendor') throw new HttpsError('permission-denied', 'Only vendors have a shop location.');
   if (account.shopLocked === true) throw new HttpsError('failed-precondition', 'Your shop location is already set and cannot be changed. Contact admin.');
@@ -190,6 +194,7 @@ async function categoryFor(categoryId) {
 /// for the admin. Only a NEW item counts toward the daily limit. A vendor must be at their shop.
 exports.saveQuickItem = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const {itemId, submissionId} = request.data || {};
@@ -237,6 +242,7 @@ async function createItems(uid, account, items, now) {
 /// vendor's GPS is checked once for the whole batch. Everything or nothing is saved.
 exports.saveQuickItems = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const list = request.data?.items;
@@ -269,6 +275,7 @@ exports.saveQuickItems = onCall(options, async request => {
 /// Show an expired / cancelled / rejected item again: new start and duration, back to the admin.
 exports.reactivateQuickItem = onCall(options, async request => {
   const uid = requireUser(request);
+  if (uid) throw new HttpsError('failed-precondition', QUICK_CLOSED);
   const account = await activeAccount(uid);
   const now = Date.now();
   const ref = db.collection('quickItems').doc(String(request.data?.itemId || ''));
@@ -318,7 +325,7 @@ exports.reviewQuickItems = onCall({...options, timeoutSeconds: 120}, async reque
     const window = approvedWindow(now, item.requestedStartAt.toMillis(), item.durationMs);
     const publicPath = `catalog/quick_${id}.jpg`;
     await bucket.file(item.photoPath).copy(bucket.file(publicPath));
-    const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
+    const imageUrl = publicStorageUrl(bucket.name, publicPath);
     await ref.update({
       status: 'approved', imageUrl, startsAt: Timestamp.fromMillis(window.startsAtMs), expiresAt: Timestamp.fromMillis(window.expiresAtMs),
       approvedAt: Timestamp.fromMillis(now), decisionReason: clean(reason, 500), decidedAt: FieldValue.serverTimestamp(), decidedBy: request.auth.uid, updatedAt: FieldValue.serverTimestamp(),
@@ -338,5 +345,5 @@ async function expireQuickItems(now = Date.now()) {
   }
   return expired;
 }
-exports.expireQuickItems = onSchedule({schedule: 'every 15 minutes', region: 'asia-south1', maxInstances: 1}, async () => { await expireQuickItems(); });
+exports.expireQuickItems = task(async () => { await expireQuickItems(); });
 exports._quick = {expireQuickItems};

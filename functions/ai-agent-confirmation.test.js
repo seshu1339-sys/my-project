@@ -1,12 +1,12 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 
-test('AI Agent confirmation: Agent PIN set/validate and gate a sensitive action', {skip: !process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+test('AI Agent confirmation: Agent PIN set/validate and gate a sensitive action', {skip: 'AI agent callables are OFF since 12 Nov 2026 (their keys were removed from Secret Manager, see functions/index.js)'}, async () => {
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
   const uid = 'agentPinAdmin1';
-  const admin = {auth: {uid, token: {admin: true, email_verified: true, email: 'agentpin1@example.test'}}};
+  const admin = {auth: {uid, token: {role: 'admin', admin: true, email_verified: true, email: 'agentpin1@example.test'}}};
   await db.collection('_adminSessions').doc(uid).set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('aiAgentRoles').doc(uid).set({role: 'owner'});
 

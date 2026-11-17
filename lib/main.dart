@@ -4,15 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'data/store.dart';
 import 'ui/consent_checkbox.dart';
+import 'ui/first_open_sign_in.dart';
 import 'ui/storefront.dart';
 import 'ui/details.dart';
 import 'ui/admin_auth.dart';
 import 'domain/catalog.dart';
+import 'ui/shop_route_map.dart' show ShopStop, showShopRoute;
 import 'services/firebase_startup.dart';
 import 'services/analytics.dart';
 import 'services/usage_start.dart';
@@ -20,9 +23,10 @@ import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/push_opens.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 import 'services/admin_route.dart';
+import 'services/area_lookup.dart';
 import 'services/location.dart';
-import 'services/location_town.dart';
 import 'services/app_theme.dart';
 import 'services/localization.dart';
 
@@ -31,6 +35,8 @@ final _messenger = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: kIsWeb && isAdminRoute ? 'admin' : 'customer');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -40,6 +46,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
       await connectToEmulatorsIfConfigured();
+      // Problems with the app's version and device, and Crashlytics on Android (lib/services/app_monitoring.dart).
+      unawaited(AppMonitoring.firebaseReady());
       if (!kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) {
@@ -64,6 +72,19 @@ Future<void> main() async {
   final store = Store(live: live, database: firestore);
   // The customer app asks people to agree to the Terms and the Privacy Policy; the admin panel (same entry point on the web) does not.
   store.requiresConsent = !(kIsWeb && isAdminRoute);
+  // The admin panel signs in with the email's own administrator login (functions/role-logins.js), never the customer one.
+  if (kIsWeb && isAdminRoute) store.appRole = 'admin';
+  // The admin panel keeps its login in this browser tab only (owner, 14 Nov 2026). The shop and the admin panel can run on the same
+  // site (locamarket.in and locamarket.in/<admin path>), and Firebase shares one login across every tab of a site: a shop tab that
+  // saw the admin login signed it out (it is not a shop login, Store._adoptLogin), and the panel fell back to its sign-in page right
+  // after opening. Kept in the tab, a reload still keeps the panel signed in; a new tab signs in again.
+  if (live && kIsWeb && isAdminRoute) {
+    try {
+      await FirebaseAuth.instance.setPersistence(Persistence.SESSION);
+    } catch (_) {
+      /* The browser refused: the panel works as before. */
+    }
+  }
   await store.init();
   if (kIsWeb && isAdminRoute) {
     // Usage analytics (lib/services/usage.dart): the admin panel counts as the admin app.
@@ -115,46 +136,30 @@ Future<void> main() async {
   }
 }
 
-// On every app open, refresh the customer's coordinates (never the manually
-// chosen pincode/address) so ads/offers and nearby search reflect where they
-// actually are right now. Never prompts for permission and never blocks
-// first paint; silently does nothing if permission was never granted.
+// On every app open, someone who chose "Use my location" has their place follow the phone: once they have moved more than a little,
+// the point, the area name and so the shops and offers shown move with them. A place chosen by hand is never moved by GPS. Never
+// prompts for permission and never blocks first paint; silently does nothing if permission was never granted.
 Future<void> _refreshLocationOnOpen(Store store) async {
   await WidgetsBinding.instance.endOfFrame;
+  if (!store.followsGps) return;
   final position = await currentPositionIfPermitted();
-  if (position != null) {
-    // Someone who chose "Use my location" has the town follow their phone: when they
-    // have travelled to another town, the stored place (and so the offers shown and
-    // the location push notification) moves with them. A town picked by hand never moves.
-    final nearest = store.followsGps
-        ? await nearestPlaceFor(position.latitude, position.longitude)
-        : null;
-    if (nearest != null && nearest.town != store.town) {
-      await store.setLocation(
-        pincodeForGps(store.pincode, nearest),
-        nearest.label,
-        lat: position.latitude,
-        lng: position.longitude,
-        town: nearest.town,
-        district: nearest.district,
-        state: nearest.state,
-        followGps: true,
-      );
-      return;
-    }
-    await store.setLocation(
-      store.pincode,
-      store.address,
-      lat: position.latitude,
-      lng: position.longitude,
-      followGps: store.followsGps,
-    );
-  }
+  if (position == null || !exactEnough(position)) return;
+  final moved = !store.located || distanceKm(store.latitude!, store.longitude!, position.latitude, position.longitude) > movedKm;
+  if (!moved && store.area.isNotEmpty) return;
+  await savePlace(store, await placeAtPoint(store, position.latitude, position.longitude), followGps: true);
 }
+
+/// How far the phone must have moved before its place (and area name) is worked out again on open.
+const movedKm = 0.3;
 
 Future<void> _openAlert(Store store, RemoteMessage message) async {
   // Counted for the admin's push centre: which notification (or which kind) was opened.
   unawaited(reportPushOpen(nid: message.data['nid'], type: message.data['type'], title: message.notification?.title ?? ''));
+  // A vendor's nearby offer (functions/modules/offer-alerts): the shop, its photo, phone and the route.
+  if (message.data['type'] == 'shopOffer' && message.data['shopId'] is String) {
+    await _openShopRoute(store, message.data['shopId'] as String);
+    return;
+  }
   final id = message.data['productId'];
   if (id == null) {
     _navigator.currentState?.popUntil((route) => route.isFirst);
@@ -179,6 +184,17 @@ Future<void> _openAlert(Store store, RemoteMessage message) async {
   }
 }
 
+Future<void> _openShopRoute(Store store, String shopId) async {
+  try {
+    final doc = await store.firestore.collection('shops').doc(shopId).get();
+    final context = _navigator.currentContext;
+    if (context == null || !context.mounted) return;
+    await showShopRoute(context, ShopStop.shop(doc.exists ? Entry(doc.id, doc.data()!) : null, shopId: shopId));
+  } catch (_) {
+    _messenger.currentState?.showSnackBar(const SnackBar(content: Text('Could not open this shop. Please try searching for it.')));
+  }
+}
+
 class MarketApp extends StatelessWidget {
   const MarketApp({super.key, required this.store});
   final Store store;
@@ -189,7 +205,7 @@ class MarketApp extends StatelessWidget {
       navigatorKey: _navigator,
       scaffoldMessengerKey: _messenger,
       debugShowCheckedModeBanner: false,
-      title: 'Local Market • Everyday shopping made easy',
+      title: 'LOCAMARKET • Everyday shopping made easy',
       locale: AppLocale.fromCode(store.language),
       supportedLocales: AppLocale.enabled(
         store.business.text('enabledLanguages'),
@@ -208,7 +224,8 @@ class MarketApp extends StatelessWidget {
       theme: buildAppTheme(store, dark: false),
       darkTheme: buildAppTheme(store, dark: true),
       themeMode: resolveThemeMode(store),
-      home: Storefront(store: store),
+      // First open after install: the sign-in sheet with Google's one-tap sheet over the shop, once (lib/ui/first_open_sign_in.dart).
+      home: FirstOpenSignIn(store: store, child: Storefront(store: store)),
     ),
   );
 }

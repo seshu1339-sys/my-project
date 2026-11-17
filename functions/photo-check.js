@@ -1,4 +1,5 @@
 'use strict';
+const {isAdminToken} = require('./role-auth');
 // The "Google check" of a photo the admin is reviewing (vendor spec section 7: is the photo genuine?). For one private photo it finds:
 //   online      whether Google has the same picture on the internet (Cloud Vision web detection): 'none' (not found),
 //               'partial' (similar pictures), 'full' (the same picture is online: probably copied), or 'limit' / 'error' when the
@@ -80,6 +81,11 @@ let webDetection = async bytes => {
   if (result.error) throw Error(result.error.message || 'Cloud Vision could not check the photo.');
   return result.webDetection || {};
 };
+// Local testing only: the Firebase emulators have no Google credentials, so with PHOTO_CHECK_FAKE set (and only inside the emulators)
+// Google's answer is made up: 'none' = not found online, 'full' = the same picture is online. Never active in production.
+if (process.env.FUNCTIONS_EMULATOR === 'true' && process.env.PHOTO_CHECK_FAKE) {
+  webDetection = async () => (process.env.PHOTO_CHECK_FAKE === 'full' ? {fullMatchingImages: [{url: 'https://example.com/the-same-picture.jpg'}]} : {});
+}
 
 /// What Google's answer means for the admin.
 function onlineVerdict(web = {}) {
@@ -149,7 +155,7 @@ async function checkPhotoAt(path, checkedBy, now = Date.now()) {
 
 exports.checkPhoto = onCall(options, async request => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true || request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
   const path = request.data?.path;
   if (typeof path !== 'string' || !CHECKABLE.test(path)) throw new HttpsError('invalid-argument', 'This photo cannot be checked.');

@@ -49,7 +49,7 @@ void main() {
     expect(photoCheckUsageText(null), 'Google checks this month: 0 of 1000 free');
   });
 
-  testWidgets('the review: Approve works only once every photo is checked with Google; then it goes to the server; Reject needs a reason', (tester) async {
+  testWidgets('the review (adding by staff closed): the old additions with their Google checks, no Approve, Reject with a reason; the old ones can be disabled', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1000, 4000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final store = _RecordingStore();
@@ -69,7 +69,9 @@ void main() {
       ),
     ));
     await tester.pump();
-    expect(find.text('2 waiting for approval, oldest first. Check every photo with Google, then approve: it goes live at once.'), findsOneWidget);
+    expect(find.text('2 old additions still waiting, oldest first.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('staff-additions-closed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('disable-old-staff-added')), findsOneWidget);
     expect(tester.getTopLeft(find.byKey(const ValueKey('staff-review-add1'))).dy < tester.getTopLeft(find.byKey(const ValueKey('staff-review-add2'))).dy, isTrue, reason: 'oldest first');
     expect(find.text('Lakshmi Kirana'), findsOneWidget);
     expect(find.text('Vendor ID: VEN-NRPM-116-321 • Phone: 9876543210'), findsOneWidget);
@@ -79,8 +81,7 @@ void main() {
     expect(find.text('Charge: ₹250 per hour'), findsOneWidget);
     expect(find.text('Not auto-approved, the Google check found:\n• work photo 1: the same photo was used before'), findsOneWidget);
     expect(find.text('0 of 5 photos checked with Google'), findsOneWidget);
-    FilledButton approve() => tester.widget<FilledButton>(find.byKey(const ValueKey('staff-approve-add1')));
-    expect(approve().onPressed, isNull, reason: 'not before every photo is checked');
+    expect(find.byKey(const ValueKey('staff-approve-add1')), findsNothing, reason: 'adding by staff is closed: nothing can be approved');
 
     await tester.tap(find.byKey(const ValueKey('google-check-staffAdditions/s1/add1/vendor_1')));
     await tester.pump();
@@ -99,16 +100,19 @@ void main() {
     expect(find.text('Google: this picture is online, probably copied (1 page)'), findsOneWidget);
     expect(find.text('Stock photos'), findsOneWidget);
     expect(find.text("Same file as a vendor's shop photo 1"), findsOneWidget);
-    expect(approve().onPressed, isNull);
     checks['add1']!.add({
       for (final p in ['vendor_1', 'vendor_2', 'vendor_3', 'item1_1', 'item1_2']) 'staffAdditions/s1/add1/$p': {'online': 'none'},
     });
     await tester.pump();
     expect(find.text('5 of 5 photos checked with Google'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('staff-approve-add1')));
-    await tester.pump();
-    expect(store.calls.last.$1, 'reviewStaffAddition');
-    expect(store.calls.last.$2, {'additionId': 'add1', 'approved': true});
+    expect(find.byKey(const ValueKey('staff-approve-add1')), findsNothing);
+
+    // the admin disables the old ones (asks first)
+    await tester.tap(find.byKey(const ValueKey('disable-old-staff-added')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('disable-old-confirm')));
+    await tester.pumpAndSettle();
+    expect(store.calls.last.$1, 'disableOldStaffAdded');
 
     // reject the provider with a reason
     await tester.tap(find.byKey(const ValueKey('staff-reject-add2')));

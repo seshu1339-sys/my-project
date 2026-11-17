@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,10 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
+import '../domain/ads_admin.dart' show renewedEnd;
 import '../domain/catalog.dart';
+import '../domain/ist_time.dart';
 import '../domain/right_boxes.dart';
 import '../domain/shop_ads.dart';
+import '../services/server_clock.dart';
 import 'color_picker_field.dart';
+import 'ist_date_time_picker.dart';
 import 'shared.dart';
 
 /// What the page shows about the shop ads (live only): every shop ad (rightBoxAds), their total views and taps (adStats), and the
@@ -146,7 +151,7 @@ class _AdminRightBoxesPageState extends State<AdminRightBoxesPage> {
     }
     // The shop ad ends first (the vendor keeps the views counted so far); a box is never removed with its ad still running.
     if (hasAd && store.live && !await _link(count, '', quiet: true)) return;
-    await _write({'count': count - 1}, remove: {'box${count}Image', 'box${count}Target', 'box${count}Color'});
+    await _write({'count': count - 1}, remove: {'box${count}Image', 'box${count}Target', 'box${count}Color', 'box${count}StartsAt', 'box${count}EndsAt'});
   }
 
   Future<void> _upload(int n) async {
@@ -210,6 +215,7 @@ class _AdminRightBoxesPageState extends State<AdminRightBoxesPage> {
                 key: ValueKey('admin-right-box-$n'),
                 number: n,
                 box: rightBoxAt(record, n),
+                sample: record.data['box${n}Sample'] == true,
                 store: store,
                 busy: busy,
                 onUpload: () => _upload(n),
@@ -408,8 +414,10 @@ class _VendorPickerDialogState extends State<_VendorPickerDialog> {
 }
 
 class _BoxCard extends StatelessWidget {
-  const _BoxCard({super.key, required this.number, required this.box, required this.store, required this.busy, required this.onUpload, required this.onWrite, this.shopAd});
+  const _BoxCard({super.key, required this.number, required this.box, required this.store, required this.busy, required this.onUpload, required this.onWrite, this.shopAd, this.sample = false});
   final int number;
+  // The box holds a sample photo (made by the sample script; "Delete all samples" empties it).
+  final bool sample;
   final RightBox box;
   final Store store;
   final bool busy;
@@ -440,7 +448,7 @@ class _BoxCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Right Side Ad Box $number', style: Theme.of(context).textTheme.titleMedium),
+            Row(children: [Text('Right Side Ad Box $number', style: Theme.of(context).textTheme.titleMedium), if (sample) ...[const SizedBox(width: 8), const SampleTag()]]),
             const SizedBox(height: 10),
             Wrap(
               spacing: 16,
@@ -495,6 +503,8 @@ class _BoxCard extends StatelessWidget {
                       ],
                       const SizedBox(height: 10),
                       ColorPickerField(label: 'Background colour', value: box.color, onChanged: (v) => v.isEmpty ? onWrite(const {}, remove: {'box${number}Color'}) : onWrite({'box${number}Color': v})),
+                      const SizedBox(height: 10),
+                      _BoxTimer(number: number, box: box, busy: busy, onWrite: onWrite),
                     ],
                   ),
                 ),
@@ -504,6 +514,74 @@ class _BoxCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A box's start and end (India time, by the server's clock): its status (Live / Scheduled / Expired), the buttons to set or clear
+/// each one, and renewals. Outside its start / end the box's photo is not shown to customers and its shop ad gains no views.
+class _BoxTimer extends StatelessWidget {
+  const _BoxTimer({required this.number, required this.box, required this.busy, required this.onWrite});
+  final int number;
+  final RightBox box;
+  final bool busy;
+  final Future<void> Function(Map<String, dynamic> changes, {Set<String> remove}) onWrite;
+
+  Future<void> _pick(BuildContext context, String key, {required bool end}) async {
+    final current = end ? box.end : box.start;
+    final picked = await pickIstDateTime(context, initial: current ?? ServerClock.now(), helpText: end ? 'Box $number ends (India time)' : 'Box $number starts (India time)', endOfDay: end && current == null);
+    if (picked == null) return;
+    final other = end ? box.start : box.end;
+    if (other != null && (end ? !picked.isAfter(other) : !other.isAfter(picked))) {
+      if (context.mounted) message(context, 'The end must be after the start.');
+      return;
+    }
+    await onWrite({key: istIso(picked)});
+  }
+
+  /// Adds a week or a month: to the current end while it is still running, else from now.
+  Future<void> _renew(String by) async {
+    final now = ServerClock.now();
+    final end = renewedEnd(Entry('box', {'endsAt': box.endsAt}), now, by: by);
+    await onWrite({'box${number}EndsAt': end});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = box.statusAt(ServerClock.now());
+    final (label, colour) = switch (status) {
+      'live' => ('Live', Colors.green),
+      'scheduled' => ('Scheduled', Colors.blue),
+      'expired' => ('Expired', Colors.red),
+      _ => ('No photo', Colors.grey),
+    };
+    return Column(
+      key: ValueKey('right-box-timer-$number'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          const Text('Runs (India time)', style: TextStyle(fontWeight: FontWeight.w600)),
+          Chip(key: ValueKey('right-box-status-$number-$status'), label: Text(label), visualDensity: VisualDensity.compact, labelStyle: TextStyle(color: colour, fontWeight: FontWeight.bold)),
+        ]),
+        Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          OutlinedButton.icon(
+            key: ValueKey('right-box-start-$number'),
+            onPressed: busy ? null : () => _pick(context, 'box${number}StartsAt', end: false),
+            icon: const Icon(Icons.event, size: 18),
+            label: Text(box.start == null ? 'Start: now' : 'Start: ${istLabel(box.start)}'),
+          ),
+          if (box.start != null) TextButton(onPressed: busy ? null : () => onWrite(const {}, remove: {'box${number}StartsAt'}), child: const Text('Clear')),
+          OutlinedButton.icon(
+            key: ValueKey('right-box-end-$number'),
+            onPressed: busy ? null : () => _pick(context, 'box${number}EndsAt', end: true),
+            icon: const Icon(Icons.event_busy, size: 18),
+            label: Text(box.end == null ? 'End: never' : 'End: ${istLabel(box.end)}'),
+          ),
+          if (box.end != null) TextButton(onPressed: busy ? null : () => onWrite(const {}, remove: {'box${number}EndsAt'}), child: const Text('Clear')),
+          TextButton(key: ValueKey('right-box-renew-week-$number'), onPressed: busy ? null : () => _renew('week'), child: Text(status == 'expired' ? 'Renew +1 week' : '+1 week')),
+          TextButton(key: ValueKey('right-box-renew-month-$number'), onPressed: busy ? null : () => _renew('month'), child: Text(status == 'expired' ? 'Renew +1 month' : '+1 month')),
+        ]),
+      ],
     );
   }
 }

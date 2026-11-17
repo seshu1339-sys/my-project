@@ -1,25 +1,12 @@
+import 'report_problem.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../data/store.dart';
 import 'field_registration_form.dart';
-import 'quick_add.dart';
+import '../modules/staffareas/staffareas_module.dart';
+import '../modules/flash/flash_module.dart' show staffAppFlashButton;
 import 'field_workspace.dart';
-
-/// Why this login cannot register as field staff: vendor, service-provider and field-staff accounts are completely separate, so an
-/// account that is already a vendor or a service provider is told to use another email address. Null when it may register.
-String? fieldAccountBlock({
-  Map<String, dynamic>? vendorApplication,
-  Map<String, dynamic>? vendor,
-  Map<String, dynamic>? quickAccount,
-  Map<String, dynamic>? providerApplication,
-  Map<String, dynamic>? provider,
-}) {
-  const after = 'Field staff must use a separate account: sign out and register as staff with a different email address.';
-  if (vendorApplication != null || vendor != null || quickAccount?['role'] == 'vendor') return 'This account is a vendor account. $after';
-  if (providerApplication != null || provider != null) return 'This account is a service-provider account. $after';
-  return null;
-}
 
 /// Streams the signed-in staff member's own fieldStaff/{uid} doc and shows the
 /// right screen for its status. Unlike before, no fieldStaff/{uid} doc existing
@@ -40,10 +27,11 @@ class _FieldHomePageState extends State<FieldHomePage> {
   Widget build(BuildContext context) {
     final user = store.user;
     if (user == null) return const SizedBox.shrink();
-    final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
-    if (!user.emailVerified) {
+    // "Report a problem" (lib/ui/report_problem.dart, owner spec G) beside Log out.
+    final actions = [ReportProblemButton(store: store, asIcon: true), IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
+    if (!store.emailConfirmed) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Field Assistant'), actions: actions),
+        appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),
         body: const _Message(
           title: 'Verify your email first',
           body: 'Sign out and sign in again with Google or an email code so we can verify your email. Registration opens once your email is verified.',
@@ -51,16 +39,17 @@ class _FieldHomePageState extends State<FieldHomePage> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Field Assistant'), actions: actions),
+      floatingActionButton: staffAppFlashButton(store),
+      appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: store.firestore.collection('fieldStaff').doc(user.uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) return const _Message(title: 'Could not load your access status', body: 'Please check your connection and try again.');
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final status = snapshot.data!.data()?['status'];
-          if (status == 'active') return FieldWorkspace(store: store, uid: user.uid);
-          // An account the admin created for Quick Add goes straight to Quick Add.
-          return QuickAccountGate(store: store, role: 'staff', quickOnly: () => QuickAddOnly(store: store), otherwise: () => _fieldStage(snapshot.data!, status));
+          if (status == 'active') return FieldWorkspace(store: store, uid: user.uid, areaDashboard: StaffAreaDashboard(store: store, uid: user.uid));
+          // Quick Add is closed (owner, 6 Nov 2026): every staff account goes through registration and the area.
+          return _fieldStage(snapshot.data!, status);
         },
       ),
     );
@@ -70,48 +59,29 @@ class _FieldHomePageState extends State<FieldHomePage> {
     {
       {
         {
-          if (!snapshot.exists) return _SeparateAccountCheck(store: store);
+          // The staff app signs in with the email's own staff login (functions/role-logins.js), so the same email may also be a
+          // customer, vendor or service provider: those are separate logins with their own records. Sending this form makes the
+          // pending staff record; nothing can be submitted until an administrator approves it.
+          if (!snapshot.exists) return FieldRegistrationForm(store: store, displayName: store.user?.displayName ?? '');
           if (status == 'suspended') {
             return const _Message(title: 'Access suspended', body: 'Your field staff access has been suspended by the administrator. Contact them to have it reinstated.');
           }
+          if (status == 'cancelled') {
+            return const _Message(title: 'Staff ID closed', body: 'Your staff ID was cancelled by LOCAMARKET and is closed for good. Your cell is free for a new staff member. Contact the LOCAMARKET office if you have questions.');
+          }
           if (status == 'rejected') {
-            return const _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved. Contact the administrator for details.');
+            // A photo refused by the AI check says why (functions/field-assistant.js autoDecideStaff).
+            final why = snapshot.data()?['autoRejected'] == true ? ' ${snapshot.data()?['decisionReason'] ?? ''}' : '';
+            return _Message(title: 'Access request not approved', body: 'Your field staff access request was not approved.$why Contact the administrator for details.');
           }
           final code = '${snapshot.data()?['staffCode'] ?? ''}';
-          return _Message(
-            title: 'Waiting for approval',
-            body: 'Your access request is waiting for administrator approval. You will be able to submit entries here once it is approved.'
-                '${code.isEmpty ? '' : '\n\nYour Staff ID: $code'}',
-          );
+          // Registration finishes with the area: the staff member chooses a free one standing inside it and accepts the Terms
+          // (lib/modules/staffareas). The area stays Pending, held for them, until the admin approves them.
+          return _PendingStaff(store: store, uid: snapshot.id, staffCode: code);
         }
       }
     }
   }
-}
-
-/// No staff record yet: the registration form, unless this login is already a vendor or a service-provider account.
-class _SeparateAccountCheck extends StatelessWidget {
-  const _SeparateAccountCheck({required this.store});
-  final Store store;
-
-  Future<String?> _block() async {
-    final uid = store.user!.uid;
-    Future<Map<String, dynamic>?> read(String collection) async => (await store.firestore.collection(collection).doc(uid).get()).data();
-    final docs = await Future.wait([for (final c in ['vendorApplications', 'vendors', 'quickAccounts', 'providerApplications', 'providers']) read(c)]);
-    return fieldAccountBlock(vendorApplication: docs[0], vendor: docs[1], quickAccount: docs[2], providerApplication: docs[3], provider: docs[4]);
-  }
-
-  @override
-  Widget build(BuildContext context) => FutureBuilder<String?>(
-    future: _block(),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-      // When the check itself fails the form still opens; the server refuses a second kind of account anyway.
-      final block = snapshot.hasError ? null : snapshot.data;
-      if (block != null) return _Message(title: 'Use a separate account', body: block);
-      return FieldRegistrationForm(store: store, displayName: store.user?.displayName ?? '');
-    },
-  );
 }
 
 class _Message extends StatelessWidget {
@@ -130,5 +100,29 @@ class _Message extends StatelessWidget {
         ]),
       ),
     ),
+  );
+}
+
+/// A registered staff member waiting for approval: first their area (claimed standing inside it, Terms accepted), then the wait.
+class _PendingStaff extends StatelessWidget {
+  const _PendingStaff({required this.store, required this.uid, required this.staffCode});
+  final Store store;
+  final String uid, staffCode;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    stream: store.firestore.collection('staffAreaStaff').doc(uid).snapshots(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      final mine = snapshot.data!.data();
+      final area = mine?['areaId'] == null ? null : '${mine?['areaName'] ?? ''}';
+      // New staff register a hexagon cell (owner, 13 Nov 2026); the older claim page stays in the code, unused.
+      if (area == null) return StaffHexCellPage(store: store);
+      return _Message(
+        title: 'Waiting for approval',
+        body: 'Your registration is waiting for administrator approval. Your area "$area" is held for you until then; nobody else can take it.'
+            '${staffCode.isEmpty ? '' : '\n\nYour Staff ID: $staffCode'}',
+      );
+    },
   );
 }

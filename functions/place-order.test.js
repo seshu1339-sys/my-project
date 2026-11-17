@@ -7,7 +7,7 @@ const {getFirestore} = require('firebase-admin/firestore');
 
 const skip = !process.env.FIRESTORE_EMULATOR_HOST;
 const db = getFirestore();
-const auth = {uid: 'po-user', token: {email_verified: true}};
+const auth = {uid: 'po-user', token: {role: 'user', email_verified: true}};
 const near = {latitude: 17.027, longitude: 82.0}; // about 3 km from the customer
 const here = {latitude: 17.0, longitude: 82.0};
 

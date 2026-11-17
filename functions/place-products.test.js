@@ -8,13 +8,13 @@ test('approved vendor and staff products carry their shop\'s place', {skip: !pro
   const {getFirestore, Timestamp} = require('firebase-admin/firestore');
   const fns = require('./index');
   const db = getFirestore();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   await db.collection('settings').doc('business').set({name: 'Test', autoPublishVendorChanges: false});
 
   // ---- vendor: live as soon as it is saved, at the shop's place
   await db.collection('productImageLibrary').doc('lib-rice').set({name: 'Sona Masoori Rice', imageUrl: 'https://example.test/rice.jpg', categoryId: 'cat-rice', active: true, order: 1});
-  const vendor = {auth: {uid: 'plV', token: {email_verified: true}}};
+  const vendor = {auth: {uid: 'plV', token: {role: 'vendor', email_verified: true}}};
   await db.collection('vendors').doc('plV').set({vendorId: 'plV', name: 'Raj Store', shopId: 'plShop', status: 'approved', verified: true});
   await db.collection('vendorShopPhotos').doc('plV_1').set({vendorId: 'plV', slot: 1, status: 'approved'}); // photo 1 (the shop) is required before items
   await db.collection('shops').doc('plShop').set({name: 'Raj Store', address: 'Main Road', pincode: '533101', latitude: 16.99, longitude: 81.78, ownerId: 'plV', active: true});

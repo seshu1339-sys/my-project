@@ -31,11 +31,11 @@ List<String> vendorApplicationErrors({
     if (!RegExp(r'^\+?[0-9][0-9 -]{6,17}$').hasMatch(phone.trim())) 'Enter a valid contact phone number.',
     if (!between(shopName, 2, 120)) 'Enter the shop name.',
     if (!between(shopCategory, 2, 80)) 'Enter the shop category.',
-    if (!between(address, 5, 500)) 'Enter the shop address.',
+    // Owner, 13 Nov 2026: the address (filled from the GPS), the description and the shop photo are optional at registration.
+    if (address.trim().isNotEmpty && address.trim().length > 500) 'Keep the shop address under 500 letters.',
     if (!RegExp(r'^\d{6}$').hasMatch(pincode.trim())) 'Enter a valid six-digit pincode.',
-    if (!between(description, 10, 1000)) 'Describe the shop (at least 10 characters).',
+    if (description.trim().length > 1000) 'Keep the description under 1000 letters.',
     if (!hasVendorPhoto) 'Upload a clear personal photo of the vendor.',
-    if (!hasShopPhoto) 'Upload a photo of the actual shop.',
     if (!hasLocation) "Capture the shop's GPS location.",
   ];
 }
@@ -205,14 +205,14 @@ class _VendorRegistrationFormState extends State<VendorRegistrationForm> {
       TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Contact phone')),
       TextField(controller: shopName, textCapitalization: TextCapitalization.words, decoration: const InputDecoration(labelText: 'Shop name')),
       TextField(controller: shopCategory, decoration: const InputDecoration(labelText: 'Shop category', hintText: 'For example Grocery, Hardware')),
-      TextField(controller: address, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop address', helperText: 'Filled from your GPS location; correct it if needed.')),
+      TextField(controller: address, maxLines: 2, decoration: const InputDecoration(labelText: 'Shop address (optional)', helperText: 'Filled from your GPS location; correct it if needed.')),
       TextField(controller: pincode, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'Pincode', counterText: '')),
-      TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Shop description')),
+      TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'Shop description (optional)')),
       const SizedBox(height: 12),
       _locationCard,
       const SizedBox(height: 12),
       _photo(kind: 'vendorPhoto', title: 'Vendor photo', hint: 'A clear personal photo of the vendor (owner).', bytes: vendorBytes, ready: vendorReady),
-      _photo(kind: 'shopPhoto', title: 'Shop photo', hint: 'A separate photo of the actual shop.', bytes: shopBytes, ready: shopReady),
+      _photo(kind: 'shopPhoto', title: 'Shop photo (optional now)', hint: 'A photo of the actual shop. You can add it later; it is needed before your first item.', bytes: shopBytes, ready: shopReady),
       if (errors.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Please fix the following before submitting:', style: TextStyle(fontWeight: FontWeight.bold)),
         for (final e in errors) Text('• $e', style: TextStyle(color: Theme.of(context).colorScheme.error)),

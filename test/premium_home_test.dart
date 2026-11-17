@@ -7,8 +7,10 @@ import 'package:ecommerce_app/modules/offerdisplay/offerdisplay_module.dart';
 import 'package:ecommerce_app/modules/offerstore/offerstore_module.dart';
 import 'package:ecommerce_app/modules/premium/premium_module.dart';
 import 'package:ecommerce_app/modules/premiumscreen/premiumscreen_module.dart';
+import 'package:ecommerce_app/modules/showcase/showcase_module.dart';
+import 'package:ecommerce_app/services/server_clock.dart';
 import 'package:ecommerce_app/ui/home_today_offers.dart';
-import 'package:ecommerce_app/ui/shop_page.dart';
+import 'package:ecommerce_app/ui/shop_route_map.dart' show ShopRouteView;
 import 'package:ecommerce_app/ui/vendor_premium_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,7 +65,7 @@ Future<Store> openStore(List<Entry> adminOffers, {double? latitude = 17.667}) as
   return store;
 }
 
-Future<void> show(WidgetTester tester, Store store, List<TodaysOffer> vendors, {double width = 1400, int visible = 6}) async {
+Future<void> show(WidgetTester tester, Store store, List<TodaysOffer> vendors, {double width = 1400, int visible = 6, int boxes = 6}) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -76,6 +78,8 @@ Future<void> show(WidgetTester tester, Store store, List<TodaysOffer> vendors, {
         appearance: Entry('promo', {'visibleCount': visible, 'animationMs': 3000}),
         speed: 200,
         vendorOffers: Stream.value(vendors),
+        visible: boxes,
+        seconds: 5,
       ),
     ),
   ));
@@ -94,53 +98,107 @@ Future<void> clear(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('admin offers come first, then vendor offers, promotions fill what is left, and nothing moves', (tester) async {
+  // Owner, 6 Nov 2026: one box per paid vendor, 6 at a time on the website and 2 in the Android app, each turn the admin's seconds long;
+  // with few vendors every other turn has none of them, so no vendor's box stays on longer than the set time.
+  // Today, on a turn that is even and a multiple of 3 (5-second turns; the offers in these tests run around now).
+  final base = DateTime.now().millisecondsSinceEpoch ~/ 30000 * 30000;
+  void clock(int seconds) => ServerClock.debugSet(device: () => DateTime.fromMillisecondsSinceEpoch(base + seconds * 1000));
+
+  testWidgets('admin offers first, then the paid vendors in the boxes left; promotions fill the rest; the next turn has no vendors', (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
     final store = await openStore([adminOffer(4)]);
     await show(tester, store, [vendorOffer(1), vendorOffer(2)]);
     expect(find.text('Admin item 4'), findsOneWidget);
     expect(find.byType(VendorOfferBox), findsNWidgets(2));
-    expect(find.text('₹101'), findsOneWidget);
     expect(find.text('Old box 3'), findsOneWidget);
     expect(find.text('Old box 4'), findsNothing, reason: '3 offers + 3 promotions = 6 boxes');
     final admin = tester.getTopLeft(find.byType(TodayOfferBox));
     final vendor = tester.getTopLeft(find.byKey(const ValueKey('vendor-offer-box-2')));
     expect(admin.dx, lessThan(vendor.dx));
-    await nextSet(tester);
-    expect(find.text('Admin item 4'), findsOneWidget, reason: 'six or fewer: no rotation');
+    clock(5);
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.byType(VendorOfferBox), findsNothing, reason: 'two vendors for five boxes: they never stay longer than 5 seconds');
+    expect(find.text('Admin item 4'), findsOneWidget, reason: "the admin's own offer stays");
+    clock(10);
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.byType(VendorOfferBox), findsNWidgets(2), reason: 'and come back on the next turn');
     await clear(tester);
   });
 
-  testWidgets('more than 6 offers: the boxes change set by set, every offer gets its turn, then back to the first', (tester) async {
+  testWidgets('more vendors than boxes: a set at a time, each turn the admin seconds long, then back to the first', (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
     final store = await openStore([adminOffer(1), adminOffer(2)]);
     await show(tester, store, [for (var i = 1; i <= 9; i++) vendorOffer(i)]);
-    expect(find.text('Admin item 1'), findsOneWidget);
+    // 2 admin offers leave 4 boxes: vendors 1-4, then 5-8, then 9, then 1-4 again.
+    expect(find.text('₹101'), findsOneWidget);
     expect(find.text('₹104'), findsOneWidget);
     expect(find.text('₹105'), findsNothing);
-    expect(find.textContaining('Old box'), findsNothing, reason: 'only offers while they fill the boxes');
-    await nextSet(tester);
-    // 11 offers: the second set is the last 5, and the box left over takes the first offer again
+    clock(5);
+    await tester.pump(const Duration(seconds: 6));
     expect(find.text('₹105'), findsOneWidget);
-    expect(find.text('₹109'), findsOneWidget, reason: 'the last offer is not skipped');
-    expect(find.text('₹104'), findsNothing);
-    expect(find.text('Admin item 1'), findsOneWidget);
-    await nextSet(tester);
-    expect(find.text('₹104'), findsOneWidget, reason: 'it loops to the first set');
+    expect(find.text('₹108'), findsOneWidget);
+    expect(find.text('₹101'), findsNothing);
+    clock(10);
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.text('₹109'), findsOneWidget, reason: 'the last vendor is not skipped');
+    clock(15);
+    await tester.pump(const Duration(seconds: 6));
+    expect(find.text('₹101'), findsOneWidget, reason: 'it loops to the first set');
     expect(find.text('Admin item 1'), findsOneWidget);
     await clear(tester);
   });
 
-  testWidgets('on a phone they go 2 at a time, so all of them come on screen', (tester) async {
-    final store = await openStore([adminOffer(1)]);
-    await show(tester, store, [vendorOffer(1), vendorOffer(2), vendorOffer(3)], width: 390, visible: 2);
-    expect(find.text('Admin item 1'), findsOneWidget);
+  testWidgets('in the Android app 2 boxes at a time, so every vendor comes on screen in turn', (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
+    final store = await openStore([]);
+    await show(tester, store, [vendorOffer(1), vendorOffer(2), vendorOffer(3)], width: 390, visible: 2, boxes: 2);
     expect(find.text('₹101'), findsOneWidget);
+    expect(find.text('₹102'), findsOneWidget);
     expect(find.text('₹103'), findsNothing);
-    await nextSet(tester);
+    clock(5);
+    await tester.pump(const Duration(seconds: 6));
     expect(find.text('₹103'), findsOneWidget);
     await clear(tester);
   });
 
+  testWidgets("with the vendors' reach known, only vendors whose plan km covers the customer, and only running plans", (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
+    final store = await openStore([]);
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TodayOffersSection(
+          store: store,
+          boxes: [for (final p in store.entries('promotions')) if (p.text('placement') == 'carousel') p],
+          appearance: const Entry('promo', {'visibleCount': 6, 'animationMs': 3000}),
+          vendorOffers: Stream.value([vendorOffer(1), vendorOffer(2), vendorOffer(3)]),
+          showcase: Stream.value(const {
+            'v1': ShowcaseEntry(vendorId: 'v1', shopId: 'near', shopName: 'Lakshmi', photoUrl: '', radiusKm: 5, active: true),
+            'v2': ShowcaseEntry(vendorId: 'v2', shopId: 'near', shopName: 'Lakshmi', photoUrl: '', radiusKm: 5, active: false),
+            'v3': ShowcaseEntry(vendorId: 'v3', shopId: 'near', shopName: 'Lakshmi', photoUrl: '', radiusKm: 0.05, active: true),
+          }),
+          seconds: 5,
+        ),
+      ),
+    ));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('₹101'), findsOneWidget, reason: 'about 150 m away, the plan reaches 5 km');
+    expect(find.text('₹102'), findsNothing, reason: 'the plan has ended');
+    expect(find.text('₹103'), findsNothing, reason: 'the plan reaches only 50 m');
+    await clear(tester);
+  });
+
   testWidgets('a customer sees only offers of shops in the circle; with no location, none', (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
     final store = await openStore([]);
     await show(tester, store, [vendorOffer(1), vendorOffer(2, shop: 'far')]);
     expect(find.byType(VendorOfferBox), findsOneWidget);
@@ -153,13 +211,15 @@ void main() {
     await clear(tester);
   });
 
-  testWidgets('a tap on a vendor box goes straight to the shop page', (tester) async {
+  testWidgets("a tap on a vendor box goes straight to the shop's place, address and route", (tester) async {
+    addTearDown(ServerClock.debugReset);
+    clock(0);
     final store = await openStore([]);
     await show(tester, store, [vendorOffer(1)]);
     await tester.tap(find.byType(VendorOfferBox));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byType(ShopPage), findsOneWidget);
+    expect(find.byType(ShopRouteView), findsOneWidget);
     await clear(tester);
   });
 

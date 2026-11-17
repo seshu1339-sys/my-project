@@ -4,6 +4,7 @@
 //   vendorOffersConfig/main  {approvalRequired}: off means offers go live at once.
 const {FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {MAX_RUNNING, photoPath, validateOffer, statusOnSave, endsAtFrom, isRunning} = require('./rules');
+const {readPostDurationMs, cappedEnd} = require('../../post-duration');
 
 const offers = db => db.collection('vendorOffers');
 const configRef = db => db.collection('vendorOffersConfig').doc('main');
@@ -39,10 +40,20 @@ async function saveOffer(db, bucket, uid, data, now = Date.now()) {
   }
   const shop = (await db.collection('shops').doc(vendor.shopId).get()).data();
   const status = statusOnSave(await approvalRequired(db));
+  // The nearby alert is chosen for a new offer, or when an ended one runs again (then it may alert again). Editing a running offer
+  // keeps what it had, so an edit never sends a second alert.
+  const fresh = !current || !isRunning(current, now);
+  const alert = fresh ? {alert: safe.alert, alertRadiusKm: FieldValue.delete(), alertClaimedAt: FieldValue.delete(), alertStatus: FieldValue.delete(), alertSentAt: FieldValue.delete()} : {};
+  // Posted now when it is new or runs again; an edit of a running offer keeps its posted time. The days chosen are the offer's own
+  // end; the admin's post duration (post-duration.js) caps it for everyone.
+  const postedAt = fresh ? now : (current.postedAt?.toMillis?.() ?? current.createdAt?.toMillis?.() ?? now);
+  const ownEndsAt = safe.days ? endsAtFrom(now, safe.days) : (current?.ownEndsAt?.toMillis?.() ?? endsAt);
+  const cappedEndsAt = cappedEnd(postedAt, await readPostDurationMs(db), ownEndsAt);
   await ref.set({
+    ...alert,
     vendorId: uid, shopId: vendor.shopId, shopName: shop?.name || vendor.name || '',
     title: safe.title, details: safe.details, offerPrice: safe.offerPrice, regularPrice: safe.regularPrice, photos: safe.photos,
-    status, endsAt: Timestamp.fromMillis(safe.days ? endsAtFrom(now, safe.days) : endsAt),
+    status, endsAt: Timestamp.fromMillis(cappedEndsAt), ownEndsAt: Timestamp.fromMillis(ownEndsAt), postedAt: Timestamp.fromMillis(postedAt),
     updatedAt: FieldValue.serverTimestamp(), ...(current ? {} : {createdAt: FieldValue.serverTimestamp()}),
   }, {merge: true});
   if (current) await dropPhotos(bucket, (current.photos || []).filter(url => !safe.photos.includes(url)), uid);

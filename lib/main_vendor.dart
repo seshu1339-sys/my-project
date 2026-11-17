@@ -11,6 +11,7 @@ import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/google_analytics.dart';
 import 'services/emulators.dart';
+import 'services/server_clock.dart';
 import 'ui/app_bottom_ad.dart';
 import 'ui/consent_checkbox.dart';
 import 'ui/sign_in_panel.dart';
@@ -18,6 +19,8 @@ import 'ui/vendor_home.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Ads and offers start and end by the server's clock, not the phone's (lib/services/server_clock.dart). Never blocks the start.
+  unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'vendor');
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
@@ -27,6 +30,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
       await connectToEmulatorsIfConfigured();
+      // Problems with the app's version and device, and Crashlytics on Android (lib/services/app_monitoring.dart).
+      unawaited(AppMonitoring.firebaseReady());
       live = true;
     } catch (_) {
       startupError = 'Firebase could not start. Check the supplied project configuration.';
@@ -59,7 +64,7 @@ class VendorApp extends StatelessWidget {
         listenable: store,
         builder: (context, _) => MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Vendor studio',
+          title: 'Loca Market Vendor',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff8c4a22))),
           // The ads box at the bottom of every page, once signed in.
           builder: (context, child) => withConsentGate(context, withAppBottomAd(context, child, store), store),
@@ -73,26 +78,29 @@ class VendorApp extends StatelessWidget {
       );
 }
 
-/// Vendors and service providers sign in with Google (or an emailed code); the registration form opens once the email is in.
+/// Vendors and service providers sign in with Google (or an emailed code); the registration form opens once the email is in. The
+/// first time, the person then chooses Vendor or Service provider (two separate accounts of the same email; the home screen switches).
 class VendorLoginPage extends StatelessWidget {
   const VendorLoginPage({super.key, required this.store});
   final Store store;
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Vendor studio')),
+        appBar: AppBar(title: const Text('Loca Market Vendor')),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Text('Become a vendor', style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                const Text('Sign in with your Google account. Once you are in you can register your shop or service for approval.'),
-                const SizedBox(height: 16),
-                SignInPanel(store: store),
-              ]),
+              child: store.choosingVendorRole
+                  ? VendorRoleChooser(store: store)
+                  : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Text('Become a vendor', style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 8),
+                      const Text('Sign in with your Google account. Once you are in you can register your shop or service for approval.'),
+                      const SizedBox(height: 16),
+                      SignInPanel(store: store),
+                    ]),
             ),
           ),
         ),

@@ -1,26 +1,31 @@
 'use strict';
+const {assertNotBlocked} = require('./block-list');
+const {anthropicKey: photoSafetyKey, checkStoredPhotos, unsafeReason} = require('./photo-safety');
+const {requireRole, isAdminToken, loginEmail} = require('./role-auth');
 // Service providers: a separate kind of account from vendors (one login is never both; a person who wants both registers twice, with
 // two email addresses). A provider registers like a vendor (verified email, location on, admin approval) with a name, mobile number,
 // photo, one service from the admin's list (the service types in the services collection) and their own charge per hour. Once the
 // admin approves, the provider's listing is created in the services collection (never in products), with the photo made public.
+const {publicStorageUrl} = require('./storage-url');
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {requireAdminSession} = require('./admin-session');
 const {locationStamp} = require('./places');
-const {accountKinds, otherAccountMessage, claimEmailRole} = require('./accounts');
+const {flagOn} = require('./domain');
+const {accountKinds} = require('./accounts');
 const {accountCodeFor} = require('./vendor-id');
 const db = getFirestore();
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
-  if (request.auth.token.email_verified !== true) throw new HttpsError('permission-denied', 'Verify your email first.');
+  requireRole(request);
   return request.auth.uid;
 }
 async function requireAdmin(request) {
   requireUser(request);
-  if (request.auth.token.admin !== true) throw new HttpsError('permission-denied', 'Administrator access required.');
+  if (!isAdminToken(request.auth.token)) throw new HttpsError('permission-denied', 'Administrator access required.');
   await requireAdminSession(request.auth.uid);
 }
 
@@ -61,13 +66,13 @@ const photoPath = uid => `providerApplications/${uid}/photo`;
 // Two decimals of a degree: about 1 km, enough for "near you" without showing where the provider lives.
 const approximate = value => Math.round(value * 100) / 100;
 
-exports.registerProvider = onCall(options, async request => {
-  const uid = requireUser(request);
+exports.registerProvider = onCall({...options, secrets: [photoSafetyKey]}, async request => {
+  // Only the email's service-provider login registers a service (its other roles have their own IDs and records).
+  const uid = requireRole(request, ['provider']);
   let details;
   try { details = providerApplication(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  // One login is only ever one kind of account: a vendor, a service provider or field staff.
-  const taken = await otherAccountMessage(db, uid, 'provider', request.auth.token.email);
-  if (taken) throw new HttpsError('failed-precondition', taken);
+  // A permanently blocked email or phone cannot register again (functions/block-list.js).
+  await assertNotBlocked(db, {emails: [loginEmail(request)], phones: [details.phone]});
   const type = (await db.collection('services').doc(details.serviceTypeId).get()).data();
   if (!type || type.kind !== 'serviceType' || type.active === false) throw new HttpsError('invalid-argument', 'Choose a service from the list.');
   const ref = db.collection('providerApplications').doc(uid);
@@ -82,33 +87,23 @@ exports.registerProvider = onCall(options, async request => {
   const providerCode = await accountCodeFor(db, 'SRV', {pincode: details.pincode, existing: existing.exists ? existing.data().providerCode : '', owner: uid});
   await ref.set({
     providerId: uid, ...details, serviceName: String(type.name || ''), serviceTypeKey: String(type.typeId || details.serviceTypeId.replace(/^type-/, '')),
-    photoPath: file.name, email: request.auth.token.email || null, status: 'pending', providerCode,
+    photoPath: file.name, email: loginEmail(request) || null, status: 'pending', providerCode,
     submittedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     decisionReason: FieldValue.delete(), decidedAt: FieldValue.delete(),
   }, {merge: true});
-  await claimEmailRole(db, request.auth.token.email, 'provider');
+  const decided = await autoDecideProvider(uid);
+  if (decided) return {...decided, providerCode, auto: true};
   return {status: 'pending', providerCode};
 });
 
-exports.approveProvider = onCall(options, async request => {
-  await requireAdmin(request);
-  const {providerId, approved, reason = ''} = request.data || {};
-  if (typeof providerId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(providerId) || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the provider and the decision.');
-  const ref = db.collection('providerApplications').doc(providerId);
-  const snapshot = await ref.get();
-  if (!snapshot.exists) throw new HttpsError('not-found', 'Service-provider application not found.');
-  const data = snapshot.data();
-  if (data.status !== 'pending') throw new HttpsError('failed-precondition', 'Only a pending application can be approved or rejected.');
-  if (!approved) {
-    if (!String(reason).trim()) throw new HttpsError('invalid-argument', 'Give the reason for rejecting.');
-    await ref.set({status: 'rejected', decisionReason: String(reason).trim().slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
-    return {status: 'rejected'};
-  }
+/// Publishes an approved provider: the public listing, the provider record and the decision (the admin's approval and the Auto
+/// Approval; [extra] marks the auto one).
+async function publishProvider(providerId, ref, data, reason = '', extra = {}) {
   // The photo becomes public with the listing (copied to catalog/, which everyone can read); the application copy stays private.
   const bucket = getStorage().bucket();
   const publicPath = `catalog/provider_${providerId}.jpg`;
   await bucket.file(data.photoPath).copy(bucket.file(publicPath));
-  const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(publicPath)}?alt=media`;
+  const imageUrl = publicStorageUrl(bucket.name, publicPath);
   const listingId = `prov-${providerId}`;
   const digits = String(data.phone || '').replace(/[^0-9]/g, '');
   // Applications from before the Provider ID get one now.
@@ -124,16 +119,53 @@ exports.approveProvider = onCall(options, async request => {
     providerCode, active: true, order: 1000, createdAt: FieldValue.serverTimestamp(),
   });
   batch.set(db.collection('providers').doc(providerId), {
-    providerId, name: data.name, status: 'approved', listingId, serviceTypeId: data.serviceTypeId, providerCode, approvedAt: FieldValue.serverTimestamp(),
+    providerId, name: data.name, status: 'approved', listingId, serviceTypeId: data.serviceTypeId, providerCode, approvedAt: FieldValue.serverTimestamp(), ...extra,
   }, {merge: true});
-  batch.set(ref, {status: 'approved', listingId, providerCode, decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+  batch.set(ref, {status: 'approved', listingId, providerCode, decisionReason: String(reason).slice(0, 500), decidedAt: FieldValue.serverTimestamp(), ...extra}, {merge: true});
   await batch.commit();
   return {status: 'approved', listingId};
+}
+
+/// Auto Approval for service providers (Business Profile > Auto Approval, OFF unless the admin turns it on): the same photo check as
+/// vendors (functions/photo-safety.js). Safe -> listed at once; forbidden -> refused with the reason; not checked -> the admin decides.
+async function autoDecideProvider(providerId, {force = false, ...checkOptions} = {}) {
+  const business = force ? {} : (await db.collection('settings').doc('business').get()).data() || {};
+  if (!force && !flagOn(business.autoApproval)) return null;
+  const ref = db.collection('providerApplications').doc(providerId);
+  const data = (await ref.get()).data();
+  if (!data || data.status !== 'pending') return null;
+  const check = await checkStoredPhotos(db, [data.photoPath], {feature: 'auto_approval_provider', uid: providerId, ...checkOptions});
+  if (check.verdict === 'unsafe') {
+    await ref.set({status: 'rejected', decisionReason: unsafeReason(check.categories), autoRejected: true, photoSafety: check.categories, decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+    return {status: 'rejected'};
+  }
+  if (check.verdict !== 'safe') {
+    await ref.set({autoApprovalHeld: check.results.map(r => r.note).filter(Boolean).join(' ') || 'The photo check did not run.'}, {merge: true});
+    return null;
+  }
+  return publishProvider(providerId, ref, data, 'Auto approved', {autoApproved: true});
+}
+
+exports.approveProvider = onCall(options, async request => {
+  await requireAdmin(request);
+  const {providerId, approved, reason = ''} = request.data || {};
+  if (typeof providerId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(providerId) || typeof approved !== 'boolean') throw new HttpsError('invalid-argument', 'Provide the provider and the decision.');
+  const ref = db.collection('providerApplications').doc(providerId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new HttpsError('not-found', 'Service-provider application not found.');
+  const data = snapshot.data();
+  if (data.status !== 'pending') throw new HttpsError('failed-precondition', 'Only a pending application can be approved or rejected.');
+  if (!approved) {
+    if (!String(reason).trim()) throw new HttpsError('invalid-argument', 'Give the reason for rejecting.');
+    await ref.set({status: 'rejected', decisionReason: String(reason).trim().slice(0, 500), decidedAt: FieldValue.serverTimestamp()}, {merge: true});
+    return {status: 'rejected'};
+  }
+  return publishProvider(providerId, ref, data, reason);
 });
 
 // An approved provider changes their charge per hour; the listing shows it at once.
 exports.updateProviderRate = onCall(options, async request => {
-  const uid = requireUser(request);
+  const uid = requireRole(request, ['provider']);
   let rate;
   try { rate = hourlyRate(request.data?.hourlyRate); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
   const provider = (await db.collection('providers').doc(uid).get()).data();
@@ -146,3 +178,4 @@ exports.updateProviderRate = onCall(options, async request => {
 
 exports.providerApplication = providerApplication;
 exports.isVendorAccount = isVendorAccount;
+exports._autoApproval = {autoDecideProvider};

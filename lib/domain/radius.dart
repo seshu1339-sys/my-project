@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'catalog.dart';
+import 'ist_time.dart';
 
 // ---------------------------------------------------------------------------------------------
 // ONE radius system for the right-side Ads and for Today's Offers (and any other promotion): the same fields, the same rule.
@@ -58,7 +59,7 @@ List<Entry> coveringCustomer(List<Entry> items, double? lat, double? lng) {
   return [for (final e in items) if (radiusCovers(e, lat, lng) && seen.add(e.id)) e];
 }
 
-DateTime? _date(Entry e, String key) => DateTime.tryParse(e.text(key));
+DateTime? _date(Entry e, String key) => parseIstTime(e.text(key));
 
 /// Do the two run at the same time? A missing date means "always".
 bool runsTogether(Entry a, Entry b) {

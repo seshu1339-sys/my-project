@@ -7,7 +7,7 @@ test('vendor registration requires GPS coordinates, and they carry onto the appr
   const fns = require('./index');
   const db = getFirestore();
   const bucket = getStorage().bucket();
-  const admin = {auth: {uid: 'admin1', token: {admin: true, email_verified: true}}};
+  const admin = {auth: {uid: 'admin1', token: {role: 'admin', admin: true, email_verified: true}}};
   // Admin callables now also require a fresh OTP-verified session (see admin-otp.js).
   await db.collection('_adminSessions').doc('admin1').set({expiresAt: Timestamp.fromMillis(Date.now() + 3600000)});
   const application = uid => ({
@@ -19,7 +19,7 @@ test('vendor registration requires GPS coordinates, and they carry onto the appr
     await bucket.file(`vendorApplications/${uid}/vendorPhoto`).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
     await bucket.file(`vendorApplications/${uid}/shopPhoto`).save(Buffer.from([0xff, 0xd8, 0xff]), {metadata: {contentType: 'image/jpeg'}});
   };
-  const register = (uid, data) => fns.registerVendor.run({auth: {uid, token: {email_verified: true}}, data});
+  const register = (uid, data) => fns.registerVendor.run({auth: {uid, token: {role: 'vendor', email_verified: true}}, data});
 
   // ---- registerVendor refuses missing or invalid coordinates; the application is never created
   const gpsV = 'gpsV';

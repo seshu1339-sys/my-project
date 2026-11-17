@@ -1,3 +1,4 @@
+import 'sample_tag.dart';
 import 'package:flutter/material.dart';
 
 import 'admin_frame.dart';
@@ -8,6 +9,7 @@ import '../domain/catalog.dart';
 import 'moderation_dialogs.dart';
 import 'photo_check.dart';
 import 'shop_map.dart';
+import '../modules/stafflinks/stafflinks_module.dart' show RegisteredByLine;
 
 /// Vendor applications, fee payments, active/suspended vendors, pending shop
 /// photos, and pending public changes — all vendor-moderation concerns in
@@ -47,6 +49,7 @@ class VendorModerationPage extends StatelessWidget {
   Widget build(BuildContext context) => AdminPageFrame(
         title: 'Vendor approvals and publishing',
         actions: [
+          RunAiCheckButton(call: store.call),
           TextButton.icon(onPressed: () => _verifyShop(context), icon: const Icon(Icons.location_on), label: const Text('Verify shop')),
         ],
         body: ListView(padding: const EdgeInsets.all(20), children: [
@@ -57,6 +60,18 @@ class VendorModerationPage extends StatelessWidget {
               if (snapshot.hasError) const ListTile(title: Text('Vendor applications could not load.')),
               for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc),
               if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(title: Text('No pending applications.')),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          // Auto Approval (Business Profile): the vendors approved at once after the AI photo check, with their photos, phone,
+          // location and the staff member who linked them; suspend one below if something is wrong.
+          Text('Auto Approved', style: Theme.of(context).textTheme.titleLarge),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: store.firestore.collection('vendorApplications').where('autoApproved', isEqualTo: true).limit(100).snapshots(),
+            builder: (context, snapshot) => Column(children: [
+              if (snapshot.hasError) const ListTile(title: Text('Auto approved vendors could not load.')),
+              for (final doc in snapshot.data?.docs ?? const []) _applicationTile(context, doc, decide: false),
+              if (snapshot.hasData && snapshot.data!.docs.isEmpty) const ListTile(key: ValueKey('auto-approved-empty'), title: Text('No auto approved vendors yet.')),
             ]),
           ),
           const SizedBox(height: 16),
@@ -132,12 +147,14 @@ class VendorModerationPage extends StatelessWidget {
       onSuccess: (_) => 'Shop verified',
     );
   }
-  Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+  Widget _applicationTile(BuildContext context, QueryDocumentSnapshot<Map<String, dynamic>> doc, {bool decide = true}) {
     final data = doc.data();
     return Card(child: ExpansionTile(
-      title: Text(data['name']?.toString() ?? doc.id),
-      subtitle: Text('Vendor ID: ${data['vendorCode'] ?? doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}'),
+      title: SampleTitle(data['name']?.toString() ?? doc.id, id: doc.id, data: data),
+      subtitle: Text('${data['autoApproved'] == true ? 'Auto Approved • ' : ''}Vendor ID: ${data['vendorCode'] ?? doc.id} • ${data['status'] == 'pending' ? 'Pending Approval' : data['status']}${data['autoApprovalHeld'] != null ? ' • waits for you: ${data['autoApprovalHeld']}' : ''}'),
       children: [
+        // Self-registered, or linked by a staff member within 30 minutes (lib/modules/stafflinks).
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Align(alignment: Alignment.centerLeft, child: RegisteredByLine(store: store, accountUid: doc.id))),
         // The two mandatory photos are stored separately; both are shown for review.
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Wrap(spacing: 16, runSpacing: 12, children: [
           // Under each photo, the Google check (is the picture online, was it used before).
@@ -157,10 +174,11 @@ class VendorModerationPage extends StatelessWidget {
             )),
           ])),
         for (final entry in data.entries.where((e) => e.key != 'vendorPhotoPath' && e.key != 'shopPhotoPath')) ListTile(dense: true, title: Text(entry.key), subtitle: Text('${entry.value}')),
-        OverflowBar(children: [
-          IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
-          IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
-        ]),
+        if (decide)
+          OverflowBar(children: [
+            IconButton(tooltip: 'Approve', onPressed: () => reviewApplication(context, doc.id, approved: true), icon: const Icon(Icons.check)),
+            IconButton(tooltip: 'Reject', onPressed: () => reviewApplication(context, doc.id, approved: false), icon: const Icon(Icons.close)),
+          ]),
       ],
     ));
   }
@@ -188,7 +206,7 @@ class VendorModerationPage extends StatelessWidget {
     final reason = '${data['suspensionReason'] ?? ''}'.trim();
     final exclusives = data['specialCategoryExclusives'] == true;
     return Card(child: ListTile(
-      title: Text(name),
+      title: SampleTitle(name, id: doc.id, data: data),
       subtitle: Text('Vendor ID: ${data['vendorCode'] ?? doc.id} • ${suspended ? 'Suspended${reason.isEmpty ? '' : ' — $reason'}' : 'Active'}'
           '${exclusives ? ' • Exclusives up to ${data['exclusivesMaxDurationDays']} day(s)' : ''}'),
       trailing: Wrap(spacing: 8, children: [
@@ -219,7 +237,7 @@ class VendorModerationPage extends StatelessWidget {
     final data = doc.data();
     return Card(child: ListTile(
       leading: ApplicationPhoto(label: 'Slot ${data['slot']}', path: data['path']?.toString(), height: 150, width: 200),
-      title: Text('${data['vendorName'] ?? data['vendorId']}'),
+      title: SampleTitle('${data['vendorName'] ?? data['vendorId']}', id: doc.id, data: data),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Shop photo, slot ${data['slot']}'),
         if ('${data['path'] ?? ''}'.isNotEmpty) PhotoCheck(store: store, path: '${data['path']}'),

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
+import '../domain/post_duration.dart';
 import '../domain/ad_reports.dart';
 import '../domain/ads.dart';
 import '../domain/ads_admin.dart';
 import '../domain/catalog.dart';
+import '../domain/ist_time.dart';
+import '../services/server_clock.dart';
 import 'ad_box.dart';
 import 'ad_reports_page.dart';
 import 'ads_column.dart';
@@ -20,10 +23,10 @@ String vendorAdState(Entry ad, DateTime now) => adStatusLabels[adStatus(ad, now)
 
 /// "12 days left", "ends today", "ended 3 days ago", or '' with no end date.
 String daysRemainingText(Entry ad, DateTime now) {
-  final end = DateTime.tryParse(ad.text('endsAt'));
+  final end = parseIstTime(ad.text('endsAt'));
   if (end == null) return '';
   final left = end.difference(now);
-  if (left.isNegative) return 'ended ${(-left.inDays).clamp(0, 9999)} day(s) ago';
+  if (left.isNegative) return 'ended';
   if (left.inHours < 24) return 'ends today';
   return '${(left.inHours / 24).ceil()} days left';
 }
@@ -43,7 +46,7 @@ class VendorAdsPage extends StatefulWidget {
 
 class _VendorAdsPageState extends State<VendorAdsPage> {
   Store get store => widget.store;
-  DateTime get now => widget.now ?? DateTime.now();
+  DateTime get now => widget.now ?? ServerClock.now();
 
   void toast(Object m) => message(context, m);
 
@@ -83,6 +86,7 @@ class _VendorAdsPageState extends State<VendorAdsPage> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
                   const Text('Nothing you send goes live by itself. The administrator checks every new ad and every change before customers see it.'),
+                  Text(postDurationNotice(store.business), key: const ValueKey('my-ads-duration-note')),
                   const SizedBox(height: 8),
                   if (recent.isNotEmpty)
                     Card(
@@ -199,7 +203,8 @@ class _VendorAdEditorState extends State<VendorAdEditor> {
   late final phone = TextEditingController(text: widget.ad?.text('tapAction') == 'call' || widget.ad?.text('tapAction') == 'whatsapp' ? widget.ad!.text('tapValue') : '');
   late String tapAction = widget.ad?.text('tapAction') ?? '';
   String package = 'normal';
-  int days = 30;
+  // With the day choices hidden the longest choice is sent: the admin's post duration (server) ends the ad first.
+  int days = showPostDayChoices ? 30 : vendorAdDurations.keys.last;
   bool busy = false;
   String? error;
 
@@ -314,7 +319,7 @@ class _VendorAdEditorState extends State<VendorAdEditor> {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            if (showPostDayChoices) Expanded(
               child: DropdownButtonFormField<int>(
                 key: const ValueKey('vad-days'),
                 initialValue: days,

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'app_monitoring.dart';
+
 /// The device's current position, asking for location permission first.
 ///
 /// A fresh install has not been granted permission, so calling
@@ -13,6 +15,7 @@ import 'package:geolocator/geolocator.dart';
 /// permission-denied message reads naturally for whichever caller it is.
 Future<Position> currentPosition({String action = 'verify a purchase at the shop'}) async {
   if (!kIsWeb && !await Geolocator.isLocationServiceEnabled()) {
+    AppMonitoring.fail('location', 'Location services are off ($action)');
     throw StateError('Turn on location services on this device, then try again.');
   }
   var permission = await Geolocator.checkPermission();
@@ -20,6 +23,7 @@ Future<Position> currentPosition({String action = 'verify a purchase at the shop
     permission = await Geolocator.requestPermission();
   }
   if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    AppMonitoring.fail('location', 'Location permission ${permission.name} ($action)');
     throw StateError(
       permission == LocationPermission.deniedForever
           ? 'Location permission is turned off. Allow it for this app in your device settings.'
@@ -32,6 +36,36 @@ Future<Position> currentPosition({String action = 'verify a purchase at the shop
     );
   } on TimeoutException {
     throw StateError('Your location could not be found in time. Move to an open area and try again.');
+  }
+}
+
+/// A fix less exact than this (a computer without GPS guesses from its internet connection, often a city hundreds of km away) is not
+/// used to set the customer's place: they choose it by hand instead.
+const roughFixMeters = 5000.0;
+
+/// True when [position] is exact enough to set the customer's place ([roughFixMeters]; an unknown accuracy counts as exact).
+bool exactEnough(Position position) => position.accuracy <= 0 || position.accuracy <= roughFixMeters;
+
+/// The first open of the app or the website: asks for location permission (the phone's or the browser's own question) and then
+/// the position. Null when it is refused or blocked, location is off, or no position comes: the caller then shows the place picker.
+/// Never throws.
+Future<Position?> positionWithPermission() async {
+  try {
+    if (!kIsWeb && !await Geolocator.isLocationServiceEnabled()) return null;
+    LocationPermission permission;
+    try {
+      permission = await Geolocator.checkPermission();
+    } catch (_) {
+      // Some browsers cannot tell before asking.
+      permission = LocationPermission.denied;
+    }
+    if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
+    if (permission != LocationPermission.always && permission != LocationPermission.whileInUse) return null;
+    return await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)),
+    );
+  } catch (_) {
+    return null;
   }
 }
 
