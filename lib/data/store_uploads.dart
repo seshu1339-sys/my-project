@@ -22,9 +22,13 @@ extension StoreUploads on Store {
     final ref = FirebaseStorage.instance.ref(
       '$folder/${DateTime.now().microsecondsSinceEpoch}.${image.ext}',
     );
+    final started = DateTime.now();
     try {
       await ref.putData(image.bytes, SettableMetadata(contentType: image.type));
-      return await ref.getDownloadURL();
+      final url = await ref.getDownloadURL();
+      final took = DateTime.now().difference(started);
+      if (took > AppMonitoring.slowSave) AppMonitoring.slowCall('photo upload ($folder)', took);
+      return url;
     } on FirebaseException catch (e) {
       AppMonitoring.fail('upload', 'Photo upload ($folder): ${e.code}');
       rethrow;

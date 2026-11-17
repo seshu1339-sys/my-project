@@ -9,6 +9,7 @@ import '../services/health_watch.dart';
 import 'agent_ai_settings.dart';
 import 'agent_hooks.dart';
 import 'app_health_page.dart';
+import 'health_extras.dart';
 
 /// Business > Health (owner spec F + H, 17 Nov 2026): the daily self-test of the website and the admin panel (05:20 India time, or
 /// "Run now"), the server's errors of the last 24 hours, and a link to App Health. A failing check is red with its raw error; with
@@ -64,6 +65,9 @@ class _HealthPageState extends State<HealthPage> {
     if (mounted) setState(() => explaining.remove(c.id));
   }
 
+  void _openAppHealth(BuildContext context) =>
+      Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('App Health')), body: AppHealthPage(store: store))));
+
   String _when(DateTime? t) {
     if (t == null) return '';
     final l = t.toLocal();
@@ -108,6 +112,8 @@ class _HealthPageState extends State<HealthPage> {
     listenable: Listenable.merge([HealthWatch.instance, store]),
     builder: (context, _) {
       final s = widget.status ?? HealthWatch.instance.status;
+      // Server errors with the most first (owner spec part 1: most errors first).
+      final serverErrors = [...s.serverErrors]..sort((a, b) => b.count.compareTo(a.count));
       final aiOn = aiExplainOn(store);
       final groups = <String, List<HealthCheck>>{};
       for (final c in s.checks) {
@@ -141,6 +147,11 @@ class _HealthPageState extends State<HealthPage> {
           ),
           if (note != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(note!, key: const ValueKey('health-note'))),
           const SizedBox(height: 12),
+          // AI Agent + Health System part 1: push alerts, the biggest problems of every app (most affected first) and the limits.
+          if (widget.status == null) ...[
+            HealthAlertsSwitch(store: store),
+            TopProblemsCard(store: store, openAppHealth: () => _openAppHealth(context)),
+          ],
           for (final g in groups.entries) ...[
             Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 4), child: Text(g.key, style: Theme.of(context).textTheme.titleSmall)),
             for (final c in g.value) _check(c, aiOn),
@@ -148,7 +159,7 @@ class _HealthPageState extends State<HealthPage> {
           Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 4), child: Text('Server errors (last 24 hours)', style: Theme.of(context).textTheme.titleSmall)),
           if (s.serverErrorsNote.isNotEmpty) Text(s.serverErrorsNote, style: const TextStyle(color: Colors.orange)),
           if (s.serverErrors.isEmpty && s.serverErrorsNote.isEmpty) const Text('No server errors.', key: ValueKey('health-no-server-errors')),
-          for (final e in s.serverErrors)
+          for (final e in serverErrors)
             ListTile(
               dense: true,
               leading: const Icon(Icons.dns_outlined, color: Colors.red),
@@ -172,9 +183,10 @@ class _HealthPageState extends State<HealthPage> {
               title: const Text('App Health: what goes wrong for real people'),
               subtitle: Text('Vendor, Staff and User apps, the website and the admin panel${HealthWatch.instance.newReports > 0 ? ' · ${HealthWatch.instance.newReports} new reports' : ''}'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('App Health')), body: AppHealthPage(store: store)))),
+              onTap: () => _openAppHealth(context),
             ),
           ),
+          if (widget.status == null) HealthLimitsCard(store: store),
         ],
       );
     },

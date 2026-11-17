@@ -179,6 +179,7 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
     final page = switch (choice) {
       'assistant' => Scaffold(appBar: AppBar(title: const Text('AI assistant')), body: AdminAiAssistantPage(store: store)),
       'older' => AiAgentPage(store: store),
+      'fixAgent' => adminSettingsSectionPage(store, 'fixAgent'),
       'log' => adminSettingsSectionPage(store, 'agentLog'),
       'ai' => adminSettingsSectionPage(store, 'aiProvider'),
       _ => (widget.intents ?? defaultAgentIntents).healthPage(store),
@@ -271,6 +272,7 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
                   tooltip: 'Agent menu: AI assistant, older AI Agent, Health, log, AI key',
                   onSelected: _menu,
                   itemBuilder: (_) => const [
+                    PopupMenuItem(key: ValueKey('agent-menu-fix'), value: 'fixAgent', child: ListTile(leading: Icon(Icons.healing_outlined), title: Text('AI Agent: problems & fixes'))),
                     PopupMenuItem(value: 'assistant', child: ListTile(leading: Icon(Icons.smart_toy_outlined), title: Text('AI assistant (questions)'))),
                     PopupMenuItem(value: 'older', child: ListTile(leading: Icon(Icons.history), title: Text('Older AI Agent'))),
                     PopupMenuItem(value: 'health', child: ListTile(leading: Icon(Icons.monitor_heart_outlined), title: Text('Health'))),

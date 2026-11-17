@@ -153,7 +153,7 @@ void main() {
       AppMonitoring.reset();
     });
 
-    test('login / OTP calls always count; other calls only when the server broke; the screen goes with it', () async {
+    test('every failed call counts with its cause (a "fill in" answer is user side); a repeat is sent once; the screen goes with it', () async {
       AppMonitoring.start(app: 'vendor');
       AppMonitoring.screen = 'vendor_products';
       AppMonitoring.callFailed('verifyEmailLoginCode', 'invalid-argument', 'Wrong code');
@@ -165,7 +165,10 @@ void main() {
       AppMonitoring.fail('upload', 'Photo upload (catalog): unauthorized');
       await AppMonitoring.flushNow();
       final problems = (AppMonitoring.testSink!.single['problems'] as List).cast<Map>();
-      expect([for (final p in problems) p['kind']], ['otp', 'login', 'api', 'upload', 'location'], reason: 'the "fill in" answer is not a problem; a repeat is sent once');
+      expect([for (final p in problems) p['kind']], ['otp', 'login', 'api', 'api', 'upload', 'location', 'repeat'], reason: 'the second upload failure is a repeat, sent once');
+      expect(problems[2]['side'], 'user', reason: '"Fill in the price" is for the person to fix');
+      expect(problems[2]['cause'], 'missing_field');
+      expect(problems[3]['side'], 'our');
       expect(problems.first['screen'], 'vendor_products');
       expect(AppMonitoring.testSink!.single['app'], 'vendor');
     });

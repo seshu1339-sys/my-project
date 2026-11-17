@@ -81,4 +81,20 @@ async function recordEvent(db, event, now = Date.now()) {
     }
   });
 }
-module.exports = {normalizeEvent, recordEvent, dayKey, SHARDS};
+/// The events of one call: a batch {visitorId, platform, events: [{type, adId, placement, sourceAd}]} (apps from 1.0.13 send views and
+/// taps together every few seconds, free-limit plan 17 Nov 2026), or one event (older apps). At most MAX_BATCH events; a wrong one
+/// in a batch is skipped, a wrong single event is refused.
+const MAX_BATCH = 30;
+function normalizeEvents(data = {}) {
+  if (!Array.isArray(data.events)) return [normalizeEvent(data)];
+  const out = [];
+  for (const e of data.events.slice(0, MAX_BATCH)) {
+    try {
+      out.push(normalizeEvent({...(e && typeof e === 'object' ? e : {}), visitorId: data.visitorId, platform: data.platform}));
+    } catch { /* skip the wrong one */ }
+  }
+  if (!out.length) normalizeEvent({visitorId: data.visitorId, type: 'none'}); // throws the visitor-id or event error
+  return out;
+}
+
+module.exports = {normalizeEvent, normalizeEvents, recordEvent, dayKey, SHARDS, MAX_BATCH};

@@ -6,7 +6,7 @@ const {onDocumentUpdated} = require('firebase-functions/v2/firestore');
 const {initializeApp} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
-const {normalizeEvent, recordEvent} = require('./analytics');
+const {normalizeEvents, recordEvent} = require('./analytics');
 const {normalizeBatch: normalizeAdBatch, recordAdEvents} = require('./ad-tracking');
 const {normalizeUsageBatch, recordUsage, countUsage} = require('./usage');
 const {createHash, randomInt} = require('node:crypto');
@@ -121,6 +121,8 @@ Object.assign(exports, require('./modules/agent'));
 Object.assign(exports, require('./modules/health'));
 // App problems: errors, key failures and "Report a problem" from every app, for the Health and App Health pages (functions/modules/app-problems).
 Object.assign(exports, require('./modules/app-problems'));
+// AI Support: the AI Support box's problem reports, the admin's replies, the limited AI answers (functions/modules/support).
+Object.assign(exports, require('./modules/support'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
 const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
 Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});
@@ -190,12 +192,13 @@ async function requireApplicationPhotos(uid) {
 }
 // Anonymous, aggregate-only site and ad analytics (visits, ad impressions, clicks).
 // Visitors are random device ids; nothing personal is stored and clients cannot read it back.
+// One event (older apps) or a batch of views and taps (apps from 1.0.13: fewer calls, free-limit plan 17 Nov 2026).
 exports.trackEvent = onCall({...options, maxInstances: 5}, async request => {
-  let event;
-  try { event = normalizeEvent(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
-  await rateLimit(`track:${event.visitorId}`, 240, 60 * 1000);
-  await recordEvent(db, event);
-  return {ok: true};
+  let events;
+  try { events = normalizeEvents(request.data || {}); } catch (error) { throw new HttpsError('invalid-argument', error.message); }
+  await rateLimit(`track:${events[0].visitorId}`, 240, 60 * 1000);
+  for (const event of events) await recordEvent(db, event);
+  return {ok: true, saved: events.length};
 });
 // Genuine ad views for the unified Ads system. The device reports what happened in small batches; ad-tracking.js decides what counts
 // (on screen for a second, once per device per minute, never the vendor's own, admin, staff, bots or test devices).

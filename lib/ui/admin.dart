@@ -13,6 +13,7 @@ import 'agent_command_box.dart';
 import 'agent_hooks.dart';
 import 'agent_open.dart';
 import 'agent_registry_build.dart';
+import 'health_alert_banner.dart';
 import 'health_page.dart';
 import '../services/health_watch.dart';
 
@@ -190,6 +191,8 @@ class _AdminPageState extends State<AdminPage> {
           ),
           body: Column(
             children: [
+              // The red banner while a problem keeps happening (lib/ui/health_alert_banner.dart).
+              if (store.live) HealthAlertBanner(store: store),
               // The command box: find and open any option, ask a number, check health, ads and design by command (lib/ui/agent_command_box.dart).
               if (tall) AdminSettingsSearchBar(store: store),
               if (!store.live)

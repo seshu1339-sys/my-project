@@ -63,13 +63,15 @@ class HealthStatus {
   List<HealthCheck> failingFor(String registryId) => [for (final c in failing) if (c.registryIds.contains(registryId)) c];
 }
 
-/// One problem of an app (an appProblems document).
+/// One problem of an app (an appProblems document). [users] is how many different people had it; [side] is 'user', 'device' or 'our'
+/// (AI Agent + Health System, 17 Nov 2026); [devices] and [oses] count the cases per phone model and Android version.
 class AppProblem {
-  const AppProblem({required this.id, required this.app, required this.platform, required this.kind, required this.message, this.screen = '', this.count = 1, this.lastAt, this.version = '', this.device = '', this.role = '', this.userCode = '', this.ms});
-  final String id, app, platform, kind, message, screen, version, device, role, userCode;
-  final int count;
+  const AppProblem({required this.id, required this.app, required this.platform, required this.kind, required this.message, this.screen = '', this.count = 1, this.lastAt, this.version = '', this.device = '', this.role = '', this.userCode = '', this.ms, this.users = 1, this.side = 'our', this.cause = '', this.option = '', this.devices = const {}, this.oses = const {}, this.status = 'open', this.lastShot = '', this.network = ''});
+  final String id, app, platform, kind, message, screen, version, device, role, userCode, side, cause, option, status, lastShot, network;
+  final int count, users;
   final DateTime? lastAt;
   final int? ms;
+  final Map<String, int> devices, oses;
 
   factory AppProblem.from(String id, Map<String, dynamic> d) => AppProblem(
     id: id,
@@ -85,7 +87,72 @@ class AppProblem {
     role: '${d['lastRole'] ?? ''}',
     userCode: '${d['lastUserCode'] ?? ''}',
     ms: (d['lastMs'] as num?)?.toInt(),
+    users: (d['users'] as num?)?.toInt() ?? 1,
+    side: const ['user', 'device', 'our'].contains(d['side']) ? '${d['side']}' : 'our',
+    cause: '${d['cause'] ?? ''}',
+    option: '${d['option'] ?? ''}',
+    devices: _counts(d['devices']),
+    oses: _counts(d['oses']),
+    status: '${d['status'] ?? 'open'}',
+    lastShot: '${d['lastShot'] ?? ''}',
+    network: '${d['lastNetwork'] ?? ''}',
   );
+
+  bool get solved => status == 'solved';
+
+  /// The phone models (or Android versions) with their counts, most first: "Redmi 9 ×5, Galaxy A12 ×1".
+  static String topOf(Map<String, int> counts, {int take = 3}) {
+    final list = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return [for (final e in list.take(take)) '${e.key} ×${e.value}'].join(', ');
+  }
+}
+
+Map<String, int> _counts(Object? v) => v is Map ? {for (final e in v.entries) '${e.key}': (e.value as num?)?.toInt() ?? 0} : const {};
+
+/// Which side a problem is on, in English and Telugu (owner spec part 2).
+const problemSideNames = <String, String>{
+  'user': 'User side (వినియోగదారు వైపు)',
+  'device': 'Device side (ఫోన్ మోడల్)',
+  'our': 'Our side (మా వైపు)',
+};
+
+/// Most affected people first, then most errors, then newest (owner spec part 1).
+int byImpact(AppProblem a, AppProblem b) {
+  final u = b.users.compareTo(a.users);
+  if (u != 0) return u;
+  final c = b.count.compareTo(a.count);
+  if (c != 0) return c;
+  return (b.lastAt ?? DateTime(2000)).compareTo(a.lastAt ?? DateTime(2000));
+}
+
+List<AppProblem> mostAffectedFirst(List<AppProblem> list) => [...list]..sort(byImpact);
+
+/// An open burst alert (healthAlerts): the same problem many times in a short time.
+class HealthAlert {
+  const HealthAlert({required this.id, required this.app, required this.platform, required this.message, this.screen = '', this.n = 0, this.minutes = 60, this.side = 'our', this.type = 'burst', this.at});
+  final String id, app, platform, message, screen, side, type;
+  final int n, minutes;
+  final DateTime? at;
+
+  factory HealthAlert.from(String id, Map<String, dynamic> d) => HealthAlert(
+    id: id,
+    app: '${d['app'] ?? ''}',
+    platform: '${d['platform'] ?? ''}',
+    message: '${d['message'] ?? ''}',
+    screen: '${d['screen'] ?? ''}',
+    n: (d['n'] as num?)?.toInt() ?? 0,
+    minutes: (d['minutes'] as num?)?.toInt() ?? 60,
+    side: '${d['side'] ?? 'our'}',
+    type: '${d['type'] ?? 'burst'}',
+    at: _time(d['at']),
+  );
+
+  /// "Vendor app: 'No answer to Save item' 6 times in 60 min (add_item)".
+  String get line {
+    if (type == 'billing') return message;
+    final where = [for (final t in appHealthTabs) if (t.$1 == app && t.$2 == platform) t.$3].firstOrNull ?? app;
+    return '$where: "$message" $n times in $minutes min${screen.isEmpty ? '' : ' ($screen)'}';
+  }
 }
 
 /// The tabs of the App Health dashboard: Vendor / Staff / User Android apps, then the website and the admin panel.
@@ -107,7 +174,11 @@ const problemKindNames = <String, String>{
   'location': 'Location permission / GPS (లొకేషన్)',
   'upload': 'Photo upload failed (ఫోటో అప్‌లోడ్)',
   'api': 'Server (API) error (సర్వర్)',
-  'slow': 'Slow screen (నెమ్మదిగా)',
+  'slow': 'Slow screen or save (నెమ్మదిగా)',
+  'tap': 'Tapped again and again, no answer (స్పందన లేదు)',
+  'freeze': 'App hung / froze (నిలిచిపోయింది)',
+  'stuck': 'Screen stuck loading (లోడ్ అవుతూనే ఉంది)',
+  'repeat': 'Same save / upload failed again (మళ్ళీ విఫలం)',
 };
 
 /// Problems newest first; [counts] per kind (from the problems' own counts).

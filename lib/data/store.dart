@@ -875,15 +875,27 @@ class Store extends ChangeNotifier {
 
   Future<Map<String, dynamic>> call(String name, Map<String, dynamic> data) async {
     if (!live) throw StateError('This action requires a connected Firebase project.');
+    final started = DateTime.now();
     try {
       final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
+      final took = DateTime.now().difference(started);
+      AppMonitoring.noteCall(took);
+      // A save slower than the admin's limit is a problem too (AI Agent + Health System part 2), except the problem reports themselves.
+      if (took > AppMonitoring.slowSave && !_quietCalls.contains(name)) AppMonitoring.slowCall(name, took);
       return Map<String, dynamic>.from(result.data as Map);
     } on FirebaseFunctionsException catch (e) {
-      // Login / OTP / email failures and server breakdowns go to the App Health page (lib/services/app_monitoring.dart).
-      AppMonitoring.callFailed(name, e.code, e.message);
+      AppMonitoring.noteCall(DateTime.now().difference(started));
+      // Every failure goes to the App Health page with its cause (lib/services/app_monitoring.dart, lib/domain/problem_cause.dart).
+      if (!_quietCalls.contains(name)) AppMonitoring.callFailed(name, e.code, e.message);
+      rethrow;
+    } catch (e) {
+      if (!_quietCalls.contains(name)) AppMonitoring.callFailed(name, 'unknown', '$e');
       rethrow;
     }
   }
+
+  /// Calls that are not checked for problems (the problem reports and AI Support themselves, so a broken report cannot report itself).
+  static const _quietCalls = {'reportAppProblems', 'reportProblem', 'openSupportTicket', 'askSupport', 'mySupportTickets', 'answerSupportTicket'};
 
   /// Password sign-in (the customer app's form and the admin panel): proves the email, then enters this app's role login.
   Future<void> login(String email, String password) async {

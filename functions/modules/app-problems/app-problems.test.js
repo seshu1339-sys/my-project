@@ -13,7 +13,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 test('the header is checked, private details are taken out, one problem has one id everywhere', () => {
   assert.throws(() => header({app: 'other'}), /app must be/);
   assert.deepEqual(header({app: 'vendor', platform: 'android', version: '1.0.12+22', device: 'Redmi 9 call 9876543210', deviceId: 'd1'}),
-    {app: 'vendor', platform: 'android', version: '1.0.12+22', device: 'Redmi 9 call <number>', deviceId: 'd1'});
+    {app: 'vendor', platform: 'android', version: '1.0.12+22', device: 'Redmi 9 call <number>', deviceId: 'd1', os: '', network: ''});
   assert.equal(clean('OTP for a@b.in failed https://x.y/z 123456', 100), 'OTP for <email> failed <link> <number>');
   assert.equal(fingerprint('vendor', 'otp', 'x'), fingerprint('vendor', 'otp', 'x'));
   assert.notEqual(fingerprint('vendor', 'otp', 'x'), fingerprint('staff', 'otp', 'x'));

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import 'admin.dart';
 import 'shared.dart';
+import '../services/difficulty_watch.dart';
+import 'support_shell.dart';
 
 /// The admin panel's real entry point (see services/admin_route.dart for the
 /// hidden URL that reaches it). Two mandatory steps gate access: password
@@ -22,6 +24,8 @@ class AdminEntryApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Business studio',
+      builder: (context, child) => withSupportShell(context, child, store),
+      navigatorObservers: [SupportNavigatorObserver.shared],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b50)),

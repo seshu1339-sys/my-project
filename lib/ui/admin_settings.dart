@@ -34,6 +34,8 @@ import 'field_moderation.dart';
 import 'layout_editor.dart';
 import 'screen_view.dart';
 import 'visual_editor.dart';
+import 'support_inbox_page.dart';
+import 'fix_agent_page.dart';
 
 class _SettingsSection {
   const _SettingsSection(this.key, this.label, this.icon, this.hint);
@@ -87,6 +89,9 @@ final _sections = <_SettingsSection>[
   _SettingsSection('designTexts', 'Design texts & sizes', Icons.format_size, "Right-side ad box height, Today's Offers box texts (were fixed in the app)"),
   _SettingsSection('designHistory', 'Design history', Icons.history, 'Every design change made by command, newest first, with Undo'),
   _SettingsSection('appHealth', 'App Health', Icons.phone_android, 'Vendor / Staff / User apps: crashes, login, OTP, location, upload, API, slow screens, reports'),
+  // AI Agent + Health System (17 Nov 2026): the AI Support box's reports with the admin's replies.
+  _SettingsSection('supportReports', 'AI Support reports', Icons.support_agent, 'What people sent from the AI Support box: reply, Seen, Solved'),
+  _SettingsSection('fixAgent', 'AI Agent: problems & fixes', Icons.healing_outlined, 'Summary of every app problem, most affected first; Telugu reason, Fix or not, OK, Undo'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -194,6 +199,10 @@ Widget adminSettingsContent(Store store, String key) {
         return AdminAdsPage(store: store);
       case 'appHealth':
         return AppHealthPage(store: store);
+      case 'supportReports':
+        return SupportInboxPage(store: store);
+      case 'fixAgent':
+        return FixAgentPage(store: store);
       case 'reports':
         return AdminReportsPage(store: store);
       case 'blockList':

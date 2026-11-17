@@ -12,6 +12,9 @@ import 'services/usage_start.dart';
 import 'services/app_monitoring.dart';
 import 'services/emulators.dart';
 import 'services/server_clock.dart';
+import 'services/difficulty_watch.dart';
+import 'ui/support_shell.dart';
+import 'ui/ai_support_box.dart';
 
 // A separate entry point so the admin panel compiles into its own web
 // bundle, reachable only at its own build/deploy target, never from the
@@ -22,6 +25,8 @@ Future<void> main() async {
   unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'admin');
+  // The AI Support box opens by itself when a person meets a problem (lib/ui/ai_support_box.dart).
+  AiSupportBox.install();
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;
@@ -62,6 +67,8 @@ class AdminApp extends StatelessWidget {
     builder: (context, _) => MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Business studio',
+      builder: (context, child) => withSupportShell(context, child, store),
+      navigatorObservers: [SupportNavigatorObserver.shared],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff176b50)),

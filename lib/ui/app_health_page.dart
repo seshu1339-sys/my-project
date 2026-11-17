@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -9,8 +11,9 @@ import 'admin_frame.dart';
 import 'agent_ai_settings.dart';
 
 /// Business > App Health (owner spec G, 17 Nov 2026): one tab each for the Vendor, Staff and User Android apps (and the website and the
-/// admin panel): how many problems of each kind, the problems newest first (with version, device, screen and the Vendor / Staff ID),
-/// and the "Report a problem" messages with their screenshots. Crash stacks of the Android apps are also in Firebase Crashlytics.
+/// admin panel): how many problems of each kind, the problems with the MOST AFFECTED PEOPLE first, then the most errors (AI Agent +
+/// Health System part 1), each with its side (user / device / our), phone models, version, screen, option, the Vendor / Staff ID and its
+/// automatic screenshot, and the "Report a problem" messages with their screenshots. Crash stacks are also in Firebase Crashlytics.
 class AppHealthPage extends StatelessWidget {
   const AppHealthPage({super.key, required this.store, this.load});
   final Store store;
@@ -47,7 +50,7 @@ Future<(List<AppProblem>, List<Map<String, dynamic>>)> _loadLive(Store store, St
     for (final d in reports?.docs ?? const <QueryDocumentSnapshot<Map<String, dynamic>>>[])
       if ('${d.data()['platform']}' == platform) {'id': d.id, ...d.data()},
   ]..sort((a, b) => ((b['at'] as Timestamp?)?.millisecondsSinceEpoch ?? 0).compareTo((a['at'] as Timestamp?)?.millisecondsSinceEpoch ?? 0));
-  return (newestFirst([for (final d in problems.docs) AppProblem.from(d.id, d.data())]), list);
+  return (mostAffectedFirst([for (final d in problems.docs) AppProblem.from(d.id, d.data())]), list);
 }
 
 class _AppTab extends StatefulWidget {
@@ -62,6 +65,7 @@ class _AppTab extends StatefulWidget {
 class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
   late Future<(List<AppProblem>, List<Map<String, dynamic>>)> data = widget.load(widget.app, widget.platform);
   String kind = '';
+  String side = '';
   final explained = <String, String>{};
 
   @override
@@ -85,7 +89,9 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
   Future<void> _setStatus(String id, String status) async {
     await widget.store.firestore.collection('problemReports').doc(id).update({'status': status});
     AgentLog.write(widget.store, action: 'report_$status', target: id);
-    setState(() => data = widget.load(widget.app, widget.platform));
+    setState(() {
+      data = widget.load(widget.app, widget.platform);
+    });
   }
 
   Widget _report(Map<String, dynamic> r) {
@@ -123,6 +129,62 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
     await showDialog<void>(context: context, builder: (d) => Dialog(child: InteractiveViewer(child: Image.network(url))));
   }
 
+  /// The automatic screenshot of a problem's latest case (appShots), shown full size.
+  Future<void> _showAutoShot(String caseId) async {
+    final d = (await widget.store.firestore.collection('appShots').doc(caseId).get()).data();
+    final data = '${d?['data'] ?? ''}';
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(child: data.isEmpty ? const Padding(padding: EdgeInsets.all(24), child: Text('The screenshot was deleted (solved or older than 30 days).')) : InteractiveViewer(child: Image.memory(base64Decode(data)))),
+    );
+  }
+
+  Widget _problemCard(AppProblem p, bool aiOn) => Card(
+    key: ValueKey('app-health-problem-${p.id}'),
+    color: p.solved ? const Color(0xFFF1F8E9) : null,
+    child: Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Tooltip(
+            message: '${p.users} people, ${p.count} times',
+            child: Chip(
+              visualDensity: VisualDensity.compact,
+              avatar: const Icon(Icons.people_alt_outlined, size: 16),
+              label: Text('${p.users} · ${p.count}×', key: ValueKey('app-health-impact-${p.id}')),
+              backgroundColor: p.kind == 'crash' || p.users >= 5 ? const Color(0xFFFFCDD2) : const Color(0xFFFFE0B2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(problemKindNames[p.kind] ?? p.kind, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Text(_when(p.lastAt), style: const TextStyle(fontSize: 12)),
+        ]),
+        Wrap(spacing: 6, children: [
+          Chip(visualDensity: VisualDensity.compact, label: Text(problemSideNames[p.side] ?? p.side, style: const TextStyle(fontSize: 12)), backgroundColor: p.side == 'user' ? const Color(0xFFE3F2FD) : p.side == 'device' ? const Color(0xFFF3E5F5) : const Color(0xFFFFEBEE)),
+          if (p.solved) const Chip(visualDensity: VisualDensity.compact, label: Text('Solved', style: TextStyle(fontSize: 12))),
+        ]),
+        SelectableText(p.message, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+        Text([
+          if (p.screen.isNotEmpty) 'screen ${p.screen}',
+          if (p.option.isNotEmpty) 'option "${p.option}"',
+          if (p.version.isNotEmpty) 'v${p.version}',
+          if (p.userCode.isNotEmpty) p.userCode,
+          if (p.network.isNotEmpty) p.network,
+          if (p.ms != null) '${(p.ms! / 1000).toStringAsFixed(1)} s',
+        ].join(' · '), style: const TextStyle(fontSize: 12, color: Colors.black54)),
+        if (p.devices.isNotEmpty) Text('Phones: ${AppProblem.topOf(p.devices)}', key: ValueKey('app-health-devices-${p.id}'), style: const TextStyle(fontSize: 12)),
+        if (p.oses.isNotEmpty && p.platform == 'android') Text('Android: ${AppProblem.topOf(p.oses)}', style: const TextStyle(fontSize: 12)),
+        Wrap(spacing: 4, children: [
+          if (p.lastShot.isNotEmpty) TextButton.icon(onPressed: () => _showAutoShot(p.lastShot), icon: const Icon(Icons.image_outlined, size: 16), label: const Text('Screenshot')),
+          if (aiOn && explained[p.id] == null)
+            TextButton.icon(onPressed: () => _explain(p), icon: const Icon(Icons.auto_awesome_outlined, size: 16), label: const Text('AI explain (Telugu)')),
+        ]),
+        if (explained[p.id] != null) Container(padding: const EdgeInsets.all(8), color: const Color(0xFFFFF8E1), child: SelectableText(explained[p.id]!)),
+      ]),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -132,11 +194,15 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
       builder: (context, snap) {
         if (snap.hasError) return Center(child: Text('Could not load: ${snap.error}'));
         if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        final (problems, reports) = snap.data!;
+        final (loaded, reports) = snap.data!;
+        final problems = mostAffectedFirst(loaded);
         final counts = countsByKind(problems);
-        final shown = kind.isEmpty ? problems : [for (final p in problems) if (p.kind == kind) p];
+        final shown = [for (final p in problems) if ((kind.isEmpty || p.kind == kind) && (side.isEmpty || p.side == side)) p];
+        final bySide = <String, int>{for (final s in problemSideNames.keys) s: problems.where((p) => p.side == s).length};
         return RefreshIndicator(
-          onRefresh: () async => setState(() => data = widget.load(widget.app, widget.platform)),
+          onRefresh: () async => setState(() {
+            data = widget.load(widget.app, widget.platform);
+          }),
           child: ListView(
             padding: const EdgeInsets.all(12),
             children: [
@@ -145,39 +211,19 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
                 for (final e in counts.entries)
                   ChoiceChip(key: ValueKey('app-health-kind-${e.key}'), label: Text('${problemKindNames[e.key] ?? e.key}: ${e.value}'), selected: kind == e.key, onSelected: (_) => setState(() => kind = e.key)),
               ]),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                ChoiceChip(label: const Text('Every side'), selected: side.isEmpty, onSelected: (_) => setState(() => side = '')),
+                for (final e in problemSideNames.entries)
+                  ChoiceChip(key: ValueKey('app-health-side-${e.key}'), label: Text('${e.value}: ${bySide[e.key]}'), selected: side == e.key, onSelected: (_) => setState(() => side = e.key)),
+              ]),
               if (reports.isNotEmpty) ...[
                 Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 4), child: Text('"Report a problem" messages (${reports.where((r) => r['status'] == 'new').length} new)', style: Theme.of(context).textTheme.titleSmall)),
                 for (final r in reports.take(50)) _report(r),
               ],
-              Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 4), child: Text('Problems, newest first', style: Theme.of(context).textTheme.titleSmall)),
+              Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 4), child: Text('Problems, most affected people first', key: const ValueKey('app-health-order'), style: Theme.of(context).textTheme.titleSmall)),
               if (shown.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No problems reported. 👍', key: ValueKey('app-health-none'))),
-              for (final p in shown)
-                Card(
-                  key: ValueKey('app-health-problem-${p.id}'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        CircleAvatar(radius: 14, backgroundColor: p.kind == 'crash' ? Colors.red : Colors.orange, child: Text('${p.count}', style: const TextStyle(fontSize: 11, color: Colors.white))),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(problemKindNames[p.kind] ?? p.kind, style: const TextStyle(fontWeight: FontWeight.w600))),
-                        Text(_when(p.lastAt), style: const TextStyle(fontSize: 12)),
-                      ]),
-                      const SizedBox(height: 4),
-                      SelectableText(p.message, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                      Text([
-                        if (p.screen.isNotEmpty) 'screen ${p.screen}',
-                        if (p.version.isNotEmpty) 'v${p.version}',
-                        if (p.device.isNotEmpty) p.device,
-                        if (p.userCode.isNotEmpty) p.userCode,
-                        if (p.ms != null) '${(p.ms! / 1000).toStringAsFixed(1)} s',
-                      ].join(' · '), style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                      if (aiOn && explained[p.id] == null)
-                        TextButton.icon(onPressed: () => _explain(p), icon: const Icon(Icons.auto_awesome_outlined, size: 16), label: const Text('AI explain (Telugu)')),
-                      if (explained[p.id] != null) Container(padding: const EdgeInsets.all(8), color: const Color(0xFFFFF8E1), child: SelectableText(explained[p.id]!)),
-                    ]),
-                  ),
-                ),
+              for (final p in shown) _problemCard(p, aiOn),
             ],
           ),
         );
