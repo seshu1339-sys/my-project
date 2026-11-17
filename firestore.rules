@@ -440,8 +440,29 @@ service cloud.firestore {
     match /healthRuns/{id} { allow read: if admin(); allow write: if false; }
     match /healthExplain/{id} { allow read: if admin(); allow write: if false; }
     match /_healthTest/{id} { allow read, write: if false; }
-    match /appProblems/{id} { allow read: if admin(); allow write: if false; }
+    match /appProblems/{id} {
+      allow read: if admin();
+      allow write: if false;
+      match /who/{person} { allow read, write: if false; }
+    }
     match /appProblemsDaily/{id} { allow read: if admin(); allow write: if false; }
+    // AI Agent + Health System (17 Nov 2026): every case with its details and automatic screenshot, for the admin only (functions write
+    // them). A burst alert is open until the admin closes it; the admin panel saves its own browsers / phones for the alert push.
+    match /appCases/{id} { allow read: if admin(); allow write: if false; }
+    match /appShots/{id} { allow read: if admin(); allow write: if false; }
+    match /healthAlerts/{id} {
+      allow read: if admin();
+      allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['open', 'closedBy', 'closedAt'])
+        && request.resource.data.open == false && request.resource.data.closedBy == request.auth.uid;
+      allow create, delete: if false;
+    }
+    match /adminPushTokens/{token} {
+      allow read: if admin();
+      allow create: if admin() && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == request.auth.uid
+        && request.resource.data.at == request.time;
+      allow delete: if admin();
+      allow update: if false;
+    }
     match /appProblemDevices/{id} { allow read, write: if false; }
     match /problemReports/{id} {
       allow read: if admin();
