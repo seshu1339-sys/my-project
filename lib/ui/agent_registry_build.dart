@@ -49,6 +49,8 @@ final _telugu = RegExp(r'[ఀ-౿]');
 
 /// The readable name of a layout field ("cameraIconColor" -> "Camera icon color").
 String designFieldLabel(String key) {
+  // The search box's image search icon is the camera people talk about.
+  if (key == 'imageIconSize') return 'Camera (image search) icon size';
   final dim = dimensionFields[key];
   if (dim != null) return dim.$1;
   const named = {

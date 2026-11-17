@@ -96,7 +96,8 @@ class _DesignChangePageState extends State<DesignChangePage> {
       AgentLog.write(store, action: 'design_change', command: widget.command.text, target: widget.entry.id, details: {'before': '$before', 'after': '$after'});
       if (!mounted) return;
       final line = describeChange(widget.entry, before, '$after');
-      setState(() { done = line; fitted = null; });
+      // The box shows what was saved (a value outside the safe range was fitted into it).
+      setState(() { done = line; fitted = null; value.text = f.value; });
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text('Changed: $line'),
         action: SnackBarAction(label: 'Undo', onPressed: () => undoDesign(store, target.record, target.field, before, entryId: widget.entry.id)),

@@ -198,7 +198,8 @@ class _ExplainBox extends StatelessWidget {
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(color: const Color(0xFFFFF8E1), borderRadius: BorderRadius.circular(8)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SelectableText(text),
+      // The Claude Code prompt shows as a block of its own, without the ``` marks.
+      SelectableText(text.replaceAll(RegExp(r'```\w*\n?'), '').trim()),
       Align(
         alignment: Alignment.centerRight,
         child: TextButton.icon(
