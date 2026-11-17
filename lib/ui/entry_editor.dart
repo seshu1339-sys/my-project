@@ -9,6 +9,7 @@ import '../domain/post_duration.dart';
 import '../domain/radius.dart';
 import '../domain/reach.dart';
 import 'admin_fields.dart';
+import 'agent_focus.dart';
 import 'color_picker_field.dart';
 import '../domain/towns.dart';
 import 'geo_target_picker.dart';
@@ -889,7 +890,8 @@ class _EntryEditorState extends State<EntryEditor> {
         constraints: const BoxConstraints(maxWidth: 760),
         child: Form(
           key: form,
-          child: ListView(
+          // Opened by the command box at one field: the whole form is built at once, so the field far down can be scrolled to.
+          child: AgentFormList(
             padding: const EdgeInsets.all(24),
             children: [
               const Text(
@@ -903,7 +905,8 @@ class _EntryEditorState extends State<EntryEditor> {
               for (final f in fields[widget.collection]!.entries)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 18),
-                  child: field(f.key, f.value),
+                  // The command box's field glows and scrolls into view (lib/ui/agent_focus.dart).
+                  child: AgentFocusTarget(fieldKey: f.key, child: field(f.key, f.value)),
                 ),
               if (controllers.containsKey('imageUrl'))
                 OutlinedButton.icon(

@@ -2,9 +2,10 @@
 // sends every setting of the panel (from the panel's own lists, with the current values) and shows the answer and the settings it chose.
 // A limit message never stops the normal search. No real AI call: a fake answers.
 import 'package:ecommerce_app/data/store.dart';
+import 'package:ecommerce_app/domain/agent_registry.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/ui/admin_settings.dart';
-import 'package:ecommerce_app/ui/admin_settings_search.dart';
+import 'package:ecommerce_app/ui/agent_command_box.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,7 +30,7 @@ void main() {
     await store.init();
     store.catalog['settings'] = [...store.entries('settings').where((e) => e.id != 'business'), const Entry('business', {'name': 'Local Market', 'abuseReportsToSuspend': 12})];
     final sent = <Map<String, dynamic>>[];
-    AdminSettingHit? opened;
+    RegistryEntry? opened;
     var limit = false;
     final reports = adminSettingsIndex().firstWhere((h) => h.hint == 'abuseReportsToSuspend');
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: AdminSettingsSearchBar(
@@ -46,18 +47,18 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('admin-settings-ask-ai')), findsNothing);
     // Everyday words it does not know: the button, and the AI's answer with the setting.
-    await tester.enterText(find.byKey(const ValueKey('admin-settings-search')), 'ఎన్ని రిపోర్టులకు బ్లాక్');
+    await tester.enterText(find.byKey(const ValueKey('admin-settings-search')), 'ఆటోమేటిక్ గా ఆపేయడానికి పరిమితి');
     await tester.pump();
     expect(find.byKey(const ValueKey('admin-settings-search-none')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('admin-settings-ask-ai')));
     await tester.pumpAndSettle();
-    expect(sent.single['query'], 'ఎన్ని రిపోర్టులకు బ్లాక్');
+    expect(sent.single['query'], 'ఆటోమేటిక్ గా ఆపేయడానికి పరిమితి');
     final row = (sent.single['index'] as List).cast<Map>().firstWhere((r) => r['key'] == 'abuseReportsToSuspend');
     expect(row['value'], '12', reason: 'the current value goes with it');
     expect('${row['label']}', contains('Business Profile'));
     expect(find.textContaining('12 రిపోర్టులు'), findsOneWidget);
     await tester.tap(find.byKey(ValueKey('admin-settings-ai-hit-${reports.serial}')));
-    expect(opened?.hint, 'abuseReportsToSuspend');
+    expect(opened?.field, 'abuseReportsToSuspend');
 
     // Past the AI's daily limit: the message shows, and the normal search still works.
     limit = true;

@@ -12,7 +12,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {getFirestore, Timestamp} = require('firebase-admin/firestore');
 const {requireRole, isAdminToken} = require('../../role-auth');
 const {requireAdminSession} = require('../../admin-session');
-const {anthropic, anthropicKey, logAiCall, takeDailyUse, AI_MODELS, keyIsSet} = require('../ai-core');
+const {anthropic, anthropicKey, loadAiKey, logAiCall, takeDailyUse, AI_MODELS} = require('../ai-core');
 
 const options = {region: 'us-central1', maxInstances: 3, invoker: 'public', secrets: [anthropicKey], timeoutSeconds: 120};
 const DEFAULT_ADMIN_AI_PER_DAY = 50;
@@ -101,7 +101,7 @@ async function answerQuestion(db, client, uid, question, now = Date.now()) {
 
 exports.askAdminAssistant = onCall(options, async request => {
   const uid = await requireAdmin(request);
-  if (!keyIsSet(process.env.ANTHROPIC_API_KEY)) throw new HttpsError('failed-precondition', 'The AI assistant is not set up yet.');
+  if (!(await loadAiKey(getFirestore()))) throw new HttpsError('failed-precondition', 'The AI assistant is not set up yet. Set the key in Settings > AI provider & usage.');
   return answerQuestion(getFirestore(), anthropic, uid, request.data?.question);
 });
 
@@ -189,7 +189,7 @@ async function searchWithAi(db, client, uid, data = {}, now = Date.now()) {
 
 exports.askAdminSearch = onCall({...options, timeoutSeconds: 60}, async request => {
   const uid = await requireAdmin(request);
-  if (!keyIsSet(process.env.ANTHROPIC_API_KEY)) throw new HttpsError('failed-precondition', 'The AI search is not set up yet.');
+  if (!(await loadAiKey(getFirestore()))) throw new HttpsError('failed-precondition', 'The AI search is not set up yet. Set the key in Settings > AI provider & usage.');
   return searchWithAi(getFirestore(), anthropic, uid, request.data || {});
 });
 

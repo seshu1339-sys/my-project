@@ -5,24 +5,29 @@
 //   aiCallLog/<id>         {feature, model, inputTokens, outputTokens, uid, stopReason, at}; only the admin reads it
 //   aiDailyUse/<key>_<day> {count, day}; only functions touch it
 //
-// The API key lives in the ANTHROPIC_API_KEY secret, which Firebase hands to a function as an environment variable. It is never in an app.
+// The API key: the one the admin sets in Settings > AI provider & usage (functions/ai-key.js, a server-only document), else the
+// ANTHROPIC_API_KEY secret, which Firebase hands to a function as an environment variable. It is never in an app.
 const {defineSecret} = require('firebase-functions/params');
 const {Timestamp} = require('firebase-admin/firestore');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 // The model names live in functions/ai-models.js (one place for every AI feature).
 const {AI_MODELS, SONNET, HAIKU, keyIsSet} = require('../../ai-models');
+const {currentAiKey, loadAiKey} = require('../../ai-key');
 const IST = 19800000;
 
-let client;
-/// The Anthropic client. Loaded on first use, so starting the other functions stays fast.
-/// Until the owner sets the real key (the secret holds a placeholder), it throws before any call, so nothing reaches Anthropic; every
-/// AI feature then falls back (Flash makes a ticket, the assistant says it is not set up).
+let client, clientKey = '';
+/// The Anthropic client. Loaded on first use, so starting the other functions stays fast. Call loadAiKey(db) first in a function (it
+/// reads the admin's key, cached); a new key makes a new client.
+/// Until the owner sets the real key, it throws before any call, so nothing reaches Anthropic; every AI feature then falls back (Flash
+/// makes a ticket, the assistant says it is not set up).
 function anthropic() {
-  if (!keyIsSet(process.env.ANTHROPIC_API_KEY)) throw Object.assign(Error('The Anthropic key is not set up yet.'), {name: 'AiKeyMissing'});
-  if (!client) {
+  const key = currentAiKey();
+  if (!keyIsSet(key)) throw Object.assign(Error('The Anthropic key is not set up yet.'), {name: 'AiKeyMissing'});
+  if (!client || clientKey !== key) {
     const Anthropic = require('@anthropic-ai/sdk').default;
-    client = new Anthropic({apiKey: process.env.ANTHROPIC_API_KEY});
+    client = new Anthropic({apiKey: key});
+    clientKey = key;
   }
   return client;
 }
@@ -49,4 +54,4 @@ async function takeDailyUse(db, key, limit, now = Date.now()) {
   });
 }
 
-module.exports = {anthropicKey, anthropic, logAiCall, takeDailyUse, SONNET, HAIKU, AI_MODELS, keyIsSet};
+module.exports = {anthropicKey, anthropic, loadAiKey, logAiCall, takeDailyUse, SONNET, HAIKU, AI_MODELS, keyIsSet};

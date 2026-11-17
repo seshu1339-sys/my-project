@@ -115,6 +115,8 @@ Object.assign(exports, require('./modules/payments'));
 Object.assign(exports, require('./modules/flash'));
 // Admin AI assistant: the admin's questions answered by Claude Sonnet 5.5 from today's counts (functions/modules/admin-assistant).
 Object.assign(exports, require('./modules/admin-assistant'));
+// Agent: the admin command box's AI key (server-only) and its status (functions/modules/agent).
+Object.assign(exports, require('./modules/agent'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
 const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
 Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});

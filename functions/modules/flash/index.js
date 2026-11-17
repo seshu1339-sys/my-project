@@ -13,7 +13,7 @@ const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('../../admin-session');
-const {anthropic, anthropicKey} = require('../ai-core');
+const {anthropic, anthropicKey, loadAiKey} = require('../ai-core');
 const {saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket} = require('./store');
 
 const chats = {user: require('./user/chat'), vendor: require('./vendor/chat'), premium: require('./premium/chat'), provider: require('./provider/chat'), staff: require('./staff/chat')};
@@ -39,6 +39,7 @@ const chatEndpoint = (chat, roles) => onCall({...options, secrets: [anthropicKey
   try {
     if (data.action === 'solved') return await markSolved(db, chat, uid, data);
     if (data.action === 'unsolved') return await markUnsolved(db, chat, uid, data);
+    await loadAiKey(db);
     return await sendMessage(db, anthropic, chat, {uid, email: loginEmail(request) ?? ''}, data);
   } catch (error) { return fail(error); }
 });
@@ -62,5 +63,6 @@ exports.saveFlashConfig = onCall(options, async request => {
   try { return await saveConfig(getFirestore(), request.data || {}); } catch (error) { return fail(error); }
 });
 exports.triageFlashTicket = onDocumentCreated({document: 'flashTickets/{ticketId}', region: 'asia-south1', maxInstances: 3, secrets: [anthropicKey], timeoutSeconds: 120}, async event => {
+  await loadAiKey(getFirestore());
   await triageTicket(getFirestore(), anthropic, event.params.ticketId, event.data.data());
 });

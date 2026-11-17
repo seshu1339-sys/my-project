@@ -6,7 +6,8 @@
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {defineSecret} = require('firebase-functions/params');
 const {getFirestore, Timestamp} = require('firebase-admin/firestore');
-const {AI_MODELS, keyIsSet} = require('./ai-models');
+const {AI_MODELS} = require('./ai-models');
+const {currentAiKey, loadAiKey} = require('./ai-key');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 const MODEL = AI_MODELS.photoSearch;
@@ -54,12 +55,14 @@ async function takePhotoSearch(db, uid, now = Date.now()) {
   return limit;
 }
 
-let client;
-/// The Anthropic client, made on first use.
+let client, clientKey = '';
+/// The Anthropic client with the key in use (the admin's key, else the secret: functions/ai-key.js), made on first use.
 function anthropic() {
-  if (!client) {
+  const key = currentAiKey();
+  if (!client || clientKey !== key) {
     const Anthropic = require('@anthropic-ai/sdk').default;
-    client = new Anthropic({apiKey: anthropicKey.value()});
+    client = new Anthropic({apiKey: key});
+    clientKey = key;
   }
   return client;
 }
@@ -70,8 +73,8 @@ exports.describeImageForSearch = onCall({region: 'us-central1', maxInstances: 5,
   if (typeof image !== 'string' || !image || image.length > MAX_BASE64) throw new HttpsError('invalid-argument', 'Send a photo under 3 MB.');
   const type = imageType(image);
   if (!type) throw new HttpsError('invalid-argument', 'Use a JPEG, PNG or WebP photo.');
-  if (!keyIsSet(anthropicKey.value())) throw new HttpsError('failed-precondition', 'Photo search is not set up yet.');
   const db = getFirestore();
+  if (!(await loadAiKey(db))) throw new HttpsError('failed-precondition', 'Photo search is not set up yet.');
   await takePhotoSearch(db, request.auth.uid);
   let response;
   try {

@@ -2,13 +2,14 @@
 // or spoken), vendor and staff app ads only where they were posted, the voice search language, and the admin AI assistant page.
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/domain/ads.dart';
+import 'package:ecommerce_app/domain/agent_registry.dart';
 import 'package:ecommerce_app/domain/catalog.dart';
 import 'package:ecommerce_app/domain/post_duration.dart';
 import 'package:ecommerce_app/modules/premiumscreen/offer_form_dialog.dart';
 import 'package:ecommerce_app/services/search_providers.dart';
 import 'package:ecommerce_app/ui/admin_ai_assistant.dart';
 import 'package:ecommerce_app/ui/admin_settings.dart';
-import 'package:ecommerce_app/ui/admin_settings_search.dart';
+import 'package:ecommerce_app/ui/agent_command_box.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -71,13 +72,13 @@ void main() {
 
   testWidgets('the admin types or says a setting and a tap opens it', (tester) async {
     final store = await _store();
-    AdminSettingHit? opened;
+    RegistryEntry? opened;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: AdminSettingsSearchBar(store: store, listen: () async => 'scrolling text', open: (h) => opened = h))));
     await tester.enterText(find.byKey(const ValueKey('admin-settings-search')), 'post duration');
     await tester.pump();
     final hit = searchAdminSettings('post duration').first;
     await tester.tap(find.byKey(ValueKey('admin-settings-hit-${hit.serial}')));
-    expect(opened?.hint, 'postDuration');
+    expect(opened?.field, 'postDuration');
     await tester.tap(find.byKey(const ValueKey('admin-settings-search-mic')));
     await tester.pumpAndSettle();
     expect(find.text('Scrolling Text'), findsWidgets, reason: 'what was said is searched');

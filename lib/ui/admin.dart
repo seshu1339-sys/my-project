@@ -7,13 +7,14 @@ import 'admin_entry_list.dart';
 import 'sample_tag.dart';
 import 'admin_frame.dart';
 import 'admin_insights.dart';
-import 'admin_ai_assistant.dart';
 import 'admin_groups.dart';
 import 'admin_settings.dart';
-import 'admin_settings_search.dart';
+import 'agent_command_box.dart';
+import 'agent_open.dart';
+import 'agent_registry_build.dart';
 
-// admin.dart is the admin shell: the tabs (Insights, Orders, Products, Vendors, Shops, Complaints, Promotions, Settings)
-// and the three top-bar buttons (Search, AI Agent, Sign out). Each moderation/editing concern lives in its own file with no
+// admin.dart is the admin shell: the six groups, the command box at the top (lib/ui/agent_command_box.dart: it took the place of the
+// "Find a setting" bar and the "AI Agent" button, which is now in its menu) and the top-bar buttons (Search, Sign out). Each moderation/editing concern lives in its own file with no
 // shared private helpers between them. Exported (not just imported) so that existing code importing only 'admin.dart' --
 // main_admin.dart, admin_auth.dart, and test/admin_test.dart's direct `EntryEditor` usage -- keeps working unchanged.
 import 'admin_orders.dart';
@@ -53,6 +54,16 @@ class _AdminPageState extends State<AdminPage> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: widget.store)));
       });
+    }
+    // A deep link to one option (`?open=field.settings.postDuration`): it opens at its field once the panel is up.
+    final linked = agentDeepLinkId;
+    if (linked != null) {
+      final entry = buildAgentRegistry().where((e) => e.id == linked).firstOrNull;
+      if (entry != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) openAgentEntry(context, widget.store, entry, command: 'link');
+        });
+      }
     }
   }
 
@@ -102,9 +113,9 @@ class _AdminPageState extends State<AdminPage> {
         );
       }
       final store = widget.store;
-      // The three top-bar buttons always carry a text label. On a phone they sit in a row under the title instead of beside it.
+      // The top-bar buttons always carry a text label. On a phone they sit in a row under the title instead of beside it.
       final narrow = MediaQuery.sizeOf(context).width < 760;
-      // The settings search sits at the top of the panel; on a short window (under 700 px high) it opens from a top-bar button instead,
+      // The command box sits at the top of the panel; on a short window (under 700 px high) it opens from a top-bar button instead,
       // so the pages keep their room.
       final tall = MediaQuery.sizeOf(context).height >= 700;
       final buttons = <Widget>[
@@ -112,33 +123,17 @@ class _AdminPageState extends State<AdminPage> {
           TextButton.icon(
             key: const ValueKey('top-find-setting'),
             onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(
-              appBar: AppBar(title: const Text('Find a setting')),
+              appBar: AppBar(title: const Text('Command box')),
               body: Column(children: [AdminSettingsSearchBar(store: store)]),
             ))),
-            icon: const Icon(Icons.manage_search),
-            label: const Text('Find setting'),
+            icon: const Icon(Icons.smart_toy_outlined),
+            label: const Text('Command'),
           ),
         TextButton.icon(
           key: const ValueKey('top-search'),
           onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AdminSearchPage(store: store))),
           icon: const Icon(Icons.search),
           label: const Text('Search'),
-        ),
-        TextButton.icon(
-          key: const ValueKey('top-ai-agent'),
-          // The AI assistant (Claude Sonnet 5.5, read-only counts). The older AI Agent page stays one tap away in its top bar.
-          onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (context) => Scaffold(
-            appBar: AppBar(title: const Text('AI assistant'), actions: [
-              TextButton(
-                key: const ValueKey('open-old-ai-agent'),
-                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: store))),
-                child: const Text('Older AI Agent'),
-              ),
-            ]),
-            body: AdminAiAssistantPage(store: store),
-          ))),
-          icon: const Icon(Icons.smart_toy_outlined),
-          label: const Text('AI Agent'),
         ),
         if (store.live)
           TextButton.icon(
@@ -170,7 +165,7 @@ class _AdminPageState extends State<AdminPage> {
           ),
           body: Column(
             children: [
-              // Find any setting by name or number, typed or spoken (lib/ui/admin_settings_search.dart).
+              // The command box: find and open any option, ask a number, check health, ads and design by command (lib/ui/agent_command_box.dart).
               if (tall) AdminSettingsSearchBar(store: store),
               if (!store.live)
                 Container(

@@ -24,3 +24,11 @@ bool get isAdminRoute => kIsWeb && Uri.base.path == adminRoutePath;
 /// itself is completely unchanged; this only decides what's shown right
 /// after it succeeds.
 bool get wantsAiAgentDirectly => kIsWeb && Uri.base.queryParameters['open'] == 'ai-agent';
+
+/// `?open=<registry id>` on the admin route (owner spec B, 17 Nov 2026): every option has a deep link that opens it at its field
+/// after the normal login, e.g. `/jyothi9?open=field.settings.postDuration`. Null when the URL has none (or asks for the AI agent).
+String? get agentDeepLinkId {
+  if (!kIsWeb) return null;
+  final id = Uri.base.queryParameters['open'];
+  return id == null || id.isEmpty || id == 'ai-agent' ? null : id;
+}

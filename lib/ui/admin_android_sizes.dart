@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/android_sizes.dart';
 import '../domain/catalog.dart';
+import 'agent_focus.dart';
 import 'android_layout.dart';
 import 'shared.dart';
 
@@ -149,7 +150,7 @@ class _AndroidSizesEditorState extends State<AndroidSizesEditor> {
             expandedAlignment: Alignment.centerLeft,
             maintainState: true,
             children: [
-              Wrap(spacing: 12, runSpacing: 12, children: [for (final field in part.fields) _field(part, field, separate)]),
+              Wrap(spacing: 12, runSpacing: 12, children: [for (final field in part.fields) AgentFocusTarget(fieldKey: AndroidSizes.key(part.id, field.id), child: _field(part, field, separate))]),
             ],
           ),
         const SizedBox(height: 12),

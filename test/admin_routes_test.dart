@@ -1,7 +1,7 @@
 import 'package:ecommerce_app/data/store.dart';
 import 'package:ecommerce_app/ui/admin_routes.dart';
 import 'package:ecommerce_app/ui/admin_settings.dart';
-import 'package:ecommerce_app/ui/admin_settings_search.dart';
+import 'package:ecommerce_app/ui/agent_command_box.dart';
 import 'package:ecommerce_app/ui/ai_agent_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,7 +40,7 @@ void main() {
     final opened = <String>[];
     var said = 'సెల్స్ తెరువు';
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(body: AdminSettingsSearchBar(store: Store(), open: (hit) => opened.add(hit.sectionKey), listen: () async => said)),
+      home: Scaffold(body: AdminSettingsSearchBar(store: Store(), open: (hit) => opened.add(hit.open), listen: () async => said)),
     ));
     await tester.enterText(find.byKey(const ValueKey('admin-settings-search')), 'ప్లాన్స్');
     await tester.pump();

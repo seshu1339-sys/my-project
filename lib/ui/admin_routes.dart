@@ -68,6 +68,8 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('androidHome', 'ఆండ్రాయిడ్ యాప్', ['android', 'app']),
   AdminRoute('areaNames', 'ఏరియా పేర్లు', ['area names', 'place names', 'ప్రదేశాల పేర్లు']),
   AdminRoute('samples', 'శాంపిల్ డేటా', ['sample', 'demo']),
+  AdminRoute('aiProvider', 'AI కీ, వినియోగం', ['ai key', 'api key', 'కీ', 'provider', 'ai usage', 'ai explain', 'claude']),
+  AdminRoute('agentLog', 'ఏజెంట్ లాగ్', ['agent log', 'log', 'లాగ్', 'history', 'చరిత్ర', 'who did']),
 ];
 
 /// Every word a page is known by, besides its English title (the route map lines with this key that are not extra parts).

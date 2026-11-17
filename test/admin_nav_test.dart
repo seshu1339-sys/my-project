@@ -52,13 +52,14 @@ void main() {
     expect(find.text('Site and ad statistics'), findsOneWidget);
   });
 
-  testWidgets('the top bar has only Search, AI Agent and Sign out, each with a text label', (tester) async {
+  testWidgets('the top bar has only Search (and Command on a short window) and Sign out; the AI Agent button is in the command box', (tester) async {
     for (final width in [360.0, 800.0, 1440.0]) {
       await _open(tester, width);
       expect(find.byKey(const ValueKey('top-search')), findsOneWidget);
-      expect(find.byKey(const ValueKey('top-ai-agent')), findsOneWidget);
+      expect(find.byKey(const ValueKey('top-ai-agent')), findsNothing, reason: 'merged into the command box (owner spec A, 17 Nov 2026)');
       expect(find.text('Search'), findsOneWidget);
-      expect(find.text('AI Agent'), findsOneWidget);
+      expect(find.byKey(const ValueKey('top-find-setting')).evaluate().length + find.byKey(const ValueKey('admin-settings-search')).evaluate().length, 1,
+          reason: 'the command box: at the top, or behind the Command button on a short window');
       // not live in tests: no Sign out then; and no bare icons, no ⋮ menu, no gear, no layout/visual-editor icons
       expect(find.descendant(of: find.byType(AppBar), matching: find.byType(IconButton)), findsNothing);
       expect(find.descendant(of: find.byType(AppBar), matching: find.byType(PopupMenuButton<String>)), findsNothing);

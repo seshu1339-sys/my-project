@@ -11,7 +11,8 @@
 const {defineSecret} = require('firebase-functions/params');
 const {getStorage} = require('firebase-admin/storage');
 const {Timestamp} = require('firebase-admin/firestore');
-const {AI_MODELS, keyIsSet} = require('./ai-models');
+const {AI_MODELS} = require('./ai-models');
+const {currentAiKey, loadAiKey} = require('./ai-key');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 const CATEGORIES = ['drugs', 'weapons', 'alcohol', 'tobacco', 'adult'];
@@ -60,11 +61,14 @@ async function takeCheck(db, now) {
   });
 }
 
-let client;
+let client, clientKey = '';
+/// The Anthropic client with the key in use (the admin's key, else the secret: functions/ai-key.js), made on first use.
 function anthropic() {
-  if (!client) {
+  const key = currentAiKey();
+  if (!client || clientKey !== key) {
     const Anthropic = require('@anthropic-ai/sdk').default;
-    client = new Anthropic({apiKey: anthropicKey.value()});
+    client = new Anthropic({apiKey: key});
+    clientKey = key;
   }
   return client;
 }
@@ -73,7 +77,7 @@ function anthropic() {
 async function checkBytes(db, bytes, contentType, {feature = 'photo_safety', uid = '', makeClient, now = Date.now()} = {}) {
   const type = mediaType(bytes, contentType);
   if (!type || !bytes.length || bytes.length > MAX_BYTES) return {verdict: 'unknown', categories: [], note: 'The photo could not be read.'};
-  if (!makeClient && !keyIsSet(process.env.ANTHROPIC_API_KEY)) return {verdict: 'unknown', categories: [], note: 'The photo check is not set up yet.'};
+  if (!makeClient && !(await loadAiKey(db))) return {verdict: 'unknown', categories: [], note: 'The photo check is not set up yet.'};
   if (!(await takeCheck(db, now))) return {verdict: 'unknown', categories: [], note: "Today's photo checks are used up."};
   let response;
   try {

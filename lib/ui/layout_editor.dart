@@ -7,6 +7,7 @@ import '../data/store.dart';
 import '../domain/catalog.dart';
 import 'color_picker_field.dart';
 import 'design_tokens.dart';
+import 'agent_focus.dart';
 import 'entry_editor.dart';
 import 'home_rotating_pages.dart';
 import 'layout_current_values.dart';
@@ -50,15 +51,17 @@ List<MapEntry<String, String>> layoutComponentChoices() {
 }
 
 class LayoutSettingsPage extends StatefulWidget {
-  const LayoutSettingsPage({super.key, required this.store});
+  const LayoutSettingsPage({super.key, required this.store, this.initialComponent});
   final Store store;
+  // The part to open first (the command box opens a design property's part); the Search Box when not given.
+  final String? initialComponent;
   @override
   State<LayoutSettingsPage> createState() => _LayoutSettingsPageState();
 }
 
 class _LayoutSettingsPageState extends State<LayoutSettingsPage> {
   final formKey = GlobalKey<LayoutFieldsFormState>();
-  String component = 'search';
+  late String component = widget.initialComponent ?? 'search';
 
   /// The ticker banner (14): its size, colors, text and speed are in the
   /// Scrolling Text Settings editor, not a layout form.
@@ -260,6 +263,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
   bool busy = false;
   bool dirty = false;
   final advancedController = ExpansibleController();
+  bool _openedForAgent = false;
   Timer? _debounce;
   int _animationPreviewTick = 0;
   Entry get saved =>
@@ -952,7 +956,7 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
           spacing: 16,
           runSpacing: 16,
           crossAxisAlignment: WrapCrossAlignment.start,
-          children: [for (final key in keys) SizedBox(width: width, child: _fieldWidget(key))],
+          children: [for (final key in keys) SizedBox(width: width, child: AgentFocusTarget(fieldKey: key, child: _fieldWidget(key)))],
         );
         final advanced = [
           if (_splitAdvanced)
@@ -960,6 +964,14 @@ class LayoutFieldsFormState extends State<LayoutFieldsForm> {
               if (_kindOf(key) == _FieldKind.number) key,
         ];
         final simple = [for (final key in fields) if (!advanced.contains(key)) key];
+        // The command box asked for a field under Advanced: open it, so the field can scroll into view.
+        final asked = AgentFocusScope.of(context);
+        if (asked != null && advanced.contains(asked) && !_openedForAgent) {
+          _openedForAgent = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) advancedController.expand();
+          });
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

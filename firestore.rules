@@ -416,6 +416,15 @@ service cloud.firestore {
       allow write: if false;
     }
     match /aiDailyUse/{id} { allow read, write: if false; }
+    // Admin command box (owner spec I, 17 Nov 2026): every agent action is logged by the admin who did it, with the server's time;
+    // nobody edits or deletes a line. _private holds server-only values (the AI key, functions/ai-key.js): no app reads or writes it.
+    match /agentLog/{id} {
+      allow read: if admin();
+      allow create: if admin() && request.resource.data.uid == request.auth.uid && request.resource.data.at == request.time
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'action', 'command', 'target', 'platform', 'details', 'at']);
+      allow update, delete: if false;
+    }
+    match /_private/{id} { allow read, write: if false; }
     // Abuse reports (functions/modules/abuse-reports) and the permanent block list (functions/block-list.js): the admin reads them,
     // functions write them. Who reported whom is never readable by the person reported. The admin only marks an alert as read.
     // Shop and provider ratings (functions/modules/shop-ratings): anyone reads the ratings that are not hidden (no phone, no account id

@@ -9,6 +9,8 @@ import 'admin_groups.dart';
 import 'admin_staff_work.dart';
 import 'admin_ratings.dart';
 import 'admin_ai_assistant.dart';
+import 'agent_ai_settings.dart';
+import 'agent_log_page.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
 import 'admin_city_codes.dart';
@@ -68,6 +70,9 @@ final _sections = <_SettingsSection>[
   _SettingsSection('staffRanking', 'Staff ranking', Icons.leaderboard_outlined, "This month's best staff: updates, active vendors, target done; by area"),
   _SettingsSection('idReport', 'ID report', Icons.manage_search, 'Type a Vendor, provider or Staff ID: the full report, graphs, Excel and PDF'),
   _SettingsSection('staffLinks', 'Staff links and requests', Icons.link, 'Link any vendor to staff of its area; vendors\' "connect me to local staff" requests'),
+  // The command box (owner spec A-C, I, 17 Nov 2026): its AI key and use, and the log of every agent action.
+  _SettingsSection('aiProvider', 'AI provider & usage', Icons.key_outlined, "The AI key (kept on the server), this month's AI use, and the AI explain switch"),
+  _SettingsSection('agentLog', 'Agent log', Icons.receipt_long_outlined, 'Every command-box action: who, what, when'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -161,6 +166,10 @@ Widget adminSettingsContent(Store store, String key) {
   switch (key) {
       case 'aiAssistant':
         return AdminAiAssistantPage(store: store);
+      case 'aiProvider':
+        return AgentAiSettingsPage(store: store);
+      case 'agentLog':
+        return AgentLogPage(store: store);
       case 'reports':
         return AdminReportsPage(store: store);
       case 'blockList':
