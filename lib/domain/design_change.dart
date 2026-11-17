@@ -26,6 +26,7 @@ const designFields = <DesignField>[
   DesignField('rightBoxHeight', 'Right-side ad box height', 240.0, min: 120, max: 400, te: ['కుడి యాడ్ బాక్స్ ఎత్తు']),
   DesignField('todaysOfferLabel', "Today's Offers box heading text", "Today's Offer", te: ['టుడేస్ ఆఫర్ పేరు']),
   DesignField('noOfferText', "Today's Offers empty box text", 'Local vendor not updated offer', te: ['ఖాళీ బాక్స్ టెక్స్ట్']),
+  DesignField('noPriceText', 'Text when an item has no price', 'Local vendor not updated item price', te: ['ధర లేని ఐటమ్ టెక్స్ట్']),
 ];
 
 /// A number of settings/design (its default when not set; always inside its safe range).

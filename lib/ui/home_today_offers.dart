@@ -8,7 +8,6 @@ import '../domain/admin_ads.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
 import '../domain/design_change.dart';
-import '../domain/catalog_lines.dart' show noLocalPriceText;
 import '../domain/today_offers.dart';
 import '../domain/reach.dart';
 import '../modules/offerdisplay/offerdisplay_module.dart';
@@ -187,7 +186,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
       return VendorOfferBox(
         key: ValueKey('admin-ad-box-${ad.id}'),
         photoUrl: ad.photoUrl.isNotEmpty ? ad.photoUrl : (ad.isRate ? rateItemPhoto(widget.store, ad.productName) : ''),
-        price: ad.isRate ? (rate == null ? noLocalPriceText : '₹${rate == rate.roundToDouble() ? rate.round() : rate.toStringAsFixed(2)}') : ad.title,
+        price: ad.isRate ? (rate == null ? noPriceText(widget.store) : '₹${rate == rate.roundToDouble() ? rate.round() : rate.toStringAsFixed(2)}') : ad.title,
         frame: entryDecoration(look, fallback: AppTokens.primaryLight),
         colour: colorFromHex(look.text('backgroundColor'), AppTokens.primary),
         radius: inner,

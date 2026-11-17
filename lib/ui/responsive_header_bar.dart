@@ -75,7 +75,7 @@ class ResponsiveHeader extends StatelessWidget {
                       if (store.item(id) case final entry?)
                         ListTile(
                           title: Text(entry.text('name')),
-                          subtitle: Text(priceOrNotUpdated(entry.price(store.pincode))),
+                          subtitle: Text(priceOrNotUpdated(entry.price(store.pincode), store)),
                           onTap: () {
                             Navigator.pop(dialog);
                             onProduct(entry);

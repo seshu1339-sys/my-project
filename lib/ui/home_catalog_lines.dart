@@ -90,6 +90,7 @@ class _HomeCatalogLinesState extends State<HomeCatalogLines> {
                 perLine: perLine,
                 priceOf: (item) => lowestLinePrice(item, products, pincode: store.pincode),
                 open: (item) => openItemShops(context, store, name: item.name, libraryItemId: item.libraryItemId, openItem: widget.onProduct),
+                noPrice: noPriceText(store),
               ),
             ),
         ],
@@ -99,7 +100,9 @@ class _HomeCatalogLinesState extends State<HomeCatalogLines> {
 }
 
 class _Line extends StatelessWidget {
-  const _Line({super.key, required this.line, required this.title, required this.items, required this.perLine, required this.priceOf, required this.open});
+  const _Line({super.key, required this.line, required this.title, required this.items, required this.perLine, required this.priceOf, required this.open, required this.noPrice});
+  // The words for an item with no price (Settings > Design texts & sizes).
+  final String noPrice;
   final int line;
   final String title;
   final List<CatalogLineItem> items;
@@ -123,7 +126,7 @@ class _Line extends StatelessWidget {
           children: [
             for (var i = 0; i < perLine; i++) ...[
               if (i > 0) const SizedBox(width: 8),
-              Expanded(child: i < items.length ? _Box(item: items[i], price: priceOf(items[i]), open: open) : const SizedBox.shrink()),
+              Expanded(child: i < items.length ? _Box(item: items[i], price: priceOf(items[i]), open: open, noPrice: noPrice) : const SizedBox.shrink()),
             ],
           ],
         ),
@@ -133,7 +136,8 @@ class _Line extends StatelessWidget {
 }
 
 class _Box extends StatelessWidget {
-  const _Box({required this.item, required this.price, required this.open});
+  const _Box({required this.item, required this.price, required this.open, required this.noPrice});
+  final String noPrice;
   final CatalogLineItem item;
   final LinePrice? price;
   final ValueChanged<CatalogLineItem> open;
@@ -174,7 +178,7 @@ class _Box extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: p == null
-                    ? const Text(noLocalPriceText, key: ValueKey('catalog-no-price'), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9.5, color: Colors.black54, height: 1.2))
+                    ? Text(noPrice, key: const ValueKey('catalog-no-price'), maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 9.5, color: Colors.black54, height: 1.2))
                     : Text('${money(p.price)}${p.unit.isEmpty ? '' : ' / ${p.unit}'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xff1d5e3d))),
               ),
             ],

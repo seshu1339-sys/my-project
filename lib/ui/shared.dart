@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../domain/catalog.dart';
-import '../domain/catalog_lines.dart' show noLocalPriceText;
+import '../data/store.dart';
+import '../domain/design_change.dart';
 import 'design_tokens.dart';
 
 Color colorFromHex(String value, Color fallback) {
@@ -318,7 +319,10 @@ class ProductArt extends StatelessWidget {
 
 /// An item's price, or, when no vendor here has one, "Local vendor not updated item price" (owner, 16 Nov 2026): an item is never hidden
 /// for having no price.
-String priceOrNotUpdated(num price) => price > 0 ? money(price) : noLocalPriceText;
+/// The words for an item with no price (Settings > Design texts & sizes, owner 17 Nov 2026; the default when not set).
+String noPriceText(Store? store) => designText(store?.entries('settings') ?? const [], 'noPriceText');
+
+String priceOrNotUpdated(num price, [Store? store]) => price > 0 ? money(price) : noPriceText(store);
 
 String money(num value) =>
     '₹${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2)}';

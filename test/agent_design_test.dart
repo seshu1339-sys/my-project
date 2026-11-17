@@ -8,6 +8,7 @@ import 'package:ecommerce_app/domain/design_change.dart';
 import 'package:ecommerce_app/services/agent_log.dart';
 import 'package:ecommerce_app/ui/agent_design_flow.dart';
 import 'package:ecommerce_app/ui/agent_registry_build.dart';
+import 'package:ecommerce_app/ui/shared.dart' show priceOrNotUpdated, noPriceText;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,19 @@ void main() {
     expect(designTargetOf(e('design.web.search.cameraIconColor')), (record: 'section_search', field: 'cameraIconColor'));
     expect(designTargetOf(e('design.user.search.height')), (record: 'androidSizes', field: 'search__height'));
     expect(registry.where((x) => x.id == 'design.web.design.todaysOfferLabel'), hasLength(1));
+  });
+
+  test('the "no price" words are a setting: default until the admin sets them, then everywhere', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = Store();
+    await store.init();
+    expect(priceOrNotUpdated(0, store), 'Local vendor not updated item price');
+    expect(registry.where((x) => x.id == 'design.web.design.noPriceText'), hasLength(1), reason: 'the command box finds it');
+    store.catalog['settings'] = [...store.entries('settings'), const Entry('design', {'noPriceText': 'ధర త్వరలో'})];
+    expect(priceOrNotUpdated(0, store), 'ధర త్వరలో');
+    expect(noPriceText(store), 'ధర త్వరలో');
+    expect(priceOrNotUpdated(40, store), isNot('ధర త్వరలో'));
+    store.dispose();
   });
 
   test('the value from the words: colours, absolute, wider / smaller by, percent', () {
