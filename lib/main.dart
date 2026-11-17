@@ -29,6 +29,9 @@ import 'services/area_lookup.dart';
 import 'services/location.dart';
 import 'services/app_theme.dart';
 import 'services/localization.dart';
+import 'services/difficulty_watch.dart';
+import 'ui/support_shell.dart';
+import 'ui/ai_support_box.dart';
 
 final _navigator = GlobalKey<NavigatorState>();
 final _messenger = GlobalKey<ScaffoldMessengerState>();
@@ -39,6 +42,8 @@ Future<void> main() async {
   unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: kIsWeb && isAdminRoute ? 'admin' : 'customer');
+  // The AI Support box opens by itself when a person meets a problem (lib/ui/ai_support_box.dart).
+  AiSupportBox.install();
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;
@@ -219,8 +224,9 @@ class MarketApp extends StatelessWidget {
         textDirection: AppLocale.isRtl(store.language)
             ? TextDirection.rtl
             : TextDirection.ltr,
-        child: withConsentGate(context, child, store),
+        child: withSupportShell(context, withConsentGate(context, child, store), store),
       ),
+      navigatorObservers: [SupportNavigatorObserver.shared],
       theme: buildAppTheme(store, dark: false),
       darkTheme: buildAppTheme(store, dark: true),
       themeMode: resolveThemeMode(store),

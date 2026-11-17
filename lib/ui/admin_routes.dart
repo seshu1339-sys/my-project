@@ -21,9 +21,11 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('tab:Insights', 'ఇన్‌సైట్స్', ['గణాంకాలు', 'dashboard', 'numbers', 'analytics']),
   AdminRoute('tab:Orders', 'ఆర్డర్లు', ['ఆర్డర్', 'order']),
   AdminRoute('tab:Support Team chat', 'సపోర్ట్ టీమ్', ['support', 'chat', 'inbox', 'చాట్', 'flash']),
+  AdminRoute('fixAgent', 'AI ఏజెంట్: సమస్యలు & పరిష్కారాలు', ['ai agent', 'fix', 'fixes', 'problems', 'summary', 'పరిష్కారం', 'సమస్యలు', 'ఫిక్స్']),
   AdminRoute('aiAssistant', 'AI సహాయకుడు', ['assistant', 'ai', 'ఏఐ']),
   AdminRoute('health', 'హెల్త్ చెక్', ['health check', 'status', 'errors', 'ఆరోగ్యం', 'పరీక్ష', 'self test']),
   AdminRoute('appHealth', 'యాప్ హెల్త్', ['app health', 'crashes', 'crashlytics', 'క్రాష్', 'report a problem', 'app errors']),
+  AdminRoute('supportReports', 'AI సపోర్ట్ రిపోర్టులు', ['ai support', 'support reports', 'replies', 'problem reports', 'సమస్యలు', 'జవాబు']),
   // Vendors & Shops
   AdminRoute('tab:Vendors', 'వెండర్లు', ['వెండర్', 'vendor', 'approve', 'ఆమోదం']),
   AdminRoute('tab:Shops', 'షాపులు', ['షాప్', 'దుకాణాలు', 'shop']),

@@ -16,6 +16,9 @@ import 'ui/app_bottom_ad.dart';
 import 'ui/consent_checkbox.dart';
 import 'ui/sign_in_panel.dart';
 import 'ui/field.dart';
+import 'services/difficulty_watch.dart';
+import 'ui/support_shell.dart';
+import 'ui/ai_support_box.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +26,8 @@ Future<void> main() async {
   unawaited(ServerClock.start());
   // App errors and start speed for the admin's Setup check (lib/services/app_monitoring.dart).
   AppMonitoring.start(app: 'staff');
+  // The AI Support box opens by itself when a person meets a problem (lib/ui/ai_support_box.dart).
+  AiSupportBox.install();
   const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
   var live = false;
   String? startupError;
@@ -67,7 +72,8 @@ class FieldAssistantApp extends StatelessWidget {
           title: 'Loca Market staff',
           theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff1b5e20))),
           // The ads box at the bottom of every page, once signed in.
-          builder: (context, child) => withConsentGate(context, withAppBottomAd(context, child, store, staff: true), store),
+          builder: (context, child) => withSupportShell(context, withConsentGate(context, withAppBottomAd(context, child, store, staff: true), store), store),
+          navigatorObservers: [SupportNavigatorObserver.shared],
           home: !store.live
               ? const FieldDemoPage()
               : store.user == null

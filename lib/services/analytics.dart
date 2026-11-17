@@ -97,18 +97,49 @@ class Analytics {
     _send('adClick', {'adId': ad.id, 'placement': ad.text('placement')});
   }
 
+  /// The ad views and taps waiting to go (sent together every [batchEvery], at once on a visit or when the app goes to the
+  /// background: one call instead of one per ad; free-limit plan 17 Nov 2026).
+  static final _waiting = <Map<String, Object?>>[];
+  static Timer? _batchTimer;
+  static const batchEvery = Duration(seconds: 15);
+  static const maxBatch = 30;
+
+  /// Test seam: where the calls go instead of the server.
+  @visibleForTesting
+  static Future<void> Function(Map<String, Object?> data)? testTransport;
+
   static void _send(String type, Map<String, Object?> extra) {
-    unawaited(() async {
-      try {
-        await FirebaseFunctions.instance.httpsCallable('trackEvent').call({
-          'visitorId': _visitorId,
-          'type': type,
-          'platform': kIsWeb ? 'web' : 'android',
-          ...extra,
-        });
-      } catch (_) {
-        /* Analytics is best-effort. */
-      }
-    }());
+    _waiting.add({'type': type, ...extra});
+    if (type == 'visit' || _waiting.length >= maxBatch) {
+      unawaited(flush());
+    } else {
+      _batchTimer ??= Timer(batchEvery, () => unawaited(flush()));
+    }
+  }
+
+  /// Sends what is waiting in one call (also called when the app goes to the background). Never throws.
+  static Future<void> flush() async {
+    _batchTimer?.cancel();
+    _batchTimer = null;
+    if (_waiting.isEmpty) return;
+    final events = [..._waiting.take(maxBatch)];
+    _waiting.removeRange(0, events.length);
+    final data = {'visitorId': _visitorId, 'platform': kIsWeb ? 'web' : 'android', 'events': events};
+    try {
+      await (testTransport ?? (d) => FirebaseFunctions.instance.httpsCallable('trackEvent').call(d))(data);
+    } catch (_) {
+      /* Analytics is best-effort. */
+    }
+    if (_waiting.isNotEmpty) _batchTimer ??= Timer(batchEvery, () => unawaited(flush()));
+  }
+
+  @visibleForTesting
+  static void resetForTest({String visitorId = '0123456789abcdef0123'}) {
+    _waiting.clear();
+    _batchTimer?.cancel();
+    _batchTimer = null;
+    _lastImpression.clear();
+    _visitorId = visitorId;
+    _enabled = true;
   }
 }

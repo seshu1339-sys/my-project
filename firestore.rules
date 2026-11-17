@@ -456,6 +456,36 @@ service cloud.firestore {
         && request.resource.data.open == false && request.resource.data.closedBy == request.auth.uid;
       allow create, delete: if false;
     }
+    // AI Support (functions/modules/support): a person reads their own problem reports (the app asks the server for a device's
+    // reports when not signed in); the admin reads all and answers through the server. A problem is marked solved by the admin
+    // (one record per time it is solved; the problem and its reports react to it).
+    match /supportTickets/{id} { allow read: if admin() || (signedIn() && resource.data.uid == request.auth.uid); allow write: if false; }
+    match /supportShots/{id} { allow read: if admin(); allow write: if false; }
+    match /supportDevices/{id} { allow read, write: if false; }
+    match /solvedProblems/{id} {
+      allow read: if admin();
+      allow create: if admin() && request.resource.data.keys().hasOnly(['problemId', 'by', 'at', 'how'])
+        && request.resource.data.by == request.auth.uid && request.resource.data.at == request.time
+        && request.resource.data.problemId is string && request.resource.data.problemId.size() > 0;
+      allow update, delete: if false;
+    }
+    // The admin AI Agent's fix requests (lib/ui/fix_agent_page.dart, tools/fix-queue on the owner's PC writes the fix's progress with
+    // the owner's own login). The admin asks a fix (or Don't fix), approves only a fix that is ready (OK), sends a new instruction, or
+    // asks Undo of a live fix. Nothing else; nobody deletes one. fixAgent/status: when the PC's fix agent last looked (admin reads).
+    match /fixRequests/{id} {
+      allow read: if admin();
+      allow create: if admin() && request.resource.data.by == request.auth.uid && request.resource.data.at == request.time
+        && request.resource.data.status in ['requested', 'declined'] && request.resource.data.problemId is string;
+      allow update: if admin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'instruction', 'approvedBy', 'approvedAt', 'decidedBy', 'decidedAt'])
+        && request.resource.data.decidedBy == request.auth.uid
+        && ((request.resource.data.status == 'approved' && resource.data.status == 'ready' && request.resource.data.approvedBy == request.auth.uid)
+          || (request.resource.data.status == 'requested' && resource.data.status in ['ready', 'failed', 'live', 'declined', 'undone'])
+          || (request.resource.data.status == 'declined' && resource.data.status in ['ready', 'failed', 'live', 'requested'])
+          || (request.resource.data.status == 'undoRequested' && resource.data.status == 'live'));
+      allow delete: if false;
+    }
+    match /fixAgent/{id} { allow read: if admin(); allow write: if false; }
     match /adminPushTokens/{token} {
       allow read: if admin();
       allow create: if admin() && request.resource.data.keys().hasOnly(['uid', 'at']) && request.resource.data.uid == request.auth.uid

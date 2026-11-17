@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'usage.dart';
+import 'analytics.dart';
 
 /// Starts usage analytics in an app (customer, vendor, staff or admin) once Firebase is connected: a random id for the device
 /// (the same one the visit and ad counting use), and batches sent to the `trackUsage` callable. Never throws.
@@ -27,7 +28,11 @@ Future<void> startUsage({required String app}) async {
       transport: (batch) => FirebaseFunctions.instance.httpsCallable('trackUsage').call(batch),
     )..touch();
     // What is waiting is sent when the app is left (another tab, the home screen), not lost.
-    AppLifecycleListener(onHide: () => Usage.instance?.flush());
+    AppLifecycleListener(onHide: () {
+      Usage.instance?.flush();
+      // The ad views and taps waiting to go, too (lib/services/analytics.dart).
+      Analytics.flush();
+    });
     // Signing in says who is active now (the admin's inactive-accounts list).
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user != null) Usage.instance?.touch();

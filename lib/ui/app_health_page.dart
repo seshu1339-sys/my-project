@@ -89,7 +89,9 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
   Future<void> _setStatus(String id, String status) async {
     await widget.store.firestore.collection('problemReports').doc(id).update({'status': status});
     AgentLog.write(widget.store, action: 'report_$status', target: id);
-    setState(() => data = widget.load(widget.app, widget.platform));
+    setState(() {
+      data = widget.load(widget.app, widget.platform);
+    });
   }
 
   Widget _report(Map<String, dynamic> r) {
@@ -198,7 +200,9 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
         final shown = [for (final p in problems) if ((kind.isEmpty || p.kind == kind) && (side.isEmpty || p.side == side)) p];
         final bySide = <String, int>{for (final s in problemSideNames.keys) s: problems.where((p) => p.side == s).length};
         return RefreshIndicator(
-          onRefresh: () async => setState(() => data = widget.load(widget.app, widget.platform)),
+          onRefresh: () async => setState(() {
+            data = widget.load(widget.app, widget.platform);
+          }),
           child: ListView(
             padding: const EdgeInsets.all(12),
             children: [

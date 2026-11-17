@@ -19,11 +19,14 @@
 //   problemReports/<id>                      {app, platform, version, device, text, screen, screenshotPath, uid, role, userCode, status, at}
 //   appProblemDevices/<device hash>~<day>    {count, reports, shots}   the per-device daily cap (functions only)
 //   healthAlerts/<problemId>                 the burst alert (alerts.js); settings/health {burstCount, burstMinutes, burstSides}
+//   solvedProblems/<id> {problemId, by, at}  written when the admin marks a problem solved or its fix goes live: the problem becomes
+//                                            'solved', its alert closes and its screenshots are deleted (problemSolved trigger)
 //
 // Cost guards: a device sends at most DEVICE_DAILY_CAP problems, SHOTS_PER_DAY screenshots and REPORTS_PER_DAY reports a day (the rest
 // are dropped), at most MAX_BATCH problems a call, texts are cut short, emails / links / long numbers are taken out, bots are ignored,
 // an automatic screenshot is at most 120 KB and a report's at most 400 KB.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
 const {getStorage} = require('firebase-admin/storage');
 const {createHash} = require('node:crypto');
@@ -220,6 +223,20 @@ async function saveProblems(db, request, now = Date.now(), {send} = {}) {
   return {saved: keep.length, cases, alerts: alerts.length};
 }
 
+/// A problem was solved: its record says so, its alert closes and its screenshots are marked for deletion (cleanShots deletes them).
+async function markSolved(db, problemId, now = Date.now()) {
+  const ref = db.collection('appProblems').doc(problemId);
+  if (!(await ref.get()).exists) return 0;
+  const at = Timestamp.fromMillis(now);
+  await ref.update({status: 'solved', solvedAt: at});
+  await db.collection('healthAlerts').doc(problemId).set({open: false, closedAt: at}, {merge: true});
+  const shots = await db.collection('appShots').where('problemId', '==', problemId).limit(400).get();
+  const b = db.batch();
+  shots.docs.forEach(d => b.delete(d.ref));
+  if (shots.size) await b.commit();
+  return shots.size;
+}
+
 /// Deletes the automatic screenshots that are past their 30 days, and those of solved problems (a few hundred a run).
 async function cleanShots(db, now = Date.now()) {
   const old = await db.collection('appShots').where('expiresAt', '<', Timestamp.fromMillis(now)).limit(300).get();
@@ -269,7 +286,11 @@ async function saveReport(db, bucket, request, now = Date.now()) {
 }
 
 exports.reportAppProblems = onCall(options, async request => saveProblems(getFirestore(), request));
+exports.problemSolved = onDocumentCreated({document: 'solvedProblems/{id}', region: 'asia-south1', maxInstances: 2}, async event => {
+  const problemId = String(event.data?.data()?.problemId || '');
+  if (problemId) console.log('Problem solved, screenshots deleted', await markSolved(getFirestore(), problemId));
+});
 exports.cleanAppShots = task(async () => console.log('App screenshots deleted', await cleanShots(getFirestore())));
 exports.reportProblem = onCall({...options, memory: '256MiB'}, async request => saveReport(getFirestore(), getStorage().bucket(), request));
 
-exports._test = {saveProblems, saveReport, header, clean, fingerprint, problemId, screenshotOf, autoShotOf, problemOf, contactOf, cleanShots, resetConfig, KINDS, DEVICE_DAILY_CAP, SHOTS_PER_DAY, REPORTS_PER_DAY, dayKey};
+exports._test = {saveProblems, saveReport, header, clean, fingerprint, problemId, screenshotOf, autoShotOf, problemOf, contactOf, cleanShots, markSolved, resetConfig, KINDS, DEVICE_DAILY_CAP, SHOTS_PER_DAY, REPORTS_PER_DAY, dayKey};

@@ -40,9 +40,11 @@ final adminGroups = <AdminGroup>[
     _tab('Insights', Icons.insights_outlined),
     _tab('Orders', Icons.receipt_long_outlined),
     for (final m in moduleAdminTabs) if (m.id == 'flash') _moduleTab(m, 'Support Team inbox'),
+    const AdminItem('fixAgent', 'AI Agent: problems & fixes', Icons.healing_outlined),
     const AdminItem('aiAssistant', 'AI assistant', Icons.smart_toy_outlined),
     const AdminItem('health', 'Health', Icons.monitor_heart_outlined),
     const AdminItem('appHealth', 'App Health', Icons.phone_android),
+    const AdminItem('supportReports', 'AI Support reports', Icons.support_agent),
   ]),
   AdminGroup('vendors', 'Vendors & Shops', Icons.storefront_outlined, [
     _tab('Vendors', Icons.how_to_reg_outlined, 'Vendors (approve)'),
