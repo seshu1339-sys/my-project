@@ -117,6 +117,10 @@ Object.assign(exports, require('./modules/flash'));
 Object.assign(exports, require('./modules/admin-assistant'));
 // Agent: the admin command box's AI key (server-only) and its status (functions/modules/agent).
 Object.assign(exports, require('./modules/agent'));
+// Health: the daily website / admin self-test, its status and the AI explain of a failure (functions/modules/health).
+Object.assign(exports, require('./modules/health'));
+// App problems: errors, key failures and "Report a problem" from every app, for the Health and App Health pages (functions/modules/app-problems).
+Object.assign(exports, require('./modules/app-problems'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
 const {reportAbuse, decideAbuseTarget, blockContact, unblockContact} = require('./modules/abuse-reports');
 Object.assign(exports, {reportAbuse, decideAbuseTarget, blockContact, unblockContact});

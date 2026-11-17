@@ -59,6 +59,9 @@ dependencies:
   archive: ^4.5.2
   pdf: ^3.11.3
   google_sign_in: ^7.2.0
+  firebase_crashlytics: ^5.4.1
+  package_info_plus: ^10.2.2
+  device_info_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

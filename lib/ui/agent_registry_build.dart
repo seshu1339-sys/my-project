@@ -1,6 +1,9 @@
 import '../domain/agent_registry.dart';
 import '../domain/android_sizes.dart';
+import '../domain/design_change.dart';
 import 'admin_settings.dart';
+import 'agent_ids.dart';
+export 'agent_ids.dart';
 import 'layout_settings.dart';
 
 // The settings registry (owner spec B, 17 Nov 2026), made from the panel's OWN lists every time it is asked for, so a new page, field,
@@ -40,7 +43,7 @@ Set<AgentPlatform> platformsOf(String pageKey) => {
   if (_userPages.contains(pageKey)) AgentPlatform.user,
 };
 
-String _slug(String key) => key.replaceFirst('tab:', 'tab.').replaceAll(RegExp(r'[^A-Za-z0-9.]+'), '-').toLowerCase();
+String _slug(String key) => registrySlug(key);
 
 final _telugu = RegExp(r'[ఀ-౿]');
 
@@ -116,6 +119,22 @@ List<RegistryEntry> buildAgentRegistry() {
         en: [c.key],
       ));
     }
+  }
+  // Values that were fixed in the code, now in settings/design (owner spec E): Settings > Design texts & sizes.
+  for (final f in designFields) {
+    out.add(RegistryEntry(
+      id: 'design.web.design.${f.id}',
+      name: f.label,
+      path: 'Settings > Design texts & sizes > ${f.label}',
+      platforms: const {AgentPlatform.website, AgentPlatform.user},
+      what: f.isNumber ? '${f.label} (${_n(f.min!)} to ${_n(f.max!)}, default ${f.defaultValue})' : '${f.label} (default "${f.defaultValue}")',
+      open: 'designTexts',
+      field: f.id,
+      kind: RegistryKind.design,
+      min: f.min,
+      max: f.max,
+      te: f.te,
+    ));
   }
   // Android app design: the sizes of Settings > Android App (the app reads them from the server, no Play Store update).
   for (final part in androidSizeParts) {

@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -83,6 +84,11 @@ android {
 
     buildTypes {
         release {
+            // Crashlytics: the build id only. The apps start Firebase from dart-define values (no google-services.json plugin), so the
+            // R8 mapping upload, which needs that plugin's app id, is off; Flutter crashes carry their own Dart stack anyway.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
             // Falls back to the debug key only if key.properties/upload-keystore.jks
             // haven't been generated yet (see https://flutter.dev/to/reference-keystore).
             signingConfig = if (keystorePropertiesFile.exists()) {

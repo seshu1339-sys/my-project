@@ -1,3 +1,4 @@
+import 'report_problem.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -244,6 +245,8 @@ class _AccountPageState extends State<AccountPage> {
                 ] else
                   AccountAuthForm(store: widget.store),
                 if (busy) const LinearProgressIndicator(),
+                // "Report a problem" for everyone, signed in or not (lib/ui/report_problem.dart, owner spec G); only on a live app.
+                if (widget.store.live) Padding(padding: const EdgeInsets.only(top: 16), child: Align(alignment: Alignment.centerLeft, child: ReportProblemButton(store: widget.store))),
               ],
             ),
           ),

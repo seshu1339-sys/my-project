@@ -16,6 +16,7 @@ import '../domain/quick_items.dart';
 import '../domain/reach.dart';
 import '../domain/towns.dart';
 import '../services/google_account.dart';
+import '../services/app_monitoring.dart';
 import '../services/usage.dart';
 import 'store_consent.dart';
 import '../services/localization.dart';
@@ -874,17 +875,26 @@ class Store extends ChangeNotifier {
 
   Future<Map<String, dynamic>> call(String name, Map<String, dynamic> data) async {
     if (!live) throw StateError('This action requires a connected Firebase project.');
-    final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
-    return Map<String, dynamic>.from(result.data as Map);
+    try {
+      final result = await FirebaseFunctions.instance.httpsCallable(name).call(data);
+      return Map<String, dynamic>.from(result.data as Map);
+    } on FirebaseFunctionsException catch (e) {
+      // Login / OTP / email failures and server breakdowns go to the App Health page (lib/services/app_monitoring.dart).
+      AppMonitoring.callFailed(name, e.code, e.message);
+      rethrow;
+    }
   }
 
   /// Password sign-in (the customer app's form and the admin panel): proves the email, then enters this app's role login.
   Future<void> login(String email, String password) async {
     roleBlock = null;
-    final signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    final UserCredential signedIn;
+    try {
+      signedIn = await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+    } on FirebaseAuthException catch (e) {
+      AppMonitoring.fail('login', 'Password sign-in: ${e.code}');
+      rethrow;
+    }
     if (signedIn.user?.emailVerified == true) await enterAppRole();
   }
 
@@ -1053,9 +1063,11 @@ class Store extends ChangeNotifier {
       }
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) return false;
+      AppMonitoring.fail('login', 'Google sign-in: ${e.code.name}');
       rethrow;
     } on FirebaseAuthException catch (e) {
       if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return false;
+      AppMonitoring.fail('login', 'Google sign-in: ${e.code}');
       rethrow;
     }
     await enterAppRole();
@@ -1104,7 +1116,12 @@ class Store extends ChangeNotifier {
     final current = user;
     if (current == null) throw StateError('Sign in first.');
     await FirebaseAuth.instance.setLanguageCode(language);
-    await current.sendEmailVerification();
+    try {
+      await current.sendEmailVerification();
+    } on FirebaseAuthException catch (e) {
+      AppMonitoring.fail('email', 'Verification email: ${e.code}');
+      rethrow;
+    }
   }
 
   /// After the person opened the verification link: once the email is verified, the app's role login is entered.

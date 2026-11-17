@@ -19,6 +19,15 @@ service firebase.storage {
         && firestore.get(/databases/(default)/documents/_adminSessions/$(request.auth.uid)).data.expiresAt.toMillis() > request.time.toMillis();
     }
     function isAdmin() { return signedInAs('admin') && request.auth.token.admin == true && adminSessionValid(); }
+    // "Report a problem" screenshots (functions/modules/app-problems saves them): only the admin looks at them. The health check's test
+    // photo (functions/modules/health) is written and deleted by the server only.
+    match /problemReports/{file} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /_healthTest/{file} {
+      allow read, write: if false;
+    }
     match /catalog/{file} {
       allow read: if true;
       allow create, update: if isAdmin()

@@ -46,6 +46,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(options: firebaseOptions);
       await connectToEmulatorsIfConfigured();
+      // Problems with the app's version and device, and Crashlytics on Android (lib/services/app_monitoring.dart).
+      unawaited(AppMonitoring.firebaseReady());
       if (!kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) {

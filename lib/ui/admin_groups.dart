@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../modules/home_module.dart' show ModuleAdminSection;
 import '../modules/module_admin.dart';
+import 'agent_ids.dart';
+import 'health_marks.dart';
 
 // The admin panel in six groups (owner, 13 Nov 2026): similar things together, so the panel is clear at a glance. Every page that was
 // a tab or a Settings section before is one item of one group; nothing was taken away. A page shown in two places before is in one
@@ -17,6 +19,9 @@ class AdminItem {
   final String id, label;
   final IconData icon;
   final AdminItemKind kind;
+
+  /// Its command-box option ID, for the red health mark (lib/ui/health_marks.dart).
+  String get registryId => pageRegistryId(switch (kind) { AdminItemKind.tab => 'tab:$id', AdminItemKind.providers => 'serviceProviders', AdminItemKind.section => id });
 }
 
 class AdminGroup {
@@ -36,6 +41,8 @@ final adminGroups = <AdminGroup>[
     _tab('Orders', Icons.receipt_long_outlined),
     for (final m in moduleAdminTabs) if (m.id == 'flash') _moduleTab(m, 'Support Team inbox'),
     const AdminItem('aiAssistant', 'AI assistant', Icons.smart_toy_outlined),
+    const AdminItem('health', 'Health', Icons.monitor_heart_outlined),
+    const AdminItem('appHealth', 'App Health', Icons.phone_android),
   ]),
   AdminGroup('vendors', 'Vendors & Shops', Icons.storefront_outlined, [
     _tab('Vendors', Icons.how_to_reg_outlined, 'Vendors (approve)'),
@@ -75,12 +82,15 @@ final adminGroups = <AdminGroup>[
     const AdminItem('scrollingText', 'Scrolling Text', Icons.text_rotation_none),
     const AdminItem('ads', 'Right Side Ads', Icons.campaign_outlined),
     const AdminItem('rightBoxes', 'Right Side Ad Boxes', Icons.view_agenda_outlined),
+    const AdminItem('adminAds', 'Ads by command', Icons.campaign),
   ]),
   AdminGroup('settings', 'Settings', Icons.settings_outlined, [
     const AdminItem('settings', 'Business Profile', Icons.business_outlined),
     const AdminItem('theme', 'Theme', Icons.palette_outlined),
     const AdminItem('animations', 'Animations', Icons.animation),
     const AdminItem('layout', 'Layout', Icons.dashboard_customize_outlined),
+    const AdminItem('designTexts', 'Design texts & sizes', Icons.format_size),
+    const AdminItem('designHistory', 'Design history', Icons.history),
     const AdminItem('androidHome', 'Android App', Icons.phone_android_outlined),
     const AdminItem('areaNames', 'Area names', Icons.place_outlined),
     const AdminItem('samples', 'Sample data', Icons.science_outlined),
@@ -118,7 +128,7 @@ class _AdminGroupPageState extends State<AdminGroupPage> {
                 key: ValueKey('group-item-${item.id}'),
                 selected: item.id == open.id,
                 leading: Icon(item.icon),
-                title: Text(item.label),
+                title: withHealthMark(Text(item.label), item.registryId),
                 onTap: () => setState(() => open = item),
               ),
           ]),
@@ -133,7 +143,7 @@ class _AdminGroupPageState extends State<AdminGroupPage> {
         ListTile(
           key: ValueKey('group-item-${item.id}'),
           leading: Icon(item.icon),
-          title: Text(item.label),
+          title: withHealthMark(Text(item.label), item.registryId),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: Text(item.label)), body: widget.build(item)))),
         ),

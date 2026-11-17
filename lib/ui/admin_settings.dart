@@ -9,8 +9,14 @@ import 'admin_groups.dart';
 import 'admin_staff_work.dart';
 import 'admin_ratings.dart';
 import 'admin_ai_assistant.dart';
+import 'agent_ad_flow.dart';
 import 'agent_ai_settings.dart';
 import 'agent_log_page.dart';
+import 'design_pages.dart';
+import 'agent_ids.dart';
+import 'app_health_page.dart';
+import 'health_marks.dart';
+import 'health_page.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
 import 'admin_city_codes.dart';
@@ -73,6 +79,14 @@ final _sections = <_SettingsSection>[
   // The command box (owner spec A-C, I, 17 Nov 2026): its AI key and use, and the log of every agent action.
   _SettingsSection('aiProvider', 'AI provider & usage', Icons.key_outlined, "The AI key (kept on the server), this month's AI use, and the AI explain switch"),
   _SettingsSection('agentLog', 'Agent log', Icons.receipt_long_outlined, 'Every command-box action: who, what, when'),
+  // Health (owner spec F-H): the daily self-test of the website and admin, and what goes wrong in the apps for real people.
+  _SettingsSection('health', 'Health', Icons.monitor_heart_outlined, 'Daily self-test: pages, server functions, saves, photos, ads, remote config; server errors'),
+  // Ads by command (owner spec D): the admin's own ads made in the command box, with Stop.
+  _SettingsSection('adminAds', 'Ads by command', Icons.campaign, "The admin's ads made in the command box: where, who sees them, until when; Stop"),
+  // Design by command (owner spec E): the values that were fixed in the code, and every design change with one-click Undo.
+  _SettingsSection('designTexts', 'Design texts & sizes', Icons.format_size, "Right-side ad box height, Today's Offers box texts (were fixed in the app)"),
+  _SettingsSection('designHistory', 'Design history', Icons.history, 'Every design change made by command, newest first, with Undo'),
+  _SettingsSection('appHealth', 'App Health', Icons.phone_android, 'Vendor / Staff / User apps: crashes, login, OTP, location, upload, API, slow screens, reports'),
 ];
 
 /// One thing the admin can search for at the top of the admin panel: a Settings section ("5 Business Profile") or one field of it
@@ -170,6 +184,16 @@ Widget adminSettingsContent(Store store, String key) {
         return AgentAiSettingsPage(store: store);
       case 'agentLog':
         return AgentLogPage(store: store);
+      case 'health':
+        return HealthPage(store: store);
+      case 'designTexts':
+        return DesignTextsPage(store: store);
+      case 'designHistory':
+        return DesignHistoryPage(store: store);
+      case 'adminAds':
+        return AdminAdsPage(store: store);
+      case 'appHealth':
+        return AppHealthPage(store: store);
       case 'reports':
         return AdminReportsPage(store: store);
       case 'blockList':
@@ -282,7 +306,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
             key: ValueKey('settings-${s.$2.key}'),
             selected: wide && selected == s.$2.key,
             leading: Icon(s.$2.icon),
-            title: Text(s.$2.label),
+            // A red mark when one of the health checks of this page fails (lib/ui/health_marks.dart).
+            title: withHealthMark(Text(s.$2.label), pageRegistryId(s.$2.key)),
             subtitle: wide ? null : Text(s.$2.hint),
             trailing: wide ? null : const Icon(Icons.chevron_right),
             onTap: () => _open(s.$2),

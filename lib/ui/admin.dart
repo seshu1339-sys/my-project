@@ -10,8 +10,11 @@ import 'admin_insights.dart';
 import 'admin_groups.dart';
 import 'admin_settings.dart';
 import 'agent_command_box.dart';
+import 'agent_hooks.dart';
 import 'agent_open.dart';
 import 'agent_registry_build.dart';
+import 'health_page.dart';
+import '../services/health_watch.dart';
 
 // admin.dart is the admin shell: the six groups, the command box at the top (lib/ui/agent_command_box.dart: it took the place of the
 // "Find a setting" bar and the "AI Agent" button, which is now in its menu) and the top-bar buttons (Search, Sign out). Each moderation/editing concern lives in its own file with no
@@ -55,6 +58,14 @@ class _AdminPageState extends State<AdminPage> {
         if (mounted) Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiAgentPage(store: widget.store)));
       });
     }
+    // Any page may open a command-box option by its ID (Health, a design change): lib/ui/agent_hooks.dart.
+    agentOpenById = (context, store, id, {String command = ''}) async {
+      final entry = buildAgentRegistry().where((e) => e.id == id).firstOrNull;
+      if (entry != null) await openAgentEntry(context, store, entry, command: command);
+    };
+    agentOptionName = (id) => buildAgentRegistry().where((e) => e.id == id).firstOrNull?.name ?? '';
+    // The health status for the red marks and the Health badge (lib/services/health_watch.dart): one small listener.
+    if (widget.store.live && widget.store.admin) HealthWatch.instance.start(widget.store);
     // A deep link to one option (`?open=field.settings.postDuration`): it opens at its field once the panel is up.
     final linked = agentDeepLinkId;
     if (linked != null) {
@@ -135,6 +146,20 @@ class _AdminPageState extends State<AdminPage> {
           icon: const Icon(Icons.search),
           label: const Text('Search'),
         ),
+        // Health with a red count when a check fails or a new "Report a problem" came in (owner spec H: the admin notification).
+        if (store.live)
+          ListenableBuilder(
+            listenable: HealthWatch.instance,
+            builder: (context, _) {
+              final n = HealthWatch.instance.alertCount;
+              return TextButton.icon(
+                key: const ValueKey('top-health'),
+                onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Health')), body: HealthPage(store: store)))),
+                icon: Badge(isLabelVisible: n > 0, label: Text('$n'), child: Icon(n > 0 ? Icons.monitor_heart : Icons.monitor_heart_outlined, color: n > 0 ? Colors.red : null)),
+                label: const Text('Health'),
+              );
+            },
+          ),
         if (store.live)
           TextButton.icon(
             key: const ValueKey('top-sign-out'),

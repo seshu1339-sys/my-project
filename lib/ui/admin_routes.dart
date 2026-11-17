@@ -22,6 +22,8 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('tab:Orders', 'ఆర్డర్లు', ['ఆర్డర్', 'order']),
   AdminRoute('tab:Support Team chat', 'సపోర్ట్ టీమ్', ['support', 'chat', 'inbox', 'చాట్', 'flash']),
   AdminRoute('aiAssistant', 'AI సహాయకుడు', ['assistant', 'ai', 'ఏఐ']),
+  AdminRoute('health', 'హెల్త్ చెక్', ['health check', 'status', 'errors', 'ఆరోగ్యం', 'పరీక్ష', 'self test']),
+  AdminRoute('appHealth', 'యాప్ హెల్త్', ['app health', 'crashes', 'crashlytics', 'క్రాష్', 'report a problem', 'app errors']),
   // Vendors & Shops
   AdminRoute('tab:Vendors', 'వెండర్లు', ['వెండర్', 'vendor', 'approve', 'ఆమోదం']),
   AdminRoute('tab:Shops', 'షాపులు', ['షాప్', 'దుకాణాలు', 'shop']),
@@ -60,11 +62,14 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('scrollingText', 'స్క్రోలింగ్ టెక్స్ట్', ['moving text', 'కదిలే లైన్']),
   AdminRoute('ads', 'యాడ్స్', ['ads', 'ప్రకటనలు', 'advert']),
   AdminRoute('rightBoxes', 'యాడ్ బాక్సులు', ['ad boxes', 'right boxes']),
+  AdminRoute('adminAds', 'కమాండ్ యాడ్స్', ['ads by command', 'my ads', 'admin ads', 'నా యాడ్స్', 'live rate']),
   // Settings
   AdminRoute('settings', 'బిజినెస్ ప్రొఫైల్', ['business', 'profile', 'సెట్టింగ్స్', 'settings', 'auto approval']),
   AdminRoute('theme', 'థీమ్', ['colours', 'colors', 'రంగులు']),
   AdminRoute('animations', 'యానిమేషన్లు', ['animation']),
   AdminRoute('layout', 'లేఅవుట్', ['design', 'డిజైన్']),
+  AdminRoute('designTexts', 'డిజైన్ టెక్స్ట్, సైజులు', ['design texts', 'box height', 'offer text']),
+  AdminRoute('designHistory', 'డిజైన్ చరిత్ర', ['design history', 'undo', 'అన్‌డూ', 'changes']),
   AdminRoute('androidHome', 'ఆండ్రాయిడ్ యాప్', ['android', 'app']),
   AdminRoute('areaNames', 'ఏరియా పేర్లు', ['area names', 'place names', 'ప్రదేశాల పేర్లు']),
   AdminRoute('samples', 'శాంపిల్ డేటా', ['sample', 'demo']),

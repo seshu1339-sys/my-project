@@ -1,3 +1,4 @@
+import 'package:ecommerce_app/ui/admin_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,7 +24,11 @@ Future<Store> _open(WidgetTester tester, {bool withoutTheme = false}) async {
 }
 
 Future<void> _section(WidgetTester tester, String key) async {
-  await tester.tap(find.byKey(ValueKey('settings-$key')));
+  // The Settings list grew (Health, App Health, Ads by command, Design pages: 17 Nov 2026): scroll to the section first.
+  final tile = find.byKey(ValueKey('settings-$key'));
+  await tester.scrollUntilVisible(tile, 120, scrollable: find.descendant(of: find.byType(AdminSettingsPage), matching: find.byType(Scrollable)).first);
+  await tester.pumpAndSettle();
+  await tester.tap(tile);
   // the Scrolling Text page shows the moving line itself, which never stops, so wait a moment instead of for stillness
   if (key == 'scrollingText') {
     await tester.pump(const Duration(milliseconds: 600));

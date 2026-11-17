@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/admin_ads.dart';
+import '../domain/design_change.dart';
 import '../modules/showcase/showcase_module.dart';
+import '../services/admin_ads_watch.dart';
 import 'shop_route_map.dart' show ShopStop, showShopRoute;
 
 import '../domain/ads.dart';
@@ -23,13 +26,17 @@ import 'shared.dart';
 /// A box with a vendor's shop ad (a photo and an ad id) or an ad from the list reports to [tracker] when it has really been seen for a
 /// second, and when it is tapped, so the vendor's total views add up (functions/ad-tracking.js).
 class RightAdBoxes extends StatefulWidget {
-  const RightAdBoxes({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now, this.store, this.showcase, this.showsBox});
+  const RightAdBoxes({super.key, required this.settings, required this.onTarget, this.tracker, this.town = '', this.adsAt, this.now, this.store, this.showcase, this.showsBox, this.adminAds});
 
   /// The paid vendors' ad boxes (lib/modules/showcase): one box per paid vendor with the photo they chose, only for customers within
   /// their plan's km, taking turns with the admin's seconds; a tap opens the shop's place and route. [store] gives the customer's
   /// place and the shops; [showcase] the records (from Firestore when null and the store is live).
   final Store? store;
   final Stream<Map<String, ShowcaseEntry>>? showcase;
+
+  /// The admin's ads by command for the right-side boxes (lib/domain/admin_ads.dart): they take turns with the paid vendors' boxes, no
+  /// priority. Null: from Firestore when the store is live.
+  final Stream<List<AdminAd>>? adminAds;
   final List<Entry> settings;
   final ValueChanged<String> onTarget;
 
@@ -68,6 +75,8 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
   DateTime get _now => (widget.now ?? ServerClock.now)();
   Map<String, ShowcaseEntry> _reach = const {};
   StreamSubscription<Map<String, ShowcaseEntry>>? _reachSub;
+  List<AdminAd> _adminAds = const [];
+  StreamSubscription<List<AdminAd>>? _adminSub;
 
   @override
   void initState() {
@@ -75,6 +84,10 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
     final source = widget.showcase ?? (widget.store?.live == true ? watchShowcase(widget.store!) : null);
     _reachSub = source?.listen((r) {
       if (mounted) setState(() => _reach = r);
+    });
+    final admin = widget.adminAds ?? (widget.store?.live == true ? watchAdminAds(widget.store!) : null);
+    _adminSub = admin?.listen((a) {
+      if (mounted) setState(() => _adminAds = a);
     });
     // Every 5 seconds: a box or an ad may have started or ended (no reload needed), and ads take turns when there are more than boxes.
     _tick = Timer.periodic(const Duration(seconds: 5), (_) => _check());
@@ -84,6 +97,7 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
   void dispose() {
     _tick?.cancel();
     _reachSub?.cancel();
+    _adminSub?.cancel();
     super.dispose();
   }
 
@@ -120,7 +134,14 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
     final free = [for (final b in boxes) if (!b.liveAt(now)) b.number];
     // Paid vendors first, one box each, taking turns every [config.seconds]; with as many or fewer vendors than boxes, every other turn
     // has none, so no vendor's box stays on longer than the admin's seconds (owner, 6 Nov 2026). The boxes left go to the ads.
-    final vendors = rotationPage<ShowcaseEntry>(_vendors(now), visible: free.length, seconds: config.seconds, now: now);
+    // The admin's ads by command join the same turns (owner spec D, 17 Nov 2026): one queue with the vendors, no priority.
+    final store = widget.store;
+    final commandAds = [
+      for (final a in adminAdsFor(_adminAds, AdminAdPlacement.rightBox, now, lat: store?.latitude, lng: store?.longitude, town: store?.town ?? widget.town, district: store?.district ?? '', state: store?.state ?? ''))
+        ShowcaseEntry(vendorId: 'admin:${a.id}', shopId: '', shopName: a.isRate ? "Today's rate: ${a.productName}" : a.title, photoUrl: a.photoUrl.isNotEmpty || store == null ? a.photoUrl : rateItemPhoto(store, a.productName), radiusKm: a.radiusKm, active: true),
+    ];
+    final queue = mixQueue<ShowcaseEntry>(_vendors(now), [for (final c in commandAds) if (c.photoUrl.isNotEmpty) c], (v) => v.vendorId);
+    final vendors = rotationPage<ShowcaseEntry>(queue, visible: free.length, seconds: config.seconds, now: now);
     final byVendor = <int, ShowcaseEntry>{for (final (i, v) in vendors.indexed) free[i]: v};
     free.removeRange(0, vendors.length);
     final shown = <int, Entry>{};
@@ -157,7 +178,7 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
             padding: const EdgeInsets.only(bottom: 12),
             child: SizedBox(
               key: ValueKey('right-box-${slot.box.number}'),
-              height: rightBoxHeight,
+              height: designNumber(widget.settings, 'rightBoxHeight'),
               width: double.infinity,
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 450),
@@ -173,6 +194,29 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
     final box = slot.box;
     final ad = slot.ad;
     final vendor = slot.vendor;
+    if (vendor != null && vendor.vendorId.startsWith('admin:')) {
+      // An admin ad by command: its photo, with its words (or the live rate) along the bottom.
+      final ad = _adminAds.where((a) => 'admin:${a.id}' == vendor.vendorId).firstOrNull;
+      final rate = ad != null && ad.isRate && widget.store != null ? liveRateOf(widget.store!, ad.productName) : null;
+      final words = ad == null ? '' : ad.isRate ? "Today's rate: ${ad.productName} ${rate == null ? '' : '₹${rate.round()}'}" : ad.title;
+      return ClipRRect(
+        key: ValueKey('right-box-admin-${vendor.vendorId.substring(6)}'),
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(fit: StackFit.expand, children: [
+          Image.network(vendor.photoUrl, fit: BoxFit.cover, errorBuilder: (_, error, stack) => const _Placeholder()),
+          if (words.trim().isNotEmpty)
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xAA000000),
+                padding: const EdgeInsets.all(6),
+                child: Text(words, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ]),
+      );
+    }
     if (vendor != null) {
       return Material(
         key: ValueKey('right-box-vendor-${vendor.vendorId}'),
@@ -184,7 +228,7 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
             final shop = widget.store?.entries('shops').where((s) => s.id == vendor.shopId).firstOrNull;
             showShopRoute(context, ShopStop.shop(shop, shopId: vendor.shopId));
           },
-          child: Image.network(vendor.photoUrl, fit: BoxFit.cover, width: double.infinity, height: rightBoxHeight, errorBuilder: (_, error, stack) => const _Placeholder()),
+          child: Image.network(vendor.photoUrl, fit: BoxFit.cover, width: double.infinity, height: designNumber(widget.settings, 'rightBoxHeight'), errorBuilder: (_, error, stack) => const _Placeholder()),
         ),
       );
     }
@@ -228,7 +272,7 @@ class _RightAdBoxesState extends State<RightAdBoxes> {
                   box.imageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
-                  height: rightBoxHeight,
+                  height: designNumber(widget.settings, 'rightBoxHeight'),
                   errorBuilder: (_, error, stack) => const _Placeholder(),
                 ),
         ),

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'app_monitoring.dart';
+
 /// The device's current position, asking for location permission first.
 ///
 /// A fresh install has not been granted permission, so calling
@@ -13,6 +15,7 @@ import 'package:geolocator/geolocator.dart';
 /// permission-denied message reads naturally for whichever caller it is.
 Future<Position> currentPosition({String action = 'verify a purchase at the shop'}) async {
   if (!kIsWeb && !await Geolocator.isLocationServiceEnabled()) {
+    AppMonitoring.fail('location', 'Location services are off ($action)');
     throw StateError('Turn on location services on this device, then try again.');
   }
   var permission = await Geolocator.checkPermission();
@@ -20,6 +23,7 @@ Future<Position> currentPosition({String action = 'verify a purchase at the shop
     permission = await Geolocator.requestPermission();
   }
   if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    AppMonitoring.fail('location', 'Location permission ${permission.name} ($action)');
     throw StateError(
       permission == LocationPermission.deniedForever
           ? 'Location permission is turned off. Allow it for this app in your device settings.'

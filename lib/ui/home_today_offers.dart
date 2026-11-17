@@ -4,8 +4,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../domain/admin_ads.dart';
 import '../domain/ads.dart';
 import '../domain/catalog.dart';
+import '../domain/design_change.dart';
+import '../domain/catalog_lines.dart' show noLocalPriceText;
 import '../domain/today_offers.dart';
 import '../domain/reach.dart';
 import '../modules/offerdisplay/offerdisplay_module.dart';
@@ -13,6 +16,7 @@ import '../modules/offerrotation/offerrotation_module.dart';
 import '../modules/offerstore/offerstore_module.dart';
 import '../modules/showcase/showcase_module.dart';
 import '../services/ad_tracker.dart';
+import '../services/admin_ads_watch.dart';
 import '../services/analytics.dart';
 import '../services/server_clock.dart';
 import '../services/strings.dart';
@@ -54,6 +58,7 @@ class TodayOffersSection extends StatefulWidget {
     this.vendorOffers,
     this.adsAt,
     this.showcase,
+    this.adminAds,
     this.visible = todayOfferBoxCount,
     this.seconds = 5,
   });
@@ -61,6 +66,9 @@ class TodayOffersSection extends StatefulWidget {
 
   /// The paid vendors' reach (lib/modules/showcase): a vendor's box shows only to customers within their plan's km. Null: from Firestore.
   final Stream<Map<String, ShowcaseEntry>>? showcase;
+
+  /// The admin's ads by command (lib/domain/admin_ads.dart): they join the vendors' turns, no priority. Null: from Firestore.
+  final Stream<List<AdminAd>>? adminAds;
 
   /// How many boxes show at once (Android 2, website 6), and how many seconds each vendor's box stays before the next ones come.
   final int visible, seconds;
@@ -96,6 +104,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
   DateTime? _nextAt;
   Timer? _turn;
   late final Stream<Map<String, ShowcaseEntry>>? _showcase = widget.showcase ?? (widget.store.live ? watchShowcase(widget.store) : null);
+  late final Stream<List<AdminAd>>? _adminAds = widget.adminAds ?? (widget.store.live ? watchAdminAds(widget.store) : null);
 
   @override
   void dispose() {
@@ -170,6 +179,24 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
     },
   );
 
+  /// An admin ad by command in a box, like a vendor's: its photo and its text (a live-rate ad: the item's lowest price here now).
+  _Box _adminAdBox(AdminAd ad) => _Box(
+    offer: (look, i) {
+      final inner = max(clampedNumber(look, 'radius', 20, 0, 80) - VendorOfferBox.frameWidth, 6.0);
+      final rate = ad.isRate ? liveRateOf(widget.store, ad.productName) : null;
+      return VendorOfferBox(
+        key: ValueKey('admin-ad-box-${ad.id}'),
+        photoUrl: ad.photoUrl.isNotEmpty ? ad.photoUrl : (ad.isRate ? rateItemPhoto(widget.store, ad.productName) : ''),
+        price: ad.isRate ? (rate == null ? noLocalPriceText : '₹${rate == rate.roundToDouble() ? rate.round() : rate.toStringAsFixed(2)}') : ad.title,
+        frame: entryDecoration(look, fallback: AppTokens.primaryLight),
+        colour: colorFromHex(look.text('backgroundColor'), AppTokens.primary),
+        radius: inner,
+        note: ad.isRate ? "Today's rate: ${ad.productName}" : '',
+        onTap: () {},
+      );
+    },
+  );
+
   /// An ad of the Ads list in a box: the box's colour as a frame, the ad (photo and / or text) inside; a tap opens what the ad links to.
   /// Its views count like the ad's views anywhere else (functions/ad-tracking.js).
   _Box _adBox(Entry ad) => _Box(
@@ -201,7 +228,9 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<Map<String, ShowcaseEntry>>(
+  Widget build(BuildContext context) => StreamBuilder<List<AdminAd>>(
+    stream: _adminAds,
+    builder: (context, adminAdsSnap) => StreamBuilder<Map<String, ShowcaseEntry>>(
     stream: _showcase,
     builder: (context, reach) => VendorOffersFeed(
       store: widget.store,
@@ -219,9 +248,17 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
           // One box per paid vendor, [visible] at a time, each turn [seconds] long; with few vendors every other turn has none of them,
           // so no vendor's box stays on longer than the admin's seconds.
           final liveAdmin = liveTodayOffers(adminOffers, now);
+          // The admin's ads by command join the vendors' turns with no priority (owner spec D, 17 Nov 2026): one queue, a stable mix.
+          final store = widget.store;
+          final commandAds = adminAdsFor(adminAdsSnap.data ?? const [], AdminAdPlacement.todaysOffers, now, lat: store.latitude, lng: store.longitude, town: store.town, district: store.district, state: store.state);
+          final queue = mixQueue<(String, _Box)>(
+            [for (final o in vendorOffers) ('v:${o.vendorId}:${o.submittedAt}', _vendorBox(o))],
+            [for (final a in commandAds) ('a:${a.id}', _adminAdBox(a))],
+            (e) => e.$1,
+          );
         // The vendors take the boxes the admin's own offers leave, so a turn's set stays still for exactly the admin's seconds.
-        final vendorTurn = rotationPage<TodaysOffer>(vendorOffers, visible: max(1, widget.visible - liveAdmin.length), seconds: widget.seconds, now: now);
-          if (vendorOffers.isNotEmpty) _nextTurn(now);
+        final vendorTurn = rotationPage<(String, _Box)>(queue, visible: max(1, widget.visible - liveAdmin.length), seconds: widget.seconds, now: now);
+          if (queue.isNotEmpty) _nextTurn(now);
           final boxes = fillBoxes<_Box>(
             mergeOffers(
               [
@@ -230,7 +267,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
                     offer: (look, i) => TodayOfferBox(key: ValueKey('today-offer-box-${i + 1}'), look: look, offer: o, onOpen: _open),
                   ),
               ],
-              [for (final o in vendorTurn) _vendorBox(o), for (final ad in ads) _adBox(ad)],
+              [for (final o in vendorTurn) o.$2, for (final ad in ads) _adBox(ad)],
             ),
             [for (final p in widget.boxes) _Box(promotion: p)],
             widget.visible,
@@ -240,7 +277,8 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
           // message (Business Profile: noOffersMessage) shows under the boxes, as before.
           final nothingHere = boxes.isEmpty;
           while (boxes.length < todayOfferBoxCount) {
-            boxes.add(_Box(offer: (look, i) => TodayOfferEmptyBox(key: ValueKey('today-offer-empty-${i + 1}'), look: look)));
+            final settings = widget.store.entries('settings');
+            boxes.add(_Box(offer: (look, i) => TodayOfferEmptyBox(key: ValueKey('today-offer-empty-${i + 1}'), look: look, label: designText(settings, 'todaysOfferLabel'), text: designText(settings, 'noOfferText'))));
           }
           final looks = todayOfferBoxLooks(widget.looks ?? widget.boxes);
           return Column(
@@ -264,6 +302,7 @@ class _TodayOffersSectionState extends State<TodayOffersSection> {
         },
       ),
     ),
+    ),
   );
 }
 
@@ -273,8 +312,11 @@ const noLocalOfferText = 'Local vendor not updated offer';
 /// A box with no offer here: the same coloured frame and white inside as an offer box, "Today's Offer" across the top and
 /// "Local vendor not updated offer" in the middle.
 class TodayOfferEmptyBox extends StatelessWidget {
-  const TodayOfferEmptyBox({super.key, required this.look});
+  const TodayOfferEmptyBox({super.key, required this.look, this.label = "Today's Offer", this.text = noLocalOfferText});
   final Entry look;
+
+  /// The heading and the words inside (Settings > Design texts & sizes, owner spec E).
+  final String label, text;
 
   @override
   Widget build(BuildContext context) {
@@ -291,12 +333,12 @@ class TodayOfferEmptyBox extends StatelessWidget {
           children: [
             FittedBox(
               fit: BoxFit.fitWidth,
-              child: Text("Today's Offer".tr(context), style: TextStyle(color: colour, fontWeight: FontWeight.w900)),
+              child: Text(label.tr(context), style: TextStyle(color: colour, fontWeight: FontWeight.w900)),
             ),
             Expanded(
               child: Center(
                 child: Text(
-                  noLocalOfferText.tr(context),
+                  text.tr(context),
                   textAlign: TextAlign.center,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,

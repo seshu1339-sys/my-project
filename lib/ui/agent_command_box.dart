@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/store.dart';
 import '../domain/agent_command.dart';
 import '../domain/agent_registry.dart';
+import '../domain/design_change.dart';
 import '../domain/towns.dart';
 import '../services/agent_counts.dart';
 import '../services/agent_log.dart';
@@ -14,6 +16,7 @@ import 'admin_settings.dart';
 import 'agent_intents.dart';
 import 'agent_open.dart';
 import 'agent_registry_build.dart';
+import 'health_marks.dart';
 import 'ai_agent_page.dart';
 
 /// The ONE command box at the top of the admin panel (owner spec A, 17 Nov 2026). It took the place of the "Find a setting" bar and the
@@ -55,6 +58,8 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
   // The answer of a count / health command, for the words asked ([answerFor]).
   String? answer, answerFor;
   bool answering = false;
+  // The photo attached for an ad command ("this photo, Today's Offers, Narsipatnam, 10 km, 2 days").
+  XFile? attached;
 
   List<String> get _places => [
     for (final t in parseServiceTowns(widget.store.entries('settings').where((e) => e.id == 'business').firstOrNull?.text('serviceTowns') ?? '')) t.name,
@@ -124,11 +129,14 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
       case AgentIntent.ad:
       case AgentIntent.rate:
         AgentLog.write(widget.store, action: c.intent.name, command: q, platform: platform?.name ?? '');
-        return (widget.intents ?? defaultAgentIntents).ad(context, widget.store, c);
+        final photo = attached;
+        setState(() => attached = null);
+        return (widget.intents ?? defaultAgentIntents).ad(context, widget.store, c, photo);
       case AgentIntent.design:
-        final ranked = [for (final m in _rank(q)) if (m.entry.kind == RegistryKind.design) m];
+        final ranked = [for (final m in _rank(q)) if (isDesignOption(m.entry)) m];
+        final sure = confidentMatch(ranked);
         AgentLog.write(widget.store, action: 'design', command: q, platform: platform?.name ?? '');
-        return (widget.intents ?? defaultAgentIntents).design(context, widget.store, c, [for (final m in ranked.take(3)) m.entry], platform);
+        return (widget.intents ?? defaultAgentIntents).design(context, widget.store, c, sure != null ? [sure] : [for (final m in ranked.take(3)) m.entry], platform);
       case AgentIntent.open:
         final ranked = _rank(q);
         final sure = confidentMatch(ranked);
@@ -205,7 +213,7 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
     key: ValueKey('$keyPrefix-${e.serial.isNotEmpty && e.kind != RegistryKind.design ? e.serial : e.id}'),
     dense: true,
     leading: CircleAvatar(radius: 16, child: Text(e.serial.isEmpty ? (e.kind == RegistryKind.design ? 'D' : '•') : e.serial, style: const TextStyle(fontSize: 11))),
-    title: Text(e.kind == RegistryKind.page ? e.name : e.path.replaceFirst('Settings > ', ''), maxLines: 2, overflow: TextOverflow.ellipsis),
+    title: withHealthMark(Text(e.kind == RegistryKind.page ? e.name : e.path.replaceFirst('Settings > ', ''), maxLines: 2, overflow: TextOverflow.ellipsis), e.id),
     subtitle: Text('${e.platforms.map((p) => p.label).join(' · ')}  —  ${e.what}', maxLines: 1, overflow: TextOverflow.ellipsis),
     trailing: Row(mainAxisSize: MainAxisSize.min, children: [
       if (e.risky) const Tooltip(message: 'Has risky buttons: they ask to confirm', child: Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange)),
@@ -247,6 +255,15 @@ class _AdminSettingsSearchBarState extends State<AdminSettingsSearchBar> {
               suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
                 if (query.text.isNotEmpty)
                   IconButton(key: const ValueKey('admin-settings-search-clear'), tooltip: 'Clear', onPressed: () => setState(query.clear), icon: const Icon(Icons.close)),
+                IconButton(
+                  key: const ValueKey('agent-attach-photo'),
+                  tooltip: attached == null ? 'Attach a photo (for an ad)' : 'Photo attached: ${attached!.name}',
+                  onPressed: () async {
+                    final f = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600);
+                    if (f != null && mounted) setState(() => attached = f);
+                  },
+                  icon: Icon(attached == null ? Icons.add_photo_alternate_outlined : Icons.photo, color: attached == null ? null : Colors.green),
+                ),
                 IconButton(key: const ValueKey('admin-settings-search-mic'), tooltip: 'Speak (Telugu / English)', onPressed: _voice, icon: const Icon(Icons.mic_none)),
                 IconButton(key: const ValueKey('agent-go'), tooltip: 'Go', onPressed: () => _run(query.text), icon: const Icon(Icons.arrow_forward)),
                 PopupMenuButton<String>(

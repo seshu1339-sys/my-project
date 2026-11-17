@@ -10,6 +10,7 @@
 //                     08:20 vendor ad summaries
 //                     17:20 staff areas last-chance reminder
 //                     00:20, 06:20, 12:20, 18:20 AI agent health check (does nothing unless switched on)
+//                     05:20 the daily self-test of the website and admin (functions/modules/health, owner spec F)
 //
 // Each piece is the old scheduled function's own code (now a plain task(), see task.js), so what each one does is unchanged. One piece
 // failing is logged and does not stop the others.
@@ -55,6 +56,7 @@ function hourlyPieces(tasks, now = Date.now()) {
   const names = [];
   if (hour === 0) names.push('staffAreaNightly');
   if (hour === 3) names.push('sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', ...(monday ? ['weeklyStorageUsage'] : []));
+  if (hour === 5) names.push('dailyHealthCheck');
   if (hour === 8) names.push('sendAdSummaries');
   if (hour === 17) names.push('staffAreaLastChance');
   if (hour % 6 === 0) names.push('aiAgentHealthCheck');
@@ -64,7 +66,7 @@ function hourlyPieces(tasks, now = Date.now()) {
 }
 
 const TASK_NAMES = ['expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers', 'staffAreaNightly',
-  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck', 'rateReminder'];
+  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck', 'rateReminder', 'dailyHealthCheck'];
 
 /// The two scheduled functions, given every task by name. A missing task stops the deploy rather than a job silently not running.
 function scheduledJobs(tasks) {

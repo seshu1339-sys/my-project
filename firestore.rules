@@ -425,6 +425,30 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     match /_private/{id} { allow read, write: if false; }
+    // The admin's ads by command (owner spec D, lib/domain/admin_ads.dart): everyone reads them (the customer app and website show
+    // them), only the admin writes.
+    match /adminAds/{id} { allow read: if true; allow write: if admin(); }
+    // Design changes by command (owner spec E): the admin writes a line per change and may only mark it undone; nobody deletes one.
+    match /designHistory/{id} {
+      allow read, create: if admin();
+      allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['undone', 'undoneAt']);
+      allow delete: if false;
+    }
+    // Health (functions/modules/health) and app problems (functions/modules/app-problems), owner spec F-H: the admin reads them; only
+    // functions write them. The admin may only move a "Report a problem" between new / seen / fixed.
+    match /healthStatus/{id} { allow read: if admin(); allow write: if false; }
+    match /healthRuns/{id} { allow read: if admin(); allow write: if false; }
+    match /healthExplain/{id} { allow read: if admin(); allow write: if false; }
+    match /_healthTest/{id} { allow read, write: if false; }
+    match /appProblems/{id} { allow read: if admin(); allow write: if false; }
+    match /appProblemsDaily/{id} { allow read: if admin(); allow write: if false; }
+    match /appProblemDevices/{id} { allow read, write: if false; }
+    match /problemReports/{id} {
+      allow read: if admin();
+      allow update: if admin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['new', 'seen', 'fixed'];
+      allow create, delete: if false;
+    }
     // Abuse reports (functions/modules/abuse-reports) and the permanent block list (functions/block-list.js): the admin reads them,
     // functions write them. Who reported whom is never readable by the person reported. The admin only marks an alert as read.
     // Shop and provider ratings (functions/modules/shop-ratings): anyone reads the ratings that are not hidden (no phone, no account id

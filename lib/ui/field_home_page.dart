@@ -1,3 +1,4 @@
+import 'report_problem.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -26,7 +27,8 @@ class _FieldHomePageState extends State<FieldHomePage> {
   Widget build(BuildContext context) {
     final user = store.user;
     if (user == null) return const SizedBox.shrink();
-    final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
+    // "Report a problem" (lib/ui/report_problem.dart, owner spec G) beside Log out.
+    final actions = [ReportProblemButton(store: store, asIcon: true), IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     if (!store.emailConfirmed) {
       return Scaffold(
         appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),

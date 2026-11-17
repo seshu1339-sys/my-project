@@ -106,7 +106,7 @@ test('the hourly job runs each piece at its hour in India; the 15-minute job run
   assert.deepEqual(at(8), ['sendAdSummaries', 'rateReminder']);
   assert.deepEqual(at(17), ['staffAreaLastChance', 'rateReminder']);
   assert.deepEqual(at(6), ['aiAgentHealthCheck', 'rateReminder']);
-  assert.deepEqual(at(5), ['rateReminder']);
+  assert.deepEqual(at(5), ['dailyHealthCheck', 'rateReminder'], 'the daily self-test (owner spec F)');
   assert.deepEqual(quarterHourPieces(tasks).map(([name]) => name), ['postDuration', 'expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers']);
 });
 

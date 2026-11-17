@@ -1,3 +1,4 @@
+import 'report_problem.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
@@ -71,6 +72,7 @@ class VendorHomePage extends StatelessWidget {
       },
       onSwitch: store.live ? (to) => _switchTo(context, to) : null,
       onLogout: store.live ? store.logout : null,
+      reportButton: ReportProblemButton(store: store, asIcon: true),
     ),
   );
 }
@@ -87,6 +89,7 @@ class VendorHomeView extends StatelessWidget {
     this.onSwitch,
     this.onLogout,
     this.chatButton,
+    this.reportButton,
   });
 
   /// 'vendor' or 'provider': the login the app is signed in as ('' in the demo).
@@ -97,6 +100,8 @@ class VendorHomeView extends StatelessWidget {
   final VoidCallback? onLogout;
   // The floating Help chat button (lib/modules/flash).
   final Widget? chatButton;
+  // "Report a problem" (lib/ui/report_problem.dart, owner spec G).
+  final Widget? reportButton;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +137,7 @@ class VendorHomeView extends StatelessWidget {
       floatingActionButton: chatButton,
       appBar: AppBar(
         title: const Text('Loca Market Vendor'),
-        actions: [if (onLogout != null) IconButton(tooltip: 'Log out', onPressed: onLogout, icon: const Icon(Icons.logout))],
+        actions: [?reportButton, if (onLogout != null) IconButton(tooltip: 'Log out', onPressed: onLogout, icon: const Icon(Icons.logout))],
       ),
       body: Center(
         child: SingleChildScrollView(
