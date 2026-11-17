@@ -18,14 +18,17 @@ test('the admin key wins over the secret; a placeholder never counts; the read i
   const before = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = 'XX';
   const counter = {reads: 0};
-  assert.equal(await aiKey.loadAiKey(fakeDb({key: 'XX'}, counter), 1000), '', 'nothing set: AI is off');
+  // (the AI money limit is tested in functions/ai-budget.test.js; here it is open)
+  const open = {budget: async () => true};
+  assert.equal(await aiKey.loadAiKey(fakeDb({key: 'XX'}, counter), 1000, open), '', 'nothing set: AI is off');
   aiKey.resetAiKeyCache();
-  assert.equal(await aiKey.loadAiKey(fakeDb({key: KEY}, counter), 1000), KEY);
-  assert.equal(await aiKey.loadAiKey(fakeDb({key: 'other'}, counter), 2000), KEY, 'cached for 5 minutes');
+  assert.equal(await aiKey.loadAiKey(fakeDb({key: KEY}, counter), 1000, open), KEY);
+  assert.equal(await aiKey.loadAiKey(fakeDb({key: 'other'}, counter), 2000, open), KEY, 'cached for 5 minutes');
   assert.equal(counter.reads, 2);
   aiKey.resetAiKeyCache();
   process.env.ANTHROPIC_API_KEY = 'sk-ant-secret-' + 'c'.repeat(30);
-  assert.equal(await aiKey.loadAiKey(fakeDb({}), 1000), process.env.ANTHROPIC_API_KEY, 'no admin key: the secret');
+  assert.equal(await aiKey.loadAiKey(fakeDb({}), 1000, open), process.env.ANTHROPIC_API_KEY, 'no admin key: the secret');
+  assert.equal(await aiKey.loadAiKey(fakeDb({}), 1000, {budget: async () => false}), '', 'over the AI money limit: no key');
   process.env.ANTHROPIC_API_KEY = before;
   aiKey.resetAiKeyCache();
 });

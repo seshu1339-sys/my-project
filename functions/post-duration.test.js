@@ -101,8 +101,8 @@ test('the hourly job runs each piece at its hour in India; the 15-minute job run
   const tasks = Object.fromEntries(TASK_NAMES.map(name => [name, task(() => name)]));
   const at = (h, day = 16) => hourlyPieces(tasks, Date.UTC(2026, 10, day, h, 20) - 5.5 * 3600000).map(([name]) => name);
   assert.deepEqual(at(0), ['staffAreaNightly', 'aiAgentHealthCheck', 'rateReminder'], 'the rate reminder looks every hour');
-  assert.deepEqual(at(3), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'rateReminder'], '16 Nov 2026 is a Monday');
-  assert.deepEqual(at(3, 17), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'rateReminder']);
+  assert.deepEqual(at(3), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'weeklyStorageUsage', 'rateReminder'], '16 Nov 2026 is a Monday');
+  assert.deepEqual(at(3, 17), ['sweepInactiveAccounts', 'dailyStorageMaintenance', 'rateReminder']);
   assert.deepEqual(at(8), ['sendAdSummaries', 'rateReminder']);
   assert.deepEqual(at(17), ['staffAreaLastChance', 'rateReminder']);
   assert.deepEqual(at(6), ['aiAgentHealthCheck', 'rateReminder']);

@@ -13,11 +13,13 @@ const {getStorage} = require('firebase-admin/storage');
 const {Timestamp} = require('firebase-admin/firestore');
 const {AI_MODELS} = require('./ai-models');
 const {currentAiKey, loadAiKey} = require('./ai-key');
+const {recordSpend} = require('./ai-budget');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 const CATEGORIES = ['drugs', 'weapons', 'alcohol', 'tobacco', 'adult'];
 const LABELS = {drugs: 'drugs', weapons: 'guns or weapons', alcohol: 'alcohol', tobacco: 'cigarettes or tobacco', adult: 'adult content'};
-const DEFAULT_CHECKS_PER_DAY = 300;
+// Inside the ₹90-a-month AI limit (owner, 17 Nov 2026); past it a photo waits for the admin's own look, as before.
+const DEFAULT_CHECKS_PER_DAY = 30;
 const MAX_BYTES = 4 * 1024 * 1024;
 const IST_MS = 5.5 * 60 * 60 * 1000;
 const PROMPT = 'This photo was uploaded to LOCAMARKET, a marketplace of local shops and service providers in India. Look only for these ' +
@@ -91,6 +93,7 @@ async function checkBytes(db, bytes, contentType, {feature = 'photo_safety', uid
     console.warn('Photo safety check failed', error.status ?? error.name);
     return {verdict: 'unknown', categories: [], note: 'The photo check is busy.'};
   }
+  await recordSpend(db, AI_MODELS.photoSearch, response.usage, now);
   try {
     await db.collection('aiCallLog').add({feature, model: AI_MODELS.photoSearch, uid, stopReason: response.stop_reason ?? '',
       inputTokens: response.usage?.input_tokens ?? 0, outputTokens: response.usage?.output_tokens ?? 0, at: Timestamp.fromMillis(now)});

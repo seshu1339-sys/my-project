@@ -8,11 +8,13 @@ const {defineSecret} = require('firebase-functions/params');
 const {getFirestore, Timestamp} = require('firebase-admin/firestore');
 const {AI_MODELS} = require('./ai-models');
 const {currentAiKey, loadAiKey} = require('./ai-key');
+const {recordSpend} = require('./ai-budget');
 
 const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 const MODEL = AI_MODELS.photoSearch;
 const MAX_BASE64 = 4 * 1024 * 1024;
 const DEFAULT_PHOTO_SEARCHES_PER_DAY = 10;
+const PHOTO_SEARCHES_ALL_PER_DAY = 20;
 const IST_MS = 5.5 * 60 * 60 * 1000;
 const PROMPT = 'This photo was taken by a shopper looking for a product or a local service in an Indian town. ' +
   'Reply with ONLY 1 to 3 plain English words naming the product or service (for example "rice", "plumber", "school bag"). ' +
@@ -52,6 +54,15 @@ async function takePhotoSearch(db, uid, now = Date.now()) {
     return true;
   });
   if (!allowed) throw new HttpsError('resource-exhausted', `You have used today's ${limit} photo searches. Please try again tomorrow.`);
+  // Everyone together, inside the ₹90-a-month AI limit (owner, 17 Nov 2026): then the camera asks for words instead.
+  const all = db.collection('aiDailyUse').doc(`photo_search_all_${day}`);
+  const allOk = await db.runTransaction(async tx => {
+    const count = (await tx.get(all)).data()?.count ?? 0;
+    if (count >= PHOTO_SEARCHES_ALL_PER_DAY) return false;
+    tx.set(all, {key: 'photo_search_all', day, count: count + 1});
+    return true;
+  });
+  if (!allOk) throw new HttpsError('resource-exhausted', 'Photo search is resting for today. Please type what you are looking for.');
   return limit;
 }
 
@@ -92,6 +103,7 @@ exports.describeImageForSearch = onCall({region: 'us-central1', maxInstances: 5,
     throw new HttpsError('unavailable', 'Photo search is busy. Try again.');
   }
   const text = response.stop_reason === 'refusal' ? '' : response.content.find(block => block.type === 'text')?.text;
+  await recordSpend(db, MODEL, response.usage);
   try {
     await db.collection('aiCallLog').add({
       feature: 'photo_search', model: MODEL, uid: request.auth.uid, stopReason: response.stop_reason ?? '',

@@ -17,6 +17,9 @@ test('a new threshold alerts once; the same one again does not; under every thre
   const base = {budgetDisplayName: 'LOCAMARKET Rs 1 alert (email only)', costAmount: 1.4, budgetAmount: 1, currencyCode: 'INR', costIntervalStart: '2026-11-01T00:00:00Z'};
   const now = Date.parse('2026-11-17T15:00:00Z');
   assert.equal(await onBudgetMessage(db, {...base, costAmount: 0.2}, now, {send}), false, 'no threshold passed');
+  const status = (await db.collection('billingStatus').doc('current').get()).data().budgets['LOCAMARKET Rs 1 alert _email only_'];
+  assert.equal(status.cost, 0.2, 'every message updates "spent this month"');
+  assert.equal(status.month, '2026-11');
   assert.equal(await onBudgetMessage(db, {...base, alertThresholdExceeded: 1}, now, {send}), true);
   assert.equal(await onBudgetMessage(db, {...base, alertThresholdExceeded: 1}, now + 1800000, {send}), false, 'the same status again');
   assert.equal(pushes.length, 1);

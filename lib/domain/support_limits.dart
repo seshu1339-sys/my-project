@@ -18,7 +18,7 @@ const supportLimits = <SupportLimit>[
   SupportLimit('health', 'loadingSeconds', 'A screen still loading after this is stuck', 20, 5, 120, unit: 's'),
   SupportLimit('health', 'freezeSeconds', 'The app not answering for this long is a hang', 3, 1, 30, unit: 's'),
   SupportLimit('support', 'replyDays', '"We will solve it within … day(s)" in the AI Support box', 1, 1, 30, unit: 'days'),
-  SupportLimit('support', 'aiDailyLimit', 'AI answers in the AI Support box per day (all people together)', 50, 0, 2000),
+  SupportLimit('support', 'aiDailyLimit', 'AI answers in the AI Support box per day (all people together)', 15, 0, 2000),
 ];
 
 SupportLimit supportLimit(String id) => supportLimits.firstWhere((l) => l.id == id);

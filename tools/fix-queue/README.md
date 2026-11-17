@@ -28,8 +28,10 @@ Or once: `/fix-queue`. The panel shows "Fix agent on the PC is running" when it 
 3. For each **approved** request (the admin pressed OK):
    1. `fixq.mjs deploying <id>`. Merge `fix/<id>` into `main`; the commit before the merge is the backup.
    2. Deploy only what the fix changed:
-      - **server**: `firebase deploy --only functions:<the changed functions>` (and `firestore:rules` / `storage` when rules changed).
-      - **website / admin**: build (`--dart-define-from-file=firebase-config-web.json`), `scripts/build-admin-web.ps1` for the admin site,
+      - **server**: `firebase deploy --only "$(node scripts/changed-functions.cjs <last deployed commit>)"` (and `firestore:rules` /
+        `storage` when rules changed), then `node scripts/clean-function-images.cjs` (Artifact Registry stays under its free 0.5 GB).
+      - **website / admin**: build (`--dart-define-from-file=firebase-config-web.json`), the shop site ALONE and last (it must have
+        about 529 files; building other targets in the same run has left it incomplete), `scripts/build-admin-web.ps1` for the admin site,
         `firebase deploy --only hosting:<target>`; locamarket.in with the Hostinger deploy (same build zip).
       - **design / remote config**: write the settings value (with a `designHistory` line for Undo). The apps take it at once.
       - **app**: raise the version in `pubspec.yaml`, build the 3 signed bundles, upload to the Closed testing track with

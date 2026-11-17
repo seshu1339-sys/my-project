@@ -55,7 +55,8 @@ function hourlyPieces(tasks, now = Date.now()) {
   const hour = ist.getUTCHours(), monday = ist.getUTCDay() === 1;
   const names = [];
   if (hour === 0) names.push('staffAreaNightly');
-  if (hour === 3) names.push('sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', ...(monday ? ['weeklyStorageUsage'] : []));
+  // The older AI agent's daily backup was stopped (owner, free-limit plan 17 Nov 2026): it wrote to the Mumbai bucket, which has no free tier.
+  if (hour === 3) names.push('sweepInactiveAccounts', 'dailyStorageMaintenance', ...(monday ? ['weeklyStorageUsage'] : []));
   if (hour === 4) names.push('cleanAppShots', 'cleanSupportShots');
   if (hour === 5) names.push('dailyHealthCheck');
   if (hour === 8) names.push('sendAdSummaries');
@@ -67,7 +68,7 @@ function hourlyPieces(tasks, now = Date.now()) {
 }
 
 const TASK_NAMES = ['expireQuickItems', 'clearTodaysOffers', 'expirePremiumStatus', 'notifyNewOffers', 'staffAreaNightly',
-  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'aiAgentDailyBackup', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck', 'rateReminder', 'dailyHealthCheck', 'cleanAppShots', 'cleanSupportShots'];
+  'sweepInactiveAccounts', 'dailyStorageMaintenance', 'weeklyStorageUsage', 'sendAdSummaries', 'staffAreaLastChance', 'aiAgentHealthCheck', 'rateReminder', 'dailyHealthCheck', 'cleanAppShots', 'cleanSupportShots'];
 
 /// The two scheduled functions, given every task by name. A missing task stops the deploy rather than a job silently not running.
 function scheduledJobs(tasks) {

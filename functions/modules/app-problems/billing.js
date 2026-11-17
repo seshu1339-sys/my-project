@@ -4,6 +4,7 @@
 // red line (healthAlerts/billing~<budget>) and a push to every admin device. Nothing is stopped: alerts only.
 //
 //   billingAlerts/<budget>~<month>   {threshold, cost, budget, at}   the highest threshold already alerted this month (functions only)
+//   billingStatus/current            {budgets: {<budget>: {name, cost, budget, currency, month, at}}}   the latest spend of each budget
 // Pub/Sub is free for this (a few small messages a day, far under 10 GB a month).
 const {Timestamp} = require('firebase-admin/firestore');
 const {pushAdmins} = require('./alerts');
@@ -13,6 +14,15 @@ const money = (n, currency) => `${currency === 'INR' ? '₹' : `${currency || ''
 
 /// Handles one budget message ([data] is the JSON Google sends). Returns true when the admin was alerted.
 async function onBudgetMessage(db, data, now = Date.now(), {send} = {}) {
+  // Every message (several a day): this month's spend per budget, for the Health page's "Spent this month".
+  if (data && data.costAmount != null) {
+    await db.collection('billingStatus').doc('current').set({
+      budgets: {[safe(data.budgetDisplayName)]: {
+        name: String(data.budgetDisplayName || 'budget').slice(0, 80), cost: Number(data.costAmount || 0), budget: Number(data.budgetAmount || 0),
+        currency: String(data.currencyCode || 'INR'), month: String(data.costIntervalStart || '').slice(0, 7), at: Timestamp.fromMillis(now),
+      }},
+    }, {merge: true});
+  }
   const threshold = Number(data?.alertThresholdExceeded);
   if (!Number.isFinite(threshold) || threshold <= 0) return false; // a status message under every threshold
   const name = safe(data.budgetDisplayName);

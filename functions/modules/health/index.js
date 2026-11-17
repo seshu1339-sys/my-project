@@ -21,7 +21,7 @@ const {anthropic, anthropicKey, loadAiKey, logAiCall, takeDailyUse, AI_MODELS} =
 const {buildChecks, runChecks} = require('./checks');
 
 const KEEP_RUNS = 30;
-const EXPLAIN_PER_DAY = 30;
+const EXPLAIN_PER_DAY = 5; // inside the ₹90-a-month AI limit (owner, 17 Nov 2026)
 const EXPLAIN_PER_RUN = 5;
 const options = {region: 'us-central1', maxInstances: 2, invoker: 'public', timeoutSeconds: 300, secrets: [anthropicKey]};
 

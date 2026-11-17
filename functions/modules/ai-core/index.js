@@ -14,6 +14,7 @@ const anthropicKey = defineSecret('ANTHROPIC_API_KEY');
 // The model names live in functions/ai-models.js (one place for every AI feature).
 const {AI_MODELS, SONNET, HAIKU, keyIsSet} = require('../../ai-models');
 const {currentAiKey, loadAiKey} = require('../../ai-key');
+const {recordSpend} = require('../../ai-budget');
 const IST = 19800000;
 
 let client, clientKey = '';
@@ -32,8 +33,9 @@ function anthropic() {
   return client;
 }
 
-/// Records one AI call. A failed log never fails the caller.
+/// Records one AI call, and its cost against the month's AI money limit (functions/ai-budget.js). A failed log never fails the caller.
 async function logAiCall(db, {feature, model, usage, uid = '', stopReason = ''}, now = Date.now()) {
+  await recordSpend(db, model, usage, now);
   try {
     await db.collection('aiCallLog').add({
       feature, model, uid, stopReason,

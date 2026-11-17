@@ -17,7 +17,7 @@
 //   supportShots/<id>    {data (JPEG, base64), ticketId, at, expiresAt}    the person's screenshot (deleted when solved / after 30 days)
 //
 // Cost guards: 5 tickets and 10 AI answers a device a day; AI answers for everyone together at most settings/support.aiDailyLimit a day
-// (default 50); texts are cut short; emails, links and long numbers are taken out; a screenshot is at most 300 KB.
+// (default 15); texts are cut short; emails, links and long numbers are taken out; a screenshot is at most 300 KB.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {getFirestore, Timestamp, FieldValue} = require('firebase-admin/firestore');
@@ -222,7 +222,8 @@ async function ask(db, request, now = Date.now(), client = anthropic) {
   if (s.aiOn !== true) return {text: '', off: true};
   const question = clean(d.question, 600);
   if (!question) throw new HttpsError('invalid-argument', 'Type your question.');
-  const limit = Number.isFinite(Number(s.aiDailyLimit)) ? Math.max(0, Math.min(2000, Math.round(Number(s.aiDailyLimit)))) : 50;
+  // 15 a day for everyone together unless the admin set another number (the ₹90-a-month AI limit holds either way).
+  const limit = Number.isFinite(Number(s.aiDailyLimit)) ? Math.max(0, Math.min(2000, Math.round(Number(s.aiDailyLimit)))) : 15;
   if (!(await takeDevice(db, deviceKeyOf(d.deviceId || request.rawRequest?.ip), 'ai', AI_PER_DEVICE, now))) return {text: '', limit: true};
   if (!(await takeDailyUse(db, 'support_ai', limit, now))) return {text: '', limit: true};
   if (!(await loadAiKey(db))) return {text: '', off: true};

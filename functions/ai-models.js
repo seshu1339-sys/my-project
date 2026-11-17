@@ -6,7 +6,9 @@
 //               and the Support Inbox's ticket reading (Flash triage)
 const HAIKU = 'claude-haiku-5-5';
 const SONNET = 'claude-sonnet-5-5';
-const AI_MODELS = Object.freeze({chat: HAIKU, photoSearch: HAIKU, admin: SONNET});
+// The admin assistant and the Support Inbox's ticket reading moved from Sonnet to Haiku (owner, free-limit plan 17 Nov 2026: at most
+// ₹90 a month of AI in all; Haiku is 20 times cheaper). SONNET stays exported for a chat that asks for it on purpose.
+const AI_MODELS = Object.freeze({chat: HAIKU, photoSearch: HAIKU, admin: HAIKU});
 
 /// True when the key is a real one (the secret holds a placeholder such as "XX" until the owner sets the key): without it no AI feature
 /// calls Anthropic at all.

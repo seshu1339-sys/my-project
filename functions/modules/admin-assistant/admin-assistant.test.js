@@ -11,8 +11,8 @@ const photo = require('../../image-search')._test;
 
 const emulated = {skip: !process.env.FIRESTORE_EMULATOR_HOST};
 
-test('one place names the models: Haiku 5.5 for chat and photo search, Sonnet 5.5 for the admin', () => {
-  assert.deepEqual({...AI_MODELS}, {chat: 'claude-haiku-5-5', photoSearch: 'claude-haiku-5-5', admin: 'claude-sonnet-5-5'});
+test('one place names the models: Haiku 5.5 for everything (free-limit plan, 17 Nov 2026)', () => {
+  assert.deepEqual({...AI_MODELS}, {chat: 'claude-haiku-5-5', photoSearch: 'claude-haiku-5-5', admin: 'claude-haiku-5-5'});
 });
 
 test('a placeholder key never reaches Anthropic', () => {
@@ -44,22 +44,22 @@ test('a person gets the day\'s photo searches, then "try again tomorrow"', emula
   }
 });
 
-test('the assistant answers from the counts with Sonnet 5.5 and stops at the daily limit without calling Anthropic', emulated, async () => {
+test('the assistant answers from the counts with Haiku 5.5 (free-limit plan) and stops at the daily limit without calling Anthropic', emulated, async () => {
   const db = getFirestore();
   const uid = `admin${Date.now()}`;
   const calls = [];
-  const fake = () => ({beta: {messages: {create: async request => {
+  const fake = () => ({messages: {create: async request => {
     calls.push(request);
     return {model: request.model, stop_reason: 'end_turn', usage: {input_tokens: 10, output_tokens: 5}, content: [{type: 'text', text: 'There are 2 vendors waiting.'}]};
-  }}}});
+  }}});
   await db.doc('settings/business').set({adminAiPerDay: 1}, {merge: true});
   try {
     const result = await answerQuestion(db, fake, uid, 'How many vendors are waiting?');
     assert.equal(result.answer, 'There are 2 vendors waiting.');
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].model, 'claude-sonnet-5-5');
+    assert.equal(calls[0].model, 'claude-haiku-5-5');
     assert.deepEqual(calls[0].output_config, {effort: 'low'});
-    assert.equal(calls[0].fallbacks, 'default');
+    assert.equal(calls[0].fallbacks, undefined, 'Haiku has no server-side fallback');
     assert.match(calls[0].messages[0].content, /<facts>[\s\S]*vendors[\s\S]*<\/facts>[\s\S]*How many vendors are waiting\?/);
     await assert.rejects(answerQuestion(db, fake, uid, 'And now?'), error => error.code === 'resource-exhausted' && /try again tomorrow/i.test(error.message));
     assert.equal(calls.length, 1, 'past the limit Anthropic is not called');
@@ -79,7 +79,7 @@ test('the admin search "Ask AI": Haiku 5.5 chooses from the panel list, unknown 
   const {searchWithAi, searchAiLimit, indexLines} = require('.')._test;
   const db = getFirestore();
   const uid = `search${Date.now()}`;
-  assert.equal(searchAiLimit({}), 100);
+  assert.equal(searchAiLimit({}), 10);
   assert.match(indexLines([{serial: '5.12', label: 'Business Profile > Post duration', key: 'postDuration', value: '24h'}]), /5\.12 \| Business Profile > Post duration \| postDuration \| 24h/);
   const calls = [];
   const fake = () => ({messages: {create: async request => {

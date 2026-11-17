@@ -16,7 +16,7 @@ test('the check: safe, unsafe with the reason, and never an automatic decision w
   const {getFirestore} = require('firebase-admin/firestore');
   const {checkBytes, unsafeReason, checksPerDay} = require('./photo-safety');
   const db = getFirestore();
-  assert.equal(checksPerDay({}), 300);
+  assert.equal(checksPerDay({}), 30, 'inside the ₹90-a-month AI limit');
   assert.deepEqual((await checkBytes(db, JPEG, 'image/jpeg', {makeClient: fakeAi([])})).verdict, 'safe');
   const bad = await checkBytes(db, JPEG, 'image/jpeg', {makeClient: fakeAi(['alcohol', 'tobacco', 'not-a-category'])});
   assert.deepEqual([bad.verdict, bad.categories], ['unsafe', ['alcohol', 'tobacco']]);

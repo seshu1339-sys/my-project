@@ -201,3 +201,73 @@ class _HealthLimitsCardState extends State<HealthLimitsCard> {
     ),
   );
 }
+
+/// "Spent this month" (free-limit plan, 17 Nov 2026): what Google Cloud has charged this month (from the budgets' own messages,
+/// functions/modules/app-problems/billing.js) and the AI spend against its ₹90-a-month limit (functions/ai-budget.js).
+class SpentThisMonthCard extends StatefulWidget {
+  const SpentThisMonthCard({super.key, required this.store, this.load});
+  final Store store;
+
+  /// Test seam: (billingStatus/current, aiSpend month, aiSpend day).
+  final Future<(Map<String, dynamic>?, Map<String, dynamic>?, Map<String, dynamic>?)> Function()? load;
+
+  static const aiMonthLimit = 90.0;
+  static const aiDayLimit = 3.0;
+
+  @override
+  State<SpentThisMonthCard> createState() => _SpentThisMonthCardState();
+}
+
+class _SpentThisMonthCardState extends State<SpentThisMonthCard> {
+  late final data = (widget.load ?? _live)();
+
+  Future<(Map<String, dynamic>?, Map<String, dynamic>?, Map<String, dynamic>?)> _live() async {
+    if (!widget.store.live) return (null, null, null);
+    final ist = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final month = ist.toIso8601String().substring(0, 7), day = ist.toIso8601String().substring(0, 10);
+    final db = widget.store.firestore;
+    final r = await Future.wait([
+      db.collection('billingStatus').doc('current').get(),
+      db.collection('aiSpend').doc(month).get(),
+      db.collection('aiSpend').doc(day).get(),
+    ]);
+    return (r[0].data(), r[1].data(), r[2].data());
+  }
+
+  String _rs(num v) => '₹${v.toStringAsFixed(v < 10 ? 2 : 0)}';
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<(Map<String, dynamic>?, Map<String, dynamic>?, Map<String, dynamic>?)>(
+    future: data,
+    builder: (context, snap) {
+      final (billing, aiMonth, aiDay) = snap.data ?? (null, null, null);
+      final budgets = [for (final v in ((billing?['budgets'] as Map?) ?? const {}).values) if (v is Map) Map<String, dynamic>.from(v)]
+        ..sort((a, b) => ((a['budget'] as num?) ?? 0).compareTo((b['budget'] as num?) ?? 0));
+      final aiM = (aiMonth?['inr'] as num?) ?? 0, aiD = (aiDay?['inr'] as num?) ?? 0;
+      final stopped = aiM >= SpentThisMonthCard.aiMonthLimit;
+      return Card(
+        key: const ValueKey('health-spent'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Spent this month (ఈ నెల ఖర్చు)', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            if (budgets.isEmpty)
+              const Text('Google Cloud: no budget message yet today (they come a few times a day).', key: ValueKey('health-spent-none'))
+            else
+              for (final b in budgets)
+                Text('Google Cloud: ${_rs((b['cost'] as num?) ?? 0)} (budget "${b['name']}" ${_rs((b['budget'] as num?) ?? 0)})',
+                    key: ValueKey('health-spent-${b['name']}'), style: TextStyle(color: ((b['cost'] as num?) ?? 0) > 0 ? Colors.deepOrange : null)),
+            Text(
+              'AI (Anthropic): ${_rs(aiM)} of ${_rs(SpentThisMonthCard.aiMonthLimit)} this month · today ${_rs(aiD)} of ${_rs(SpentThisMonthCard.aiDayLimit)} · ${(aiMonth?['calls'] as num?) ?? 0} AI answers',
+              key: const ValueKey('health-spent-ai'),
+            ),
+            if (stopped)
+              const Text('AI has stopped for this month (the ₹90 limit). It starts again on the 1st.', key: ValueKey('health-spent-ai-stopped'), style: TextStyle(color: Colors.red)),
+            const Text('Every item of the Google bill: BigQuery dataset billing_export (Billing > Billing export).', style: TextStyle(fontSize: 12, color: Colors.black54)),
+          ]),
+        ),
+      );
+    },
+  );
+}

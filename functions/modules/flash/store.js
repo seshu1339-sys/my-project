@@ -84,8 +84,16 @@ async function openTicket(db, chat, ref, data, {summary, reason, lastText}, now)
   return {chatId: ref.id, status, reply};
 }
 
+/// AI answers for everyone together each day, in all five chats (owner, 17 Nov 2026: inside the ₹90-a-month AI limit). After that the
+/// chat becomes a ticket for the team, as when Flash has no answer.
+/// (FLASH_DAILY_TOTAL / FLASH_TRIAGE_DAILY_TOTAL in the environment only for the tests.)
+const flashDailyTotal = () => Number(process.env.FLASH_DAILY_TOTAL) || 30;
+/// Tickets Flash reads for the admin each day (the rest stay unread for the admin, nothing is lost).
+const triageDailyTotal = () => Number(process.env.FLASH_TRIAGE_DAILY_TOTAL) || 5;
+
 /// Flash's reply to one message; null for no usable answer. A failure here, of AI or of reading the facts, must not lose the person's problem.
 async function flashAnswer(db, client, chat, {uid, category}, ref, help, now) {
+  if (!(await takeDailyUse(db, 'flash_all', flashDailyTotal(), now))) return null;
   try {
     const facts = await chat.facts(db, uid, category, now);
     const history = historyFor(await readMessages(ref));
@@ -182,10 +190,14 @@ async function verifyChat(db, chats, adminUid, data = {}, now = Date.now()) {
   return {verified: true};
 }
 
-/// Sonnet reads one new ticket for the admin. A trigger can fire twice, so a ticket already read is left alone.
+/// Haiku reads one new ticket for the admin. A trigger can fire twice, so a ticket already read is left alone.
 async function triageTicket(db, client, id, ticket, now = Date.now()) {
   const ref = db.collection('flashTicketTriage').doc(id);
   if ((await ref.get()).exists) return;
+  if (!(await takeDailyUse(db, 'flash_triage', triageDailyTotal(), now))) {
+    await ref.set({failed: true, reason: "today's AI limit", kind: ticket.kind, at: Timestamp.fromMillis(now)});
+    return;
+  }
   let triage = null;
   try {
     const result = await readTicket(client(), ticket);

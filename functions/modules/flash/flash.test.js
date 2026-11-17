@@ -1,4 +1,7 @@
 const {test} = require('node:test');
+// The everyone-together daily totals (17 Nov 2026) are tested on their own below; the other tests send many messages on one day.
+process.env.FLASH_DAILY_TOTAL = '100000';
+process.env.FLASH_TRIAGE_DAILY_TOTAL = '100000';
 const assert = require('node:assert/strict');
 const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
@@ -114,11 +117,11 @@ test('only a clean reading from Sonnet counts', () => {
   assert.equal(TRIAGE_FORMAT.schema.additionalProperties, false);
 });
 
-test('Sonnet is given one ticket and no tools', async () => {
+test('Haiku is given one ticket and no tools', async () => {
   let body;
   const client = {messages: {create: async sent => { body = sent; return reply({type: 'order', urgency: 'low', suggestion: 'Ask the shop.'}); }}};
   await readTicket(client, {kind: 'user', category: 'Orders', summary: '', text: 'late order'});
-  assert.equal(body.model, 'claude-sonnet-5-5');
+  assert.equal(body.model, 'claude-haiku-5-5');
   assert.equal(body.tools, undefined);
   assert.equal(body.messages.length, 1);
   assert.match(body.messages[0].content, /late order/);
@@ -406,7 +409,7 @@ test('each chat is given its own help text', emulated, async () => {
   } finally { await S.saveConfig(db, R.DEFAULT_CONFIG); }
 });
 
-test('Sonnet reads a new ticket once and only suggests', emulated, async () => {
+test('Haiku reads a new ticket once and only suggests', emulated, async () => {
   const db = getFirestore(), ai = model({type: 'payment', urgency: 'high', suggestion: 'Check the bank first.'}), who = person();
   const id = fresh('ticket');
   const ticket = {kind: 'vendor', uid: who.uid, category: 'Payment', summary: 'x', text: 'money gone', status: 'open'};
@@ -417,8 +420,24 @@ test('Sonnet reads a new ticket once and only suggests', emulated, async () => {
   assert.equal(saved.urgency, 'high');
   assert.equal(saved.suggestion, 'Check the bank first.');
   const log = await db.collection('aiCallLog').where('uid', '==', who.uid).get();
-  assert.equal(log.docs[0].data().model, 'claude-sonnet-5-5');
+  assert.equal(log.docs[0].data().model, 'claude-haiku-5-5');
   assert.equal(log.docs[0].data().feature, 'flash_triage');
+});
+
+test("past the day's AI answers for everyone, a message becomes a ticket for the team (no AI call)", emulated, async () => {
+  const db = getFirestore();
+  const day = Date.parse('2026-12-24T06:00:00Z');
+  process.env.FLASH_TRIAGE_DAILY_TOTAL = '1';
+  try {
+    const ai = model({type: 'other', urgency: 'low', suggestion: 'x'});
+    await S.triageTicket(db, ai.client, fresh('ticket'), {kind: 'user', uid: 'u', category: 'Other', summary: '', text: 'a'}, day);
+    const id = fresh('ticket');
+    await S.triageTicket(db, ai.client, id, {kind: 'user', uid: 'u', category: 'Other', summary: '', text: 'b'}, day);
+    assert.equal(ai.calls.length, 1, 'the second ticket of the day is not read by AI');
+    assert.equal((await db.collection('flashTicketTriage').doc(id).get()).data().reason, "today's AI limit");
+  } finally {
+    process.env.FLASH_TRIAGE_DAILY_TOTAL = '100000';
+  }
 });
 
 test('a ticket that cannot be read says so and stays open for the admin', emulated, async () => {

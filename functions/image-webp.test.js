@@ -1,7 +1,16 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const sharp = require('sharp');
-const {toWebp, optimizeObject} = require('./image-webp')._imageWebp;
+const {toWebp, optimizeObject, cacheFor} = require('./image-webp')._imageWebp;
+
+test('every photo folder gets the 30-day cache: public photos public, ID and application photos private, others untouched', () => {
+  assert.equal(cacheFor('catalog/a.webp'), 'public, max-age=2592000');
+  assert.equal(cacheFor('vendorItemPhotos/u1/x.webp'), 'public, max-age=2592000');
+  assert.equal(cacheFor('vendorApplications/u1/vendorPhoto'), 'private, max-age=2592000');
+  assert.equal(cacheFor('fieldStaffApplications/u1/staffPhoto'), 'private, max-age=2592000');
+  assert.equal(cacheFor('problemReports/r1.png'), null);
+  assert.equal(cacheFor('ai-agent-backups/x.json'), null);
+});
 
 const isWebp = buffer => buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP';
 // a busy picture so that JPEG/PNG are not tiny
@@ -50,13 +59,13 @@ test('a stored photo is converted in place, keeps its download link, and is not 
   assert.equal(meta.contentType, 'image/webp');
   assert.equal(meta.metadata.firebaseStorageDownloadTokens, 'token-abc', 'the download link keeps working');
   assert.equal(meta.metadata.optimized, 'webp');
-  assert.equal(meta.cacheControl, 'public,max-age=3600');
+  assert.equal(meta.cacheControl, 'public, max-age=2592000', 'kept on phones for 30 days');
   const [stored] = await bucket.file('catalog/photo1.jpg').download();
   assert.ok(isWebp(stored));
   assert.equal((await sharp(stored).metadata()).width, 1600);
 
   // the upload of the converted file triggers the function again: it must do nothing
-  assert.deepEqual(await optimizeObject(bucket, 'catalog/photo1.jpg', 'image/webp'), {status: 'skipped', reason: 'not a JPEG or PNG'});
+  assert.deepEqual(await optimizeObject(bucket, 'catalog/photo1.jpg', 'image/webp'), {status: 'skipped', reason: 'cache already set'});
   await bucket.file('catalog/photo1.jpg').setMetadata({contentType: 'image/jpeg'}); // even if the type were reset, the marker stops a second pass
   assert.deepEqual(await optimizeObject(bucket, 'catalog/photo1.jpg', 'image/jpeg'), {status: 'skipped', reason: 'already optimized'});
 
@@ -67,17 +76,23 @@ test('a stored photo is converted in place, keeps its download link, and is not 
     assert.equal((await optimizeObject(bucket, name, 'image/png')).status, 'converted', name);
     assert.equal((await bucket.file(name).getMetadata())[0].contentType, 'image/webp');
   }
+  assert.equal((await bucket.file('vendorApplications/u1/vendorPhoto').getMetadata())[0].cacheControl, 'private, max-age=2592000');
+  // a photo the apps already sent as WebP only gets the cache rule
+  await store('vendorItemPhotos/u1/i.webp', await toWebp(png), 'image/webp');
+  assert.equal((await optimizeObject(bucket, 'vendorItemPhotos/u1/i.webp', 'image/webp')).status, 'cached');
+  assert.equal((await bucket.file('vendorItemPhotos/u1/i.webp').getMetadata())[0].cacheControl, 'public, max-age=2592000');
 
   // things that must be left alone
   await store('somewhere/else.jpg', jpeg, 'image/jpeg');
   assert.equal((await optimizeObject(bucket, 'somewhere/else.jpg', 'image/jpeg')).reason, 'not a photo folder');
   await store('catalog/anim.gif', Buffer.from('GIF89a'), 'image/gif');
-  assert.equal((await optimizeObject(bucket, 'catalog/anim.gif', 'image/gif')).reason, 'not a JPEG or PNG');
+  assert.equal((await optimizeObject(bucket, 'catalog/anim.gif', 'image/gif')).status, 'cached', 'not converted, but cached');
   await store('catalog/broken.jpg', Buffer.from('not an image at all'), 'image/jpeg');
   const broken = await optimizeObject(bucket, 'catalog/broken.jpg', 'image/jpeg');
   assert.equal(broken.status, 'skipped');
   assert.match(broken.reason, /unreadable image/);
   assert.equal((await bucket.file('catalog/broken.jpg').getMetadata())[0].contentType, 'image/jpeg', 'a file it cannot read is left as it was');
+  assert.equal((await bucket.file('catalog/broken.jpg').getMetadata())[0].cacheControl, 'public, max-age=2592000');
   const tiny = await sharp({create: {width: 8, height: 8, channels: 3, background: '#ffffff'}}).jpeg({quality: 100}).toBuffer();
   await store('catalog/tiny.jpg', tiny, 'image/jpeg');
   const kept = await optimizeObject(bucket, 'catalog/tiny.jpg', 'image/jpeg');

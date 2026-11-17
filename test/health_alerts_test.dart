@@ -135,4 +135,20 @@ void main() {
     expect(limitValue(store.entries('settings'), 'replyDays'), 2);
     expect(supportAiOn(store.entries('settings')), isTrue);
   });
+
+  testWidgets('Spent this month: Google Cloud from the budgets, AI against ₹90 a month and ₹3 a day; stopped at the limit', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SpentThisMonthCard(store: store, load: () async => (
+      {'budgets': {'rs1': {'name': 'LOCAMARKET Rs 1 alert', 'cost': 28.57, 'budget': 1}, 'all': {'name': 'Auto Stop', 'cost': 30.1, 'budget': 200}}},
+      {'inr': 12.5, 'calls': 240},
+      {'inr': 0.42},
+    )))));
+    await tester.pumpAndSettle();
+    expect(find.text('Google Cloud: ₹29 (budget "LOCAMARKET Rs 1 alert" ₹1.00)'), findsOneWidget);
+    expect(find.textContaining('AI (Anthropic): ₹13 of ₹90 this month · today ₹0.42 of ₹3.00 · 240 AI answers'), findsOneWidget);
+    expect(find.byKey(const ValueKey('health-spent-ai-stopped')), findsNothing);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SpentThisMonthCard(key: const ValueKey('b'), store: store, load: () async => (null, {'inr': 90.2, 'calls': 1800}, {'inr': 3.1})))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('health-spent-none')), findsOneWidget);
+    expect(find.byKey(const ValueKey('health-spent-ai-stopped')), findsOneWidget);
+  });
 }

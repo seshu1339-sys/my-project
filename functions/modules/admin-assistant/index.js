@@ -15,7 +15,8 @@ const {requireAdminSession} = require('../../admin-session');
 const {anthropic, anthropicKey, loadAiKey, logAiCall, takeDailyUse, AI_MODELS} = require('../ai-core');
 
 const options = {region: 'us-central1', maxInstances: 3, invoker: 'public', secrets: [anthropicKey], timeoutSeconds: 120};
-const DEFAULT_ADMIN_AI_PER_DAY = 50;
+// Daily totals inside the ₹90-a-month AI limit (owner, 17 Nov 2026); the admin may raise them in Settings, the money limit still holds.
+const DEFAULT_ADMIN_AI_PER_DAY = 5;
 const MAX_QUESTION = 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -81,10 +82,9 @@ async function answerQuestion(db, client, uid, question, now = Date.now()) {
   const facts = await adminFacts(db, now);
   let response;
   try {
-    // Thinking stays adaptive at low effort; on a policy decline the API re-runs the request on its default fallback model.
-    response = await client().beta.messages.create({
+    // Claude Haiku 5.5 at low effort (its refusals have no server-side fallback, so none is asked for).
+    response = await client().messages.create({
       model: AI_MODELS.admin, max_tokens: 4000,
-      betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
       output_config: {effort: 'low'},
       system: SYSTEM,
       messages: [{role: 'user', content: `<facts>\n${JSON.stringify(facts, null, 1)}\n</facts>\n\n${text}`}],
@@ -111,7 +111,7 @@ exports.askAdminAssistant = onCall(options, async request => {
 // so a new setting is in it by itself) with the current values, plus values only the server reads (staff targets, pay slabs, the
 // Support Team chat limit), and answers which setting it is, its current value, and the serial to open it. Its own daily allowance
 // (settings/business.adminSearchAiPerDay, 100 when not set); past it the normal search still works.
-const DEFAULT_SEARCH_AI_PER_DAY = 100;
+const DEFAULT_SEARCH_AI_PER_DAY = 10;
 const MAX_INDEX = 1500;
 const SEARCH_SYSTEM = 'You help the administrator of LOCAMARKET find a setting in the admin panel. SETTINGS lists every page and setting: ' +
   '"serial | group > section > name | key | current value". VALUES holds more current values (staff targets, pay slabs, limits). ' +
