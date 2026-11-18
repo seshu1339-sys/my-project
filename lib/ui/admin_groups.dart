@@ -59,7 +59,7 @@ final adminGroups = <AdminGroup>[
     const AdminItem('ratings', 'Ratings', Icons.star_outline),
     const AdminItem('reports', 'Reports', Icons.flag_outlined),
     const AdminItem('blockList', 'Block list', Icons.block),
-    for (final m in moduleAdminSections) if (m.id == 'itemPhotos') AdminItem('module-${m.id}', m.title, m.icon),
+    for (final m in moduleAdminSections) if (m.id == 'itemPhotos' || m.id == 'companyMessages') AdminItem('module-${m.id}', m.title, m.icon),
   ]),
   AdminGroup('services', 'Services', Icons.home_repair_service_outlined, [
     const AdminItem('services', 'Services and service types', Icons.home_repair_service_outlined),

@@ -1,3 +1,4 @@
+import '../modules/companymessages/companymessages_module.dart' show vendorCompanyBell;
 import 'package:flutter/material.dart';
 import '../modules/flash/flash_module.dart' show vendorAppFlashButton;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -33,7 +34,7 @@ class _VendorPageState extends State<VendorPage> {
     if (!store.live) return _demo();
     final user = store.user;
     if (user == null) return const SizedBox.shrink();
-    final actions = [IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
+    final actions = [?vendorCompanyBell(store), IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     // The registration form only exists for a verified email address.
     if (!store.emailConfirmed) {
       return Scaffold(

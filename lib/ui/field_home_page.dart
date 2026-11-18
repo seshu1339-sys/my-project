@@ -6,6 +6,7 @@ import '../data/store.dart';
 import 'field_registration_form.dart';
 import '../modules/staffareas/staffareas_module.dart';
 import '../modules/flash/flash_module.dart' show staffAppFlashButton;
+import '../modules/companymessages/companymessages_module.dart' show StaffCompanyMessagesButton;
 import 'field_workspace.dart';
 
 /// Streams the signed-in staff member's own fieldStaff/{uid} doc and shows the
@@ -28,7 +29,7 @@ class _FieldHomePageState extends State<FieldHomePage> {
     final user = store.user;
     if (user == null) return const SizedBox.shrink();
     // "Report a problem" (lib/ui/report_problem.dart, owner spec G) beside Log out.
-    final actions = [ReportProblemButton(store: store, asIcon: true), IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
+    final actions = [StaffCompanyMessagesButton(store: store), ReportProblemButton(store: store, asIcon: true), IconButton(tooltip: 'Log out', onPressed: store.logout, icon: const Icon(Icons.logout))];
     if (!store.emailConfirmed) {
       return Scaffold(
         appBar: AppBar(title: const Text('Loca Market staff'), actions: actions),

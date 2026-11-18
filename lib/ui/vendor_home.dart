@@ -1,3 +1,4 @@
+import '../modules/companymessages/companymessages_module.dart' show vendorCompanyBell;
 import 'report_problem.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
@@ -73,6 +74,7 @@ class VendorHomePage extends StatelessWidget {
       onSwitch: store.live ? (to) => _switchTo(context, to) : null,
       onLogout: store.live ? store.logout : null,
       reportButton: ReportProblemButton(store: store, asIcon: true),
+      bell: vendorCompanyBell(store),
     ),
   );
 }
@@ -90,6 +92,7 @@ class VendorHomeView extends StatelessWidget {
     this.onLogout,
     this.chatButton,
     this.reportButton,
+    this.bell,
   });
 
   /// 'vendor' or 'provider': the login the app is signed in as ('' in the demo).
@@ -97,6 +100,8 @@ class VendorHomeView extends StatelessWidget {
   final String email;
   final VoidCallback onVendor, onServices, onTransport;
   final void Function(String to)? onSwitch;
+  /// The bell with the LOCAMARKET Team's messages (lib/modules/companymessages).
+  final Widget? bell;
   final VoidCallback? onLogout;
   // The floating Help chat button (lib/modules/flash).
   final Widget? chatButton;
@@ -137,7 +142,7 @@ class VendorHomeView extends StatelessWidget {
       floatingActionButton: chatButton,
       appBar: AppBar(
         title: const Text('Loca Market Vendor'),
-        actions: [?reportButton, if (onLogout != null) IconButton(tooltip: 'Log out', onPressed: onLogout, icon: const Icon(Icons.logout))],
+        actions: [?bell, ?reportButton, if (onLogout != null) IconButton(tooltip: 'Log out', onPressed: onLogout, icon: const Icon(Icons.logout))],
       ),
       body: Center(
         child: SingleChildScrollView(

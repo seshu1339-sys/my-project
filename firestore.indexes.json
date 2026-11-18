@@ -4,139 +4,282 @@
       "collectionGroup": "flashUserChats",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "uid", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "flashVendorChats",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "uid", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "flashPremiumChats",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "uid", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "flashProviderChats",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "uid", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "flashStaffChats",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "uid", "order": "ASCENDING"},
-        {"fieldPath": "updatedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "userId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vendorPremium",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "active", "order": "ASCENDING"},
-        {"fieldPath": "endsAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endsAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vendorOffers",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "endsAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "endsAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "usageOwnerDaily",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "ownerId", "order": "ASCENDING"},
-        {"fieldPath": "day", "order": "DESCENDING"}
+        {
+          "fieldPath": "ownerId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "day",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vendorNotices",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "vendorId", "order": "ASCENDING"},
-        {"fieldPath": "createdAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "vendorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "adSubmissions",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "vendorId", "order": "ASCENDING"},
-        {"fieldPath": "submittedAt", "order": "DESCENDING"}
+        {
+          "fieldPath": "vendorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "adViews",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "adId", "order": "ASCENDING"},
-        {"fieldPath": "at", "order": "DESCENDING"}
+        {
+          "fieldPath": "adId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "adStatsDaily",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "vendorId", "order": "ASCENDING"},
-        {"fieldPath": "day", "order": "ASCENDING"}
+        {
+          "fieldPath": "vendorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "day",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vendorShopPhotos",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "status", "order": "ASCENDING"},
-        {"fieldPath": "submittedAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "isExclusive", "order": "ASCENDING"},
-        {"fieldPath": "active", "order": "ASCENDING"},
-        {"fieldPath": "expiresAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "isExclusive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expiresAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "isExclusive", "order": "ASCENDING"},
-        {"fieldPath": "active", "order": "ASCENDING"},
-        {"fieldPath": "archivedAt", "order": "ASCENDING"}
+        {
+          "fieldPath": "isExclusive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "archivedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-        {"fieldPath": "ownerId", "order": "ASCENDING"},
-        {"fieldPath": "isExclusive", "order": "ASCENDING"},
-        {"fieldPath": "active", "order": "ASCENDING"}
+        {
+          "fieldPath": "ownerId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isExclusive",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "companyMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "vendorUids",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sentAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "companyMessages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "sentBy.uid",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sentAt",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],

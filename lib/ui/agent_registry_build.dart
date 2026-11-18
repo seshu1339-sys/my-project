@@ -17,7 +17,7 @@ import 'layout_settings.dart';
 const _vendorPages = {
   'tab:Vendors', 'tab:Shops', 'tab:Products', 'tab:Plans', 'tab:Premium', 'tab:Payments', 'tab:Vendor Offers', 'tab:Support Team chat',
   'categories', 'productImageLibrary', 'module-itemPhotos', 'cityCodes', 'settings', 'shopsLocation', 'ratings', 'reports', 'idReport',
-  'staffLinks', 'blockList',
+  'staffLinks', 'blockList', 'module-companyMessages',
 };
 const _staffPages = {
   'fieldAssistants', 'tab:Staff Areas', 'staffWork', 'staffRanking', 'idReport', 'staffLinks', 'locations', 'settings', 'cityCodes',

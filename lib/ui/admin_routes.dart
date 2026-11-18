@@ -42,6 +42,7 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('reports', 'రిపోర్టులు', ['abuse', 'ఫిర్యాదు రిపోర్ట్', 'report']),
   AdminRoute('blockList', 'బ్లాక్ లిస్ట్', ['block', 'బ్లాక్']),
   AdminRoute('module-itemPhotos', 'ఐటమ్ ఫోటోలు', ['item photo', 'own photo', 'add to catalog']),
+  AdminRoute('module-companyMessages', 'వెండర్ మెసేజ్‌లు', ['vendor messages', 'company message', 'message vendors', 'notice', 'announcement', 'మెసేజ్', 'సందేశం']),
   // Services
   AdminRoute('services', 'సేవలు', ['సర్వీసులు', 'service types']),
   AdminRoute('serviceProviders', 'సర్వీస్ ప్రొవైడర్లు', ['providers', 'ప్రొవైడర్']),

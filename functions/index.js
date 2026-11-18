@@ -123,6 +123,8 @@ Object.assign(exports, require('./modules/health'));
 Object.assign(exports, require('./modules/app-problems'));
 // Problem screenshots: one US bucket for every problem screenshot, opened only by the admin (functions/problem-shots.js).
 exports.problemShot = require('./problem-shots').problemShot;
+// Company messages: official LOCAMARKET Team messages to vendors, by the admin or permitted staff (functions/modules/company-messages).
+Object.assign(exports, require('./modules/company-messages'));
 // AI Support: the AI Support box's problem reports, the admin's replies, the limited AI answers (functions/modules/support).
 Object.assign(exports, require('./modules/support'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).
