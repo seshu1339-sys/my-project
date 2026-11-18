@@ -63,12 +63,16 @@ class HealthStatus {
   List<HealthCheck> failingFor(String registryId) => [for (final c in failing) if (c.registryIds.contains(registryId)) c];
 }
 
-/// One problem of an app (an appProblems document). [users] is how many different people had it; [side] is 'user', 'device' or 'our'
-/// (AI Agent + Health System, 17 Nov 2026); [devices] and [oses] count the cases per phone model and Android version.
+/// One problem of an app (an appProblems document). [users] is how many different people had it ([usersMore]: more than the 100 the
+/// record keeps); [side] is 'user', 'device' or 'our' (AI Agent + Health System, 17 Nov 2026); [devices] and [oses] count the cases per
+/// phone model and Android version. Since 18 Nov 2026 the record also keeps its last 3 [examples] and up to 3 [shotPaths] (US bucket).
 class AppProblem {
-  const AppProblem({required this.id, required this.app, required this.platform, required this.kind, required this.message, this.screen = '', this.count = 1, this.lastAt, this.version = '', this.device = '', this.role = '', this.userCode = '', this.ms, this.users = 1, this.side = 'our', this.cause = '', this.option = '', this.devices = const {}, this.oses = const {}, this.status = 'open', this.lastShot = '', this.network = ''});
+  const AppProblem({required this.id, required this.app, required this.platform, required this.kind, required this.message, this.screen = '', this.count = 1, this.lastAt, this.version = '', this.device = '', this.role = '', this.userCode = '', this.ms, this.users = 1, this.side = 'our', this.cause = '', this.option = '', this.devices = const {}, this.oses = const {}, this.status = 'open', this.lastShot = '', this.network = '', this.usersMore = false, this.examples = const [], this.shotPaths = const []});
   final String id, app, platform, kind, message, screen, version, device, role, userCode, side, cause, option, status, lastShot, network;
   final int count, users;
+  final bool usersMore;
+  final List<Map<String, dynamic>> examples;
+  final List<String> shotPaths;
   final DateTime? lastAt;
   final int? ms;
   final Map<String, int> devices, oses;
@@ -96,7 +100,13 @@ class AppProblem {
     status: '${d['status'] ?? 'open'}',
     lastShot: '${d['lastShot'] ?? ''}',
     network: '${d['lastNetwork'] ?? ''}',
+    usersMore: d['usersMore'] == true,
+    examples: [for (final e in (d['examples'] is List ? d['examples'] as List : const [])) if (e is Map) Map<String, dynamic>.from(e)],
+    shotPaths: [for (final s in (d['shotPaths'] is List ? d['shotPaths'] as List : const [])) '$s'],
   );
+
+  /// The screenshots to show: the saved paths (at most 3), else the one of the version before 18 Nov 2026.
+  List<String> get screenshots => shotPaths.isNotEmpty ? shotPaths : [if (lastShot.isNotEmpty) lastShot];
 
   bool get solved => status == 'solved';
 

@@ -19,6 +19,7 @@ test('the header is checked, private details are taken out, one problem has one 
   assert.notEqual(fingerprint('vendor', 'otp', 'x'), fingerprint('staff', 'otp', 'x'));
   assert.equal(screenshotOf(''), null);
   assert.throws(() => screenshotOf(Buffer.from('GIF89a').toString('base64')), /PNG or JPEG/);
+  assert.throws(() => screenshotOf(Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(90 * 1024)]).toString('base64')), /under 80 KB/);
   assert.equal(screenshotOf(PNG).type, 'image/png');
 });
 
@@ -60,7 +61,7 @@ test('a report keeps the text and the screenshot; at most 5 a day per device', e
   const saved = (await db.collection('problemReports').doc(id).get()).data();
   assert.equal(saved.text, 'Cart button does nothing');
   assert.equal(saved.status, 'new');
-  assert.equal(saved.screenshotPath, `problemReports/${id}.png`);
+  assert.equal(saved.screenshotPath, `reports/${id}.png`, 'in the US bucket');
   assert.ok(files.has(saved.screenshotPath));
   await assert.rejects(saveReport(db, bucket, {...req, data: {...req.data, text: ''}}, now), /Write what went wrong/);
   for (let i = 0; i < 4; i++) await saveReport(db, bucket, req, now);

@@ -12,12 +12,18 @@
 //   solveSupportTickets  trigger on solvedProblems/<id> {problemId, by, at, how} (written when the admin marks a problem solved or a fix goes live):
 //                        every open ticket of that problem -> solved, and each person gets "Your problem is solved" in their language
 //
-//   supportTickets/<id>  {uid, deviceKey, app, platform, version, device, problemId, problemKind, cause, side, message, screen, option,
-//                         text, lang, auto, status: sent | seen | solved, reply, at, updatedAt, replyAt, userCode, phone, shot}
-//   supportShots/<id>    {data (JPEG, base64), ticketId, at, expiresAt}    the person's screenshot (deleted when solved / after 30 days)
+//   supportTickets/<id>  ONE ticket per problem (owner, 18 Nov 2026: cost cuts part 3): the same problem from more people counts up,
+//                        it never makes a ticket per person. Id p_<hash of problemId>; a typed question with no problem has its own.
+//                        {problemId, app, platform, problemKind, cause, side, message, screen, option, auto, status: sent | seen | solved,
+//                         reply, replyAt, count, users, usersMore, members: [u_<uid>, d_<device>] (the people's accounts and devices,
+//                         for MAX_MEMBERS people: whose "My problems" list shows it and who gets the answer), langs: {<member>: lang}, notes: [{text, at, member, userCode,
+//                         phone, role, lang}] (the people's own words, the last MAX_NOTES), shots, shotPaths, firstAt, at (latest),
+//                         updatedAt, and the latest version, device, userCode, phone, role, lang, text (the latest words), shot}
+//   screenshots          support/<ticketId>/<n>.<jpg|png> in the US bucket (functions/problem-shots.js), at most 3 a ticket; deleted
+//                        when solved and by the bucket after 30 days. supportShots (Firestore) was the place before 18 Nov 2026.
 //
 // Cost guards: 5 tickets and 10 AI answers a device a day; AI answers for everyone together at most settings/support.aiDailyLimit a day
-// (default 15); texts are cut short; emails, links and long numbers are taken out; a screenshot is at most 300 KB.
+// (default 15); texts are cut short; emails, links and long numbers are taken out; a screenshot is at most 80 KB.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {getFirestore, Timestamp, FieldValue} = require('firebase-admin/firestore');
@@ -27,14 +33,15 @@ const {requireRole, isAdminToken} = require('../../role-auth');
 const {requireAdminSession} = require('../../admin-session');
 const {task} = require('../../task');
 const {anthropic, anthropicKey, loadAiKey, logAiCall, takeDailyUse, AI_MODELS} = require('../ai-core');
+const {shots: shotStore} = require('../../problem-shots');
 
 const APPS = ['customer', 'vendor', 'staff', 'admin'];
 const SIDES = ['user', 'device', 'our'];
 const STATUSES = ['sent', 'seen', 'solved'];
 const TICKETS_PER_DAY = 5;
 const AI_PER_DEVICE = 10;
-const MAX_SHOT = 300 * 1024;
-const SHOT_DAYS = 30;
+const MAX_MEMBERS = 100;
+const MAX_NOTES = 20;
 const options = {region: 'us-central1', maxInstances: 3, invoker: 'public'};
 const IST = 19800000;
 
@@ -97,14 +104,18 @@ async function contactOf(db, auth) {
 
 function shotOf(base64) {
   if (!base64) return null;
-  if (typeof base64 !== 'string' || base64.length > Math.ceil(MAX_SHOT * 4 / 3) + 8) throw new HttpsError('invalid-argument', 'The screenshot must be under 300 KB.');
-  const head = Buffer.from(base64.slice(0, 8), 'base64');
-  if (!(head[0] === 0xff && head[1] === 0xd8) && !(head[0] === 0x89 && head[1] === 0x50)) throw new HttpsError('invalid-argument', 'The screenshot must be a JPEG or PNG.');
-  return base64;
+  const shot = shotStore.shotBytes(base64);
+  if (!shot) throw new HttpsError('invalid-argument', `The screenshot must be a JPEG or PNG under ${Math.round(shotStore.MAX_BYTES / 1024)} KB.`);
+  return shot;
 }
 
-/// Saves one ticket (the tests call it with a fake request).
-async function openTicket(db, request, now = Date.now()) {
+/// The ticket of one problem: the same id for everyone who meets it.
+const ticketIdOf = problemId => `p_${hash(problemId).slice(0, 20)}`;
+/// Who sent it: the signed-in account, else the device.
+const memberOf = (request, deviceKey) => (request.auth?.uid ? `u_${request.auth.uid}` : `d_${deviceKey}`);
+
+/// Saves one ticket, or counts up the ticket of the same problem (the tests call it with a fake request and a fake [bucket]).
+async function openTicket(db, request, now = Date.now(), {bucket} = {}) {
   const d = request.data || {};
   const app = APPS.includes(d.app) ? d.app : null;
   if (!app) throw new HttpsError('invalid-argument', `app must be one of ${APPS.join(', ')}`);
@@ -113,51 +124,90 @@ async function openTicket(db, request, now = Date.now()) {
   if (!text && !message) throw new HttpsError('invalid-argument', 'Write what went wrong.');
   const shot = shotOf(d.screenshot);
   const deviceKey = deviceKeyOf(d.deviceId || request.rawRequest?.ip);
-  // "Tell us more" for a report the box already sent: added to it (only from the same device).
-  if (d.ticketId) {
-    const ref = db.collection('supportTickets').doc(clip(d.ticketId, 60));
-    const t = (await ref.get()).data();
-    if (!t || t.deviceKey !== deviceKey) throw new HttpsError('not-found', 'This problem report is not there any more.');
-    if (!(await takeDevice(db, deviceKey, 'adds', 20, now))) throw new HttpsError('resource-exhausted', 'Thank you — our team has your messages.');
-    const at = Timestamp.fromMillis(now);
-    await ref.update({text: [t.text, text].filter(Boolean).join(' / ').slice(0, 3000), updatedAt: at, ...(shot ? {shot: true} : {}), ...(t.status === 'solved' ? {status: 'sent'} : {})});
-    if (shot) await db.collection('supportShots').doc(ref.id).set({data: shot, ticketId: ref.id, at, expiresAt: Timestamp.fromMillis(now + SHOT_DAYS * 86400000)});
-    return {id: ref.id, status: t.status === 'solved' ? 'sent' : t.status};
-  }
-  if (!(await takeDevice(db, deviceKey, 'tickets', TICKETS_PER_DAY, now))) {
-    throw new HttpsError('resource-exhausted', `You have sent ${TICKETS_PER_DAY} problems today. Thank you — our team is looking at them.`);
-  }
-  const {code, phone} = await contactOf(db, request.auth);
-  const platform = d.platform === 'android' ? 'android' : 'web';
-  const problemKind = clip(d.problemKind, 20);
-  const ref = db.collection('supportTickets').doc();
+  const member = memberOf(request, deviceKey);
   const at = Timestamp.fromMillis(now);
-  const batch = db.batch();
-  batch.set(ref, {
-    uid: request.auth?.uid || '', role: String(request.auth?.token?.role || ''), deviceKey, app, platform,
-    version: clip(d.version, 30), device: clean(d.device, 80), problemId: clip(d.problemId, 120) || problemIdOf(app, platform, problemKind, message), problemKind,
-    cause: clip(d.cause, 40).replace(/[^a-z_]/g, ''), side: SIDES.includes(d.side) ? d.side : 'our', message, screen: clip(d.screen, 60),
-    option: clean(d.option, 80), text, lang: langOf(d.lang), auto: d.auto === true, status: 'sent', reply: '', userCode: code, phone,
-    shot: !!shot, at, updatedAt: at,
+  const lang = langOf(d.lang);
+  const {code, phone} = await contactOf(db, request.auth);
+  const role = String(request.auth?.token?.role || '');
+  const note = text ? {text, at, member, userCode: code, phone, role, lang} : null;
+  const latest = {
+    version: clip(d.version, 30), device: clean(d.device, 80), userCode: code, phone, role, lang, updatedAt: at, at,
+    ...(text ? {text} : {}),
+  };
+  let ref;
+  if (d.ticketId) {
+    // "Tell us more" for a report the box already sent: added to it (only by someone it belongs to).
+    ref = db.collection('supportTickets').doc(clip(d.ticketId, 60));
+    if (!(await takeDevice(db, deviceKey, 'adds', 20, now))) throw new HttpsError('resource-exhausted', 'Thank you — our team has your messages.');
+  } else {
+    if (!(await takeDevice(db, deviceKey, 'tickets', TICKETS_PER_DAY, now))) {
+      throw new HttpsError('resource-exhausted', `You have sent ${TICKETS_PER_DAY} problems today. Thank you — our team is looking at them.`);
+    }
+    const platform = d.platform === 'android' ? 'android' : 'web';
+    const problemKind = clip(d.problemKind, 20);
+    const problemId = clip(d.problemId, 120) || problemIdOf(app, platform, problemKind, message);
+    ref = problemId ? db.collection('supportTickets').doc(ticketIdOf(problemId)) : db.collection('supportTickets').doc();
+    latest.problemId = problemId;
+    latest.first = {
+      app, platform, problemId, problemKind, cause: clip(d.cause, 40).replace(/[^a-z_]/g, ''), side: SIDES.includes(d.side) ? d.side : 'our',
+      message, screen: clip(d.screen, 60), option: clean(d.option, 80), auto: d.auto === true, reply: '', firstAt: at,
+    };
+  }
+  const result = await db.runTransaction(async tx => {
+    const t = (await tx.get(ref)).data();
+    if (d.ticketId && !(t?.members || []).some(m => m === member || m === `d_${deviceKey}`)) return {missing: true};
+    // members: the person's account and their device, so "My problems" finds it signed in or not; users counts people.
+    const members = Array.isArray(t?.members) ? t.members : [];
+    const known = members.includes(member);
+    const room = !known && members.length < MAX_MEMBERS * 2;
+    const keys = [...new Set([member, `d_${deviceKey}`])].filter(k => !members.includes(k));
+    const hadShots = Number(t?.shots) || 0;
+    const path = shot && hadShots < shotStore.MAX_PER_PROBLEM ? `support/${ref.id}/${now}.${shot.ext}` : '';
+    const status = !t || t.status === 'solved' ? 'sent' : t.status;
+    const {first, problemId: _p, ...fields} = latest;
+    tx.set(ref, {
+      ...(t ? {} : first),
+      ...fields, status,
+      count: FieldValue.increment(d.ticketId ? 0 : 1),
+      users: (t?.users || 0) + (room ? 1 : 0), usersMore: t?.usersMore === true || (!known && !room),
+      ...(room && keys.length ? {members: [...members, ...keys]} : {}),
+      langs: {[member]: lang},
+      ...(note ? {notes: [...(Array.isArray(t?.notes) ? t.notes : []), note].slice(-MAX_NOTES)} : {}),
+      ...(path ? {shot: true, shots: hadShots + 1, shotPaths: [...(t?.shotPaths || []), path]} : {}),
+      ...(t?.status === 'solved' ? {reopenedAt: at} : {}),
+    }, {merge: true});
+    return {status, path};
   });
-  if (shot) batch.set(db.collection('supportShots').doc(ref.id), {data: shot, ticketId: ref.id, at, expiresAt: Timestamp.fromMillis(now + SHOT_DAYS * 86400000)});
-  await batch.commit();
-  return {id: ref.id, status: 'sent'};
+  if (result.missing) throw new HttpsError('not-found', 'This problem report is not there any more.');
+  if (result.path) {
+    await shotStore.saveShot(bucket ?? shotStore.shotBucket(), result.path, shot).catch(error => console.warn('Support screenshot not saved', error.message));
+  }
+  return {id: ref.id, status: result.status};
 }
 
-/// The person's own tickets: their account's, or (not signed in) their device's. Newest first, at most 20.
+/// The person's own tickets: their account's and their device's. Newest first, at most 20; `text` is their own words only.
 async function myTickets(db, request) {
   const deviceKey = deviceKeyOf(request.data?.deviceId || request.rawRequest?.ip);
-  const queries = [db.collection('supportTickets').where('deviceKey', '==', deviceKey).limit(40).get()];
-  if (request.auth?.uid) queries.push(db.collection('supportTickets').where('uid', '==', request.auth.uid).limit(40).get());
-  const seen = new Map();
-  for (const q of await Promise.all(queries)) for (const doc of q.docs) seen.set(doc.id, doc);
+  const mine = [`d_${deviceKey}`, ...(request.auth?.uid ? [`u_${request.auth.uid}`] : [])];
+  const q = await db.collection('supportTickets').where('members', 'array-contains-any', mine).limit(40).get();
   const ms = t => t?.toMillis?.() ?? 0;
   return {
-    tickets: [...seen.values()].map(doc => ({id: doc.id, ...doc.data()})).sort((a, b) => ms(b.at) - ms(a.at)).slice(0, 20).map(t => ({
-      id: t.id, status: t.status, message: t.message, text: t.text, reply: t.reply || '', at: ms(t.at), replyAt: ms(t.replyAt), side: t.side,
+    tickets: q.docs.map(doc => ({id: doc.id, ...doc.data()})).sort((a, b) => ms(b.at) - ms(a.at)).slice(0, 20).map(t => ({
+      id: t.id, status: t.status, message: t.message, reply: t.reply || '', at: ms(t.at), replyAt: ms(t.replyAt), side: t.side,
+      text: (t.notes || []).filter(n => mine.includes(n.member)).map(n => n.text).join(' / '),
     })),
   };
+}
+
+/// Everyone a ticket's answer goes to: each signed-in member in their own language.
+async function pushMembers(db, t, title, body, {send} = {}) {
+  let sent = 0;
+  for (const m of t.members || []) {
+    if (!m.startsWith('u_')) continue;
+    const lang = t.langs?.[m] || t.lang || 'en';
+    sent += await pushPerson(db, m.slice(2), word('title', lang), body(lang), {send});
+  }
+  return sent;
 }
 
 /// A push to the person's phones / browsers when they are signed in (users/<uid>/pushTokens). Never throws.
@@ -175,7 +225,14 @@ async function pushPerson(db, uid, title, body, {send = m => getMessaging().send
 }
 
 /// The admin's answer: seen / solved and a reply the person reads in their app.
-async function answer(db, uid, data, now = Date.now(), {send} = {}) {
+/// A solved ticket's screenshots: the bucket folder, and the Firestore copy the version before 18 Nov 2026 kept.
+async function deleteTicketShots(db, ref, bucket) {
+  await shotStore.deleteShots(bucket ?? shotStore.shotBucket(), `support/${ref.id}/`);
+  await db.collection('supportShots').doc(ref.id).delete().catch(() => {});
+  await ref.update({shots: 0, shotPaths: [], shot: false}).catch(() => {});
+}
+
+async function answer(db, uid, data, now = Date.now(), {send, bucket} = {}) {
   const id = clip(data?.id, 60);
   const status = STATUSES.includes(data?.status) ? data.status : null;
   if (!id || !status || status === 'sent') throw new HttpsError('invalid-argument', 'Give the ticket id and the status seen or solved.');
@@ -185,25 +242,25 @@ async function answer(db, uid, data, now = Date.now(), {send} = {}) {
   if (!t) throw new HttpsError('not-found', 'This problem report is not there any more.');
   const at = Timestamp.fromMillis(now);
   await ref.update({status, updatedAt: at, ...(reply ? {reply, replyAt: at, replyBy: uid} : {}), ...(status === 'solved' ? {solvedAt: at} : {})});
-  if (status === 'solved') await db.collection('supportShots').doc(id).delete().catch(() => {});
+  if (status === 'solved') await deleteTicketShots(db, ref, bucket);
   await db.collection('agentLog').add({uid, email: '', action: `support_${status}`, command: '', target: id, platform: t.app, details: {reply: reply.slice(0, 200)}, at: FieldValue.serverTimestamp()});
-  const lang = t.lang || 'en';
-  if (status === 'solved') await pushPerson(db, t.uid, word('title', lang), reply || word('solved', lang), {send});
-  else if (reply) await pushPerson(db, t.uid, word('title', lang), `${word('reply', lang)}: ${reply.slice(0, 120)}`, {send});
+  // One answer reaches everyone who had this problem, each in their language.
+  if (status === 'solved') await pushMembers(db, t, '', lang => reply || word('solved', lang), {send});
+  else if (reply) await pushMembers(db, t, '', lang => `${word('reply', lang)}: ${reply.slice(0, 120)}`, {send});
   return {ok: true};
 }
 
 /// Marks every open ticket of [problemId] solved and tells each person, in their language: "Your problem is solved" (the fix agent
 /// calls this when a fix goes live). Returns how many.
-async function solveTicketsOf(db, problemId, now = Date.now(), {send} = {}) {
+async function solveTicketsOf(db, problemId, now = Date.now(), {send, bucket} = {}) {
   if (!problemId) return 0;
   const q = await db.collection('supportTickets').where('problemId', '==', problemId).limit(300).get();
   const open = q.docs.filter(d => d.data().status !== 'solved');
   const at = Timestamp.fromMillis(now);
   for (const d of open) {
     await d.ref.update({status: 'solved', solvedAt: at, updatedAt: at, reply: d.data().reply || word('solved', d.data().lang || 'en')});
-    await db.collection('supportShots').doc(d.id).delete().catch(() => {});
-    await pushPerson(db, d.data().uid, word('title', d.data().lang || 'en'), word('solved', d.data().lang || 'en'), {send});
+    await deleteTicketShots(db, d.ref, bucket);
+    await pushMembers(db, d.data(), '', lang => word('solved', lang), {send});
   }
   return open.length;
 }
@@ -237,7 +294,8 @@ async function ask(db, request, now = Date.now(), client = anthropic) {
   return {text: response.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim()};
 }
 
-/// Deletes the people's screenshots past their 30 days (the solved ones are deleted at once).
+/// Deletes the screenshots the version before 18 Nov 2026 kept in Firestore (supportShots) once past their 30 days. New ones are in
+/// the US bucket, which deletes them after 30 days by itself.
 async function cleanSupportShots(db, now = Date.now()) {
   const old = await db.collection('supportShots').where('expiresAt', '<', Timestamp.fromMillis(now)).limit(300).get();
   const b = db.batch();
@@ -263,4 +321,4 @@ exports.solveSupportTickets = onDocumentCreated({document: 'solvedProblems/{id}'
   const problemId = String(event.data?.data()?.problemId || '');
   console.log('Support tickets solved', await solveTicketsOf(getFirestore(), problemId));
 });
-exports._test = {openTicket, myTickets, answer, ask, solveTicketsOf, cleanSupportShots, deviceKeyOf, problemIdOf, WORDS, TICKETS_PER_DAY};
+exports._test = {ticketIdOf, MAX_MEMBERS, MAX_NOTES, openTicket, myTickets, answer, ask, solveTicketsOf, cleanSupportShots, deviceKeyOf, problemIdOf, WORDS, TICKETS_PER_DAY};

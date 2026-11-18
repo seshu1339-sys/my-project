@@ -149,7 +149,7 @@ class _AiSupportBoxState extends State<AiSupportBox> {
           () async {
             final file = await ImagePicker().pickImage(source: ImageSource.gallery);
             if (file == null) return null;
-            final small = await shrinkPhotoInBackground(await file.readAsBytes());
+            final small = await shrinkProblemShotInBackground(await file.readAsBytes());
             return small == null ? null : base64Encode(small);
           })();
       if (picked != null && mounted) setState(() => screenshot = picked);

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../services/problem_shots.dart';
 import '../domain/health_status.dart';
 import '../services/agent_log.dart';
 import 'admin_frame.dart';
@@ -88,9 +89,9 @@ class _InboxState extends State<_Inbox> {
     }
   }
 
-  Future<void> _shot(String id) async {
-    final d = (await widget.store.firestore.collection('supportShots').doc(id).get()).data();
-    final b64 = '${d?['data'] ?? ''}';
+  /// One screenshot: a US-bucket path, or the ticket id of the version before 18 Nov 2026 (supportShots).
+  Future<void> _shot(String ref) async {
+    final b64 = await loadProblemShot(widget.store, ref, oldCollection: 'supportShots');
     if (!mounted) return;
     await showDialog<void>(context: context, builder: (_) => Dialog(child: b64.isEmpty ? const Padding(padding: EdgeInsets.all(24), child: Text('The screenshot was deleted.')) : InteractiveViewer(child: Image.memory(base64Decode(b64)))));
   }
@@ -119,7 +120,18 @@ class _InboxState extends State<_Inbox> {
             Text(_when(t['at']), style: const TextStyle(fontSize: 12)),
           ]),
           if ('${t['message'] ?? ''}'.isNotEmpty) SelectableText('${t['message']}', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-          if ('${t['text'] ?? ''}'.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text('"${t['text']}"', style: const TextStyle(fontSize: 15))),
+          // One ticket per problem (18 Nov 2026): how many times and people, and each person's own words.
+          if (((t['count'] as num?)?.toInt() ?? 1) > 1)
+            Text('${t['count']} times · ${peopleText((t['users'] as num?)?.toInt() ?? 1, t['usersMore'] == true)}',
+                key: ValueKey('support-count-$id'), style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (t['notes'] is List && (t['notes'] as List).isNotEmpty)
+            for (final n in (t['notes'] as List).whereType<Map>())
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('"${n['text'] ?? ''}"${'${n['userCode'] ?? ''}'.isEmpty ? '' : ' — ${n['userCode']}'}${'${n['phone'] ?? ''}'.isEmpty ? '' : ' 📞 ${n['phone']}'}', style: const TextStyle(fontSize: 15)),
+              )
+          else if ('${t['text'] ?? ''}'.isNotEmpty)
+            Padding(padding: const EdgeInsets.only(top: 4), child: Text('"${t['text']}"', style: const TextStyle(fontSize: 15))),
           Text([
             if ('${t['screen'] ?? ''}'.isNotEmpty) 'screen ${t['screen']}',
             if ('${t['option'] ?? ''}'.isNotEmpty) 'option "${t['option']}"',
@@ -140,7 +152,9 @@ class _InboxState extends State<_Inbox> {
             decoration: const InputDecoration(labelText: 'Reply (shows in their app)', border: OutlineInputBorder(), isDense: true),
           ),
           Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            if (t['shot'] == true) TextButton.icon(onPressed: () => _shot(id), icon: const Icon(Icons.image_outlined, size: 16), label: const Text('Screenshot')),
+            for (final (i, path) in [for (final p in (t['shotPaths'] is List ? t['shotPaths'] as List : const [])) '$p'].indexed)
+              TextButton.icon(key: ValueKey('support-shot-$id-$i'), onPressed: () => _shot(path), icon: const Icon(Icons.image_outlined, size: 16), label: Text('Screenshot ${i + 1}')),
+            if (t['shot'] == true && t['shotPaths'] is! List) TextButton.icon(onPressed: () => _shot(id), icon: const Icon(Icons.image_outlined, size: 16), label: const Text('Screenshot')),
             OutlinedButton(key: ValueKey('support-seen-$id'), onPressed: () => _answer(t, 'seen'), child: const Text('Seen + send reply')),
             FilledButton(key: ValueKey('support-solved-$id'), onPressed: () => _answer(t, 'solved'), child: const Text('Solved')),
             if ('${t['problemId'] ?? ''}'.isNotEmpty)

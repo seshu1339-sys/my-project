@@ -15,7 +15,8 @@ import 'package:image/image.dart' as img;
 /// screen is captured (never the phone's other apps or the system bars). Payment pages of the payment company open outside the app
 /// and are never in it.
 ///
-/// Size: about 480 pixels wide, JPEG, at most ~110 KB (Firestore, free); deleted when the problem is solved or after 30 days.
+/// Size: about 480 pixels wide, JPEG, at most 60 KB; kept in the US bucket (free 5 GB), at most 3 a problem, deleted when the problem
+/// is solved or after 30 days (functions/problem-shots.js).
 class ScreenCapture {
   ScreenCapture._();
 
@@ -23,7 +24,7 @@ class ScreenCapture {
   static final boundaryKey = GlobalKey(debugLabel: 'screen-capture');
 
   static const targetWidth = 480.0;
-  static const maxBytes = 110 * 1024;
+  static const maxBytes = 60 * 1024;
 
   /// Test seam: a fixed picture instead of the real screen (also read by app_monitoring to take pictures in tests).
   static Future<String?> Function()? testCapture;

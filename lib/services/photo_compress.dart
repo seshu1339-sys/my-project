@@ -29,5 +29,11 @@ Uint8List? shrinkPhoto(Uint8List bytes, {int maxBytes = itemPhotoMaxBytes}) {
   return img.encodeJpg(photo, quality: 35);
 }
 
+/// A problem screenshot ("Report a problem", the AI Support box): smaller still (owner, 18 Nov 2026: cost cuts part 3); the server
+/// refuses anything over 80 KB.
+const problemShotMaxBytes = 60 * 1024;
+Uint8List? shrinkProblemShot(Uint8List bytes) => shrinkPhoto(bytes, maxBytes: problemShotMaxBytes);
+Future<Uint8List?> shrinkProblemShotInBackground(Uint8List bytes) => kIsWeb ? Future.value(shrinkProblemShot(bytes)) : compute(shrinkProblemShot, bytes);
+
 /// [shrinkPhoto] away from the screen's thread (on a phone).
 Future<Uint8List?> shrinkPhotoInBackground(Uint8List bytes) => kIsWeb ? Future.value(shrinkPhoto(bytes)) : compute(shrinkPhoto, bytes);

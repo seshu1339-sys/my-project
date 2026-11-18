@@ -121,6 +121,8 @@ Object.assign(exports, require('./modules/agent'));
 Object.assign(exports, require('./modules/health'));
 // App problems: errors, key failures and "Report a problem" from every app, for the Health and App Health pages (functions/modules/app-problems).
 Object.assign(exports, require('./modules/app-problems'));
+// Problem screenshots: one US bucket for every problem screenshot, opened only by the admin (functions/problem-shots.js).
+exports.problemShot = require('./problem-shots').problemShot;
 // AI Support: the AI Support box's problem reports, the admin's replies, the limited AI answers (functions/modules/support).
 Object.assign(exports, require('./modules/support'));
 // Abuse reports: reports, the automatic temporary suspension and the admin's restore / permanent block (functions/modules/abuse-reports).

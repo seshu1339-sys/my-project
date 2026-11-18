@@ -138,6 +138,14 @@ void main() {
       expect(boxes, hasLength(1), reason: 'a quantity + is tapped again on purpose');
       final list = await problems();
       expect(list.single['message'], 'No answer to "Save item" after 3 taps');
+      expect(list.single.containsKey('shot'), isFalse, reason: 'many taps: counted only, never a screenshot (owner, 18 Nov 2026)');
+    });
+
+    test('a slow save is counted, never photographed', () async {
+      AppMonitoring.slowCall('saveQuickItem', const Duration(seconds: 12), option: 'Save item');
+      final list = await problems();
+      expect(list.single['kind'], 'slow');
+      expect(list.single.containsKey('shot'), isFalse);
     });
   });
 

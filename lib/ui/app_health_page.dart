@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../data/store.dart';
 import '../domain/health_status.dart';
 import '../services/agent_log.dart';
+import '../services/problem_shots.dart';
 import 'admin_frame.dart';
 import 'agent_ai_settings.dart';
 
@@ -124,15 +125,19 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
   }
 
   Future<void> _showShot(String path) async {
-    final url = await FirebaseStorage.instance.ref(path).getDownloadURL();
-    if (!mounted) return;
-    await showDialog<void>(context: context, builder: (d) => Dialog(child: InteractiveViewer(child: Image.network(url))));
+    // Reports before 18 Nov 2026 kept their screenshot in the Mumbai bucket; new ones are in the US bucket.
+    if (path.startsWith('problemReports/')) {
+      final url = await FirebaseStorage.instance.ref(path).getDownloadURL();
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (d) => Dialog(child: InteractiveViewer(child: Image.network(url))));
+      return;
+    }
+    await _showAutoShot(path);
   }
 
-  /// The automatic screenshot of a problem's latest case (appShots), shown full size.
-  Future<void> _showAutoShot(String caseId) async {
-    final d = (await widget.store.firestore.collection('appShots').doc(caseId).get()).data();
-    final data = '${d?['data'] ?? ''}';
+  /// One screenshot of a problem (the US bucket, or an appShots record of the version before), shown full size.
+  Future<void> _showAutoShot(String ref) async {
+    final data = await loadProblemShot(widget.store, ref);
     if (!mounted) return;
     await showDialog<void>(
       context: context,
@@ -148,11 +153,11 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Tooltip(
-            message: '${p.users} people, ${p.count} times',
+            message: '${peopleText(p.users, p.usersMore)}, ${p.count} times',
             child: Chip(
               visualDensity: VisualDensity.compact,
               avatar: const Icon(Icons.people_alt_outlined, size: 16),
-              label: Text('${p.users} · ${p.count}×', key: ValueKey('app-health-impact-${p.id}')),
+              label: Text('${p.users}${p.usersMore ? '+' : ''} · ${p.count}×', key: ValueKey('app-health-impact-${p.id}')),
               backgroundColor: p.kind == 'crash' || p.users >= 5 ? const Color(0xFFFFCDD2) : const Color(0xFFFFE0B2),
             ),
           ),
@@ -175,8 +180,26 @@ class _AppTabState extends State<_AppTab> with AutomaticKeepAliveClientMixin {
         ].join(' · '), style: const TextStyle(fontSize: 12, color: Colors.black54)),
         if (p.devices.isNotEmpty) Text('Phones: ${AppProblem.topOf(p.devices)}', key: ValueKey('app-health-devices-${p.id}'), style: const TextStyle(fontSize: 12)),
         if (p.oses.isNotEmpty && p.platform == 'android') Text('Android: ${AppProblem.topOf(p.oses)}', style: const TextStyle(fontSize: 12)),
+        // The last 3 times it happened (one record per problem: no record per person).
+        for (final (i, e) in p.examples.indexed)
+          Text([
+            _when(e['at']),
+            if ('${e['version'] ?? ''}'.isNotEmpty) 'v${e['version']}',
+            if ('${e['model'] ?? ''}'.isNotEmpty) '${e['model']}',
+            if ('${e['os'] ?? ''}'.isNotEmpty && e['os'] != 'unknown') '${e['os']}',
+            if ('${e['role'] ?? ''}'.isNotEmpty) '${e['role']}',
+            if ('${e['userCode'] ?? ''}'.isNotEmpty) '${e['userCode']}',
+            if ('${e['phone'] ?? ''}'.isNotEmpty) '📞 ${e['phone']}',
+            if ('${e['network'] ?? ''}'.isNotEmpty) '${e['network']}',
+          ].join(' · '), key: ValueKey('app-health-example-${p.id}-$i'), style: const TextStyle(fontSize: 12, color: Colors.black54)),
         Wrap(spacing: 4, children: [
-          if (p.lastShot.isNotEmpty) TextButton.icon(onPressed: () => _showAutoShot(p.lastShot), icon: const Icon(Icons.image_outlined, size: 16), label: const Text('Screenshot')),
+          for (final (i, shot) in p.screenshots.indexed)
+            TextButton.icon(
+              key: ValueKey('app-health-shot-${p.id}-$i'),
+              onPressed: () => _showAutoShot(shot),
+              icon: const Icon(Icons.image_outlined, size: 16),
+              label: Text(p.screenshots.length == 1 ? 'Screenshot' : 'Screenshot ${i + 1}'),
+            ),
           if (aiOn && explained[p.id] == null)
             TextButton.icon(onPressed: () => _explain(p), icon: const Icon(Icons.auto_awesome_outlined, size: 16), label: const Text('AI explain (Telugu)')),
         ]),

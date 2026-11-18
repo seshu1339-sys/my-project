@@ -7,30 +7,33 @@
 //                                 side, cause, shot?}]} -> {saved, cases: [<caseId>]}
 //   reportProblem      anyone -> {app, platform, version, device, deviceId, text, screen, screenshot?} -> {id}   "Report a problem"
 //
-//   appProblems/<app>~<platform>~<kind>~<fp> {app, platform, kind, message, screen, option, count, users, devices: {<model>: n},
-//                                            oses: {<version>: n}, side, cause, status, burst, lastAt, lastVersion, lastDevice,
-//                                            lastRole, lastUserCode, lastShot}
-//   appProblems/<id>/who/<person>            one per person (signed-in account, else device): how `users` is counted
-//   appCases/<id>                            every case: app, platform, version, screen, option, device, os, network, uid, phone,
-//                                            userCode, role, what, side, cause, problemId, at, shot (functions only, admin reads)
-//   appShots/<caseId>                        {problemId, data (JPEG, base64), at, expiresAt}: the automatic screenshot, deleted when the
-//                                            problem is solved or after 30 days (cleanAppShots task)
+//   appProblems/<app>~<platform>~<kind>~<fp> {app, platform, kind, message, screen, option, count, users, usersMore, people,
+//                                            devices: {<model>: n}, oses: {<version>: n}, side, cause, status, burst, lastAt,
+//                                            lastVersion, lastDevice, lastRole, lastUserCode, examples, shots, shotPaths, lastShot}
+//     ONE record per problem (owner, 18 Nov 2026: cost cuts part 3): the same problem only counts up. No record per person or per
+//     time: `people` holds up to MAX_PEOPLE short codes (a hash of the account or device) to count `users`; past that `usersMore`
+//     is true ("100+"). `examples` are the last 3 times it happened (time, version, phone, role, Vendor/Staff ID, phone number...).
+//     Screenshots: at most 3 a problem (`shots`, `shotPaths`), in the US bucket (functions/problem-shots.js), never for a slow
+//     save or many taps (only counted). Records written before this (appCases, appShots, appProblems/<id>/who) are no longer
+//     written; scripts/old-problem-records.cjs counts them and deletes them only with the owner's OK.
 //   appProblemsDaily/<day>~<app>~<platform>  {day, app, platform, total, kinds: {<kind>: n}}
 //   problemReports/<id>                      {app, platform, version, device, text, screen, screenshotPath, uid, role, userCode, status, at}
+//                                            screenshotPath is reports/<id>.<jpg|png> in the US bucket
 //   appProblemDevices/<device hash>~<day>    {count, reports, shots}   the per-device daily cap (functions only)
 //   healthAlerts/<problemId>                 the burst alert (alerts.js); settings/health {burstCount, burstMinutes, burstSides}
 //   billingAlert (Pub/Sub "billing-alerts")  a Google Cloud budget passed a new threshold: red line + admin push (billing.js)
 //   solvedProblems/<id> {problemId, by, at}  written when the admin marks a problem solved or its fix goes live: the problem becomes
-//                                            'solved', its alert closes and its screenshots are deleted (problemSolved trigger)
+//                                            'solved', its alert closes and its screenshots are deleted (problemSolved trigger); the
+//                                            bucket deletes any screenshot after 30 days by itself
 //
 // Cost guards: a device sends at most DEVICE_DAILY_CAP problems, SHOTS_PER_DAY screenshots and REPORTS_PER_DAY reports a day (the rest
 // are dropped), at most MAX_BATCH problems a call, texts are cut short, emails / links / long numbers are taken out, bots are ignored,
-// an automatic screenshot is at most 120 KB and a report's at most 400 KB.
+// a screenshot is at most 80 KB (the phone makes it 30-60 KB) and a problem keeps at most 3.
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {onMessagePublished} = require('firebase-functions/v2/pubsub');
 const {getFirestore, FieldValue, Timestamp} = require('firebase-admin/firestore');
-const {getStorage} = require('firebase-admin/storage');
+const {shots: shotStore} = require('../../problem-shots');
 const {createHash} = require('node:crypto');
 const {task} = require('../../task');
 const {healthConfig, deviceParts, sideOf, nextBurst, SIDES} = require('./cases');
@@ -43,11 +46,12 @@ const APPS = ['customer', 'vendor', 'staff', 'admin'];
 const KINDS = ['crash', 'error', 'login', 'otp', 'email', 'location', 'upload', 'api', 'slow', 'tap', 'freeze', 'stuck', 'repeat'];
 const DEVICE_DAILY_CAP = 30;
 const SHOTS_PER_DAY = 10;
-const MAX_SHOT = 120 * 1024;
-const SHOT_DAYS = 30;
 const REPORTS_PER_DAY = 5;
 const MAX_BATCH = 10;
-const MAX_SCREENSHOT = 400 * 1024;
+// Counted only, never a screenshot (owner, 18 Nov 2026): a slow save and many taps are guesses, not failures the person saw.
+const NO_SHOT_KINDS = ['slow', 'tap'];
+const MAX_PEOPLE = 100;
+const MAX_EXAMPLES = 3;
 const BOT = /bot|crawl|spider|slurp|headless|lighthouse|phantom|puppeteer|playwright|selenium|curl|wget|python-requests/i;
 const options = {region: 'us-central1', maxInstances: 3, invoker: 'public'};
 
@@ -115,11 +119,10 @@ async function takeAllowance(db, deviceKey, n, field, cap, now) {
 const deviceKeyOf = (h, request) => hash(h.deviceId || request.rawRequest?.ip || 'unknown').slice(0, 24);
 const isBot = request => BOT.test(String(request.rawRequest?.headers?.['user-agent'] || ''));
 
-/// An automatic screenshot (a small JPEG, base64) or null when there is none or it is not a JPEG / too big (then it is just left out).
+/// An automatic screenshot (a small JPEG) as bytes, or null when there is none or it is not a JPEG / too big (then it is left out).
 function autoShotOf(base64) {
-  if (typeof base64 !== 'string' || !base64 || base64.length > Math.ceil(MAX_SHOT * 4 / 3) + 8) return null;
-  const head = Buffer.from(base64.slice(0, 8), 'base64');
-  return head[0] === 0xff && head[1] === 0xd8 ? base64 : null;
+  const shot = shotStore.shotBytes(base64);
+  return shot?.type === 'image/jpeg' ? shot : null;
 }
 
 /// One problem from a call, checked.
@@ -132,7 +135,7 @@ function problemOf(p) {
     ms: Number.isFinite(Number(p?.ms)) ? Math.round(Number(p.ms)) : null,
     side: SIDES.includes(p?.side) ? p.side : 'our',
     cause: clip(p?.cause, 40).replace(/[^a-z_]/g, ''),
-    shot: autoShotOf(p?.shot),
+    shot: NO_SHOT_KINDS.includes(p?.kind) ? null : autoShotOf(p?.shot),
   };
 }
 
@@ -149,30 +152,30 @@ async function loadConfig(db, now) {
 }
 const resetConfig = () => { configCache = {at: -Infinity, value: null}; };
 
-/// Saves a batch of problems, one case record each (the tests call it with a fake request and a fake [send] for the admin push).
-async function saveProblems(db, request, now = Date.now(), {send} = {}) {
-  if (isBot(request)) return {saved: 0, cases: []};
+/// Saves a batch of problems: each problem's one record counts up (the tests call it with a fake request, a fake [send] for the admin
+/// push and a fake [bucket]).
+async function saveProblems(db, request, now = Date.now(), {send, bucket} = {}) {
+  if (isBot(request)) return {saved: 0, problems: []};
   const data = request.data || {};
   const h = header(data);
   const list = (Array.isArray(data.problems) ? data.problems : []).slice(0, MAX_BATCH).map(problemOf).filter(p => p.message);
-  if (!list.length) return {saved: 0, cases: []};
+  if (!list.length) return {saved: 0, problems: []};
   const deviceKey = deviceKeyOf(h, request);
   const allowed = await takeAllowance(db, deviceKey, list.length, 'count', DEVICE_DAILY_CAP, now);
   const keep = list.slice(0, allowed);
-  if (!keep.length) return {saved: 0, cases: []};
+  if (!keep.length) return {saved: 0, problems: []};
   const wantShots = keep.filter(p => p.shot).length;
   let shotsLeft = wantShots ? await takeAllowance(db, deviceKey, wantShots, 'shots', SHOTS_PER_DAY, now) : 0;
   const cfg = await loadConfig(db, now);
   const role = String(request.auth?.token?.role || '');
   const {code, phone} = await contactOf(db, request.auth);
-  const person = request.auth?.uid ? `u_${request.auth.uid}` : `d_${deviceKey}`;
+  const person = hash(request.auth?.uid ? `u_${request.auth.uid}` : `d_${deviceKey}`).slice(0, 10);
   const {model, os} = deviceParts(h.device, h.os);
   const at = Timestamp.fromMillis(now);
-  const batch = db.batch();
   const kinds = {};
-  const cases = [];
   const alerts = [];
-  // The same problem twice in one call is counted once with n = 2 (the reads below are made before any write).
+  const uploads = [];
+  // The same problem twice in one call is counted once with n = 2.
   const groups = new Map();
   for (const p of keep) {
     const id = problemId(h.app, h.platform, p.kind, p.message);
@@ -184,83 +187,90 @@ async function saveProblems(db, request, now = Date.now(), {send} = {}) {
   }
   for (const g of groups.values()) {
     const ref = db.collection('appProblems').doc(g.id);
-    const whoRef = ref.collection('who').doc(person);
-    const [snap, who] = await db.getAll(ref, whoRef);
-    const prev = snap.data() || {};
-    const users = (prev.users || 0) + (who.exists ? 0 : 1);
-    const devices = {...(prev.devices || {}), [model]: ((prev.devices || {})[model] || 0) + g.n};
-    const oses = {...(prev.oses || {}), [os]: ((prev.oses || {})[os] || 0) + g.n};
-    const side = sideOf({clientSide: g.p.side, users, devices, oses});
-    const {burst, alert} = nextBurst(prev.burst, g.n, now, cfg);
-    let lastShot = null;
-    for (let i = 0; i < g.n; i++) {
-      const caseRef = db.collection('appCases').doc();
-      const shot = g.shots[i];
-      batch.set(caseRef, {
-        problemId: g.id, app: h.app, platform: h.platform, version: h.version, kind: g.p.kind, what: g.p.message, screen: g.p.screen,
-        option: g.p.option, device: h.device, model, os, network: h.network, uid: request.auth?.uid || '', role, userCode: code, phone,
-        side, cause: g.p.cause, ...(g.p.ms != null ? {ms: g.p.ms} : {}), shot: !!shot, at,
-      });
-      if (shot) {
-        batch.set(db.collection('appShots').doc(caseRef.id), {problemId: g.id, data: shot, at, expiresAt: Timestamp.fromMillis(now + SHOT_DAYS * 86400000)});
-        lastShot = caseRef.id;
-      }
-      cases.push(caseRef.id);
+    const result = await db.runTransaction(async tx => {
+      const prev = (await tx.get(ref)).data() || {};
+      // Who had it: a short code per person, at most MAX_PEOPLE (then "100+").
+      const people = Array.isArray(prev.people) ? prev.people : [];
+      const known = people.includes(person);
+      const room = !known && people.length < MAX_PEOPLE;
+      const users = (prev.users || 0) + (room ? 1 : 0);
+      const usersMore = prev.usersMore === true || (!known && !room);
+      const devices = {...(prev.devices || {}), [model]: ((prev.devices || {})[model] || 0) + g.n};
+      const oses = {...(prev.oses || {}), [os]: ((prev.oses || {})[os] || 0) + g.n};
+      const side = sideOf({clientSide: g.p.side, users, devices, oses});
+      const {burst, alert} = nextBurst(prev.burst, g.n, now, cfg);
+      // At most 3 screenshots for one problem, all apps and people together.
+      const had = Number(prev.shots) || 0;
+      const take = g.shots.slice(0, Math.max(0, shotStore.MAX_PER_PROBLEM - had));
+      const paths = take.map((_, i) => `${shotStore.problemFolder(g.id)}${now}-${had + i + 1}.jpg`);
+      const example = {
+        at, version: h.version, device: h.device, model, os, network: h.network, role, userCode: code, phone, screen: g.p.screen,
+        option: g.p.option, ...(g.p.ms != null ? {ms: g.p.ms} : {}), shot: paths.at(-1) || '',
+      };
+      tx.set(ref, {
+        app: h.app, platform: h.platform, kind: g.p.kind, message: g.p.message, screen: g.p.screen, option: g.p.option,
+        count: FieldValue.increment(g.n), users, usersMore, ...(room ? {people: [...people, person]} : {}),
+        devices: {[model]: FieldValue.increment(g.n)}, oses: {[os]: FieldValue.increment(g.n)},
+        side, cause: g.p.cause, status: 'open', burst, lastAt: at, lastVersion: h.version, lastDevice: h.device, lastRole: role,
+        lastUserCode: code, lastNetwork: h.network, ...(g.p.ms != null ? {lastMs: g.p.ms} : {}),
+        examples: [example, ...(Array.isArray(prev.examples) ? prev.examples : [])].slice(0, MAX_EXAMPLES),
+        ...(paths.length ? {shots: had + paths.length, shotPaths: [...(prev.shotPaths || []), ...paths], lastShot: paths.at(-1)} : {}),
+        ...(prev.status === 'solved' ? {reopenedAt: at} : {}),
+      }, {merge: true});
+      return {side, burst, alert, paths, take};
+    });
+    result.take.forEach((shot, i) => uploads.push([result.paths[i], shot]));
+    if (result.alert && cfg.burstSides.includes(result.side)) {
+      const {shot: _shot, ...problem} = g.p;
+      alerts.push({id: g.id, ...problem, app: h.app, platform: h.platform, side: result.side, n: result.burst.n});
     }
-    if (!who.exists) batch.set(whoRef, {at});
-    batch.set(ref, {
-      app: h.app, platform: h.platform, kind: g.p.kind, message: g.p.message, screen: g.p.screen, option: g.p.option,
-      count: FieldValue.increment(g.n), users, devices: {[model]: FieldValue.increment(g.n)}, oses: {[os]: FieldValue.increment(g.n)},
-      side, cause: g.p.cause, status: 'open', burst, lastAt: at, lastVersion: h.version, lastDevice: h.device, lastRole: role,
-      lastUserCode: code, lastNetwork: h.network, ...(g.p.ms != null ? {lastMs: g.p.ms} : {}), ...(lastShot ? {lastShot} : {}),
-      ...(prev.status === 'solved' ? {reopenedAt: at} : {}),
-    }, {merge: true});
-    if (alert && cfg.burstSides.includes(side)) alerts.push({id: g.id, ...g.p, app: h.app, platform: h.platform, side, n: burst.n});
   }
-  batch.set(db.collection('appProblemsDaily').doc(`${dayKey(now)}~${h.app}~${h.platform}`), {
+  await db.collection('appProblemsDaily').doc(`${dayKey(now)}~${h.app}~${h.platform}`).set({
     day: dayKey(now), app: h.app, platform: h.platform, total: FieldValue.increment(keep.length),
     kinds: Object.fromEntries(Object.entries(kinds).map(([k, n]) => [k, FieldValue.increment(n)])),
   }, {merge: true});
-  await batch.commit();
+  if (uploads.length) {
+    const b = bucket ?? shotStore.shotBucket();
+    // A screenshot that cannot be saved is left out; the problem itself is already counted.
+    await Promise.all(uploads.map(([path, shot]) => shotStore.saveShot(b, path, shot).catch(error => console.warn('Screenshot not saved', error.message))));
+  }
   for (const a of alerts) await raiseBurstAlert(db, a, {n: a.n, minutes: cfg.burstMinutes, now, send});
-  return {saved: keep.length, cases, alerts: alerts.length};
+  return {saved: keep.length, problems: [...groups.keys()], alerts: alerts.length};
 }
 
-/// A problem was solved: its record says so, its alert closes and its screenshots are marked for deletion (cleanShots deletes them).
-async function markSolved(db, problemId, now = Date.now()) {
+/// A problem was solved: its record says so, its alert closes and its screenshots are deleted (new ones may come if it happens again).
+async function markSolved(db, problemId, now = Date.now(), {bucket} = {}) {
   const ref = db.collection('appProblems').doc(problemId);
-  if (!(await ref.get()).exists) return 0;
+  const prev = (await ref.get()).data();
+  if (!prev) return 0;
   const at = Timestamp.fromMillis(now);
-  await ref.update({status: 'solved', solvedAt: at});
+  await ref.update({
+    status: 'solved', solvedAt: at, shots: 0, shotPaths: [], lastShot: '',
+    examples: (Array.isArray(prev.examples) ? prev.examples : []).map(e => ({...e, shot: ''})),
+  });
   await db.collection('healthAlerts').doc(problemId).set({open: false, closedAt: at}, {merge: true});
-  const shots = await db.collection('appShots').where('problemId', '==', problemId).limit(400).get();
-  const b = db.batch();
-  shots.docs.forEach(d => b.delete(d.ref));
-  if (shots.size) await b.commit();
-  return shots.size;
+  await shotStore.deleteShots(bucket ?? shotStore.shotBucket(), shotStore.problemFolder(problemId));
+  return (prev.shotPaths || []).length;
 }
 
-/// Deletes the automatic screenshots that are past their 30 days, and those of solved problems (a few hundred a run).
+/// Deletes the screenshots the version before 18 Nov 2026 left in Firestore (appShots) once they are past their 30 days. New
+/// screenshots are in the US bucket, which deletes them after 30 days by itself.
 async function cleanShots(db, now = Date.now()) {
   const old = await db.collection('appShots').where('expiresAt', '<', Timestamp.fromMillis(now)).limit(300).get();
-  const solved = await db.collection('appShots').where('solved', '==', true).limit(300).get();
-  const refs = [...new Map([...old.docs, ...solved.docs].map(d => [d.id, d.ref])).values()];
-  for (let i = 0; i < refs.length; i += 400) {
+  if (old.size) {
     const b = db.batch();
-    refs.slice(i, i + 400).forEach(r => b.delete(r));
+    old.docs.forEach(d => b.delete(d.ref));
     await b.commit();
   }
-  return refs.length;
+  return old.size;
 }
 
 /// The screenshot as bytes and type, or null; a wrong one is refused.
 function screenshotOf(base64) {
   if (!base64) return null;
-  if (typeof base64 !== 'string' || base64.length > Math.ceil(MAX_SCREENSHOT * 4 / 3) + 8) throw new HttpsError('invalid-argument', 'The screenshot must be under 400 KB.');
-  const bytes = Buffer.from(base64, 'base64');
-  const png = bytes[0] === 0x89 && bytes[1] === 0x50, jpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
-  if (!png && !jpeg) throw new HttpsError('invalid-argument', 'The screenshot must be a PNG or JPEG.');
-  return {bytes, type: png ? 'image/png' : 'image/jpeg', ext: png ? 'png' : 'jpg'};
+  const shot = shotStore.shotBytes(base64);
+  if (!shot) throw new HttpsError('invalid-argument', `The screenshot must be a PNG or JPEG under ${Math.round(shotStore.MAX_BYTES / 1024)} KB.`);
+  return shot;
 }
 
 /// Saves one "Report a problem" (the tests pass a fake [bucket]).
@@ -277,8 +287,7 @@ async function saveReport(db, bucket, request, now = Date.now()) {
   const ref = db.collection('problemReports').doc();
   let screenshotPath = '';
   if (shot) {
-    screenshotPath = `problemReports/${ref.id}.${shot.ext}`;
-    await bucket.file(screenshotPath).save(shot.bytes, {contentType: shot.type, resumable: false});
+    screenshotPath = await shotStore.saveShot(bucket, `reports/${ref.id}.${shot.ext}`, shot);
   }
   await ref.set({
     app: h.app, platform: h.platform, version: h.version, device: h.device, text, screen: clip(data.screen, 60), screenshotPath,
@@ -298,6 +307,6 @@ exports.problemSolved = onDocumentCreated({document: 'solvedProblems/{id}', regi
   if (problemId) console.log('Problem solved, screenshots deleted', await markSolved(getFirestore(), problemId));
 });
 exports.cleanAppShots = task(async () => console.log('App screenshots deleted', await cleanShots(getFirestore())));
-exports.reportProblem = onCall({...options, memory: '256MiB'}, async request => saveReport(getFirestore(), getStorage().bucket(), request));
+exports.reportProblem = onCall({...options, memory: '256MiB'}, async request => saveReport(getFirestore(), shotStore.shotBucket(), request));
 
-exports._test = {saveProblems, saveReport, header, clean, fingerprint, problemId, screenshotOf, autoShotOf, problemOf, contactOf, cleanShots, markSolved, resetConfig, KINDS, DEVICE_DAILY_CAP, SHOTS_PER_DAY, REPORTS_PER_DAY, dayKey};
+exports._test = {MAX_PEOPLE, MAX_EXAMPLES, NO_SHOT_KINDS, saveProblems, saveReport, header, clean, fingerprint, problemId, screenshotOf, autoShotOf, problemOf, contactOf, cleanShots, markSolved, resetConfig, KINDS, DEVICE_DAILY_CAP, SHOTS_PER_DAY, REPORTS_PER_DAY, dayKey};

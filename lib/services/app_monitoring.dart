@@ -253,8 +253,9 @@ class AppMonitoring {
       _sent.add(id);
       if (counted) _send('app_error', '$app/$_platform/$kind/$fp', text);
       final record = <String, Object?>{'kind': kind, 'message': text, 'screen': screen, 'ms': ?ms, 'option': cleanMessage(option), 'side': c.side, 'cause': c.cause};
-      // The screenshot of the moment, for what the person met (not for an error they may never have seen).
-      final shoot = screenshots && kind != 'error' && kind != 'crash' && (ScreenCapture.testCapture != null || _firebase);
+      // The screenshot of the moment, for what the person met (not for an error they may never have seen). A slow save and many taps
+      // are only counted, never photographed (owner, 18 Nov 2026).
+      final shoot = screenshots && !const {'error', 'crash', 'slow', 'tap'}.contains(kind) && (ScreenCapture.testCapture != null || _firebase);
       if (!shoot) {
         _problems.add(record);
         _scheduleFlush();

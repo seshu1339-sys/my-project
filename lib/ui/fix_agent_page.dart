@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/store.dart';
+import '../services/problem_shots.dart';
 import '../domain/fix_texts.dart';
 import '../domain/health_status.dart';
 import '../services/agent_log.dart';
@@ -66,8 +67,9 @@ class FixAgentData {
         final q = await db.collection('supportTickets').where('status', isEqualTo: 'sent').limit(500).get();
         final out = <String, int>{};
         for (final d in q.docs) {
+          // One ticket per problem since 18 Nov 2026: its count is how many reports wait.
           final p = '${d.data()['problemId'] ?? ''}';
-          out[p] = (out[p] ?? 0) + 1;
+          out[p] = (out[p] ?? 0) + ((d.data()['count'] as num?)?.toInt() ?? 1);
         }
         return out;
       },
@@ -83,7 +85,7 @@ class FixAgentData {
         'decidedBy': uid(),
         'decidedAt': FieldValue.serverTimestamp(),
       }),
-      shot: (caseId) async => '${(await db.collection('appShots').doc(caseId).get()).data()?['data'] ?? ''}',
+      shot: (ref) => loadProblemShot(store, ref),
     );
   }
 }
@@ -213,7 +215,7 @@ class _FixAgentState extends State<_FixAgent> {
   }
 
   Future<void> _loadShot(AppProblem p) async {
-    final s = await widget.data.shot?.call(p.lastShot);
+    final s = await widget.data.shot?.call(p.screenshots.isEmpty ? '' : p.screenshots.last);
     if (mounted) setState(() => shots[p.id] = s ?? '');
   }
 
@@ -293,14 +295,14 @@ class _FixAgentState extends State<_FixAgent> {
           ]),
           const SizedBox(height: 4),
           Text([
-            '${p.users} people, ${p.count} times',
+            '${peopleText(p.users, p.usersMore)}, ${p.count} times',
             problemKindNames[p.kind] ?? p.kind,
             problemSideNames[p.side] ?? p.side,
             if (p.devices.isNotEmpty) 'phones: ${AppProblem.topOf(p.devices)}',
             if (waiting > 0) '$waiting reports waiting for a reply',
           ].join(' · '), key: ValueKey('fix-facts-${p.id}'), style: const TextStyle(fontSize: 12)),
           SelectableText(p.message, style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black54)),
-          if (p.lastShot.isNotEmpty)
+          if (p.screenshots.isNotEmpty)
             shots[p.id] == null
                 ? TextButton.icon(key: ValueKey('fix-shot-${p.id}'), onPressed: () => _loadShot(p), icon: const Icon(Icons.image_outlined, size: 16), label: const Text('Show the automatic screenshot'))
                 : shots[p.id]!.isEmpty

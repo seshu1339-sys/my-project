@@ -9,7 +9,7 @@ import '../services/photo_compress.dart';
 
 /// "Report a problem" in the Vendor, Staff and User apps (owner spec G, 17 Nov 2026): the person writes what went wrong and may add a
 /// screenshot; it reaches the admin's App Health page (functions/modules/app-problems reportProblem) with the app, version, device and
-/// screen, and the Vendor / Staff ID when signed in. The screenshot is made small on the phone (under 400 KB) before it is sent.
+/// screen, and the Vendor / Staff ID when signed in. The screenshot is made small on the phone (about 60 KB) before it is sent; it is kept in the US bucket.
 class ReportProblemButton extends StatelessWidget {
   const ReportProblemButton({super.key, required this.store, this.asIcon = false, this.send});
   final Store store;
@@ -52,9 +52,9 @@ class _ReportProblemDialogState extends State<ReportProblemDialog> {
     try {
       final file = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (file == null) return;
-      final small = await shrinkPhotoInBackground(await file.readAsBytes());
+      final small = await shrinkProblemShotInBackground(await file.readAsBytes());
       if (small == null) return setState(() => error = 'That file is not a photo.');
-      if (small.length > 400 * 1024) return setState(() => error = 'The screenshot is too big. Try another one.');
+      if (small.length > 80 * 1024) return setState(() => error = 'The screenshot is too big. Try another one.');
       setState(() { screenshot = base64Encode(small); error = null; });
     } catch (e) {
       setState(() => error = '$e');
