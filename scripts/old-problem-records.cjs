@@ -52,7 +52,7 @@ const base = `/v1/projects/${project}/databases/(default)/documents`;
   found.who = [];
   for (const p of await list(base, 'appProblems')) found.who.push(...await list(`${base}/${rel(p.name)}`, 'who'));
   found.supportShots = await list(base, 'supportShots');
-  found.oldSupportTickets = (await list(base, 'supportTickets', ['members', 'status'])).filter(d => !d.fields?.members);
+  found.oldSupportTickets = (await list(base, 'supportTickets', ['members'])).filter(d => !d.fields?.members);
   const reports = (await list(base, 'problemReports', ['screenshotPath'])).filter(d => String(d.fields?.screenshotPath?.stringValue || '').startsWith('problemReports/'));
   let files = [];
   try {
