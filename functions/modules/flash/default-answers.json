@@ -1,0 +1,233 @@
+{
+  "_about": "The starting ready answers of the Support Team chat (owner, 18 Nov 2026: cost cuts part 4). The admin changes them in Admin > Flash > Ready answers (saved to flashAnswers/main); these are used until then. Also read by the apps as an asset (pubspec.yaml). chats: user (customers and people not registered yet), vendor, premium, provider, staff. keywords: English, Telugu and Telugu in English letters.",
+  "answers": [
+    {
+      "id": "plans",
+      "chats": ["vendor", "premium"],
+      "order": 1,
+      "active": true,
+      "question": {"en": "Plans", "te": "ప్లాన్లు"},
+      "answer": {
+        "en": "Free plan: 2 items with photos, free for life. Paid plans (Silver, Gold, Premium) give more photos, a bigger reach in km and Today's Offers boxes for the plan's full period. Open the Plans card in your app to see every plan. To start a plan, contact the LOCAMARKET office.",
+        "te": "ఉచిత ప్లాన్: ఫోటోలతో 2 వస్తువులు, ఎప్పటికీ ఉచితం. పెయిడ్ ప్లాన్లు (సిల్వర్, గోల్డ్, ప్రీమియం) ప్లాన్ కాలం మొత్తం ఎక్కువ ఫోటోలు, ఎక్కువ కి.మీ. దూరం, టుడేస్ ఆఫర్స్ బాక్సులు ఇస్తాయి. అన్ని ప్లాన్లు చూడటానికి మీ యాప్‌లో Plans కార్డ్ తెరవండి. ప్లాన్ మొదలుపెట్టడానికి LOCAMARKET ఆఫీస్‌ను సంప్రదించండి."
+      },
+      "keywords": ["plan", "plans", "silver", "gold", "free plan", "paid plan", "which plan", "ప్లాన్", "సిల్వర్", "గోల్డ్", "plannu", "plan lu", "plan enti"]
+    },
+    {
+      "id": "prices",
+      "chats": ["vendor", "premium"],
+      "order": 2,
+      "active": true,
+      "question": {"en": "Plan prices", "te": "ప్లాన్ ధరలు"},
+      "answer": {
+        "en": "The price of each plan is on the Plans card in your app, always up to date. Open Plans to see the price and the period of every plan. To start or pay for a plan, contact the LOCAMARKET office.",
+        "te": "ప్రతి ప్లాన్ ధర మీ యాప్‌లోని Plans కార్డ్‌లో ఉంటుంది, ఎప్పుడూ తాజాగా. ప్రతి ప్లాన్ ధర, కాలం చూడటానికి Plans తెరవండి. ప్లాన్ మొదలుపెట్టడానికి లేదా డబ్బు కట్టడానికి LOCAMARKET ఆఫీస్‌ను సంప్రదించండి."
+      },
+      "keywords": ["plan price", "plan prices", "plan cost", "how much is", "how much", "fee", "charges", "cost", "ప్లాన్ ధర", "ఎంత", "రుసుము", "ఛార్జీ", "entha", "dhara entha", "plan dhara"]
+    },
+    {
+      "id": "validity",
+      "chats": ["vendor", "premium"],
+      "order": 3,
+      "active": true,
+      "question": {"en": "Plan validity", "te": "ప్లాన్ ఎన్ని రోజులు?"},
+      "answer": {
+        "en": "A paid plan runs for its full period from the day your payment is confirmed. The Plans card shows your plan and the date it ends. The free plan never ends. Your shop is never hidden when a plan ends: only the extra services stop.",
+        "te": "పెయిడ్ ప్లాన్ మీ డబ్బు నిర్ధారించిన రోజు నుండి పూర్తి కాలం నడుస్తుంది. మీ ప్లాన్, అది ముగిసే తేదీ Plans కార్డ్‌లో కనిపిస్తాయి. ఉచిత ప్లాన్ ఎప్పటికీ ముగియదు. ప్లాన్ ముగిసినా మీ షాప్ కనిపిస్తూనే ఉంటుంది: అదనపు సేవలు మాత్రమే ఆగుతాయి."
+      },
+      "keywords": ["validity", "valid", "expiry", "expire", "expired", "end date", "how many days", "renew", "renewal", "చెల్లుబాటు", "గడువు", "ఎన్ని రోజులు", "ముగుస్తుంది", "ముగిసింది", "gaduvu", "enni rojulu", "ennirojulu"]
+    },
+    {
+      "id": "add_item",
+      "chats": ["vendor", "premium"],
+      "order": 4,
+      "active": true,
+      "question": {"en": "How to add an item", "te": "వస్తువు ఎలా కలపాలి?"},
+      "answer": {
+        "en": "First add your first shop photo. Then tap Add an item, choose the category and the item from the list, enter the quantity and your price, and save. A price shows for 24 hours: enter it again the next day, or tap \"Are today's rates the same?\" when nothing changed.",
+        "te": "ముందు మీ షాప్ మొదటి ఫోటో పెట్టండి. తర్వాత Add an item నొక్కి, లిస్ట్ నుండి కేటగిరీ, వస్తువు ఎంచుకుని, పరిమాణం, మీ ధర రాసి సేవ్ చేయండి. ధర 24 గంటలు కనిపిస్తుంది: మరుసటి రోజు మళ్ళీ రాయండి, లేదా ఏమీ మారకపోతే \"Are today's rates the same?\" నొక్కండి."
+      },
+      "keywords": ["add item", "add an item", "new item", "add product", "upload item", "item add", "add items", "వస్తువు", "ఐటమ్", "కలపాలి", "జోడించాలి", "item add cheyyali", "item ela"]
+    },
+    {
+      "id": "change_price",
+      "chats": ["vendor", "premium"],
+      "order": 5,
+      "active": true,
+      "question": {"en": "How to change my price", "te": "నా ధర ఎలా మార్చాలి?"},
+      "answer": {
+        "en": "You can change your prices any day in your item list. A price shows for 24 hours; enter it again the next day. If your prices are the same as yesterday, tap \"Are today's rates the same?\" and customers see today's rate tick for 24 hours.",
+        "te": "మీ ఐటమ్ లిస్ట్‌లో ఏ రోజైనా ధరలు మార్చవచ్చు. ధర 24 గంటలు కనిపిస్తుంది; మరుసటి రోజు మళ్ళీ రాయండి. ధరలు నిన్నటిలాగే ఉంటే \"Are today's rates the same?\" నొక్కండి, కస్టమర్లకు 24 గంటలు టుడేస్ రేట్ టిక్ కనిపిస్తుంది."
+      },
+      "keywords": ["change price", "update price", "my price", "price change", "edit price", "today rate", "todays rate", "rates the same", "ధర మార్చ", "రేటు మార్చ", "రేటు", "dhara marchali", "rate marchali"]
+    },
+    {
+      "id": "vendor_offers",
+      "chats": ["vendor", "premium"],
+      "order": 6,
+      "active": true,
+      "question": {"en": "Today's Offers", "te": "టుడేస్ ఆఫర్స్"},
+      "answer": {
+        "en": "Open Today's Offers, tap Choose on a box, pick one of your items (its photo shows), enter the offer price and how long (1 week to 3 months). It is live at once and marked LIVE in orange in your item list. The number of boxes depends on your plan.",
+        "te": "Today's Offers తెరిచి, ఒక బాక్స్‌పై Choose నొక్కి, మీ వస్తువు ఒకటి ఎంచుకోండి (దాని ఫోటో కనిపిస్తుంది), ఆఫర్ ధర, ఎంత కాలం (1 వారం నుండి 3 నెలలు) రాయండి. అది వెంటనే లైవ్ అవుతుంది, మీ ఐటమ్ లిస్ట్‌లో నారింజ రంగు LIVE గుర్తు వస్తుంది. బాక్సుల సంఖ్య మీ ప్లాన్‌పై ఆధారపడి ఉంటుంది."
+      },
+      "keywords": ["todays offer", "today offer", "offer box", "offers", "offer", "ఆఫర్", "ఆఫర్స్", "offer pettali"]
+    },
+    {
+      "id": "vendor_approval",
+      "chats": ["vendor"],
+      "order": 7,
+      "active": true,
+      "question": {"en": "When will my shop go live?", "te": "నా షాప్ ఎప్పుడు లైవ్ అవుతుంది?"},
+      "answer": {
+        "en": "After you register your shop with its name, phone, email and location, you get a Vendor ID such as VEN-NRPM-116-325. Your shop goes live after the admin approves it; your app shows the status.",
+        "te": "షాప్ పేరు, ఫోన్, ఈమెయిల్, లొకేషన్‌తో రిజిస్టర్ చేసిన తర్వాత VEN-NRPM-116-325 లాంటి వెండర్ ID వస్తుంది. అడ్మిన్ ఆమోదించిన తర్వాత మీ షాప్ లైవ్ అవుతుంది; స్టేటస్ మీ యాప్‌లో కనిపిస్తుంది."
+      },
+      "keywords": ["approval", "approve", "approved", "go live", "pending", "vendor id", "register", "registration", "not live", "ఆమోదం", "అప్రూవ్", "రిజిస్టర్", "లైవ్", "approve avvaledu", "live avvaledu"]
+    },
+    {
+      "id": "login",
+      "chats": ["user", "vendor", "premium", "provider", "staff"],
+      "order": 8,
+      "active": true,
+      "question": {"en": "Login problem", "te": "లాగిన్ సమస్య"},
+      "answer": {
+        "en": "Sign in with your Google account. If Google sign-in does not open, choose the email code: enter your email and type the code we send to it (look in Spam too). Use the same email you registered with.",
+        "te": "మీ Google అకౌంట్‌తో సైన్ ఇన్ చేయండి. Google సైన్ ఇన్ తెరుచుకోకపోతే ఈమెయిల్ కోడ్ ఎంచుకోండి: మీ ఈమెయిల్ రాసి, మేము పంపే కోడ్ టైప్ చేయండి (Spam లో కూడా చూడండి). రిజిస్టర్ చేసిన అదే ఈమెయిల్ వాడండి."
+      },
+      "keywords": ["login", "log in", "sign in", "signin", "otp", "email code", "code not", "cannot open", "logout", "లాగిన్", "సైన్ ఇన్", "కోడ్", "login avvatledu", "login kavatledu", "login problem"]
+    },
+    {
+      "id": "search",
+      "chats": ["user"],
+      "order": 1,
+      "active": true,
+      "question": {"en": "How to find the cheapest shop", "te": "తక్కువ ధర షాప్ ఎలా వెతకాలి?"},
+      "answer": {
+        "en": "Type an item, for example tomato, in the search box and choose it. A map shows the shops near you that sell it with their price, and a list from the lowest price to the highest with the distance. Turn on location to see how far each shop is.",
+        "te": "సెర్చ్ బాక్స్‌లో ఒక వస్తువు, ఉదాహరణకు టమాటా, టైప్ చేసి ఎంచుకోండి. అది అమ్మే దగ్గరి షాపులు ధరతో మ్యాప్‌లో, తక్కువ ధర నుండి ఎక్కువ ధర వరకు దూరంతో లిస్ట్‌లో కనిపిస్తాయి. ప్రతి షాప్ ఎంత దూరమో చూడటానికి లొకేషన్ ఆన్ చేయండి."
+      },
+      "keywords": ["search", "find", "cheapest", "lowest price", "low price", "shop near", "where to buy", "price of", "వెతక", "తక్కువ ధర", "దగ్గర షాప్", "ఎక్కడ", "ekkada", "takkuva dhara", "search ela"]
+    },
+    {
+      "id": "user_offers",
+      "chats": ["user"],
+      "order": 2,
+      "active": true,
+      "question": {"en": "Today's Offers", "te": "టుడేస్ ఆఫర్స్"},
+      "answer": {
+        "en": "Today's Offers on the home page show offer items with the offer price and the normal price. Tap one to see the shop and the way there. An offer disappears after its end time.",
+        "te": "హోమ్ పేజీలోని Today's Offers లో ఆఫర్ వస్తువులు ఆఫర్ ధర, సాధారణ ధరతో కనిపిస్తాయి. షాప్, దారి చూడటానికి ఒకదాన్ని నొక్కండి. ముగింపు సమయం తర్వాత ఆఫర్ కనిపించదు."
+      },
+      "keywords": ["todays offer", "today offer", "offers", "offer", "discount", "ఆఫర్", "ఆఫర్స్", "తగ్గింపు"]
+    },
+    {
+      "id": "user_payment",
+      "chats": ["user"],
+      "order": 3,
+      "active": true,
+      "question": {"en": "Can I pay online?", "te": "ఆన్‌లైన్‌లో డబ్బు కట్టవచ్చా?"},
+      "answer": {
+        "en": "There is no online payment for customers. Find the cheapest shop in the app, go there and buy in person.",
+        "te": "కస్టమర్లకు ఆన్‌లైన్ పేమెంట్ లేదు. యాప్‌లో తక్కువ ధర షాప్ వెతికి, అక్కడికి వెళ్ళి నేరుగా కొనండి."
+      },
+      "keywords": ["pay online", "online payment", "payment", "upi", "order online", "home delivery", "delivery", "పేమెంట్", "చెల్లింపు", "ఆన్‌లైన్", "డెలివరీ", "online lo", "delivery unda"]
+    },
+    {
+      "id": "user_location",
+      "chats": ["user"],
+      "order": 4,
+      "active": true,
+      "question": {"en": "I see no shops", "te": "షాపులు కనిపించడం లేదు"},
+      "answer": {
+        "en": "The app shows the shops within the distance LOCAMARKET sets around your place. Turn on location, or tap your place at the top and choose it again. If there is no shop near you yet, please look again later.",
+        "te": "మీ ప్రదేశం చుట్టూ LOCAMARKET పెట్టిన దూరంలోని షాపులు మాత్రమే యాప్ చూపిస్తుంది. లొకేషన్ ఆన్ చేయండి, లేదా పైన మీ ప్రదేశం నొక్కి మళ్ళీ ఎంచుకోండి. మీ దగ్గర ఇంకా షాప్ లేకపోతే తర్వాత మళ్ళీ చూడండి."
+      },
+      "keywords": ["no shops", "no shop", "location", "distance", "gps", "my place", "wrong place", "km", "లొకేషన్", "షాపులు లేవు", "కనిపించడం లేదు", "దూరం", "location on", "shops levu"]
+    },
+    {
+      "id": "user_services",
+      "chats": ["user"],
+      "order": 5,
+      "active": true,
+      "question": {"en": "Find a plumber or electrician", "te": "ప్లంబర్ / ఎలక్ట్రీషియన్ ఎలా?"},
+      "answer": {
+        "en": "Tap Services and choose a service such as Plumber. You see the providers near you with a photo, their charge per hour and a Call button.",
+        "te": "Services నొక్కి Plumber లాంటి సేవ ఎంచుకోండి. మీ దగ్గరి వారు ఫోటో, గంటకు ఛార్జీ, Call బటన్‌తో కనిపిస్తారు."
+      },
+      "keywords": ["plumber", "electrician", "carpenter", "service", "services", "repair", "worker", "ప్లంబర్", "ఎలక్ట్రీషియన్", "సర్వీస్", "రిపేర్", "pani vadu"]
+    },
+    {
+      "id": "provider_register",
+      "chats": ["provider"],
+      "order": 1,
+      "active": true,
+      "question": {"en": "How do I get listed?", "te": "నా సేవ ఎలా లిస్ట్ అవుతుంది?"},
+      "answer": {
+        "en": "Register under Services with your name, photo, mobile number, your service, your charge per hour and your location. You get a Provider ID such as SRV-NRPM-116-001. Your listing goes live after the admin checks it; then customers near you can see and call you.",
+        "te": "Services లో మీ పేరు, ఫోటో, మొబైల్ నంబర్, మీ సేవ, గంటకు ఛార్జీ, లొకేషన్‌తో రిజిస్టర్ చేయండి. SRV-NRPM-116-001 లాంటి ప్రొవైడర్ ID వస్తుంది. అడ్మిన్ చూసిన తర్వాత మీ లిస్టింగ్ లైవ్ అవుతుంది; అప్పుడు దగ్గరి కస్టమర్లు మిమ్మల్ని చూసి కాల్ చేయవచ్చు."
+      },
+      "keywords": ["register", "registration", "listing", "listed", "approval", "approve", "go live", "provider id", "రిజిస్టర్", "ఆమోదం", "లైవ్", "approve avvaledu"]
+    },
+    {
+      "id": "provider_charge",
+      "chats": ["provider"],
+      "order": 2,
+      "active": true,
+      "question": {"en": "Change my charge per hour", "te": "గంటకు ఛార్జీ మార్చాలి"},
+      "answer": {
+        "en": "You can change your charge per hour in the app at any time. Customers see the new charge at once.",
+        "te": "గంటకు మీ ఛార్జీని యాప్‌లో ఎప్పుడైనా మార్చవచ్చు. కస్టమర్లకు కొత్త ఛార్జీ వెంటనే కనిపిస్తుంది."
+      },
+      "keywords": ["charge", "per hour", "hourly", "my rate", "change rate", "change charge", "ఛార్జీ", "గంటకు", "charge marchali"]
+    },
+    {
+      "id": "staff_area",
+      "chats": ["staff"],
+      "order": 1,
+      "active": true,
+      "question": {"en": "How do I get my area?", "te": "నా ఏరియా ఎలా తీసుకోవాలి?"},
+      "answer": {
+        "en": "One area per staff member. Choose a free (green) area on the town map and register it while standing inside it with GPS on, after accepting the Terms & Conditions. It is held for you until the admin approves you.",
+        "te": "ఒక్కో స్టాఫ్‌కు ఒక ఏరియా. టౌన్ మ్యాప్‌లో ఖాళీగా ఉన్న (ఆకుపచ్చ) ఏరియా ఎంచుకుని, GPS ఆన్ చేసి ఆ ఏరియా లోపల నిలబడి, Terms & Conditions ఒప్పుకుని రిజిస్టర్ చేయండి. అడ్మిన్ ఆమోదించే వరకు అది మీ కోసం ఉంటుంది."
+      },
+      "keywords": ["area", "my area", "map", "green", "hexagon", "register area", "ఏరియా", "మ్యాప్", "area ela"]
+    },
+    {
+      "id": "staff_offers",
+      "chats": ["staff"],
+      "order": 2,
+      "active": true,
+      "question": {"en": "Add Today's Offer", "te": "టుడేస్ ఆఫర్ ఎలా పెట్టాలి?"},
+      "answer": {
+        "en": "Tap Add Today's Offer, choose a shop in your area, the item from the list (its photo comes with it), the normal price, a lower offer price and a live camera photo at the shop. It is today's rate and ends by itself at midnight.",
+        "te": "Add Today's Offer నొక్కి, మీ ఏరియాలోని షాప్, లిస్ట్ నుండి వస్తువు (దాని ఫోటోతో), సాధారణ ధర, తక్కువ ఆఫర్ ధర ఎంచుకుని, షాప్ దగ్గర లైవ్ కెమెరా ఫోటో తీయండి. ఇది ఈరోజు రేటు, అర్ధరాత్రి దానంతట అదే ముగుస్తుంది."
+      },
+      "keywords": ["todays offer", "today offer", "add offer", "offer", "offers", "ఆఫర్", "offer pettali"]
+    },
+    {
+      "id": "staff_targets",
+      "chats": ["staff"],
+      "order": 3,
+      "active": true,
+      "question": {"en": "My targets", "te": "నా టార్గెట్లు"},
+      "answer": {
+        "en": "Monthly targets: live photos, vendor registrations and paid vendor registrations (a month counts only when complete), and rate updates on at least the set number of days a week. Each rate update needs a live camera photo at the shop (within 100 m, real GPS). Your dashboard shows your progress and missed days.",
+        "te": "నెలవారీ టార్గెట్లు: లైవ్ ఫోటోలు, వెండర్ రిజిస్ట్రేషన్లు, పెయిడ్ వెండర్ రిజిస్ట్రేషన్లు (పూర్తైన నెల మాత్రమే లెక్క), వారంలో నిర్ణయించిన రోజులకు తగ్గకుండా రేటు అప్‌డేట్లు. ప్రతి రేటు అప్‌డేట్‌కు షాప్ దగ్గర (100 మీ. లోపల, నిజమైన GPS) లైవ్ కెమెరా ఫోటో కావాలి. మీ డ్యాష్‌బోర్డ్‌లో మీ ప్రోగ్రెస్, మిస్ అయిన రోజులు కనిపిస్తాయి."
+      },
+      "keywords": ["target", "targets", "progress", "missed days", "pay", "salary", "dashboard", "టార్గెట్", "జీతం", "target entha"]
+    },
+    {
+      "id": "staff_link_vendor",
+      "chats": ["staff"],
+      "order": 4,
+      "active": true,
+      "question": {"en": "Link a vendor to me", "te": "వెండర్‌ను నాకు ఎలా లింక్ చేయాలి?"},
+      "answer": {
+        "en": "Vendors register themselves in the vendor app. Enter their Vendor ID under Add within 30 minutes of their registration to link them to you. You only see their updates; you cannot change their shop, items or prices.",
+        "te": "వెండర్లు వెండర్ యాప్‌లో వాళ్ళే రిజిస్టర్ చేసుకుంటారు. వాళ్ళు రిజిస్టర్ చేసిన 30 నిమిషాల లోపు Add లో వారి వెండర్ ID రాసి మీకు లింక్ చేయండి. మీకు వారి అప్‌డేట్లు మాత్రమే కనిపిస్తాయి; వారి షాప్, వస్తువులు, ధరలు మార్చలేరు."
+      },
+      "keywords": ["link vendor", "add vendor", "vendor id", "link", "30 minutes", "వెండర్", "లింక్", "vendor link"]
+    }
+  ]
+}

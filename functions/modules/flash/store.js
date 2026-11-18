@@ -10,6 +10,13 @@
 //   flashStats/<kind>                                     {cameIn, solved, verified}; pending is cameIn - solved
 //   flashConfig/main                                      {dailyMessages, helpUser, helpVendor, helpPremium, helpProvider, helpStaff, supportPhone, supportWhatsapp}
 //   flashPublic/main                                      {supportPhone, supportWhatsapp}: the office number the Premium chat shows (signed-in read)
+//   flashAnswers/main                                     {items: [ready answers], updatedAt, updatedBy}: the ready-question buttons and the
+//                                                         stored answers (signed-in read; default-answers.json until the admin saves)
+//   flashAnswerDaily/<YYYY-MM-DD> and /<YYYY-MM>          {period, ready, free, ai, team, byChat: {<kind>: {...}}}: how chats were answered
+//                                                         (ready button, a stored answer to a typed question, AI, the team), for Health
+//
+// Cost cuts part 4 (owner, 18 Nov 2026): a typed question first gets a stored answer when its keywords match (no AI); only then AI within
+// the daily limit; after that the team ("Our team will answer you.").
 //
 // The ticket id comes from the chat, so a chat can never make two tickets. Tickets are read only to close and to triage: nothing that talks
 // to a person reads them. uid and role come from the sign-in and the server's own records, never from the request.
@@ -18,6 +25,53 @@ const {AI_MODELS, logAiCall, takeDailyUse, keyIsSet} = require('../ai-core');
 const {askFlash} = require('./answer');
 const {readTicket} = require('./triage');
 const {DEFAULT_CONFIG, cleanText, helpFor, historyFor, ticketId, ticketReply, ticketText, validId, validateConfig} = require('./rules');
+const {DEFAULT_ANSWERS, matchAnswer, replyFor, validateAnswers} = require('./answers');
+
+const IST_MS = 19800000;
+const answersRef = db => db.collection('flashAnswers').doc('main');
+let answersCache = {at: -Infinity, items: null};
+
+/// The ready answers: the admin's list (read at most every 5 minutes), else the starting list.
+async function readAnswers(db, now = Date.now()) {
+  if (answersCache.items && now - answersCache.at < 300000) return answersCache.items;
+  const items = (await answersRef(db).get()).data()?.items;
+  answersCache = {at: now, items: Array.isArray(items) ? items : DEFAULT_ANSWERS};
+  return answersCache.items;
+}
+const resetAnswersCache = () => { answersCache = {at: -Infinity, items: null}; };
+
+/// The admin saves the ready answers (checked first).
+async function saveAnswers(db, data = {}, adminUid = '', now = Date.now()) {
+  const items = validateAnswers(data.items);
+  await answersRef(db).set({items, updatedAt: Timestamp.fromMillis(now), updatedBy: adminUid});
+  answersCache = {at: now, items};
+  return {saved: items.length};
+}
+
+/// Counts how one question was answered: 'ready' (a ready button), 'free' (a stored answer to a typed question), 'ai' or 'team', for
+/// the day and the month (Indian time). Never throws: a count must not break the chat.
+async function countAnswer(db, kind, how, now = Date.now()) {
+  const day = new Date(now + IST_MS).toISOString().slice(0, 10);
+  const inc = FieldValue.increment(1);
+  try {
+    const batch = db.batch();
+    for (const period of [day, day.slice(0, 7)]) {
+      batch.set(db.collection('flashAnswerDaily').doc(period), {period, [how]: inc, byChat: {[kind]: {[how]: inc}}}, {merge: true});
+    }
+    await batch.commit();
+  } catch (error) {
+    console.warn('Flash count not saved', error.message);
+  }
+}
+
+/// A ready button was tapped: the app showed its stored answer at once; this only counts it.
+async function countReady(db, chat, data = {}, now = Date.now()) {
+  const id = typeof data.answerId === 'string' ? data.answerId : '';
+  const found = (await readAnswers(db, now)).find(a => a.id === id && a.active !== false && (a.chats || []).includes(chat.kind));
+  if (!found) throw Error('That answer was not found.');
+  await countAnswer(db, chat.kind, 'ready', now);
+  return {counted: true};
+}
 
 const configRef = db => db.collection('flashConfig').doc('main');
 const statsRef = (db, kind) => db.collection('flashStats').doc(kind);
@@ -123,12 +177,31 @@ async function sendMessage(db, client, chat, person, data = {}, now = Date.now()
     addMessage(tx, ref, 'user', text, now);
     tx.update(ref, {updatedAt: Timestamp.fromMillis(now)});
   });
-
-  const answer = await flashAnswer(db, client, chat, chatData, ref, helpFor(config, chat.helpField), now);
   const later = now + 1;
+
+  // 1. A stored answer when the keywords match (no AI). One already given in this chat is not given again.
+  const stored = matchAnswer(text, await readAnswers(db, now), chat.kind, {skip: chatData.givenAnswers || []});
+  if (stored) {
+    const reply = replyFor(stored, text);
+    const status = await db.runTransaction(async tx => {
+      const fresh = (await tx.get(ref)).data();
+      if (fresh?.status === 'open') {
+        addMessage(tx, ref, 'flash', reply, later);
+        tx.update(ref, {givenAnswers: FieldValue.arrayUnion(stored.id)});
+      }
+      return fresh?.status;
+    });
+    await countAnswer(db, chat.kind, 'free', now);
+    return {chatId: ref.id, status, reply, readyAnswer: stored.id};
+  }
+
+  // 2. AI within the daily limit; 3. else the team.
+  const answer = await flashAnswer(db, client, chat, chatData, ref, helpFor(config, chat.helpField), now);
   if (!answer || answer.needsTeam) {
+    await countAnswer(db, chat.kind, 'team', now);
     return openTicket(db, chat, ref, chatData, {summary: answer?.summary ?? '', reason: answer ? 'flash' : 'no_answer', lastText: text}, later);
   }
+  await countAnswer(db, chat.kind, 'ai', now);
   const status = await db.runTransaction(async tx => {
     const fresh = (await tx.get(ref)).data();
     if (fresh?.status === 'open') addMessage(tx, ref, 'flash', answer.reply, later);
@@ -153,6 +226,7 @@ async function markUnsolved(db, chat, uid, data = {}, now = Date.now()) {
   const {ref, data: chatData} = await ownChat(db, chat, uid, data.chatId);
   const messages = await readMessages(ref);
   const lastText = messages.filter(m => m.role === 'user').at(-1)?.text ?? '';
+  await countAnswer(db, chat.kind, 'team', now);
   return openTicket(db, chat, ref, chatData, {summary: '', reason: 'person', lastText}, now);
 }
 
@@ -209,4 +283,4 @@ async function triageTicket(db, client, id, ticket, now = Date.now()) {
   await ref.set({...(triage ?? {failed: true}), kind: ticket.kind, model: AI_MODELS.admin, at: Timestamp.fromMillis(now)});
 }
 
-module.exports = {readConfig, saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket};
+module.exports = {readAnswers, resetAnswersCache, saveAnswers, countAnswer, countReady, readConfig, saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket};

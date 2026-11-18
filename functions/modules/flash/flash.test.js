@@ -57,8 +57,9 @@ test('the vendor chat reads payments only from the payment documents, and the ot
 });
 
 test('a ticket gets the fixed 24-hour reply, in Telugu for Telugu', () => {
-  assert.match(R.ticketReply('my order is late'), /within 24 hours/);
-  assert.match(R.ticketReply('నా ఆర్డర్ రాలేదు'), /ఇరవై నాలుగు గంటల్లో/);
+  // The owner's words (18 Nov 2026), in Telugu for Telugu.
+  assert.equal(R.ticketReply('my order is late'), 'Our team will answer you.');
+  assert.equal(R.ticketReply('నా ఆర్డర్ రాలేదు'), 'మా టీమ్ మీకు సమాధానం ఇస్తుంది.');
 });
 
 test('a message must have text and not be very long', () => {
@@ -204,7 +205,7 @@ test('a live offer reaches the user chat with its end date as written', emulated
   const me = person(), ai = model(), db = getFirestore();
   const title = fresh('Diwali');
   await db.collection('vendorOffers').add({status: 'live', title, shopName: 'Lakshmi', offerPrice: 90, regularPrice: 100, endsAt: Timestamp.fromMillis(NOW + HOUR)});
-  await send(ai.client, user, me, {category: 'Offers', text: 'any offers?'});
+  await send(ai.client, user, me, {category: 'Offers', text: 'anything for me today?'});
   assert.ok(ai.calls[0].system.includes(title));
 });
 
@@ -227,9 +228,9 @@ test('the vendor Plan, Offers and Shop categories read the vendor\'s own records
   await db.collection('vendorOffers').add({vendorId: me.uid, title: 'My own offer', status: 'live', offerPrice: 50, regularPrice: 60, endsAt: Timestamp.fromMillis(NOW + HOUR)});
   await db.collection('vendorTodaysOffers').doc(me.uid).set({price: 77, hours: 24, endsAt: Timestamp.fromMillis(NOW + HOUR)});
   await db.collection('shops').doc(me.uid).set({name: 'Lakshmi Stores', category: 'Grocery', address: 'Main Road', active: true});
-  await send(ai.client, vendor, me, {category: 'Plans & prices', text: 'plan?'});
+  await send(ai.client, vendor, me, {category: 'Plans & prices', text: 'what do I have?'});
   assert.match(ai.calls[0].system, /One Year.*03\/11\/2026/);
-  await send(ai.client, vendor, me, {category: 'Offers', text: 'offers?'});
+  await send(ai.client, vendor, me, {category: 'Offers', text: 'what is running?'});
   assert.match(ai.calls[1].system, /My own offer/);
   assert.match(ai.calls[1].system, /"price":77/);
   await send(ai.client, vendor, me, {category: 'Shop', text: 'shop?'});
@@ -244,7 +245,7 @@ test('the staff chat reads the member\'s own area, target, missed days, Terms an
   await db.collection('staffAreaStaff').doc(me.uid).set({areaId: 'flashArea', month, missedThisMonth: 2});
   await db.collection('staffAreaSettings').doc('main').set({monthlyPhotoTarget: 120, rateDaysPerWeek: 5, maxMissedDays: 6});
   await db.collection('staffLinks').doc('vendor_x').set({kind: 'vendor', staffUid: me.uid});
-  await send(ai.client, staff, me, {category: 'My area', text: 'my area?'});
+  await send(ai.client, staff, me, {category: 'My area', text: 'where do I work?'});
   assert.match(ai.calls[0].system, /Main Bazaar/);
   assert.match(ai.calls[0].system, /"livePhotos":120/);
   assert.match(ai.calls[0].system, /"rateUpdateDaysAWeek":5/);
@@ -503,4 +504,65 @@ test('the service providers have their own basic chat with their own listing', e
   assert.equal(ai.calls[0].model, HAIKU);
   assert.match(ai.calls[0].system, /SRV-NRPM-116-001/);
   assert.match(ai.calls[0].system, /"chargePerHour":250/);
+});
+
+
+// Cost cuts part 4 (18 Nov 2026): ready answers first, then AI within the daily limit, then the team; counted for Health.
+const answerCounts = async () => {
+  const day = new Date(NOW + 19800000).toISOString().slice(0, 10);
+  return (await getFirestore().collection('flashAnswerDaily').doc(day).get()).data() ?? {};
+};
+
+test('a typed question with stored keywords gets the stored answer with no AI, once a chat; then AI; counted', emulated, async () => {
+  S.resetAnswersCache();
+  const me = await vendorAccount(), ai = model();
+  const before = await answerCounts();
+  const first = await send(ai.client, vendor, me, {category: 'Plans & prices', text: 'What plans are there?'});
+  assert.equal(ai.calls.length, 0, 'no AI for a stored answer');
+  assert.match(first.reply, /Free plan: 2 items/);
+  assert.equal(first.readyAnswer, 'plans');
+  assert.equal(first.status, 'open');
+  const te = await send(ai.client, vendor, me, {chatId: first.chatId, text: 'ప్లాన్ గడువు ఎన్ని రోజులు'}, NOW + 1000);
+  assert.match(te.reply, /పెయిడ్ ప్లాన్/, 'Telugu question: Telugu answer');
+  assert.equal(ai.calls.length, 0);
+  // The same answer again in this chat: the person needs more, so AI is asked.
+  await send(ai.client, vendor, me, {chatId: first.chatId, text: 'which plans again?'}, NOW + 2000);
+  assert.equal(ai.calls.length, 1);
+  const after = await answerCounts();
+  assert.equal((after.free ?? 0) - (before.free ?? 0), 2);
+  assert.equal((after.ai ?? 0) - (before.ai ?? 0), 1);
+  assert.equal((after.byChat?.vendor?.free ?? 0) - (before.byChat?.vendor?.free ?? 0), 2);
+});
+
+test('no stored answer and AI said "team": the team, with the owner\'s words; counted as team', emulated, async () => {
+  S.resetAnswersCache();
+  const before = await answerCounts();
+  const result = await send(model(TEAM).client, user, person(), {category: 'Orders', text: 'my money was taken twice'});
+  assert.equal(result.status, 'ticket');
+  assert.equal(result.reply, 'Our team will answer you.');
+  assert.equal(((await answerCounts()).team ?? 0) - (before.team ?? 0), 1);
+});
+
+test('a ready button tap is only counted; another chat\'s or a missing answer is refused', emulated, async () => {
+  S.resetAnswersCache();
+  const before = await answerCounts();
+  assert.deepEqual(await S.countReady(getFirestore(), vendor, {answerId: 'plans'}, NOW), {counted: true});
+  await assert.rejects(S.countReady(getFirestore(), user, {answerId: 'plans'}, NOW), /not found/);
+  await assert.rejects(S.countReady(getFirestore(), user, {answerId: 'nothing'}, NOW), /not found/);
+  assert.equal(((await answerCounts()).ready ?? 0) - (before.ready ?? 0), 1);
+});
+
+test('the admin\'s saved answers replace the starting ones (checked first)', emulated, async () => {
+  const db = getFirestore();
+  await assert.rejects(S.saveAnswers(db, {items: [{id: 'x', chats: [], question: {en: 'Q'}, answer: {en: 'A'}}]}, 'admin1', NOW), /at least one chat/);
+  await S.saveAnswers(db, {items: [{id: 'shop_hours', chats: ['user'], question: {en: 'Shop hours'}, answer: {en: 'Shops set their own hours.'}, keywords: ['hours', 'timing']}]}, 'admin1', NOW);
+  const ai = model();
+  const r = await send(ai.client, user, person(), {category: 'App', text: 'what is the shop timing'});
+  assert.equal(r.reply, 'Shops set their own hours.');
+  assert.equal(ai.calls.length, 0);
+  const plans = await send(ai.client, user, person(), {category: 'App', text: 'What plans are there?'});
+  assert.equal(ai.calls.length, 1, 'the starting answers are gone once the admin saved a list');
+  assert.ok(plans);
+  await db.collection('flashAnswers').doc('main').delete();
+  S.resetAnswersCache();
 });

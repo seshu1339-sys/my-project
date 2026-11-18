@@ -1,3 +1,5 @@
+import 'admin_flash_answers.dart';
+import 'flash_answers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -20,13 +22,14 @@ class AdminFlashPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
-    length: flashChats.length + 2,
+    length: flashChats.length + 3,
     child: Column(children: [
-      TabBar(isScrollable: true, tabs: [const Tab(text: 'Support Inbox'), for (final chat in flashChats) Tab(text: chat.adminTitle), const Tab(text: 'Settings')]),
+      TabBar(isScrollable: true, tabs: [const Tab(text: 'Support Inbox'), for (final chat in flashChats) Tab(text: chat.adminTitle), const Tab(text: 'Ready answers'), const Tab(text: 'Settings')]),
       Expanded(
         child: TabBarView(children: [
           _InboxTab(store: store),
           for (final chat in flashChats) _ChatTab(store: store, setup: chat),
+          _ReadyAnswersTab(store: store),
           _SettingsTab(store: store),
         ]),
       ),
@@ -112,6 +115,27 @@ class _InboxTab extends StatelessWidget {
         messagesOf: (chatId) => _messages(tickets.firstWhere((t) => t.chatId == chatId), chatId),
         onClose: (ticketId, reply) => store.call('closeFlashTicket', {'ticketId': ticketId, 'reply': reply}),
       );
+    },
+  );
+}
+
+/// The ready questions and stored answers of every chat (cost cuts part 4).
+class _ReadyAnswersTab extends StatefulWidget {
+  const _ReadyAnswersTab({required this.store});
+  final Store store;
+  @override
+  State<_ReadyAnswersTab> createState() => _ReadyAnswersTabState();
+}
+
+class _ReadyAnswersTabState extends State<_ReadyAnswersTab> {
+  late final answers = loadFlashAnswers(widget.store);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<FlashAnswer>>(
+    future: answers,
+    builder: (context, found) {
+      if (!found.hasData) return const Center(child: CircularProgressIndicator());
+      return AdminFlashAnswers(answers: found.data!, starting: defaultFlashAnswers, onSave: (data) => widget.store.call('saveFlashAnswers', data));
     },
   );
 }

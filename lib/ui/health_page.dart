@@ -152,6 +152,7 @@ class _HealthPageState extends State<HealthPage> {
             HealthAlertsSwitch(store: store),
             TopProblemsCard(store: store, openAppHealth: () => _openAppHealth(context)),
             SpentThisMonthCard(store: store),
+            SupportChatAnswersCard(store: store),
           ],
           for (final g in groups.entries) ...[
             Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 4), child: Text(g.key, style: Theme.of(context).textTheme.titleSmall)),

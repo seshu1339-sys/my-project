@@ -20,6 +20,8 @@ test('a person reads only their own chats; tickets are for the admin; only funct
       await setDoc(doc(db, 'flashTicketTriage/t1'), {urgency: 'high'});
       await setDoc(doc(db, 'flashStats/user'), {cameIn: 1});
       await setDoc(doc(db, 'flashConfig/main'), {dailyMessages: 30});
+      await setDoc(doc(db, 'flashAnswers/main'), {items: []});
+      await setDoc(doc(db, 'flashAnswerDaily/2026-11-18'), {free: 1});
       await setDoc(doc(db, '_adminSessions/admin'), {expiresAt: new Date(Date.now() + 3600000)});
     });
     const p1 = env.authenticatedContext('p1', {role: 'user', email_verified: true}).firestore();
@@ -43,7 +45,13 @@ test('a person reads only their own chats; tickets are for the admin; only funct
       await assertFails(setDoc(doc(admin, `${name}/c1`), {status: 'solved'}));
     }
 
-    for (const path of ['flashTickets/t1', 'flashTicketTriage/t1', 'flashStats/user', 'flashConfig/main']) {
+    // The ready answers: every signed-in person reads the buttons; only functions write them (cost cuts part 4).
+    await assertSucceeds(getDoc(doc(p1, 'flashAnswers/main')));
+    await assertFails(getDoc(doc(anonymous, 'flashAnswers/main')));
+    await assertFails(setDoc(doc(admin, 'flashAnswers/main'), {items: []}));
+    await assertFails(setDoc(doc(p1, 'flashAnswers/main'), {items: []}));
+
+    for (const path of ['flashTickets/t1', 'flashTicketTriage/t1', 'flashStats/user', 'flashConfig/main', 'flashAnswerDaily/2026-11-18']) {
       await assertSucceeds(getDoc(doc(admin, path)));
       await assertFails(getDoc(doc(p1, path)));
       await assertFails(getDoc(doc(p2, path)));

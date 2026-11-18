@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/store.dart';
+import 'flash_answers.dart';
 import 'flash_conversation.dart';
 import 'flash_data.dart';
 import '../../services/strings.dart';
@@ -21,6 +22,13 @@ class _FlashChatPageState extends State<FlashChatPage> {
   Store get store => widget.store;
   FlashChatSetup get setup => widget.setup;
   late final chats = store.firestore.collection(setup.collection).where('uid', isEqualTo: store.user?.uid ?? '').orderBy('updatedAt', descending: true).limit(20).snapshots();
+  // The ready-question buttons (one read when the chat opens; the starting answers in the app when the admin saved none).
+  late final answers = loadFlashAnswers(store);
+
+  /// A ready button was tapped: its answer is already shown; the server only counts it (never blocks, never fails the screen).
+  void _countReady(FlashAnswer a) {
+    store.call(setup.callable, {'action': 'ready', 'answerId': a.id}).catchError((Object _) => <String, dynamic>{});
+  }
 
   void _open({required String category, String? chatId}) => Navigator.of(context).push(
     MaterialPageRoute<void>(builder: (_) => FlashConversationPage(store: store, setup: setup, category: category, chatId: chatId)),
@@ -36,6 +44,10 @@ class _FlashChatPageState extends State<FlashChatPage> {
         if (!found.hasData) return const Center(child: CircularProgressIndicator());
         return FlashChatListView(
           top: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            FutureBuilder<List<FlashAnswer>>(
+              future: answers,
+              builder: (context, ready) => FlashReadyAnswers(answers: readyFor(setup.kind, ready.data ?? const []), language: store.language, onTap: _countReady),
+            ),
             if (setup.officeContact) FlashOfficeContact(store: store),
             // Vendors and providers may ask to be connected to the staff of their area; the admin chooses who (no staff ID needed).
             if (const {'vendor', 'premium', 'provider'}.contains(setup.kind)) LocalStaffRequestButton(store: store),

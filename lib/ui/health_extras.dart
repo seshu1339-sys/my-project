@@ -271,3 +271,57 @@ class _SpentThisMonthCardState extends State<SpentThisMonthCard> {
     },
   );
 }
+
+
+/// How the Support Team chats were answered (owner, 18 Nov 2026: cost cuts part 4), today and this month: a ready button or a stored
+/// answer (free, no AI), AI, or sent to the team. From flashAnswerDaily/<day> and /<month> (functions/modules/flash/store.js).
+class SupportChatAnswersCard extends StatefulWidget {
+  const SupportChatAnswersCard({super.key, required this.store, this.load});
+  final Store store;
+
+  /// Test seam: (today, this month).
+  final Future<(Map<String, dynamic>?, Map<String, dynamic>?)> Function()? load;
+  @override
+  State<SupportChatAnswersCard> createState() => _SupportChatAnswersCardState();
+}
+
+class _SupportChatAnswersCardState extends State<SupportChatAnswersCard> {
+  late final data = (widget.load ?? _live)();
+
+  Future<(Map<String, dynamic>?, Map<String, dynamic>?)> _live() async {
+    if (!widget.store.live) return (null, null);
+    final day = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30)).toIso8601String().substring(0, 10);
+    final db = widget.store.firestore;
+    final r = await Future.wait([db.collection('flashAnswerDaily').doc(day).get(), db.collection('flashAnswerDaily').doc(day.substring(0, 7)).get()]);
+    return (r[0].data(), r[1].data());
+  }
+
+  static int _n(Map<String, dynamic>? d, String k) => (d?[k] as num?)?.toInt() ?? 0;
+
+  Widget _line(String when, Map<String, dynamic>? d, String key) {
+    final free = _n(d, 'ready') + _n(d, 'free'), ai = _n(d, 'ai'), team = _n(d, 'team');
+    final all = free + ai + team;
+    final share = all == 0 ? '' : ' (${(free * 100 / all).round()}% free)';
+    return Text('$when: $free free (${_n(d, 'ready')} ready buttons, ${_n(d, 'free')} typed) · $ai by AI · $team to the team$share', key: ValueKey(key));
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<(Map<String, dynamic>?, Map<String, dynamic>?)>(
+    future: data,
+    builder: (context, snap) {
+      final (today, month) = snap.data ?? (null, null);
+      return Card(
+        key: const ValueKey('health-chat-answers'),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Support chat answers', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            _line('Today', today, 'health-chat-today'),
+            _line('This month', month, 'health-chat-month'),
+          ]),
+        ),
+      );
+    },
+  );
+}

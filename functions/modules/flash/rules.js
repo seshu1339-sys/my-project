@@ -46,9 +46,10 @@ const DEFAULT_HELP = {
 const helpFor = (config, field) => (typeof config?.[field] === 'string' && config[field].trim() ? config[field] : DEFAULT_HELP[field] || '');
 const ID = /^[a-zA-Z0-9_-]{1,160}$/;
 
-// The promise made when a ticket opens. The server writes it, so AI can never change or skip it.
-const TICKET_REPLY = 'Your problem has reached our team. It will be resolved within 24 hours.';
-const TICKET_REPLY_TELUGU = 'మీ సమస్య మా టీమ్‌కు చేరింది. ఇరవై నాలుగు గంటల్లో పరిష్కారం అవుతుంది.';
+// The words when a chat goes to the team (owner, 18 Nov 2026: "Our team will answer you."). The server writes them, so AI can never
+// change or skip them.
+const TICKET_REPLY = 'Our team will answer you.';
+const TICKET_REPLY_TELUGU = 'మా టీమ్ మీకు సమాధానం ఇస్తుంది.';
 
 const ticketReply = text => /[ఀ-౿]/.test(text) ? TICKET_REPLY_TELUGU : TICKET_REPLY;
 const validId = id => typeof id === 'string' && ID.test(id);

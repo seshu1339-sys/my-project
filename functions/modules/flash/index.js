@@ -8,13 +8,15 @@ const {requireRole, isAdminToken, loginEmail} = require('../../role-auth');
 //   closeFlashTicket                                   admin     -> answers the person and closes the ticket
 //   verifyFlashChat                                    admin     -> marks a chat Flash solved as checked
 //   saveFlashConfig                                    admin     -> daily limit and what Flash knows about each app
+//   saveFlashAnswers                                   admin     -> the ready questions and their stored answers (no AI)
+//   (each chat endpoint also takes {action: 'ready', answerId}: a ready button was tapped, only counted)
 //   triageFlashTicket                                  trigger   -> Sonnet reads one new ticket and suggests; it changes nothing
 const {onCall, HttpsError} = require('firebase-functions/v2/https');
 const {onDocumentCreated} = require('firebase-functions/v2/firestore');
 const {getFirestore} = require('firebase-admin/firestore');
 const {requireAdminSession} = require('../../admin-session');
 const {anthropic, anthropicKey, loadAiKey} = require('../ai-core');
-const {saveConfig, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket} = require('./store');
+const {saveConfig, saveAnswers, countReady, sendMessage, markSolved, markUnsolved, closeTicket, verifyChat, triageTicket} = require('./store');
 
 const chats = {user: require('./user/chat'), vendor: require('./vendor/chat'), premium: require('./premium/chat'), provider: require('./provider/chat'), staff: require('./staff/chat')};
 const options = {region: 'us-central1', maxInstances: 10, invoker: 'public'};
@@ -39,6 +41,7 @@ const chatEndpoint = (chat, roles) => onCall({...options, secrets: [anthropicKey
   try {
     if (data.action === 'solved') return await markSolved(db, chat, uid, data);
     if (data.action === 'unsolved') return await markUnsolved(db, chat, uid, data);
+    if (data.action === 'ready') return await countReady(db, chat, data);
     await loadAiKey(db);
     return await sendMessage(db, anthropic, chat, {uid, email: loginEmail(request) ?? ''}, data);
   } catch (error) { return fail(error); }
@@ -61,6 +64,10 @@ exports.verifyFlashChat = onCall(options, async request => {
 exports.saveFlashConfig = onCall(options, async request => {
   await requireAdmin(request);
   try { return await saveConfig(getFirestore(), request.data || {}); } catch (error) { return fail(error); }
+});
+exports.saveFlashAnswers = onCall(options, async request => {
+  const uid = await requireAdmin(request);
+  try { return await saveAnswers(getFirestore(), request.data || {}, uid); } catch (error) { return fail(error); }
 });
 exports.triageFlashTicket = onDocumentCreated({document: 'flashTickets/{ticketId}', region: 'asia-south1', maxInstances: 3, secrets: [anthropicKey], timeoutSeconds: 120}, async event => {
   await loadAiKey(getFirestore());

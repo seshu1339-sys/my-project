@@ -554,6 +554,10 @@ service cloud.firestore {
       }
     }
     // The office phone / WhatsApp the Premium vendors' chat shows (written by saveFlashConfig).
+    // Ready answers of the Support Team chat (cost cuts part 4): every signed-in person reads the buttons; only functions write.
+    match /flashAnswers/{id} { allow read: if signedIn(); allow write: if false; }
+    // How chats were answered (ready button / stored answer / AI / team), for the admin's Health page.
+    match /flashAnswerDaily/{id} { allow read: if admin(); allow write: if false; }
     match /flashPublic/{id} {
       allow read: if signedIn();
       allow write: if false;

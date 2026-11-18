@@ -102,6 +102,8 @@ flutter:
   # assets/services/ are kept on disk as full-quality backups only and are
   # deliberately NOT listed here, so they're never bundled into the app.
   assets:
+    # The Support Team chat's starting ready answers: the same file the server uses (cost cuts part 4).
+    - functions/modules/flash/default-answers.json
     - assets/services/services_list.json
     - assets/services/plumber.webp
     - assets/services/electrician.webp
