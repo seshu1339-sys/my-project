@@ -1,5 +1,7 @@
 'use strict';
 // Photo search: describeImageForSearch  signed-in user -> a few search words for the product in the picture.
+// Since 18 Nov 2026 only when the admin switched on "Camera search may use AI" (settings/cameraSearch.aiAllowed); the app first names
+// the photo on the phone with ML Kit (lib/domain/camera_search.dart) and calls this only when those names matched nothing.
 // Uses the same Anthropic key as the Flash chat (ANTHROPIC_API_KEY) and the photo search model (functions/ai-models.js). Nothing is stored.
 // Each signed-in person has a daily allowance (settings/business.photoSearchesPerDay, 10 when not set; the admin changes it in Business
 // Profile). Past it the app says "try again tomorrow" and Anthropic is not called.
@@ -66,6 +68,11 @@ async function takePhotoSearch(db, uid, now = Date.now()) {
   return limit;
 }
 
+/// settings/cameraSearch.aiAllowed: off unless the admin switched it on.
+async function cameraAiAllowed(db) {
+  return (await db.collection('settings').doc('cameraSearch').get()).data()?.aiAllowed === true;
+}
+
 let client, clientKey = '';
 /// The Anthropic client with the key in use (the admin's key, else the secret: functions/ai-key.js), made on first use.
 function anthropic() {
@@ -85,6 +92,8 @@ exports.describeImageForSearch = onCall({region: 'us-central1', maxInstances: 5,
   const type = imageType(image);
   if (!type) throw new HttpsError('invalid-argument', 'Use a JPEG, PNG or WebP photo.');
   const db = getFirestore();
+  // Camera search runs on the phone (ML Kit, free). AI only when the admin switched on "Camera search may use AI" (cost cuts, 18 Nov 2026).
+  if (!(await cameraAiAllowed(db))) throw new HttpsError('failed-precondition', 'Photo search is not available. Please type your search.');
   if (!(await loadAiKey(db))) throw new HttpsError('failed-precondition', 'Photo search is not set up yet.');
   await takePhotoSearch(db, request.auth.uid);
   let response;
@@ -112,4 +121,4 @@ exports.describeImageForSearch = onCall({region: 'us-central1', maxInstances: 5,
   } catch (error) { console.warn('AI call not logged', error.message); }
   return {query: cleanQuery(text)};
 });
-exports._test = {imageType, cleanQuery, photoSearchLimit, takePhotoSearch, DEFAULT_PHOTO_SEARCHES_PER_DAY};
+exports._test = {cameraAiAllowed, imageType, cleanQuery, photoSearchLimit, takePhotoSearch, DEFAULT_PHOTO_SEARCHES_PER_DAY};

@@ -26,6 +26,8 @@ const CLIENT_EVENTS = {
   offer_click: {}, transport_click: {}, screen_view: {}, button: {}, notification_open: {},
   // the admin's Setup check (lib/services/app_monitoring.dart): key <app>/<platform>/<speed group> and <app>/<platform>/<crash|error>/<id>
   app_start: {}, app_error: {},
+  // camera search (lib/domain/camera_search.dart): key <label>|<what opened>; only counts, never the photo
+  camera_label: {},
 };
 /// Counted by the server only (an app cannot send these).
 const SERVER_EVENTS = ['vendor_register', 'item_added', 'price_changed', 'ad_interest', 'staff_added'];

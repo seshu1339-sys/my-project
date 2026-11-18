@@ -95,3 +95,10 @@ test('the people report says who an account is: email, name and kind', {skip: !p
   const fns = require('./index');
   await assert.rejects(() => fns.accountLabels.run({auth: {uid: 'x', token: {role: 'user', email_verified: true}}, data: {uids: ['labCustomer']}}), /Administrator/);
 });
+
+test('camera search counts: label|what opened is kept as a count, nothing else (cost cuts part 1)', () => {
+  const batch = normalizeUsageBatch({deviceId: D, app: 'customer', platform: 'android', events: [
+    {event: 'camera_label', key: 'vegetable|category:cat-vegetables', label: 'vegetable|category:cat-vegetables', photo: 'AAAA'},
+  ]});
+  assert.deepEqual(batch.events, [{event: 'camera_label', key: 'vegetable|category:cat-vegetables', label: 'vegetable|category:cat-vegetables', town: ''}]);
+});

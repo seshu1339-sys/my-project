@@ -95,6 +95,7 @@ final adminGroups = <AdminGroup>[
     const AdminItem('designHistory', 'Design history', Icons.history),
     const AdminItem('androidHome', 'Android App', Icons.phone_android_outlined),
     const AdminItem('areaNames', 'Area names', Icons.place_outlined),
+    const AdminItem('cameraSearch', 'Camera search', Icons.camera_alt_outlined),
     const AdminItem('samples', 'Sample data', Icons.science_outlined),
     const AdminItem('aiProvider', 'AI provider & usage', Icons.key_outlined),
     const AdminItem('agentLog', 'Agent log', Icons.receipt_long_outlined),

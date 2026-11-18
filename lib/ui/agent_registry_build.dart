@@ -25,7 +25,7 @@ const _staffPages = {
 };
 const _userPages = {
   'androidHome', 'homeOffers', 'homePromo', 'homeFresh', 'scrollingText', 'ads', 'rightBoxes', 'categories', 'services', 'serviceProviders',
-  'module-transport', 'areaNames', 'settings', 'theme', 'animations', 'layout', 'tab:Orders', 'tab:Complaints', 'tab:Support Team chat',
+  'module-transport', 'areaNames', 'cameraSearch', 'settings', 'theme', 'animations', 'layout', 'tab:Orders', 'tab:Complaints', 'tab:Support Team chat',
   'ratings', 'tab:Promotions', 'tab:Vendor Offers', 'productImageLibrary',
 };
 const _androidOnly = {'androidHome'};

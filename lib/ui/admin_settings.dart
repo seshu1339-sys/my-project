@@ -19,6 +19,7 @@ import 'health_marks.dart';
 import 'health_page.dart';
 import 'admin_android_home.dart';
 import 'admin_area_names.dart';
+import 'admin_camera_search.dart';
 import 'admin_city_codes.dart';
 import 'admin_home_sections.dart';
 import 'admin_right_boxes.dart';
@@ -65,6 +66,7 @@ final _sections = <_SettingsSection>[
   _SettingsSection('locations', 'Quick Add locations', Icons.place_outlined, 'Extra places for Quick Add (towns come from the pincode list)'),
   _SettingsSection('samples', 'Sample data', Icons.science_outlined, 'Records labelled SAMPLE, and the button that deletes them all'),
   _SettingsSection('areaNames', 'Area names', Icons.place_outlined, 'Fix or stop the area names customers see (Kancharapalem S.O → Kancharapalem)'),
+  _SettingsSection('cameraSearch', 'Camera search', Icons.camera_alt_outlined, 'What a camera photo opens (labels → category), and whether AI may help'),
   // Each home module (Transport, ...) that has an admin section brings its own; see lib/modules/module_admin.dart.
   for (final section in moduleAdminSections) _SettingsSection('module-${section.id}', section.title, section.icon, section.hint),
   // The admin's AI assistant (Claude Sonnet 5.5, functions/modules/admin-assistant): last, so the numbers of the others stay the same.
@@ -241,6 +243,8 @@ Widget adminSettingsContent(Store store, String key) {
         return AdminCityCodesPage(store: store);
       case 'areaNames':
         return AdminAreaNamesPage(store: store);
+      case 'cameraSearch':
+        return ScreenView('admin_camera_search', child: AdminCameraSearchPage(store: store));
       case 'samples':
         return ScreenView('admin_samples', child: AdminNeedsFirebase(store: store, child: AdminSamplesPage(store: store)));
       case 'rightBoxes':

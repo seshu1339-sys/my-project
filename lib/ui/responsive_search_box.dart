@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../domain/catalog.dart';
@@ -120,6 +121,8 @@ class ResponsiveSearchBox extends StatelessWidget {
                 },
                 tint('micIconColor', AppTokens.accentOrange),
               ),
+              // Camera search reads the photo on the phone (ML Kit): the app only, never the website (owner, 18 Nov 2026).
+              if (!kIsWeb) ...[
               SizedBox(width: gap),
               icon(
                 'Camera search'.tr(context),
@@ -131,6 +134,7 @@ class ResponsiveSearchBox extends StatelessWidget {
                 },
                 tint('cameraIconColor', AppTokens.accentOrange),
               ),
+              ],
             ],
           ),
         ),

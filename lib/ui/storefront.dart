@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' show Position;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/store.dart';
+import '../domain/camera_search.dart';
+import '../services/camera_labeler.dart';
 import '../services/first_location.dart';
 import '../services/place_resolver.dart';
 import '../services/search.dart';
@@ -14,6 +17,7 @@ import '../services/search_providers.dart';
 import 'account.dart';
 import 'android_layout.dart';
 import 'details.dart';
+import 'item_shops_page.dart' show openItemShops;
 import 'location_picker_dialog.dart';
 import 'shared.dart';
 import 'wireframe_home.dart';
@@ -31,9 +35,17 @@ class Storefront extends StatefulWidget {
       image: CloudImageSearch(),
     ),
     this.firstPosition,
+    this.cameraLabeler = labelPhotoOnPhone,
+    this.takePhoto,
   });
   final Store store;
   final SmartSearch searchService;
+
+  /// Camera search: names what is in a photo on the phone (ML Kit, lib/services/camera_labeler.dart); replaced in tests.
+  final CameraLabeler cameraLabeler;
+
+  /// Takes the photo and gives its file path, or null when the person cancels (the phone's camera by default); replaced in tests.
+  final Future<String?> Function()? takePhoto;
 
   /// The first open's location question and position ([positionWithPermission] by default); replaced in tests.
   final Future<Position?> Function()? firstPosition;
@@ -51,42 +63,17 @@ class _StorefrontState extends State<Storefront> {
   Timer? timer;
   Store get store => widget.store;
   Future<void> assistedSearch(bool useImage) async {
+    if (useImage) return cameraSearch();
     try {
-      String query;
-      if (useImage) {
-        final provider = widget.searchService.image;
-        if (provider == null) {
-          throw StateError(
-            'Image search provider is not connected yet. Please type your search.',
-          );
-        }
-        if (FirebaseAuth.instance.currentUser == null) {
-          throw StateError('Please sign in to search by photo.');
-        }
-        final file = await ImagePicker().pickImage(
-          source: isAndroidApp() ? ImageSource.camera : ImageSource.gallery,
-          maxWidth: 1024,
-          imageQuality: 70,
+      final provider = widget.searchService.voice;
+      if (provider == null) {
+        throw StateError(
+          'Voice search provider is not connected yet. Please type your search.',
         );
-        if (file == null) {
-          return;
-        }
-        final bytes = await file.readAsBytes();
-        if (bytes.length > 5 * 1024 * 1024) {
-          throw StateError('Choose an image smaller than 5 MB.');
-        }
-        query = await provider.describe(bytes);
-      } else {
-        final provider = widget.searchService.voice;
-        if (provider == null) {
-          throw StateError(
-            'Voice search provider is not connected yet. Please type your search.',
-          );
-        }
-        // The phone's own recogniser listens in the app's language (Telugu or English); no server, no AI cost.
-        final voice = provider is DeviceVoiceSearch && provider.localeId == null ? DeviceVoiceSearch(localeId: voiceLocaleFor(store.language)) : provider;
-        query = await voice.transcribe();
       }
+      // The phone's own recogniser listens in the app's language (Telugu or English); no server, no AI cost.
+      final voice = provider is DeviceVoiceSearch && provider.localeId == null ? DeviceVoiceSearch(localeId: voiceLocaleFor(store.language)) : provider;
+      final query = await voice.transcribe();
       if (mounted) {
         setState(() => search.text = query);
       }
@@ -95,6 +82,111 @@ class _StorefrontState extends State<Storefront> {
         message(context, e);
       }
     }
+  }
+
+  Future<String?> _takePhoto() async {
+    final file = await ImagePicker().pickImage(
+      source: isAndroidApp() ? ImageSource.camera : ImageSource.gallery,
+      maxWidth: 1024,
+      imageQuality: 70,
+    );
+    return file?.path;
+  }
+
+  /// Camera search (cost cuts part 1): the phone names the photo (ML Kit, free, the photo never leaves the phone), then one item's
+  /// shops open, else a category, else every category button shows. AI only when the admin allows it and the names matched nothing.
+  Future<void> cameraSearch() async {
+    if (kIsWeb) return; // the website has no camera search (owner, 18 Nov 2026)
+    final String? path;
+    try {
+      path = await (widget.takePhoto ?? _takePhoto)();
+    } catch (e) {
+      if (mounted) message(context, 'The camera could not open. Please type your search.');
+      return;
+    }
+    if (path == null || !mounted) return;
+    List<CameraLabel> labels;
+    try {
+      labels = await widget.cameraLabeler(path);
+    } catch (_) {
+      labels = const [];
+    }
+    if (!mounted) return;
+    final settings = cameraSettingsOf(store.entries('settings'));
+    final match = matchCameraLabels(
+      labels,
+      rows: cameraRowsOf(settings),
+      items: store.entries('productImageLibrary'),
+      categories: store.entries('categories'),
+    );
+    final top = labels.isEmpty ? '' : labels.first.text;
+    void count(String label, String opened) => Usage.track('camera_label', key: cameraUsageKey(label, opened), label: cameraUsageKey(label, opened));
+    switch (match.kind) {
+      case CameraMatchKind.item:
+        count(match.label, 'item:${match.itemName}');
+        openItemShops(context, store, name: match.itemName, libraryItemId: match.itemId, openItem: (entry) => open(ProductPage(store: store, entry: entry)));
+      case CameraMatchKind.category:
+        count(match.label, 'category:${match.categoryId}');
+        openCategory(match.categoryId);
+      case CameraMatchKind.none:
+        if (cameraAiAllowed(settings) && await _aiCameraSearch(path)) {
+          count(top, 'ai');
+          return;
+        }
+        if (mounted) await _chooseCategory(top, count);
+    }
+  }
+
+  /// The admin's "Camera search may use AI" is on and the phone's names matched nothing: the old photo search (functions/
+  /// image-search.js, inside the daily AI limit). False when it gave nothing, so the category buttons show.
+  Future<bool> _aiCameraSearch(String path) async {
+    final provider = widget.searchService.image;
+    if (provider == null || FirebaseAuth.instance.currentUser == null) return false;
+    try {
+      final bytes = await XFile(path).readAsBytes();
+      if (bytes.length > 5 * 1024 * 1024) return false;
+      final query = await provider.describe(bytes);
+      if (mounted) setState(() => search.text = query);
+      return query.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Nothing matched: every category as a button.
+  Future<void> _chooseCategory(String label, void Function(String label, String opened) count) async {
+    final categories = [for (final c in store.entries('categories')) if (c.data['active'] != false && c.text('parentId').isEmpty && c.text('name').isNotEmpty) c];
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => SafeArea(
+        child: SingleChildScrollView(
+          key: const ValueKey('camera-categories'),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('What are you looking for?'.tr(sheet), style: Theme.of(sheet).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final c in categories)
+                    ActionChip(key: ValueKey('camera-category-${c.id}'), label: Text(c.text('name')), onPressed: () => Navigator.pop(sheet, c.id)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (chosen == null) {
+      count(label, 'none');
+      return;
+    }
+    count(label, 'chose:$chosen');
+    if (mounted) openCategory(chosen);
   }
 
   bool _resolvingPlace = false;

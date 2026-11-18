@@ -74,6 +74,7 @@ const adminRoutes = <AdminRoute>[
   AdminRoute('designHistory', 'డిజైన్ చరిత్ర', ['design history', 'undo', 'అన్‌డూ', 'changes']),
   AdminRoute('androidHome', 'ఆండ్రాయిడ్ యాప్', ['android', 'app']),
   AdminRoute('areaNames', 'ఏరియా పేర్లు', ['area names', 'place names', 'ప్రదేశాల పేర్లు']),
+  AdminRoute('cameraSearch', 'కెమెరా సెర్చ్', ['camera search', 'photo search', 'camera labels', 'ఫోటో సెర్చ్', 'కెమెరా']),
   AdminRoute('samples', 'శాంపిల్ డేటా', ['sample', 'demo']),
   AdminRoute('aiProvider', 'AI కీ, వినియోగం', ['ai key', 'api key', 'కీ', 'provider', 'ai usage', 'ai explain', 'claude']),
   AdminRoute('agentLog', 'ఏజెంట్ లాగ్', ['agent log', 'log', 'లాగ్', 'history', 'చరిత్ర', 'who did']),
